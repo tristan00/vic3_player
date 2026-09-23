@@ -107,7 +107,7 @@ def entity(name,columns,scope='public'):
 
 
 def subject(name,owner,columns,scope='public'):
-    TABLES.append(Table(name,'subject',owner,[],columns,scope))
+    TABLES.append(Table(name,'child' if scope=='player' else 'subject',owner,[],columns,scope))
 
 
 def private(owner,columns):

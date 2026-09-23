@@ -1938,14 +1938,17 @@ create table diplomatic_catalyst_private (
   run_id int4 not null,
   diplomatic_catalyst int4 not null,
   seq int4 not null,
+  present bool not null,
   country int4,
   target_country int4,
-  date game_hours not null,
+  date game_hours,
   primary key (run_id, diplomatic_catalyst, seq),
   foreign key (run_id, diplomatic_catalyst) references diplomatic_catalyst,
   foreign key (run_id, seq) references snapshot,
   foreign key (run_id, country) references country,
-  foreign key (run_id, target_country) references country
+  foreign key (run_id, target_country) references country,
+  check (present = (num_nulls(date) = 0)),
+  check (present or num_nonnulls(country, target_country, date) = 0)
 );
 
 create table diplomatic_action_history (
@@ -2139,10 +2142,13 @@ create table state_private (
   run_id int4 not null,
   state int4 not null,
   seq int4 not null,
-  wage float8 not null,
+  present bool not null,
+  wage float8,
   primary key (run_id, state, seq),
   foreign key (run_id, state) references state,
-  foreign key (run_id, seq) references snapshot
+  foreign key (run_id, seq) references snapshot,
+  check (present = (num_nulls(wage) = 0)),
+  check (present or num_nonnulls(wage) = 0)
 );
 
 create table state_timed_modifier (
@@ -2589,13 +2595,16 @@ create table building_private (
   run_id int4 not null,
   building int4 not null,
   seq int4 not null,
-  auto_expand bool not null,
-  output_paused bool not null,
-  monopoly bool not null,
-  privatizable bool not null,
+  present bool not null,
+  auto_expand bool,
+  output_paused bool,
+  monopoly bool,
+  privatizable bool,
   primary key (run_id, building, seq),
   foreign key (run_id, building) references building,
-  foreign key (run_id, seq) references snapshot
+  foreign key (run_id, seq) references snapshot,
+  check (present = (num_nulls(auto_expand, output_paused, monopoly, privatizable) = 0)),
+  check (present or num_nonnulls(auto_expand, output_paused, monopoly, privatizable) = 0)
 );
 
 create table building_flow (
@@ -2855,10 +2864,13 @@ create table charter_private (
   run_id int4 not null,
   charter int4 not null,
   seq int4 not null,
-  unlock game_hours not null,
+  present bool not null,
+  unlock game_hours,
   primary key (run_id, charter, seq),
   foreign key (run_id, charter) references charter,
-  foreign key (run_id, seq) references snapshot
+  foreign key (run_id, seq) references snapshot,
+  check (present = (num_nulls(unlock) = 0)),
+  check (present or num_nonnulls(unlock) = 0)
 );
 
 create table hq_history (
@@ -2879,13 +2891,16 @@ create table hq_private (
   run_id int4 not null,
   hq int4 not null,
   seq int4 not null,
-  hq_type int2 not null,
+  present bool not null,
+  hq_type int2,
   hq_region int2,
   primary key (run_id, hq, seq),
   foreign key (run_id, hq) references hq,
   foreign key (run_id, seq) references snapshot,
   foreign key (hq_type) references hq_type,
-  foreign key (hq_region) references strategic_region
+  foreign key (hq_region) references strategic_region,
+  check (present = (num_nulls(hq_type) = 0)),
+  check (present or num_nonnulls(hq_type, hq_region) = 0)
 );
 
 create table shipping_lane_history (
@@ -3050,16 +3065,19 @@ create table interest_group_private (
   run_id int4 not null,
   interest_group int4 not null,
   seq int4 not null,
-  civil_war_side int2 not null,
+  present bool not null,
+  civil_war_side int2,
   party_to_join int4,
-  wants_to_leave_party bool not null,
+  wants_to_leave_party bool,
   amenability float8,
-  negotiated bool not null,
+  negotiated bool,
   primary key (run_id, interest_group, seq),
   foreign key (run_id, interest_group) references interest_group,
   foreign key (run_id, seq) references snapshot,
   foreign key (civil_war_side) references civil_war_side,
-  foreign key (run_id, party_to_join) references party
+  foreign key (run_id, party_to_join) references party,
+  check (present = (num_nulls(civil_war_side, wants_to_leave_party, negotiated) = 0)),
+  check (present or num_nonnulls(civil_war_side, party_to_join, wants_to_leave_party, amenability, negotiated) = 0)
 );
 
 create table interest_group_stats (
@@ -3256,7 +3274,8 @@ create table law_private (
   run_id int4 not null,
   law int4 not null,
   seq int4 not null,
-  checkpoint_result int2 not null,
+  present bool not null,
+  checkpoint_result int2,
   replacing_law_type int2,
   enactment_start_date game_hours,
   chance float8,
@@ -3264,7 +3283,9 @@ create table law_private (
   foreign key (run_id, law) references law,
   foreign key (run_id, seq) references snapshot,
   foreign key (checkpoint_result) references law_checkpoint_result,
-  foreign key (replacing_law_type) references law_type
+  foreign key (replacing_law_type) references law_type,
+  check (present = (num_nulls(checkpoint_result) = 0)),
+  check (present or num_nonnulls(checkpoint_result, replacing_law_type, enactment_start_date, chance) = 0)
 );
 
 create table law_amendment (
@@ -3320,12 +3341,15 @@ create table party_private (
   run_id int4 not null,
   party int4 not null,
   seq int4 not null,
-  num_voters int4 not null,
+  present bool not null,
+  num_voters int4,
   leader int4,
   primary key (run_id, party, seq),
   foreign key (run_id, party) references party,
   foreign key (run_id, seq) references snapshot,
-  foreign key (run_id, leader) references character
+  foreign key (run_id, leader) references character,
+  check (present = (num_nulls(num_voters) = 0)),
+  check (present or num_nonnulls(num_voters, leader) = 0)
 );
 
 create table party_member (
@@ -3399,11 +3423,14 @@ create table institution_private (
   run_id int4 not null,
   institution int4 not null,
   seq int4 not null,
-  target_investment int2 not null,
-  growth float8 not null,
+  present bool not null,
+  target_investment int2,
+  growth float8,
   primary key (run_id, institution, seq),
   foreign key (run_id, institution) references institution,
-  foreign key (run_id, seq) references snapshot
+  foreign key (run_id, seq) references snapshot,
+  check (present = (num_nulls(target_investment, growth) = 0)),
+  check (present or num_nonnulls(target_investment, growth) = 0)
 );
 
 create table political_lobby_history (
@@ -3529,11 +3556,14 @@ create table character_private (
   run_id int4 not null,
   character int4 not null,
   seq int4 not null,
-  loyalty int2 not null,
-  recruitable bool not null,
+  present bool not null,
+  loyalty int2,
+  recruitable bool,
   primary key (run_id, character, seq),
   foreign key (run_id, character) references character,
-  foreign key (run_id, seq) references snapshot
+  foreign key (run_id, seq) references snapshot,
+  check (present = (num_nulls(loyalty, recruitable) = 0)),
+  check (present or num_nonnulls(loyalty, recruitable) = 0)
 );
 
 create table character_status (
@@ -3702,23 +3732,26 @@ create table formation_private (
   run_id int4 not null,
   formation int4 not null,
   seq int4 not null,
-  home_hq int4 not null,
+  present bool not null,
+  home_hq int4,
   strategic_objective int4,
-  travel_distance float8 not null,
-  default_fleet bool not null,
-  demobilizing bool not null,
-  invading bool not null,
-  embarked bool not null,
-  docked bool not null,
-  recalled bool not null,
-  hit_points_percent float8 not null,
-  deployable bool not null,
-  display_name text not null,
+  travel_distance float8,
+  default_fleet bool,
+  demobilizing bool,
+  invading bool,
+  embarked bool,
+  docked bool,
+  recalled bool,
+  hit_points_percent float8,
+  deployable bool,
+  display_name text,
   primary key (run_id, formation, seq),
   foreign key (run_id, formation) references formation,
   foreign key (run_id, seq) references snapshot,
   foreign key (run_id, home_hq) references hq,
-  foreign key (run_id, strategic_objective) references state
+  foreign key (run_id, strategic_objective) references state,
+  check (present = (num_nulls(home_hq, travel_distance, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name) = 0)),
+  check (present or num_nonnulls(home_hq, strategic_objective, travel_distance, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name) = 0)
 );
 
 create table formation_mobilization_option (
@@ -3862,11 +3895,14 @@ create table ship_template_private (
   run_id int4 not null,
   ship_template int4 not null,
   seq int4 not null,
-  flags int2 not null,
-  base bool not null,
+  present bool not null,
+  flags int2,
+  base bool,
   primary key (run_id, ship_template, seq),
   foreign key (run_id, ship_template) references ship_template,
-  foreign key (run_id, seq) references snapshot
+  foreign key (run_id, seq) references snapshot,
+  check (present = (num_nulls(flags, base) = 0)),
+  check (present or num_nonnulls(flags, base) = 0)
 );
 
 create table ship_template_fleet (
@@ -4012,10 +4048,13 @@ create table front_advantage (
   run_id int4 not null,
   front int4 not null,
   seq int4 not null,
-  advantage float8 not null,
+  present bool not null,
+  advantage float8,
   primary key (run_id, front, seq),
   foreign key (run_id, front) references front,
-  foreign key (run_id, seq) references snapshot
+  foreign key (run_id, seq) references snapshot,
+  check (present = (num_nulls(advantage) = 0)),
+  check (present or num_nonnulls(advantage) = 0)
 );
 
 create table front_listed_side (
@@ -4958,6 +4997,10 @@ create function diplomatic_catalyst_at(run int4, at int4) returns table ("diplom
   select diplomatic_catalyst, seq, diplomatic_catalyst_type from (select distinct on (diplomatic_catalyst) diplomatic_catalyst, seq, diplomatic_catalyst_type, present from diplomatic_catalyst_history where run_id = run and seq <= at order by diplomatic_catalyst, seq desc) latest where present
 $$;
 
+create function diplomatic_catalyst_private_at(run int4, at int4) returns table ("diplomatic_catalyst" int4, "seq" int4, "country" int4, "target_country" int4, "date" game_hours) language sql stable as $$
+  select diplomatic_catalyst, seq, country, target_country, date from (select distinct on (diplomatic_catalyst) diplomatic_catalyst, seq, country, target_country, date, present from diplomatic_catalyst_private where run_id = run and seq <= at order by diplomatic_catalyst, seq desc) latest where present
+$$;
+
 create function diplomatic_action_at(run int4, at int4) returns table ("diplomatic_action" int4, "seq" int4, "first_country" int4, "second_country" int4, "action_type" int2) language sql stable as $$
   select diplomatic_action, seq, first_country, second_country, action_type from (select distinct on (diplomatic_action) diplomatic_action, seq, first_country, second_country, action_type, present from diplomatic_action_history where run_id = run and seq <= at order by diplomatic_action, seq desc) latest where present
 $$;
@@ -4996,6 +5039,10 @@ $$;
 
 create function state_at(run int4, at int4) returns table ("state" int4, "seq" int4, "state_region" int2, "localized_name_key" int4, "country" int4, "mass_migration_culture" int4, "mass_migration_country" int4, "slave_import_marker" int4, "treaty_port_potential" bool) language sql stable as $$
   select state, seq, state_region, localized_name_key, country, mass_migration_culture, mass_migration_country, slave_import_marker, treaty_port_potential from (select distinct on (state) state, seq, state_region, localized_name_key, country, mass_migration_culture, mass_migration_country, slave_import_marker, treaty_port_potential, present from state_history where run_id = run and seq <= at order by state, seq desc) latest where present
+$$;
+
+create function state_private_at(run int4, at int4) returns table ("state" int4, "seq" int4, "wage" float8) language sql stable as $$
+  select state, seq, wage from (select distinct on (state) state, seq, wage, present from state_private where run_id = run and seq <= at order by state, seq desc) latest where present
 $$;
 
 create function state_timed_modifier_at(run int4, at int4) returns table ("state" int4, "modifier" int2, "seq" int4, "instances" int4) language sql stable as $$
@@ -5094,6 +5141,10 @@ create function building_at(run int4, at int4) returns table ("building" int4, "
   select building, seq, building_type, state, levels, slave_basket, active, subsidized, privatization_requested from (select distinct on (building) building, seq, building_type, state, levels, slave_basket, active, subsidized, privatization_requested, present from building_history where run_id = run and seq <= at order by building, seq desc) latest where present
 $$;
 
+create function building_private_at(run int4, at int4) returns table ("building" int4, "seq" int4, "auto_expand" bool, "output_paused" bool, "monopoly" bool, "privatizable" bool) language sql stable as $$
+  select building, seq, auto_expand, output_paused, monopoly, privatizable from (select distinct on (building) building, seq, auto_expand, output_paused, monopoly, privatizable, present from building_private where run_id = run and seq <= at order by building, seq desc) latest where present
+$$;
+
 create function building_production_method_active_at(run int4, at int4) returns table ("building" int4, "production_method" int2, "seq" int4) language sql stable as $$
   select building, production_method, seq from (select distinct on (building, production_method) building, production_method, seq, present from building_production_method_active where run_id = run and seq <= at order by building, production_method, seq desc) latest where present
 $$;
@@ -5150,8 +5201,16 @@ create function charter_at(run int4, at int4) returns table ("charter" int4, "se
   select charter, seq, company, company_charter_type from (select distinct on (charter) charter, seq, company, company_charter_type, present from charter_history where run_id = run and seq <= at order by charter, seq desc) latest where present
 $$;
 
+create function charter_private_at(run int4, at int4) returns table ("charter" int4, "seq" int4, "unlock" game_hours) language sql stable as $$
+  select charter, seq, unlock from (select distinct on (charter) charter, seq, unlock, present from charter_private where run_id = run and seq <= at order by charter, seq desc) latest where present
+$$;
+
 create function hq_at(run int4, at int4) returns table ("hq" int4, "seq" int4, "country" int4) language sql stable as $$
   select hq, seq, country from (select distinct on (hq) hq, seq, country, present from hq_history where run_id = run and seq <= at order by hq, seq desc) latest where present
+$$;
+
+create function hq_private_at(run int4, at int4) returns table ("hq" int4, "seq" int4, "hq_type" int2, "hq_region" int2) language sql stable as $$
+  select hq, seq, hq_type, hq_region from (select distinct on (hq) hq, seq, hq_type, hq_region, present from hq_private where run_id = run and seq <= at order by hq, seq desc) latest where present
 $$;
 
 create function shipping_lane_at(run int4, at int4) returns table ("shipping_lane" int4, "seq" int4, "country" int4, "begin_point" int4, "end_point" int4, "convoy_cost" float8, "lane_type" int2) language sql stable as $$
@@ -5188,6 +5247,10 @@ $$;
 
 create function interest_group_at(run int4, at int4) returns table ("interest_group" int4, "seq" int4, "country" int4, "interest_group_type" int2, "name_key" int4, "party" int4, "leader" int4, "approval_state" int2, "influence_type" int2, "in_government" bool, "influence_type_reason" int2) language sql stable as $$
   select interest_group, seq, country, interest_group_type, name_key, party, leader, approval_state, influence_type, in_government, influence_type_reason from (select distinct on (interest_group) interest_group, seq, country, interest_group_type, name_key, party, leader, approval_state, influence_type, in_government, influence_type_reason, present from interest_group_history where run_id = run and seq <= at order by interest_group, seq desc) latest where present
+$$;
+
+create function interest_group_private_at(run int4, at int4) returns table ("interest_group" int4, "seq" int4, "civil_war_side" int2, "party_to_join" int4, "wants_to_leave_party" bool, "amenability" float8, "negotiated" bool) language sql stable as $$
+  select interest_group, seq, civil_war_side, party_to_join, wants_to_leave_party, amenability, negotiated from (select distinct on (interest_group) interest_group, seq, civil_war_side, party_to_join, wants_to_leave_party, amenability, negotiated, present from interest_group_private where run_id = run and seq <= at order by interest_group, seq desc) latest where present
 $$;
 
 create function interest_group_ideology_at(run int4, at int4) returns table ("interest_group" int4, "ideology" int2, "seq" int4) language sql stable as $$
@@ -5234,6 +5297,10 @@ create function law_at(run int4, at int4) returns table ("law" int4, "seq" int4,
   select law, seq, country, law_type, progress, phase, checkpoint_or_stop_date, active, imposer from (select distinct on (law) law, seq, country, law_type, progress, phase, checkpoint_or_stop_date, active, imposer, present from law_history where run_id = run and seq <= at order by law, seq desc) latest where present
 $$;
 
+create function law_private_at(run int4, at int4) returns table ("law" int4, "seq" int4, "checkpoint_result" int2, "replacing_law_type" int2, "enactment_start_date" game_hours, "chance" float8) language sql stable as $$
+  select law, seq, checkpoint_result, replacing_law_type, enactment_start_date, chance from (select distinct on (law) law, seq, checkpoint_result, replacing_law_type, enactment_start_date, chance, present from law_private where run_id = run and seq <= at order by law, seq desc) latest where present
+$$;
+
 create function law_amendment_at(run int4, at int4) returns table ("law" int4, "amendment" int4, "seq" int4) language sql stable as $$
   select law, amendment, seq from (select distinct on (law, amendment) law, amendment, seq, present from law_amendment where run_id = run and seq <= at order by law, amendment, seq desc) latest where present
 $$;
@@ -5244,6 +5311,10 @@ $$;
 
 create function party_at(run int4, at int4) returns table ("party" int4, "seq" int4, "country" int4, "party_type" int2, "votes" int4) language sql stable as $$
   select party, seq, country, party_type, votes from (select distinct on (party) party, seq, country, party_type, votes, present from party_history where run_id = run and seq <= at order by party, seq desc) latest where present
+$$;
+
+create function party_private_at(run int4, at int4) returns table ("party" int4, "seq" int4, "num_voters" int4, "leader" int4) language sql stable as $$
+  select party, seq, num_voters, leader from (select distinct on (party) party, seq, num_voters, leader, present from party_private where run_id = run and seq <= at order by party, seq desc) latest where present
 $$;
 
 create function party_member_at(run int4, at int4) returns table ("party" int4, "interest_group" int4, "seq" int4) language sql stable as $$
@@ -5260,6 +5331,10 @@ $$;
 
 create function institution_at(run int4, at int4) returns table ("institution" int4, "seq" int4, "country" int4, "institution_type" int2, "investment" int2) language sql stable as $$
   select institution, seq, country, institution_type, investment from (select distinct on (institution) institution, seq, country, institution_type, investment, present from institution_history where run_id = run and seq <= at order by institution, seq desc) latest where present
+$$;
+
+create function institution_private_at(run int4, at int4) returns table ("institution" int4, "seq" int4, "target_investment" int2, "growth" float8) language sql stable as $$
+  select institution, seq, target_investment, growth from (select distinct on (institution) institution, seq, target_investment, growth, present from institution_private where run_id = run and seq <= at order by institution, seq desc) latest where present
 $$;
 
 create function political_lobby_at(run int4, at int4) returns table ("political_lobby" int4, "seq" int4, "country" int4, "target_country" int4, "political_lobby_type" int2, "appeasement" int2) language sql stable as $$
@@ -5284,6 +5359,10 @@ $$;
 
 create function character_at(run int4, at int4) returns table ("character" int4, "seq" int4, "culture" int4, "religion" int2, "birth_date" game_hours, "first_name_key" int4, "last_name_key" int4, "noble" bool, "historical" bool, "adult" bool, "country" int4, "interest_group" int4, "ideology" int2, "prominence" int4, "order_type" int2, "rank" int2, "formation" int4, "travel_arrival_date" game_hours, "assigned_state" int4) language sql stable as $$
   select character, seq, culture, religion, birth_date, first_name_key, last_name_key, noble, historical, adult, country, interest_group, ideology, prominence, order_type, rank, formation, travel_arrival_date, assigned_state from (select distinct on (character) character, seq, culture, religion, birth_date, first_name_key, last_name_key, noble, historical, adult, country, interest_group, ideology, prominence, order_type, rank, formation, travel_arrival_date, assigned_state, present from character_history where run_id = run and seq <= at order by character, seq desc) latest where present
+$$;
+
+create function character_private_at(run int4, at int4) returns table ("character" int4, "seq" int4, "loyalty" int2, "recruitable" bool) language sql stable as $$
+  select character, seq, loyalty, recruitable from (select distinct on (character) character, seq, loyalty, recruitable, present from character_private where run_id = run and seq <= at order by character, seq desc) latest where present
 $$;
 
 create function character_status_at(run int4, at int4) returns table ("character" int4, "seq" int4, "popularity" float8, "has_formation" bool) language sql stable as $$
@@ -5316,6 +5395,10 @@ $$;
 
 create function formation_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "country" int4, "formation_type" int2, "name_key" int4, "flag" int2, "color_red" int2, "color_green" int2, "color_blue" int2, "supply_hub" int4, "supply_priority" int2, "attached_to_fleet" int4) language sql stable as $$
   select formation, seq, country, formation_type, name_key, flag, color_red, color_green, color_blue, supply_hub, supply_priority, attached_to_fleet from (select distinct on (formation) formation, seq, country, formation_type, name_key, flag, color_red, color_green, color_blue, supply_hub, supply_priority, attached_to_fleet, present from formation_history where run_id = run and seq <= at order by formation, seq desc) latest where present
+$$;
+
+create function formation_private_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "home_hq" int4, "strategic_objective" int4, "travel_distance" float8, "default_fleet" bool, "demobilizing" bool, "invading" bool, "embarked" bool, "docked" bool, "recalled" bool, "hit_points_percent" float8, "deployable" bool, "display_name" text) language sql stable as $$
+  select formation, seq, home_hq, strategic_objective, travel_distance, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name from (select distinct on (formation) formation, seq, home_hq, strategic_objective, travel_distance, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name, present from formation_private where run_id = run and seq <= at order by formation, seq desc) latest where present
 $$;
 
 create function formation_mobilization_option_at(run int4, at int4) returns table ("formation" int4, "mobilization_option" int2, "seq" int4) language sql stable as $$
@@ -5354,6 +5437,10 @@ create function ship_template_at(run int4, at int4) returns table ("ship_templat
   select ship_template, seq, country, ship_type, ordinal_number, year from (select distinct on (ship_template) ship_template, seq, country, ship_type, ordinal_number, year, present from ship_template_history where run_id = run and seq <= at order by ship_template, seq desc) latest where present
 $$;
 
+create function ship_template_private_at(run int4, at int4) returns table ("ship_template" int4, "seq" int4, "flags" int2, "base" bool) language sql stable as $$
+  select ship_template, seq, flags, base from (select distinct on (ship_template) ship_template, seq, flags, base, present from ship_template_private where run_id = run and seq <= at order by ship_template, seq desc) latest where present
+$$;
+
 create function ship_template_fleet_at(run int4, at int4) returns table ("ship_template" int4, "fleet" int4, "seq" int4) language sql stable as $$
   select ship_template, fleet, seq from (select distinct on (ship_template, fleet) ship_template, fleet, seq, present from ship_template_fleet where run_id = run and seq <= at order by ship_template, fleet, seq desc) latest where present
 $$;
@@ -5384,6 +5471,10 @@ $$;
 
 create function front_at(run int4, at int4) returns table ("front" int4, "seq" int4, "x" float8, "y" float8) language sql stable as $$
   select front, seq, x, y from (select distinct on (front) front, seq, x, y, present from front_history where run_id = run and seq <= at order by front, seq desc) latest where present
+$$;
+
+create function front_advantage_at(run int4, at int4) returns table ("front" int4, "seq" int4, "advantage" float8) language sql stable as $$
+  select front, seq, advantage from (select distinct on (front) front, seq, advantage, present from front_advantage where run_id = run and seq <= at order by front, seq desc) latest where present
 $$;
 
 create function front_listed_side_at(run int4, at int4) returns table ("front" int4, "front_side" int4, "seq" int4) language sql stable as $$
@@ -5546,14 +5637,6 @@ create function country_diplomacy_at(run int4, at int4) returns table ("country"
   select latest.* from (select distinct on (country) country, seq, infamy from country_diplomacy where run_id = run and seq <= at order by country, seq desc) latest where exists (select 1 from country_at(run, at) alive where alive.country = latest.country)
 $$;
 
-create function diplomatic_catalyst_private_at(run int4, at int4) returns table ("diplomatic_catalyst" int4, "seq" int4, "country" int4, "target_country" int4, "date" game_hours) language sql stable as $$
-  select latest.* from (select distinct on (diplomatic_catalyst) diplomatic_catalyst, seq, country, target_country, date from diplomatic_catalyst_private where run_id = run and seq <= at order by diplomatic_catalyst, seq desc) latest where exists (select 1 from diplomatic_catalyst_at(run, at) alive where alive.diplomatic_catalyst = latest.diplomatic_catalyst)
-$$;
-
-create function state_private_at(run int4, at int4) returns table ("state" int4, "seq" int4, "wage" float8) language sql stable as $$
-  select latest.* from (select distinct on (state) state, seq, wage from state_private where run_id = run and seq <= at order by state, seq desc) latest where exists (select 1 from state_at(run, at) alive where alive.state = latest.state)
-$$;
-
 create function state_population_at(run int4, at int4) returns table ("state" int4, "seq" int4, "lower_strata" int8, "middle_strata" int8, "upper_strata" int8, "radicals" int8, "loyalists" int8, "subsisting_workforce" int8, "unemployed_workforce" int8, "last_week_emigration" int4, "last_week_immigration" int4, "last_week_slave_emigration" int4, "last_week_slave_immigration" int4) language sql stable as $$
   select latest.* from (select distinct on (state) state, seq, lower_strata, middle_strata, upper_strata, radicals, loyalists, subsisting_workforce, unemployed_workforce, last_week_emigration, last_week_immigration, last_week_slave_emigration, last_week_slave_immigration from state_population where run_id = run and seq <= at order by state, seq desc) latest where exists (select 1 from state_at(run, at) alive where alive.state = latest.state)
 $$;
@@ -5570,60 +5653,16 @@ create function pop_status_at(run int4, at int4) returns table ("pop" int4, "seq
   select latest.* from (select distinct on (pop) pop, seq, wealth_progress, num_literate, loyalists_and_radicals, wealth, food_security, political_strength, workforce, dependents, job_satisfaction from pop_status where run_id = run and seq <= at order by pop, seq desc) latest where exists (select 1 from pop_at(run, at) alive where alive.pop = latest.pop)
 $$;
 
-create function building_private_at(run int4, at int4) returns table ("building" int4, "seq" int4, "auto_expand" bool, "output_paused" bool, "monopoly" bool, "privatizable" bool) language sql stable as $$
-  select latest.* from (select distinct on (building) building, seq, auto_expand, output_paused, monopoly, privatizable from building_private where run_id = run and seq <= at order by building, seq desc) latest where exists (select 1 from building_at(run, at) alive where alive.building = latest.building)
-$$;
-
 create function building_flow_at(run int4, at int4) returns table ("building" int4, "seq" int4, "balance_subsidies" float8, "trade_revenue" float8, "input_goods_shortage" float8, "tariffs" float8, "tolls" float8, "subventions" float8, "supply_ship_construction" float8, "military_ship_construction" float8, "produced_supply" float8, "income_taxes" float8, "cash_reserves" float8, "staffing" float8, "throughput" float8, "salary_rate" float8, "dividends" float8, "goods_cost" float8, "goods_sales" float8, "slave_upkeep" float8) language sql stable as $$
   select latest.* from (select distinct on (building) building, seq, balance_subsidies, trade_revenue, input_goods_shortage, tariffs, tolls, subventions, supply_ship_construction, military_ship_construction, produced_supply, income_taxes, cash_reserves, staffing, throughput, salary_rate, dividends, goods_cost, goods_sales, slave_upkeep from building_flow where run_id = run and seq <= at order by building, seq desc) latest where exists (select 1 from building_at(run, at) alive where alive.building = latest.building)
-$$;
-
-create function charter_private_at(run int4, at int4) returns table ("charter" int4, "seq" int4, "unlock" game_hours) language sql stable as $$
-  select latest.* from (select distinct on (charter) charter, seq, unlock from charter_private where run_id = run and seq <= at order by charter, seq desc) latest where exists (select 1 from charter_at(run, at) alive where alive.charter = latest.charter)
-$$;
-
-create function hq_private_at(run int4, at int4) returns table ("hq" int4, "seq" int4, "hq_type" int2, "hq_region" int2) language sql stable as $$
-  select latest.* from (select distinct on (hq) hq, seq, hq_type, hq_region from hq_private where run_id = run and seq <= at order by hq, seq desc) latest where exists (select 1 from hq_at(run, at) alive where alive.hq = latest.hq)
-$$;
-
-create function interest_group_private_at(run int4, at int4) returns table ("interest_group" int4, "seq" int4, "civil_war_side" int2, "party_to_join" int4, "wants_to_leave_party" bool, "amenability" float8, "negotiated" bool) language sql stable as $$
-  select latest.* from (select distinct on (interest_group) interest_group, seq, civil_war_side, party_to_join, wants_to_leave_party, amenability, negotiated from interest_group_private where run_id = run and seq <= at order by interest_group, seq desc) latest where exists (select 1 from interest_group_at(run, at) alive where alive.interest_group = latest.interest_group)
 $$;
 
 create function interest_group_stats_at(run int4, at int4) returns table ("interest_group" int4, "seq" int4, "approval" int2, "political_strength" int8, "radicals_political_strength" int8, "loyalists_political_strength" int8, "clout" float8) language sql stable as $$
   select latest.* from (select distinct on (interest_group) interest_group, seq, approval, political_strength, radicals_political_strength, loyalists_political_strength, clout from interest_group_stats where run_id = run and seq <= at order by interest_group, seq desc) latest where exists (select 1 from interest_group_at(run, at) alive where alive.interest_group = latest.interest_group)
 $$;
 
-create function law_private_at(run int4, at int4) returns table ("law" int4, "seq" int4, "checkpoint_result" int2, "replacing_law_type" int2, "enactment_start_date" game_hours, "chance" float8) language sql stable as $$
-  select latest.* from (select distinct on (law) law, seq, checkpoint_result, replacing_law_type, enactment_start_date, chance from law_private where run_id = run and seq <= at order by law, seq desc) latest where exists (select 1 from law_at(run, at) alive where alive.law = latest.law)
-$$;
-
-create function party_private_at(run int4, at int4) returns table ("party" int4, "seq" int4, "num_voters" int4, "leader" int4) language sql stable as $$
-  select latest.* from (select distinct on (party) party, seq, num_voters, leader from party_private where run_id = run and seq <= at order by party, seq desc) latest where exists (select 1 from party_at(run, at) alive where alive.party = latest.party)
-$$;
-
-create function institution_private_at(run int4, at int4) returns table ("institution" int4, "seq" int4, "target_investment" int2, "growth" float8) language sql stable as $$
-  select latest.* from (select distinct on (institution) institution, seq, target_investment, growth from institution_private where run_id = run and seq <= at order by institution, seq desc) latest where exists (select 1 from institution_at(run, at) alive where alive.institution = latest.institution)
-$$;
-
-create function character_private_at(run int4, at int4) returns table ("character" int4, "seq" int4, "loyalty" int2, "recruitable" bool) language sql stable as $$
-  select latest.* from (select distinct on (character) character, seq, loyalty, recruitable from character_private where run_id = run and seq <= at order by character, seq desc) latest where exists (select 1 from character_at(run, at) alive where alive.character = latest.character)
-$$;
-
 create function formation_status_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "province" int4, "current_location" int4, "target_location" int4, "naval_mission" int4, "x" float8, "y" float8, "organization" float8, "sea_presence" float8, "supply" float8, "delivered_supply" float8, "supply_ships" int4, "mobilized" bool, "raised_conscripts" bool) language sql stable as $$
   select latest.* from (select distinct on (formation) formation, seq, province, current_location, target_location, naval_mission, x, y, organization, sea_presence, supply, delivered_supply, supply_ships, mobilized, raised_conscripts from formation_status where run_id = run and seq <= at order by formation, seq desc) latest where exists (select 1 from formation_at(run, at) alive where alive.formation = latest.formation)
-$$;
-
-create function formation_private_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "home_hq" int4, "strategic_objective" int4, "travel_distance" float8, "default_fleet" bool, "demobilizing" bool, "invading" bool, "embarked" bool, "docked" bool, "recalled" bool, "hit_points_percent" float8, "deployable" bool, "display_name" text) language sql stable as $$
-  select latest.* from (select distinct on (formation) formation, seq, home_hq, strategic_objective, travel_distance, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name from formation_private where run_id = run and seq <= at order by formation, seq desc) latest where exists (select 1 from formation_at(run, at) alive where alive.formation = latest.formation)
-$$;
-
-create function ship_template_private_at(run int4, at int4) returns table ("ship_template" int4, "seq" int4, "flags" int2, "base" bool) language sql stable as $$
-  select latest.* from (select distinct on (ship_template) ship_template, seq, flags, base from ship_template_private where run_id = run and seq <= at order by ship_template, seq desc) latest where exists (select 1 from ship_template_at(run, at) alive where alive.ship_template = latest.ship_template)
-$$;
-
-create function front_advantage_at(run int4, at int4) returns table ("front" int4, "seq" int4, "advantage" float8) language sql stable as $$
-  select latest.* from (select distinct on (front) front, seq, advantage from front_advantage where run_id = run and seq <= at order by front, seq desc) latest where exists (select 1 from front_at(run, at) alive where alive.front = latest.front)
 $$;
 
 create index country_history_seq on country_history using brin (run_id, seq) with (autosummarize = on);
