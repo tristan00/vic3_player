@@ -7,7 +7,8 @@ SLOT=0xFFFFFF
 
 
 def value(snapshot,table,column,ident):
-    return snapshot.map(table,f'{TABLE[snapshot.table(table)].owner},{column}').get(ident)
+    stored=table+'_history' if table+'_history' in TABLE else table
+    return snapshot.map(table,f'{TABLE[stored].owner},{column}').get(ident)
 
 
 def members(snapshot,table,ident,column):

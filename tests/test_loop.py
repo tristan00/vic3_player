@@ -4,6 +4,8 @@ from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from advisors import ADVISORS, RandomAdvisor
+from loop.effects import verify
+from tests.memory_stored import Memory
 
 
 class Queue:
@@ -14,6 +16,17 @@ class Queue:
 
     def rows(self,table,columns,**equal):
         return list(self.items) if (table,columns,equal)==('player_construction_queue_item','construction_left,speed',{'private':False}) else []
+
+
+class EffectTests(unittest.TestCase):
+    def test_research_and_subject_verdicts_read_stored_rows(self):
+        before=Memory(7,{'country_research_history':[{'country_research':3,'country':7,'researching':None}],
+                         'formation_history':[{'formation':5,'country':7}],'formation_private':[{'formation':5,'recalled':False}]})
+        after=Memory(7,{'country_research_history':[{'country_research':3,'country':7,'researching':'tech_x'}],
+                        'formation_history':[{'formation':5,'country':7}],'formation_private':[{'formation':5,'recalled':True}]})
+        self.assertTrue(verify('research',{'technology':'tech_x'},before,after,{},None))
+        self.assertFalse(verify('research',{'technology':'tech_y'},before,after,{},None))
+        self.assertTrue(verify('recall_fleet',{'military_formation':5},before,after,{},None))
 
 
 class AdvisorTests(unittest.TestCase):
