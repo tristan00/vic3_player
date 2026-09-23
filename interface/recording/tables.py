@@ -944,9 +944,8 @@ def characters(c):
     popularity=dict(c.rows('character_popularity','character','popularity'))
     has_formation=dict(c.rows('character_formation','character','has_formation'))
     private=c.rows('character_private','id','loyalty','recruitable')
-    if set(popularity)!=set(has_formation) or set(popularity)-{i for i,*_ in private}:
-        raise RuntimeError(f'Character private data covers {sorted(i for i,*_ in private)[:8]} ({len(private)}), popularity {sorted(popularity)[:8]} '
-                           f'({len(popularity)}), formation {sorted(has_formation)[:8]} ({len(has_formation)})')
+    if set(popularity)!=set(has_formation):
+        raise RuntimeError(f'Character popularity covers {sorted(popularity)[:8]} ({len(popularity)}), formation {sorted(has_formation)[:8]} ({len(has_formation)})')
     for i,loyalty,recruitable in private:
         c.add('character_private',character=ids[i],loyalty=loyalty,recruitable=flag(recruitable))
     for i,value in popularity.items():

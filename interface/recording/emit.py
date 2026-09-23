@@ -111,17 +111,8 @@ def enum(name):
 
 def name_columns():
     rows=[(t.name,c.name,c.vocabulary) for t in TABLES for c in key_columns(t)+t.columns if c.vocabulary]
-    return ('create table name_column (
-  table_name text not null,
-  column_name text not null,
-  vocabulary text not null,
-'
-            '  primary key (table_name, column_name)
-);
-insert into name_column values
-'+',
-'.join(f"  ('{t}', '{c}', '{v}')" for t,c,v in rows)+';
-')
+    return ('create table name_column (\n  table_name text not null,\n  column_name text not null,\n  vocabulary text not null,\n'
+            '  primary key (table_name, column_name)\n);\ninsert into name_column values\n'+',\n'.join(f"  ('{t}', '{c}', '{v}')" for t,c,v in rows)+';\n')
 
 
 def main():

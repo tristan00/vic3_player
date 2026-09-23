@@ -1,8 +1,7 @@
 import unittest
-from types import SimpleNamespace
 
 from interface.common import DEFAULT_GAME
-from interface.options.snapshot import Snapshot
+from tests.memory_stored import Memory
 from interface.options.triggers import COMPARE, country_scope, evaluate, parse, unsupported
 from interface.script import BLOCK_FIELDS, body, fields, read
 
@@ -23,11 +22,10 @@ class TriggerTests(unittest.TestCase):
 
 
 def journal_snapshot(player,entries):
-    empty=(None,)*17
-    rows={'country_history':[(country,*empty) for country in (7,9,4)],
-          'journal_entry_history':[(ident,country,kind,active,0.0,0.0,None,None,None) for ident,country,kind,active,_ in entries],
-          'journal_entry_involved_country':[(ident,member) for ident,*_,involved in entries for member in involved]}
-    return Snapshot(SimpleNamespace(seq=0,meta={},hours=0,date='',rows=rows,orders={},definitions=[],methods=[],dlc=[],player=player))
+    rows={'country_history':[{'country':country} for country in (7,9,4)],
+          'journal_entry_history':[{'journal_entry':ident,'country':country,'journal_entry_type':kind,'active':active} for ident,country,kind,active,_ in entries],
+          'journal_entry_involved_country':[{'journal_entry':ident,'country':member} for ident,*_,involved in entries for member in involved]}
+    return Memory(player,rows)
 
 
 class JournalTriggerTests(unittest.TestCase):

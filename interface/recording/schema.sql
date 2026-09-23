@@ -1,6 +1,3 @@
-create schema archive;
-set search_path = archive;
-
 create domain game_hours as int4;
 
 create table schema_digest (
@@ -5863,8 +5860,8 @@ declare
   target record;
 begin
   for target in select c.relname from pg_class c join pg_attribute a on a.attrelid = c.oid
-                 where c.relnamespace = 'archive'::regnamespace and c.relkind = 'r' and a.attname = 'run_id' and c.relname <> 'run' loop
-    execute format('delete from archive.%I where run_id = $1', target.relname) using doomed;
+                 where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and a.attname = 'run_id' and c.relname <> 'run' loop
+    execute format('delete from %I where run_id = $1', target.relname) using doomed;
   end loop;
-  delete from archive.run where run_id = doomed;
+  delete from run where run_id = doomed;
 end $$;

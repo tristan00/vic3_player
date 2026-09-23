@@ -20,7 +20,6 @@ def digest():
 
 
 def install(connection):
-    connection.execute('drop schema if exists archive cascade')
     connection.execute('drop schema public cascade')
     connection.execute('create schema public')
     connection.execute(SCHEMA.read_text(encoding='utf-8'))

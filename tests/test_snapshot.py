@@ -2,14 +2,12 @@ import struct
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import numpy as np
 
 from interface.options.available import RULES, trade_level
-from interface.options.snapshot import COLUMNS, Snapshot
-from interface.recording.record import Recorded
+from tests.memory_stored import Memory
 from interface.runner.memory import Reader, HEAP_LOW, visible_columns
 from interface.script import event_options
 
@@ -258,16 +256,8 @@ PLAYER=(1<<24)|7
 OTHER=(2<<24)|8
 
 
-def rows(table,*values):
-    names=COLUMNS[table]
-    return [tuple(value.get(name) for name in names) for value in values]
-
-
-def snapshot(definitions=(),**tables):
-    filled={name:[] for name in COLUMNS}
-    for table,values in tables.items():
-        filled[table]=rows(table,*values)
-    return Snapshot(Recorded(3,filled,{},PLAYER,1000,'1836.1.1',{},list(definitions),[],[]))
+def snapshot(definitions=None,**tables):
+    return Memory(PLAYER,tables,definitions)
 
 
 class RuleTests(unittest.TestCase):
