@@ -1,0 +1,8186 @@
+{
+  "version": "1.13.11",
+  "database_vtable": {
+    "building": 71537288,
+    "ai": 72306400,
+    "navy_ai": 72306344,
+    "market_area": 71538744
+  },
+  "date": [
+    93736704,
+    12
+  ],
+  "tokens": 94364928,
+  "scope_types": {
+    "0": "none",
+    "1": "value",
+    "2": "boolean",
+    "5": "ctry",
+    "11": "com",
+    "23": "cul",
+    "44": "ig",
+    "48": "journal_entry",
+    "49": "pol",
+    "50": "law_type",
+    "76": "state",
+    "78": "st_r",
+    "3": "flag",
+    "61": "political_movement_type"
+  },
+  "budget_lines": {
+    "expense": {
+      "7": "construction_goods",
+      "2": "government_goods",
+      "1": "government_slaves",
+      "3": "government_wages",
+      "5": "military_goods",
+      "4": "military_slaves",
+      "6": "military_wages",
+      "8": "subsidies",
+      "9": "subventions",
+      "10": "interest",
+      "11": "subject_payments"
+    },
+    "income": {
+      "10": "government_share_dividends",
+      "1": "income_taxes",
+      "2": "poll_taxes",
+      "9": "tariffs",
+      "5": "subject_payments"
+    }
+  },
+  "enums": {
+    "country.supply_ship_construction_level": {
+      "3": "high",
+      "1": "low",
+      "0": "very_low"
+    },
+    "country.tax_level": {
+      "3": "high",
+      "1": "low",
+      "0": "very_low"
+    },
+    "culture.name_format": {
+      "0": "first_last",
+      "1": "last_first"
+    },
+    "front_side.play_side": {
+      "0": "initiator",
+      "1": "target"
+    },
+    "hq.type": {
+      "0": "land",
+      "1": "naval"
+    },
+    "interest_group.approval_state": {
+      "0": "angry",
+      "3": "happy",
+      "4": "loyal",
+      "1": "unhappy"
+    },
+    "interest_group.influence_type": {
+      "0": "influential",
+      "1": "neutral"
+    },
+    "interest_group.influence_type_reason": {
+      "1": "above_influential_cutoff",
+      "0": "above_influential_threshold",
+      "2": "below_marginalization_threshold"
+    },
+    "law.enactment_last_checkpoint_result": {
+      "2": "advance",
+      "3": "debate",
+      "4": "stall",
+      "1": "success"
+    },
+    "formation.type": {
+      "0": "army",
+      "1": "fleet"
+    },
+    "formation.supply_priority": {
+      "2": "high_priority",
+      "0": "low_priority",
+      "1": "medium_priority"
+    },
+    "formation.ai_tag": {
+      "2": "garrison",
+      "4": "marine",
+      "1": "regular",
+      "3": "temporary"
+    },
+    "political_lobby.lobby_formation_reason": {
+      "1": "diplomacy",
+      "8": "economy",
+      "4": "funded",
+      "3": "ideology",
+      "0": "none",
+      "7": "technology"
+    },
+    "political_movement.managed_status": {
+      "2": "promoted",
+      "1": "suppressed"
+    },
+    "shipping_lane.shipping_lane_type": {
+      "1": "goods_transfer",
+      "0": "port_connection"
+    },
+    "war_goal.demand_type": {
+      "0": "primary_demand",
+      "1": "secondary_demand"
+    },
+    "war_goal.status": {
+      "1": "active",
+      "3": "discarded",
+      "2": "executed"
+    },
+    "strait.first_toll_rate": {
+      "0": "no_tolls",
+      "1": "low_tolls",
+      "2": "medium_tolls"
+    },
+    "strait.second_toll_rate": {
+      "0": "no_tolls",
+      "1": "low_tolls",
+      "2": "medium_tolls"
+    },
+    "interest_group.civil_war": {
+      "0": "revolution",
+      "2": "none"
+    },
+    "civil_war.type": {
+      "0": "revolution"
+    },
+    "formation.units_name_type": {
+      "1": "culture"
+    },
+    "battle.type": {
+      "0": "land"
+    },
+    "battle.status": {
+      "1": "attacker_victory"
+    },
+    "ai_goal.type": {
+      "0": "handle_ongoing_constructions",
+      "1": "expand_production_buildings",
+      "2": "change_production_methods",
+      "3": "handle_money_spending",
+      "4": "handle_authority_spending",
+      "5": "press_wargoals",
+      "6": "make_peace",
+      "7": "respond_to_treaties",
+      "8": "manage_treaties",
+      "9": "respond_to_diplomacy",
+      "10": "conduct_diplomacy",
+      "11": "start_diplo_plays",
+      "12": "handle_diplo_plays",
+      "13": "form_country",
+      "14": "release_country",
+      "15": "unification",
+      "16": "research_technology",
+      "17": "recruit_and_promote_generals",
+      "18": "recruit_and_promote_admirals",
+      "19": "mobilize_army",
+      "20": "handle_invasions",
+      "21": "set_generals_orders",
+      "22": "set_admirals_orders",
+      "23": "create_colonies",
+      "24": "incorporate_states",
+      "25": "change_laws",
+      "26": "repeal_amendments",
+      "27": "set_tax_levels",
+      "28": "handle_institutions",
+      "29": "reform_government",
+      "30": "violate_sovereignty",
+      "31": "take_decision",
+      "32": "set_tariff_focus",
+      "33": "declare_bankruptcy",
+      "34": "execute_character_interactions",
+      "35": "execute_character_interactions_on_exiles",
+      "36": "journal_entry",
+      "37": "manage_companies",
+      "38": "create_military_formations_and_units",
+      "39": "deploy_military_formations",
+      "40": "merge_military_formations",
+      "41": "split_military_formations",
+      "42": "transfer_combat_units",
+      "43": "manage_military_formation_tags",
+      "44": "manage_military_formation_units",
+      "45": "upgrade_military_formation_units",
+      "46": "update_military_formation_borrowing_toggles",
+      "47": "handle_ship_construction",
+      "48": "handle_flagship",
+      "49": "update_building_ownership_status",
+      "50": "manage_power_bloc",
+      "51": "impose_laws",
+      "52": "scripted_gui_command",
+      "53": "manage_straits",
+      "54": "manage_marine_formations",
+      "55": "set_supply_priorities"
+    },
+    "ai_cached_weight.type": {
+      "1": "diplomatic_play_target_sympathy",
+      "0": "diplomatic_play_initiator_sympathy",
+      "2": "diplomatic_play_boldness",
+      "3": "diplomatic_play_neutrality_escalation_target"
+    },
+    "ai_goods_stance.stance": {
+      "0": "neutral",
+      "1": "wants_high_supply",
+      "2": "wants_export",
+      "3": "does_not_want"
+    },
+    "ai_money_spending.direction": {
+      "0": "increase_spending",
+      "1": "decrease_spending"
+    },
+    "ai_money_spending.priority": {
+      "0": "should_remove",
+      "1": "nice_to_have",
+      "2": "wants_to_have",
+      "3": "should_have",
+      "4": "must_have",
+      "5": "none"
+    },
+    "ai_authority_spending.direction": {
+      "0": "increase_spending",
+      "1": "decrease_spending"
+    },
+    "ai_authority_spending.priority": {
+      "0": "should_remove",
+      "1": "nice_to_have",
+      "2": "wants_to_have",
+      "3": "should_have",
+      "4": "must_have",
+      "5": "none"
+    },
+    "ai_money_spending.type": {
+      "0": "government_building",
+      "1": "subsidies"
+    },
+    "ai_authority_spending.type": {
+      "0": "decree",
+      "1": "political_movement_bolstering",
+      "2": "political_movement_suppression",
+      "3": "consumption_tax"
+    },
+    "ai_building_construction.construction_type": {
+      "0": "government",
+      "1": "private"
+    },
+    "ai_private_building_construction.construction_type": {
+      "0": "government",
+      "1": "private"
+    },
+    "ai_country_goal.previous_attitude": {
+      "0": "belligerent",
+      "2": "antagonistic",
+      "6": "cautious",
+      "10": "protective",
+      "5": 0,
+      "4": "wary",
+      "8": "cooperative",
+      "1": "domineering"
+    },
+    "ai_country_goal.attitude": {
+      "0": "belligerent",
+      "4": "wary",
+      "8": "cooperative",
+      "10": "protective",
+      "2": "antagonistic",
+      "6": "cautious",
+      "5": 0,
+      "11": "genial",
+      "1": "domineering"
+    },
+    "ai_country_goal.secret_goal": {
+      "5": "conquer",
+      "0": "none",
+      "1": "befriend",
+      "3": "protect",
+      "6": "dominate",
+      "4": "antagonize"
+    },
+    "ai_country_goal_threat_reason.attitude": {
+      "1": "hostile"
+    },
+    "ai_country_goal_antagonize_reason.attitude": {
+      "1": "hostile"
+    },
+    "ai_country_goal_befriend_reason.attitude": {
+      "3": "friendly"
+    },
+    "ai_country_goal_protect_reason.attitude": {
+      "3": "friendly"
+    },
+    "ironman.save_interval": {
+      "0": "monthly",
+      "1": "every_other_month",
+      "2": "three_months",
+      "3": "half_year",
+      "4": "yearly"
+    },
+    "ironman.storage": {
+      "0": "local",
+      "1": "cloud"
+    }
+  },
+  "casualty_reasons": {
+    "0": "attrition",
+    "1": "battle"
+  },
+  "tariff_levels": {
+    "1": "high_subventions",
+    "2": "low_subventions",
+    "3": "no_tariffs_or_subventions",
+    "4": "low_tariffs",
+    "5": "high_tariffs",
+    "6": "max_tariffs"
+  },
+  "tables": {
+    "amendment": {
+      "rva": 93743192,
+      "fields": {
+        "cooldown": [
+          "i",
+          16
+        ],
+        "cooldown_end_date": [
+          "i",
+          24
+        ],
+        "law": [
+          "i",
+          48
+        ],
+        "sponsor": [
+          "i",
+          52
+        ],
+        "timeout": [
+          "i",
+          20
+        ],
+        "timeout_date": [
+          "i",
+          32
+        ]
+      },
+      "keys": {
+        "amendment_type": [
+          40,
+          "amendment_type",
+          24
+        ]
+      },
+      "size": 60
+    },
+    "battle": {
+      "rva": 93743056,
+      "fields": {
+        "war": [
+          "i",
+          28
+        ],
+        "front": [
+          "i",
+          32
+        ],
+        "province": [
+          "i",
+          36
+        ],
+        "victory_script_value_data_result": [
+          "q",
+          88
+        ],
+        "attacker_province": [
+          "i",
+          200
+        ],
+        "attacker_start_ce": [
+          "q",
+          208
+        ],
+        "defender_start_ce": [
+          "q",
+          216
+        ],
+        "attacker_end_ce": [
+          "q",
+          224
+        ],
+        "defender_end_ce": [
+          "q",
+          232
+        ],
+        "initial_power_ratio": [
+          "q",
+          240
+        ],
+        "attacker_start_battalions": [
+          "i",
+          248
+        ],
+        "defender_start_battalions": [
+          "i",
+          252
+        ],
+        "attacker_ending_battalions": [
+          "i",
+          256
+        ],
+        "defender_ending_battalions": [
+          "i",
+          260
+        ],
+        "attacker_starting_manpower": [
+          "i",
+          264
+        ],
+        "defender_starting_manpower": [
+          "i",
+          272
+        ],
+        "attacker_ending_manpower": [
+          "i",
+          280
+        ],
+        "defender_ending_manpower": [
+          "i",
+          288
+        ],
+        "attacker_starting_morale": [
+          "q",
+          376
+        ],
+        "defender_starting_morale": [
+          "q",
+          384
+        ],
+        "attacker_ending_morale": [
+          "q",
+          392
+        ],
+        "defender_ending_morale": [
+          "q",
+          400
+        ],
+        "start_date": [
+          "i",
+          408
+        ],
+        "end_date": [
+          "i",
+          416
+        ],
+        "battle_data_attacker_commander": [
+          "i",
+          424
+        ],
+        "battle_data_attacker_country": [
+          "i",
+          428
+        ],
+        "battle_data_attacker_formation": [
+          "i",
+          432
+        ],
+        "battle_data_attacker_initial_battle_size_script_v_d358072e": [
+          "i",
+          464
+        ],
+        "battle_data_attacker_last_condition_update": [
+          "i",
+          544
+        ],
+        "battle_data_defender_commander": [
+          "i",
+          992
+        ],
+        "battle_data_defender_country": [
+          "i",
+          996
+        ],
+        "battle_data_defender_formation": [
+          "i",
+          1000
+        ],
+        "battle_data_defender_initial_battle_size_script_v_16d3d9ca": [
+          "i",
+          1032
+        ],
+        "battle_data_defender_last_condition_update": [
+          "i",
+          1112
+        ],
+        "type": [
+          "b",
+          24
+        ],
+        "status": [
+          "b",
+          44
+        ],
+        "invasion": [
+          "i",
+          40
+        ],
+        "occupation_script_value_data_result": [
+          "q",
+          48
+        ],
+        "num_captured_provinces": [
+          "i",
+          296
+        ],
+        "capturing_country": [
+          "i",
+          300
+        ],
+        "lost_provinces_country": [
+          "i",
+          304
+        ]
+      },
+      "keys": {
+        "attacker_order_type": [
+          528,
+          "order_type",
+          24,
+          "battle_data_attacker_commander"
+        ],
+        "attacker_battle_condition": [
+          536,
+          "battle_condition",
+          24,
+          "battle_data_attacker_commander"
+        ],
+        "defender_order_type": [
+          1096,
+          "order_type",
+          24,
+          "battle_data_defender_commander"
+        ],
+        "defender_battle_condition": [
+          1104,
+          "battle_condition",
+          24,
+          "battle_data_defender_commander"
+        ]
+      },
+      "size": 1936,
+      "trends": {
+        "attacker_trend": 1584,
+        "defender_trend": 1640,
+        "attacker_still_fighting_trend": 1696,
+        "defender_still_fighting_trend": 1752,
+        "attacker_manpower_trend": 1808,
+        "defender_manpower_trend": 1864
+      },
+      "strings": {
+        "name_key": 136
+      },
+      "vectors": {
+        "battle_occupation": [
+          1560,
+          1572,
+          56,
+          {
+            "state": [
+              "i",
+              0
+            ],
+            "fraction": [
+              "q",
+              8
+            ],
+            "occupation": [
+              "q",
+              16
+            ]
+          }
+        ]
+      }
+    },
+    "building": {
+      "rva": 93742904,
+      "fields": {
+        "income_taxes": [
+          "q",
+          368
+        ],
+        "construction_province": [
+          "i",
+          224
+        ],
+        "levels": [
+          "i",
+          232
+        ],
+        "last_updated_level": [
+          "i",
+          236
+        ],
+        "establishment_date": [
+          "i",
+          248
+        ],
+        "last_layoff_date": [
+          "i",
+          256
+        ],
+        "last_failed_hire_date": [
+          "i",
+          264
+        ],
+        "hiring_rate": [
+          "q",
+          272
+        ],
+        "cash_reserves": [
+          "q",
+          280
+        ],
+        "staffing": [
+          "q",
+          288
+        ],
+        "previous_staffing": [
+          "q",
+          296
+        ],
+        "throughput": [
+          "q",
+          304
+        ],
+        "salary_rate": [
+          "q",
+          312
+        ],
+        "balance_subsidies": [
+          "q",
+          328
+        ],
+        "trade_revenue": [
+          "q",
+          336
+        ],
+        "input_goods_shortage": [
+          "q",
+          344
+        ],
+        "profit_after_reserves": [
+          "q",
+          352
+        ],
+        "profit_after_investments": [
+          "q",
+          360
+        ],
+        "tariffs": [
+          "q",
+          384
+        ],
+        "tolls": [
+          "q",
+          392
+        ],
+        "subventions": [
+          "q",
+          400
+        ],
+        "dividends": [
+          "q",
+          408
+        ],
+        "government_dividends": [
+          "q",
+          416
+        ],
+        "government_reinvestment": [
+          "q",
+          424
+        ],
+        "other_building_dividends": [
+          "q",
+          432
+        ],
+        "ownership_income": [
+          "q",
+          440
+        ],
+        "supply_ship_construction": [
+          "q",
+          448
+        ],
+        "military_ship_construction": [
+          "q",
+          456
+        ],
+        "auto_downsize_start_date": [
+          "i",
+          480
+        ],
+        "state": [
+          "i",
+          228
+        ],
+        "active": [
+          "b",
+          208,
+          0
+        ],
+        "subsidized": [
+          "b",
+          208,
+          2
+        ],
+        "hiring_rate_changed_last_week": [
+          "b",
+          208,
+          4
+        ],
+        "dead": [
+          "b",
+          230,
+          0
+        ],
+        "privatization_should_override_default": [
+          "b",
+          208,
+          5
+        ],
+        "privatization_override_value": [
+          "b",
+          208,
+          6
+        ],
+        "privatization_requested": [
+          "b",
+          620
+        ]
+      },
+      "keys": {
+        "building": [
+          240,
+          "building",
+          24
+        ]
+      },
+      "size": 680,
+      "vectors": {
+        "building_pm": [
+          488,
+          500,
+          8,
+          {
+            "production_method": [
+              "production_method",
+              0
+            ]
+          }
+        ],
+        "building_owners": [
+          560,
+          572,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "building_assets": [
+          584,
+          596,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "building_employee_transfer": [
+          512,
+          524,
+          56,
+          {
+            "transfer_total": [
+              "i",
+              32
+            ],
+            "transfer_literate": [
+              "i",
+              40
+            ]
+          }
+        ],
+        "building_failed_hire": [
+          536,
+          548,
+          48,
+          {
+            "workplace": [
+              "i",
+              16
+            ],
+            "qualifying_workforce": [
+              "i",
+              24
+            ],
+            "min_acceptable_wage": [
+              "q",
+              40
+            ]
+          }
+        ],
+        "building_enable_privatization": [
+          608,
+          620,
+          4,
+          {
+            "country": [
+              "i",
+              0
+            ]
+          }
+        ]
+      },
+      "columns": {
+        "goods_cost": [
+          976,
+          176,
+          "q",
+          160
+        ],
+        "goods_sales": [
+          976,
+          176,
+          "q",
+          168
+        ],
+        "slave_upkeep": [
+          1000,
+          96,
+          "q",
+          88
+        ],
+        "produced_supply": [
+          928,
+          24,
+          "q",
+          8
+        ],
+        "slave_basket": [
+          1000,
+          96,
+          "i",
+          80
+        ]
+      },
+      "column_goods": {
+        "building_input_goods": [
+          976,
+          176,
+          8
+        ],
+        "building_output_goods": [
+          976,
+          176,
+          88
+        ],
+        "building_slave_goods": [
+          1000,
+          96,
+          8
+        ]
+      }
+    },
+    "building_ownership": {
+      "rva": 93742888,
+      "fields": {
+        "levels": [
+          "i",
+          24
+        ],
+        "employed_levels": [
+          "i",
+          28
+        ],
+        "identity_building": [
+          "i",
+          32
+        ],
+        "identity_type": [
+          "b",
+          48
+        ],
+        "building": [
+          "i",
+          56
+        ],
+        "privatization": [
+          "b",
+          60
+        ]
+      },
+      "keys": {},
+      "size": 68
+    },
+    "character": {
+      "rva": 93736656,
+      "fields": {
+        "culture": [
+          "i",
+          132
+        ],
+        "country": [
+          "i",
+          136
+        ],
+        "interest_group": [
+          "i",
+          140
+        ],
+        "birth_date": [
+          "i",
+          144
+        ],
+        "recruitment_date": [
+          "i",
+          152
+        ],
+        "last_health_value": [
+          "q",
+          160
+        ],
+        "prominence": [
+          "i",
+          168
+        ],
+        "loyalty": [
+          "i",
+          172
+        ],
+        "adult": [
+          "b",
+          176
+        ],
+        "expected_trait_value": [
+          "q",
+          184
+        ],
+        "noble": [
+          "b",
+          128,
+          1
+        ],
+        "historical": [
+          "b",
+          128,
+          2
+        ],
+        "recruitable": [
+          "b",
+          128,
+          4
+        ]
+      },
+      "keys": {
+        "ideology": [
+          192,
+          "ideology",
+          24
+        ],
+        "religion": [
+          200,
+          "religion",
+          24
+        ],
+        "home_region": [
+          216,
+          "home_region",
+          24
+        ],
+        "character_template": [
+          208,
+          "character_template",
+          24
+        ],
+        "holding_type": [
+          224,
+          "holding_type",
+          24
+        ]
+      },
+      "size": 288,
+      "vectors": {
+        "character_timed_modifier": [
+          0,
+          12,
+          8,
+          {
+            "modifier": [
+              "modifier",
+              0
+            ],
+            "multiplier": [
+              "q",
+              8
+            ],
+            "start_date": [
+              "i",
+              16
+            ],
+            "end_date": [
+              "i",
+              24
+            ],
+            "decay": [
+              "i",
+              32
+            ]
+          },
+          232,
+          null,
+          48
+        ],
+        "character_character_roles": [
+          24,
+          36,
+          8,
+          {
+            "value": [
+              "character_character_roles",
+              0
+            ]
+          }
+        ],
+        "character_traits": [
+          272,
+          284,
+          8,
+          {
+            "value": [
+              "character_traits",
+              0
+            ]
+          }
+        ],
+        "character_career_end": [
+          96,
+          108,
+          24,
+          {
+            "role": [
+              "character_role",
+              8
+            ],
+            "date": [
+              "i",
+              16
+            ]
+          },
+          null,
+          8
+        ]
+      },
+      "columns": {
+        "order_type": [
+          576,
+          56,
+          "commander_order",
+          0
+        ],
+        "rank": [
+          576,
+          56,
+          "commander_rank",
+          16
+        ],
+        "formation": [
+          576,
+          56,
+          "i",
+          24
+        ],
+        "travel_arrival_date": [
+          576,
+          56,
+          "d",
+          48
+        ],
+        "first_name": [
+          624,
+          64,
+          "string",
+          0
+        ],
+        "last_name": [
+          624,
+          64,
+          "string",
+          32
+        ],
+        "future_interest_group": [
+          528,
+          40,
+          "i",
+          24
+        ],
+        "future_ideology": [
+          528,
+          40,
+          "ideology",
+          32
+        ],
+        "advancement": [
+          576,
+          56,
+          "q",
+          32
+        ],
+        "assigned_state": [
+          576,
+          56,
+          "i",
+          28
+        ]
+      },
+      "column_vectors": {
+        "character_variable": [
+          600,
+          32,
+          8,
+          20,
+          32,
+          {
+            "name": [
+              "token",
+              8
+            ],
+            "tick": [
+              "i",
+              12
+            ],
+            "value_type": [
+              "i",
+              16
+            ],
+            "value": [
+              "w",
+              24
+            ],
+            "flag": [
+              "optional_token",
+              24,
+              "value_type",
+              [
+                3
+              ]
+            ],
+            "definition": [
+              "scope_definition",
+              24,
+              "value_type"
+            ]
+          },
+          8
+        ],
+        "character_dna": [
+          648,
+          48,
+          16,
+          28,
+          4,
+          {}
+        ]
+      },
+      "variable_lists": {
+        "column": [
+          600,
+          32,
+          16
+        ]
+      }
+    },
+    "company": {
+      "rva": 93742896,
+      "fields": {
+        "country": [
+          "i",
+          96
+        ],
+        "building": [
+          "i",
+          100
+        ],
+        "ceo": [
+          "i",
+          104
+        ],
+        "prosperity": [
+          "q",
+          184
+        ]
+      },
+      "keys": {
+        "company_type": [
+          160,
+          "company_type",
+          24
+        ],
+        "state_region": [
+          168,
+          "state_region",
+          24
+        ],
+        "company_name": [
+          176,
+          "company_name",
+          24
+        ]
+      },
+      "size": 192
+    },
+    "country": {
+      "rva": 93736480,
+      "fields": {
+        "power_bloc_as_core": [
+          "i",
+          256
+        ],
+        "timed_modifiers_next_id": [
+          "i",
+          1712
+        ],
+        "market": [
+          "i",
+          2596
+        ],
+        "market_capital": [
+          "i",
+          2600
+        ],
+        "pop_statistics_population_lower_strata": [
+          "w",
+          3328
+        ],
+        "pop_statistics_population_middle_strata": [
+          "w",
+          3336
+        ],
+        "pop_statistics_population_upper_strata": [
+          "w",
+          3344
+        ],
+        "pop_statistics_population_radicals": [
+          "w",
+          3352
+        ],
+        "pop_statistics_population_loyalists": [
+          "w",
+          3360
+        ],
+        "pop_statistics_population_slaves": [
+          "w",
+          3368
+        ],
+        "pop_statistics_population_salaried_workforce": [
+          "w",
+          3376
+        ],
+        "pop_statistics_population_subsisting_workforce": [
+          "w",
+          3384
+        ],
+        "pop_statistics_population_unemployed_workforce": [
+          "w",
+          3392
+        ],
+        "pop_statistics_population_laborer_workforce": [
+          "w",
+          3400
+        ],
+        "pop_statistics_population_slave_workforce": [
+          "w",
+          3408
+        ],
+        "pop_statistics_population_government_workforce": [
+          "w",
+          3416
+        ],
+        "pop_statistics_population_military_workforce": [
+          "w",
+          3424
+        ],
+        "pop_statistics_population_political_participants": [
+          "w",
+          3432
+        ],
+        "pop_statistics_population_eligible_voters": [
+          "w",
+          3440
+        ],
+        "pop_statistics_primary_cultures_population": [
+          "w",
+          3448
+        ],
+        "pop_statistics_vacancies_new_culture": [
+          "w",
+          3456
+        ],
+        "pop_statistics_military_political_strength": [
+          "w",
+          3472
+        ],
+        "pop_statistics_total_wealth": [
+          "w",
+          3480
+        ],
+        "pop_statistics_slave_standard_of_living": [
+          "w",
+          3496
+        ],
+        "pop_radicals_and_loyalists_statistics_week": [
+          "i",
+          4592
+        ],
+        "pop_radicals_and_loyalists_statistics_loyalists_increase": [
+          "i",
+          4600
+        ],
+        "pop_radicals_and_loyalists_statistics_loyalists_decrease": [
+          "i",
+          4608
+        ],
+        "pop_radicals_and_loyalists_statistics_radicals_increase": [
+          "i",
+          4616
+        ],
+        "pop_radicals_and_loyalists_statistics_radicals_decrease": [
+          "i",
+          4624
+        ],
+        "budget_money": [
+          "q",
+          4664
+        ],
+        "budget_investment_pool": [
+          "q",
+          7248
+        ],
+        "budget_weekly_investment_pool_change_from_investment": [
+          "q",
+          7256
+        ],
+        "budget_weekly_investment_pool_change_from_construction": [
+          "q",
+          7264
+        ],
+        "budget_country_building_budget_expenses_governmen_484983aa": [
+          "q",
+          7320
+        ],
+        "budget_country_building_budget_expenses_construct_57ff67ab": [
+          "q",
+          7368
+        ],
+        "budget_diplomacy_expenses_43": [
+          "q",
+          7400
+        ],
+        "budget_building_tax_waste": [
+          "q",
+          7616
+        ],
+        "budget_consumption_tax_waste": [
+          "q",
+          7624
+        ],
+        "budget_country_building_budget_expense": [
+          "q",
+          7656
+        ],
+        "budget_country_building_budget_income": [
+          "q",
+          7664
+        ],
+        "budget_base_wage": [
+          "q",
+          8336
+        ],
+        "budget_average_productivity": [
+          "q",
+          8344
+        ],
+        "budget_government_cash_reserves_ownership": [
+          "q",
+          8352
+        ],
+        "budget_credit": [
+          "q",
+          8408
+        ],
+        "budget_principal": [
+          "q",
+          8416
+        ],
+        "budget_state_budget_counter": [
+          "i",
+          8588
+        ],
+        "budget_diplo_pact_counter": [
+          "i",
+          8612
+        ],
+        "budget_treaty_counter": [
+          "i",
+          8620
+        ],
+        "budget_interest_counter": [
+          "i",
+          8628
+        ],
+        "budget_additional_income_counter": [
+          "i",
+          8636
+        ],
+        "budget_tariffs_counter": [
+          "i",
+          8644
+        ],
+        "budget_tax_level_counter": [
+          "i",
+          8660
+        ],
+        "budget_weekly_counter": [
+          "i",
+          8668
+        ],
+        "budget_previous_building_group_investments_bg_com_3453aaa5": [
+          "q",
+          8712
+        ],
+        "power_bloc_join_date": [
+          "i",
+          8720
+        ],
+        "power_bloc_leave_date": [
+          "i",
+          8728
+        ],
+        "company_name_random_seed": [
+          "i",
+          9412
+        ],
+        "supply_ships": [
+          "i",
+          9416
+        ],
+        "infamy": [
+          "q",
+          9424
+        ],
+        "ruler": [
+          "i",
+          2976
+        ],
+        "heir": [
+          "i",
+          2980
+        ],
+        "capital": [
+          "i",
+          2592
+        ],
+        "supply_ship_construction_level": [
+          "b",
+          9188
+        ],
+        "founding_company": [
+          "i",
+          2604
+        ],
+        "tax_level": [
+          "b",
+          9176
+        ],
+        "construction_paused": [
+          "b",
+          9193
+        ],
+        "budget_money_trend_current": [
+          "q",
+          5056
+        ],
+        "budget_balance_trend_current": [
+          "q",
+          5448
+        ],
+        "budget_money_trend_latest_sample": [
+          "d",
+          4816
+        ],
+        "budget_balance_trend_latest_sample": [
+          "d",
+          5208
+        ],
+        "budget_money_trend_num_samples": [
+          "i",
+          4824
+        ],
+        "budget_money_trend_sample_index": [
+          "i",
+          4828
+        ],
+        "budget_balance_trend_num_samples": [
+          "i",
+          5216
+        ],
+        "budget_balance_trend_sample_index": [
+          "i",
+          5220
+        ],
+        "timed_enactment_modifiers_next_id": [
+          "i",
+          1944
+        ],
+        "pop_statistics_primary_cultures_standard_of_living": [
+          "w",
+          3488
+        ],
+        "is_main_tag": [
+          "b",
+          1472,
+          1
+        ],
+        "civil_war": [
+          "b",
+          1472,
+          2
+        ],
+        "trends_initialized": [
+          "b",
+          9192,
+          0
+        ],
+        "map_color_override": [
+          "i",
+          1520
+        ],
+        "government_wage_level": [
+          "b",
+          9180
+        ],
+        "military_wage_level": [
+          "b",
+          9184
+        ]
+      },
+      "keys": {
+        "country_definition": [
+          1488,
+          "country_definition",
+          24
+        ],
+        "government": [
+          2984,
+          "government",
+          24
+        ],
+        "religion": [
+          3296,
+          "religion",
+          24
+        ],
+        "country_type": [
+          3304,
+          "country_type",
+          24
+        ],
+        "hierarchy_override": [
+          3312,
+          "hierarchy_override",
+          24
+        ]
+      },
+      "size": 9456,
+      "vectors": {
+        "construction_queue": [
+          2704,
+          2716,
+          72,
+          {
+            "state": [
+              "i",
+              0
+            ],
+            "building_type": [
+              "building",
+              8
+            ],
+            "speed": [
+              "q",
+              40
+            ],
+            "base_speed": [
+              "q",
+              48
+            ],
+            "construction_left": [
+              "q",
+              56
+            ]
+          }
+        ],
+        "country_variable": [
+          8,
+          20,
+          32,
+          {
+            "name": [
+              "token",
+              8
+            ],
+            "tick": [
+              "i",
+              12
+            ],
+            "value_type": [
+              "i",
+              16
+            ],
+            "value": [
+              "w",
+              24
+            ],
+            "flag": [
+              "optional_token",
+              24,
+              "value_type",
+              [
+                3
+              ]
+            ],
+            "definition": [
+              "scope_definition",
+              24,
+              "value_type"
+            ]
+          },
+          1600
+        ],
+        "private_construction_queue": [
+          2824,
+          2836,
+          72,
+          {
+            "state": [
+              "i",
+              0
+            ],
+            "building_type": [
+              "building",
+              8
+            ],
+            "owner_building_type": [
+              "building",
+              16
+            ],
+            "speed": [
+              "q",
+              40
+            ],
+            "base_speed": [
+              "q",
+              48
+            ],
+            "construction_left": [
+              "q",
+              56
+            ]
+          }
+        ],
+        "country_export_tariff": [
+          9208,
+          9220,
+          32,
+          {
+            "goods_type": [
+              "goods_type",
+              8
+            ],
+            "level": [
+              "h0",
+              16
+            ],
+            "previous": [
+              "h1",
+              16
+            ],
+            "last_change": [
+              "i",
+              20
+            ]
+          },
+          null,
+          8
+        ],
+        "country_import_tariff": [
+          9248,
+          9260,
+          32,
+          {
+            "goods_type": [
+              "goods_type",
+              8
+            ],
+            "level": [
+              "h0",
+              16
+            ],
+            "previous": [
+              "h1",
+              16
+            ],
+            "last_change": [
+              "i",
+              20
+            ]
+          },
+          null,
+          8
+        ],
+        "country_leverage": [
+          3048,
+          3060,
+          24,
+          {
+            "power_bloc": [
+              "i",
+              8
+            ],
+            "value": [
+              "q",
+              16
+            ]
+          },
+          null,
+          -1
+        ],
+        "country_timed_modifier": [
+          1648,
+          1660,
+          8,
+          {
+            "modifier": [
+              "modifier",
+              0
+            ],
+            "multiplier": [
+              "q",
+              8
+            ],
+            "start_date": [
+              "i",
+              16
+            ],
+            "end_date": [
+              "i",
+              24
+            ],
+            "decay": [
+              "i",
+              32
+            ],
+            "modifier_id": [
+              "i",
+              36
+            ]
+          },
+          null,
+          null,
+          48
+        ],
+        "country_cultures": [
+          3272,
+          3284,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "country_states": [
+          3224,
+          3236,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "country_taxed_goods": [
+          9280,
+          9292,
+          8,
+          {
+            "value": [
+              "country_taxed_goods",
+              0
+            ]
+          }
+        ],
+        "country_dividend_buildings": [
+          9440,
+          9452,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "country_claims": [
+          3248,
+          3260,
+          8,
+          {
+            "value": [
+              "country_claims",
+              0
+            ]
+          }
+        ],
+        "country_budget_money_trend": [
+          4832,
+          4844,
+          8,
+          {
+            "value": [
+              "q",
+              0
+            ]
+          }
+        ],
+        "country_budget_balance_trend": [
+          5224,
+          5236,
+          8,
+          {
+            "value": [
+              "q",
+              0
+            ]
+          }
+        ],
+        "country_enactment_modifier": [
+          1880,
+          1892,
+          8,
+          {
+            "modifier": [
+              "modifier",
+              0
+            ],
+            "multiplier": [
+              "q",
+              8
+            ],
+            "start_date": [
+              "i",
+              16
+            ],
+            "end_date": [
+              "i",
+              24
+            ],
+            "decay": [
+              "i",
+              32
+            ],
+            "modifier_id": [
+              "i",
+              36
+            ]
+          },
+          null,
+          null,
+          48
+        ],
+        "country_population_workforce_by_profession": [
+          3504,
+          3516,
+          8,
+          {
+            "value": [
+              "w",
+              0
+            ]
+          }
+        ],
+        "country_population_by_profession": [
+          3528,
+          3540,
+          8,
+          {
+            "value": [
+              "w",
+              0
+            ]
+          }
+        ],
+        "country_population_by_strata": [
+          3552,
+          3564,
+          8,
+          {
+            "value": [
+              "w",
+              0
+            ]
+          }
+        ],
+        "country_fully_accepted_population_by_strata": [
+          3576,
+          3588,
+          8,
+          {
+            "value": [
+              "w",
+              0
+            ]
+          }
+        ],
+        "country_population_employable_qualifications": [
+          3600,
+          3612,
+          8,
+          {
+            "value": [
+              "w",
+              0
+            ]
+          }
+        ],
+        "country_political_participants_by_religion_array": [
+          3768,
+          3780,
+          8,
+          {
+            "value": [
+              "w",
+              0
+            ]
+          }
+        ],
+        "country_wealth_by_religion_array": [
+          3832,
+          3844,
+          8,
+          {
+            "value": [
+              "w",
+              0
+            ]
+          }
+        ],
+        "country_military_pol_str_by_religion_array": [
+          3896,
+          3908,
+          8,
+          {
+            "value": [
+              "w",
+              0
+            ]
+          }
+        ],
+        "country_standard_of_living_by_religion_array": [
+          3960,
+          3972,
+          8,
+          {
+            "value": [
+              "w",
+              0
+            ]
+          }
+        ],
+        "country_total_pol_str_by_religion": [
+          4024,
+          4036,
+          8,
+          {
+            "value": [
+              "w",
+              0
+            ]
+          }
+        ],
+        "country_total_pol_str_by_pop_type": [
+          4048,
+          4060,
+          8,
+          {
+            "value": [
+              "w",
+              0
+            ]
+          }
+        ],
+        "country_wealth_pol_str_by_pop_type": [
+          4072,
+          4084,
+          8,
+          {
+            "value": [
+              "w",
+              0
+            ]
+          }
+        ],
+        "country_vacancies_by_culture": [
+          3632,
+          3644,
+          24,
+          {
+            "culture": [
+              "i",
+              8
+            ],
+            "value": [
+              "w",
+              16
+            ]
+          },
+          null,
+          -1
+        ],
+        "country_population_by_culture": [
+          3672,
+          3684,
+          24,
+          {
+            "culture": [
+              "i",
+              8
+            ],
+            "value": [
+              "w",
+              16
+            ]
+          },
+          null,
+          -1
+        ],
+        "country_political_participants_by_culture": [
+          3736,
+          3748,
+          24,
+          {
+            "culture": [
+              "i",
+              8
+            ],
+            "value": [
+              "w",
+              16
+            ]
+          },
+          null,
+          -1
+        ],
+        "country_wealth_by_culture": [
+          3800,
+          3812,
+          24,
+          {
+            "culture": [
+              "i",
+              8
+            ],
+            "value": [
+              "w",
+              16
+            ]
+          },
+          null,
+          -1
+        ],
+        "country_military_pol_str_by_culture": [
+          3864,
+          3876,
+          24,
+          {
+            "culture": [
+              "i",
+              8
+            ],
+            "value": [
+              "w",
+              16
+            ]
+          },
+          null,
+          -1
+        ],
+        "country_standard_of_living_by_culture": [
+          3928,
+          3940,
+          24,
+          {
+            "culture": [
+              "i",
+              8
+            ],
+            "value": [
+              "w",
+              16
+            ]
+          },
+          null,
+          -1
+        ],
+        "country_total_pol_str_by_culture": [
+          3992,
+          4004,
+          24,
+          {
+            "culture": [
+              "i",
+              8
+            ],
+            "value": [
+              "w",
+              16
+            ]
+          },
+          null,
+          -1
+        ],
+        "country_population_by_religion": [
+          3704,
+          3716,
+          48,
+          {
+            "total": [
+              "w",
+              0
+            ]
+          }
+        ],
+        "country_culture_types_present": [
+          4096,
+          4108,
+          8,
+          {
+            "culture_type": [
+              "culture_type",
+              0
+            ]
+          }
+        ],
+        "country_religions_present": [
+          4120,
+          4132,
+          8,
+          {
+            "religion": [
+              "religion",
+              0
+            ]
+          }
+        ],
+        "country_counter": [
+          1624,
+          1636,
+          4,
+          {}
+        ],
+        "country_ignored_decisions": [
+          9336,
+          9348,
+          16,
+          {
+            "decision": [
+              "decision",
+              8
+            ]
+          },
+          null,
+          8
+        ],
+        "country_interaction_cooldown": [
+          3008,
+          3020,
+          24,
+          {
+            "interaction": [
+              "character_interaction",
+              8
+            ],
+            "until": [
+              "i",
+              16
+            ]
+          },
+          null,
+          8
+        ]
+      },
+      "arrays": {
+        "country_budget_weekly_expenses": [
+          7312,
+          22
+        ],
+        "country_budget_weekly_income": [
+          7488,
+          16
+        ]
+      },
+      "trends": {
+        "gdp": 8784,
+        "prestige": 8840,
+        "literacy": 8896,
+        "avgsoltrend": 8952,
+        "trend_population": 4144,
+        "trend_population_lower_strata": 4200,
+        "trend_population_middle_strata": 4256,
+        "trend_population_upper_strata": 4312,
+        "trend_radicals": 4368,
+        "trend_loyalists": 4424
+      },
+      "nested_vectors": {
+        "country_population_by_religion_culture": {
+          "outer": [
+            3704,
+            3716,
+            48,
+            {
+              "_pointer": [
+                "w",
+                16
+              ],
+              "_counts": [
+                "w",
+                24
+              ],
+              "_overflow": [
+                "w",
+                32
+              ]
+            }
+          ],
+          "inner": [
+            0,
+            12,
+            24,
+            {
+              "culture": [
+                "i",
+                8
+              ],
+              "value": [
+                "w",
+                16
+              ]
+            },
+            null,
+            -1
+          ]
+        }
+      },
+      "strings": {
+        "dynamic_country_name": 3080,
+        "dynamic_country_adjective": 3112
+      },
+      "variable_lists": {
+        "pointer": 1608
+      },
+      "variable_maps": {
+        "pointer": 1616
+      }
+    },
+    "cultural_community": {
+      "rva": 93743120,
+      "fields": {
+        "culture": [
+          "i",
+          20
+        ],
+        "state": [
+          "i",
+          24
+        ],
+        "acceptance_delta": [
+          "q",
+          40
+        ],
+        "date": [
+          "i",
+          28
+        ]
+      },
+      "keys": {},
+      "size": 48
+    },
+    "culture": {
+      "rva": 93742824,
+      "fields": {
+        "random_seed": [
+          "i",
+          280
+        ],
+        "current_fervor": [
+          "q",
+          288
+        ],
+        "casualties_from_wars": [
+          "i",
+          320
+        ],
+        "national_awakening_expiry_date": [
+          "i",
+          332
+        ],
+        "national_awakening_state_region": [
+          "i",
+          340
+        ],
+        "has_started_national_awakening": [
+          "b",
+          328
+        ],
+        "name_format": [
+          "b",
+          344
+        ]
+      },
+      "keys": {
+        "culture_type": [
+          56,
+          "culture_type",
+          24
+        ]
+      },
+      "size": 352,
+      "vectors": {
+        "culture_core_states": [
+          104,
+          116,
+          8,
+          {
+            "value": [
+              "culture_core_states",
+              0
+            ]
+          }
+        ],
+        "culture_obsessions": [
+          176,
+          188,
+          8,
+          {
+            "value": [
+              "culture_obsessions",
+              0
+            ]
+          }
+        ],
+        "culture_taboos": [
+          200,
+          212,
+          8,
+          {
+            "value": [
+              "culture_taboos",
+              0
+            ]
+          }
+        ],
+        "culture_traditions": [
+          224,
+          236,
+          8,
+          {
+            "value": [
+              "culture_traditions",
+              0
+            ]
+          }
+        ],
+        "culture_potential_migration": [
+          152,
+          164,
+          24,
+          {
+            "origin": [
+              "i",
+              8
+            ],
+            "culture": [
+              "i",
+              12
+            ],
+            "spawn_chance": [
+              "q",
+              16
+            ]
+          }
+        ],
+        "culture_migration": [
+          128,
+          140,
+          32,
+          {
+            "origin": [
+              "i",
+              8
+            ],
+            "state": [
+              "i",
+              12
+            ],
+            "date": [
+              "i",
+              16
+            ],
+            "expiry_date": [
+              "i",
+              24
+            ]
+          }
+        ]
+      }
+    },
+    "decree": {
+      "rva": 93743048,
+      "fields": {
+        "owner": [
+          "i",
+          24
+        ],
+        "state": [
+          "i",
+          28
+        ]
+      },
+      "keys": {
+        "decree_type": [
+          32,
+          "decree_type",
+          24
+        ]
+      },
+      "size": 40
+    },
+    "diplomatic_action": {
+      "rva": 93743184,
+      "fields": {
+        "targets_first": [
+          "i",
+          32
+        ],
+        "targets_second": [
+          "i",
+          36
+        ]
+      },
+      "keys": {
+        "diplomatic_action_action": [
+          24,
+          "diplomatic_action_action",
+          24
+        ]
+      },
+      "size": 44
+    },
+    "diplomatic_catalyst": {
+      "rva": 93742952,
+      "fields": {
+        "country": [
+          "i",
+          24
+        ],
+        "target_country": [
+          "i",
+          28
+        ],
+        "date": [
+          "i",
+          40
+        ]
+      },
+      "keys": {
+        "diplomatic_catalyst_type": [
+          32,
+          "diplomatic_catalyst_type",
+          24
+        ]
+      },
+      "size": 48
+    },
+    "diplomatic_demand": {
+      "rva": 93743240,
+      "fields": {
+        "sender": [
+          "i",
+          24
+        ],
+        "target_state": [
+          "i",
+          48
+        ],
+        "timeout": [
+          "i",
+          120
+        ]
+      },
+      "keys": {
+        "diplomatic_play": [
+          32,
+          "diplomatic_play",
+          24
+        ]
+      },
+      "size": 128
+    },
+    "diplomatic_play": {
+      "rva": 93736616,
+      "fields": {
+        "initiator": [
+          "i",
+          312
+        ],
+        "target": [
+          "i",
+          316
+        ],
+        "state": [
+          "i",
+          320
+        ],
+        "initiator_maneuvers": [
+          "i",
+          552
+        ],
+        "target_maneuvers": [
+          "i",
+          556
+        ],
+        "start_date": [
+          "i",
+          592
+        ],
+        "end_date": [
+          "i",
+          600
+        ],
+        "escalation": [
+          "i",
+          612
+        ],
+        "war": [
+          "i",
+          608
+        ],
+        "identity": [
+          "i",
+          8
+        ]
+      },
+      "keys": {
+        "strategic_region": [
+          328,
+          "strategic_region",
+          24
+        ],
+        "diplomatic_play_type": [
+          344,
+          "diplomatic_play_type",
+          24
+        ]
+      },
+      "size": 620,
+      "vectors": {
+        "diplomatic_play_involved": [
+          448,
+          460,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "diplomatic_play_targets": [
+          376,
+          388,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "diplomatic_play_country_record": [
+          472,
+          484,
+          104,
+          {
+            "country": [
+              "i",
+              8
+            ],
+            "side": [
+              "i",
+              12
+            ],
+            "wage_cost_of_war": [
+              "q",
+              96
+            ]
+          }
+        ],
+        "diplomatic_play_lean_initiator": [
+          400,
+          412,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "diplomatic_play_lean_target": [
+          424,
+          436,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "diplomatic_play_initiators": [
+          352,
+          364,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ]
+      },
+      "vector_goods": {
+        "diplomatic_play_country_goods": [
+          472,
+          484,
+          104,
+          {
+            "country": [
+              "i",
+              8
+            ]
+          },
+          16
+        ]
+      }
+    },
+    "election": {
+      "rva": 93743224,
+      "fields": {
+        "country": [
+          "i",
+          24
+        ],
+        "next_election": [
+          "i",
+          28
+        ],
+        "last_election": [
+          "i",
+          36
+        ],
+        "electoral_confidence": [
+          "q",
+          48
+        ],
+        "campaign_period": [
+          "b",
+          80
+        ],
+        "government_reform": [
+          "b",
+          81
+        ]
+      },
+      "keys": {},
+      "size": 89,
+      "vectors": {
+        "election_vote": [
+          56,
+          68,
+          120,
+          {
+            "party": [
+              "i",
+              8
+            ],
+            "momentum": [
+              "q",
+              16
+            ],
+            "raw_votes": [
+              "i",
+              24
+            ],
+            "raw_num_voters": [
+              "i",
+              32
+            ],
+            "last_votes": [
+              "i",
+              40
+            ],
+            "last_num_voters": [
+              "i",
+              48
+            ],
+            "last_vote_date": [
+              "i",
+              56
+            ]
+          }
+        ]
+      }
+    },
+    "delayed_event": {
+      "rva": 93743208,
+      "fields": {
+        "scope_seed": [
+          "i",
+          48
+        ],
+        "days": [
+          "i",
+          344
+        ],
+        "runtime_id": [
+          "i",
+          8
+        ]
+      },
+      "keys": {
+        "delayed_event_event": [
+          24,
+          "delayed_event_event",
+          16
+        ]
+      },
+      "size": 352,
+      "vectors": {
+        "delayed_event_target": [
+          56,
+          68,
+          24,
+          {
+            "name": [
+              "token",
+              0
+            ],
+            "scope_type": [
+              "i",
+              8
+            ],
+            "identity": [
+              "w",
+              16
+            ],
+            "flag": [
+              "optional_token",
+              16,
+              "scope_type",
+              [
+                3
+              ]
+            ],
+            "definition": [
+              "scope_definition",
+              16,
+              "scope_type"
+            ]
+          }
+        ]
+      },
+      "scopes": {
+        "scope_root": [
+          32,
+          40
+        ]
+      }
+    },
+    "event": {
+      "rva": 93743040,
+      "fields": {
+        "scope_seed": [
+          "i",
+          56
+        ],
+        "expiry_date": [
+          "i",
+          352
+        ],
+        "creation_date": [
+          "i",
+          360
+        ],
+        "origin_country": [
+          "i",
+          32
+        ],
+        "runtime_id": [
+          "i",
+          8
+        ],
+        "status": [
+          "i",
+          76
+        ]
+      },
+      "keys": {
+        "event_event": [
+          24,
+          "event_event",
+          16
+        ]
+      },
+      "size": 368,
+      "vectors": {
+        "event_target": [
+          64,
+          76,
+          24,
+          {
+            "name": [
+              "token",
+              0
+            ],
+            "scope_type": [
+              "i",
+              8
+            ],
+            "identity": [
+              "w",
+              16
+            ],
+            "flag": [
+              "optional_token",
+              16,
+              "scope_type",
+              [
+                3
+              ]
+            ],
+            "definition": [
+              "scope_definition",
+              16,
+              "scope_type"
+            ]
+          }
+        ]
+      },
+      "scopes": {
+        "scope_root": [
+          40,
+          48
+        ]
+      }
+    },
+    "famine": {
+      "rva": 93743072,
+      "fields": {
+        "start_date": [
+          "i",
+          24
+        ],
+        "state": [
+          "i",
+          32
+        ],
+        "num_births": [
+          "i",
+          40
+        ],
+        "num_deaths": [
+          "i",
+          48
+        ]
+      },
+      "keys": {},
+      "size": 56
+    },
+    "front_side": {
+      "rva": 93747752,
+      "fields": {
+        "theaters_first": [
+          "i",
+          88
+        ],
+        "theaters_second": [
+          "i",
+          92
+        ],
+        "front": [
+          "i",
+          48
+        ],
+        "play_side": [
+          "b",
+          60
+        ],
+        "war": [
+          "i",
+          56
+        ]
+      },
+      "keys": {},
+      "size": 100,
+      "province_runs": 64
+    },
+    "hq": {
+      "rva": 93743016,
+      "fields": {
+        "country": [
+          "i",
+          48
+        ],
+        "type": [
+          "b",
+          64
+        ]
+      },
+      "keys": {
+        "hq_region": [
+          56,
+          "hq_region",
+          24
+        ]
+      },
+      "size": 72
+    },
+    "institution": {
+      "rva": 93743256,
+      "fields": {
+        "country": [
+          "i",
+          32
+        ],
+        "investment": [
+          "i",
+          36
+        ],
+        "target": [
+          "i",
+          40
+        ],
+        "growth": [
+          "q",
+          48
+        ]
+      },
+      "keys": {
+        "institution": [
+          24,
+          "institution",
+          24
+        ]
+      },
+      "size": 56
+    },
+    "interest_group": {
+      "rva": 93742928,
+      "fields": {
+        "country": [
+          "i",
+          164
+        ],
+        "party": [
+          "i",
+          172
+        ],
+        "approval": [
+          "i",
+          196
+        ],
+        "political_strength": [
+          "i",
+          216
+        ],
+        "radicals_political_strength": [
+          "i",
+          224
+        ],
+        "loyalists_political_strength": [
+          "i",
+          232
+        ],
+        "clout": [
+          "q",
+          240
+        ],
+        "leader": [
+          "i",
+          168
+        ],
+        "approval_state": [
+          "b",
+          192
+        ],
+        "influence_type": [
+          "b",
+          184
+        ],
+        "party_to_join": [
+          "i",
+          176
+        ],
+        "in_government": [
+          "b",
+          152
+        ],
+        "influence_type_reason": [
+          "b",
+          188
+        ],
+        "wants_to_leave_party": [
+          "b",
+          180
+        ],
+        "civil_war": [
+          "i",
+          160
+        ]
+      },
+      "keys": {
+        "interest_group_definition": [
+          208,
+          "interest_group_definition",
+          24
+        ]
+      },
+      "size": 800,
+      "vectors": {
+        "interest_group_variable": [
+          8,
+          20,
+          32,
+          {
+            "name": [
+              "token",
+              8
+            ],
+            "tick": [
+              "i",
+              12
+            ],
+            "value_type": [
+              "i",
+              16
+            ],
+            "value": [
+              "w",
+              24
+            ],
+            "flag": [
+              "optional_token",
+              24,
+              "value_type",
+              [
+                3
+              ]
+            ],
+            "definition": [
+              "scope_definition",
+              24,
+              "value_type"
+            ]
+          },
+          528
+        ],
+        "interest_group_timed_modifier": [
+          0,
+          12,
+          8,
+          {
+            "modifier": [
+              "modifier",
+              0
+            ],
+            "multiplier": [
+              "q",
+              8
+            ],
+            "start_date": [
+              "i",
+              16
+            ],
+            "end_date": [
+              "i",
+              24
+            ],
+            "decay": [
+              "i",
+              32
+            ]
+          },
+          440,
+          null,
+          48
+        ],
+        "interest_group_movement_support": [
+          560,
+          572,
+          40,
+          {
+            "political_movement": [
+              "i",
+              8
+            ],
+            "individuals": [
+              "w",
+              16
+            ],
+            "political_strength": [
+              "w",
+              24
+            ],
+            "clout": [
+              "q",
+              32
+            ]
+          },
+          null,
+          -1
+        ],
+        "interest_group_pops": [
+          448,
+          460,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "interest_group_influencing_movements": [
+          592,
+          604,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "interest_group_traits": [
+          688,
+          700,
+          8,
+          {
+            "value": [
+              "interest_group_traits",
+              0
+            ]
+          }
+        ],
+        "interest_group_enabled_traits": [
+          752,
+          764,
+          8,
+          {
+            "value": [
+              "interest_group_enabled_traits",
+              0
+            ]
+          }
+        ],
+        "interest_group_ideologies": [
+          472,
+          484,
+          8,
+          {
+            "value": [
+              "interest_group_ideologies",
+              0
+            ]
+          }
+        ],
+        "interest_group_character_ideologies": [
+          496,
+          508,
+          8,
+          {
+            "value": [
+              "interest_group_character_ideologies",
+              0
+            ]
+          }
+        ],
+        "interest_group_counter": [
+          776,
+          788,
+          4,
+          {}
+        ]
+      },
+      "trends": {
+        "clout_trend": 248,
+        "radical_trend": 304,
+        "loyalist_trend": 360
+      },
+      "strings": {
+        "name": 616
+      },
+      "variable_lists": {
+        "pointer": 536
+      }
+    },
+    "interest": {
+      "rva": 93743008,
+      "fields": {
+        "country": [
+          "i",
+          32
+        ],
+        "grace_period_end_date": [
+          "i",
+          60
+        ],
+        "current_involvement": [
+          "q",
+          72
+        ]
+      },
+      "keys": {
+        "strategic_region": [
+          40,
+          "strategic_region",
+          24
+        ]
+      },
+      "size": 80
+    },
+    "journal_entry": {
+      "rva": 93736672,
+      "fields": {
+        "country": [
+          "i",
+          32
+        ],
+        "date_added": [
+          "i",
+          128
+        ],
+        "scope_seed": [
+          "i",
+          216
+        ],
+        "active": [
+          "b",
+          520
+        ],
+        "goal_value": [
+          "q",
+          144
+        ],
+        "baseline_value": [
+          "q",
+          136
+        ],
+        "runtime_id": [
+          "i",
+          8
+        ]
+      },
+      "keys": {
+        "journal_entry_type": [
+          24,
+          "journal_entry_type",
+          24
+        ]
+      },
+      "size": 544,
+      "vectors": {
+        "journal_entry_timed_modifier": [
+          528,
+          540,
+          8,
+          {
+            "modifier": [
+              "modifier",
+              0
+            ],
+            "multiplier": [
+              "q",
+              8
+            ],
+            "start_date": [
+              "i",
+              16
+            ],
+            "end_date": [
+              "i",
+              24
+            ],
+            "decay": [
+              "i",
+              32
+            ]
+          },
+          null,
+          null,
+          48
+        ],
+        "journal_entry_progress_bar": [
+          64,
+          76,
+          16,
+          {
+            "progress_bar": [
+              "progress_bar",
+              0
+            ],
+            "value": [
+              "q",
+              8
+            ]
+          }
+        ],
+        "journal_entry_target": [
+          224,
+          236,
+          24,
+          {
+            "name": [
+              "token",
+              0
+            ],
+            "scope_type": [
+              "i",
+              8
+            ],
+            "identity": [
+              "w",
+              16
+            ],
+            "flag": [
+              "optional_token",
+              16,
+              "scope_type",
+              [
+                3
+              ]
+            ],
+            "definition": [
+              "scope_definition",
+              16,
+              "scope_type"
+            ]
+          }
+        ],
+        "journal_entry_involved_countries": [
+          40,
+          52,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "journal_entry_variable": [
+          8,
+          20,
+          32,
+          {
+            "name": [
+              "token",
+              8
+            ],
+            "tick": [
+              "i",
+              12
+            ],
+            "type": [
+              "i",
+              16
+            ],
+            "value": [
+              "w",
+              24
+            ],
+            "flag": [
+              "optional_token",
+              24,
+              "type",
+              [
+                3
+              ]
+            ],
+            "definition": [
+              "scope_definition",
+              24,
+              "type"
+            ]
+          },
+          160
+        ]
+      },
+      "scopes": {
+        "scope_root": [
+          200,
+          208
+        ]
+      },
+      "variable_lists": {
+        "pointer": 168
+      }
+    },
+    "law": {
+      "rva": 93743000,
+      "fields": {
+        "country": [
+          "i",
+          64
+        ],
+        "activation_date": [
+          "i",
+          72
+        ],
+        "enactment_start_date": [
+          "i",
+          88
+        ],
+        "random_seed": [
+          "i",
+          104
+        ],
+        "progress": [
+          "q",
+          112
+        ],
+        "phase": [
+          "i",
+          120
+        ],
+        "enactment_last_checkpoint_or_stop_date": [
+          "i",
+          132
+        ],
+        "active": [
+          "b",
+          68
+        ],
+        "enactment_last_checkpoint_result": [
+          "b",
+          128
+        ],
+        "was_enacted": [
+          "b",
+          69,
+          0
+        ],
+        "imposer": [
+          "i",
+          48
+        ]
+      },
+      "keys": {
+        "law": [
+          56,
+          "law",
+          24
+        ],
+        "replace": [
+          80,
+          "replace",
+          24
+        ]
+      },
+      "size": 140,
+      "vectors": {
+        "law_amendments": [
+          24,
+          36,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ]
+      }
+    },
+    "market": {
+      "rva": 93736664,
+      "fields": {
+        "owner": [
+          "i",
+          2120
+        ]
+      },
+      "keys": {},
+      "size": 2128,
+      "goods": {
+        "sell_orders": 80,
+        "consumption_orders": 240,
+        "buy_orders": 480,
+        "other_buy_orders": 736,
+        "price": 1792
+      }
+    },
+    "formation": {
+      "rva": 93742992,
+      "fields": {
+        "full_supply_path_path_distance": [
+          "q",
+          1624
+        ],
+        "naval_supply_path_path_distance": [
+          "q",
+          1816
+        ],
+        "country": [
+          "i",
+          252
+        ],
+        "home_hq": [
+          "i",
+          256
+        ],
+        "naval_mission": [
+          "i",
+          268
+        ],
+        "basecamp": [
+          "i",
+          272
+        ],
+        "province": [
+          "i",
+          276
+        ],
+        "current_location_identity": [
+          "i",
+          304
+        ],
+        "target_location_identity": [
+          "i",
+          320
+        ],
+        "flag": [
+          "i",
+          376
+        ],
+        "ordinal_number": [
+          "i",
+          460
+        ],
+        "organization": [
+          "q",
+          1064
+        ],
+        "sea_presence": [
+          "q",
+          1072
+        ],
+        "supply": [
+          "q",
+          1080
+        ],
+        "delivered_supply": [
+          "q",
+          1088
+        ],
+        "supply_ships": [
+          "i",
+          1096
+        ],
+        "supply_hub": [
+          "i",
+          1100
+        ],
+        "travel_progress_path_target_node": [
+          "i",
+          1400
+        ],
+        "travel_progress_path_distance": [
+          "q",
+          1432
+        ],
+        "travel_progress_path_cost": [
+          "q",
+          1440
+        ],
+        "travel_progress_current_move": [
+          "i",
+          1448
+        ],
+        "travel_progress_cost_progress": [
+          "q",
+          1456
+        ],
+        "travel_progress_distance_progress": [
+          "q",
+          1464
+        ],
+        "travel_progress_total_distance_progress": [
+          "q",
+          1512
+        ],
+        "travel_progress_total_cost_progress": [
+          "q",
+          1520
+        ],
+        "full_supply_path_path_start_node": [
+          "i",
+          1560
+        ],
+        "full_supply_path_path_cost": [
+          "q",
+          1632
+        ],
+        "naval_supply_path_path_start_node": [
+          "i",
+          1752
+        ],
+        "naval_supply_path_path_target_node": [
+          "i",
+          1784
+        ],
+        "naval_supply_path_path_cost": [
+          "q",
+          1824
+        ],
+        "creation_date": [
+          "i",
+          1932
+        ],
+        "last_split_date": [
+          "i",
+          1940
+        ],
+        "origin": [
+          "i",
+          1948
+        ],
+        "attached_to_fleet": [
+          "i",
+          1956
+        ],
+        "type": [
+          "b",
+          280
+        ],
+        "supply_priority": [
+          "b",
+          1104
+        ],
+        "ai_tag": [
+          "b",
+          1928
+        ],
+        "color_red": [
+          "b",
+          382
+        ],
+        "color_green": [
+          "b",
+          381
+        ],
+        "color_blue": [
+          "b",
+          380
+        ],
+        "units_name_type": [
+          "i",
+          424
+        ],
+        "flags": [
+          "b",
+          1105
+        ],
+        "is_mobilized": [
+          "b",
+          1105,
+          0
+        ],
+        "has_raised_conscripts": [
+          "b",
+          1105,
+          1
+        ],
+        "dead": [
+          "b",
+          1105,
+          5
+        ],
+        "strategic_objective": [
+          "i",
+          264
+        ]
+      },
+      "keys": {},
+      "size": 1964,
+      "vectors": {
+        "formation_active_mobilization_options": [
+          984,
+          996,
+          8,
+          {
+            "value": [
+              "formation_active_mobilization_options",
+              0
+            ]
+          }
+        ],
+        "formation_regular_unit_types_to_upgrade": [
+          1008,
+          1020,
+          8,
+          {
+            "value": [
+              "formation_regular_unit_types_to_upgrade",
+              0
+            ]
+          }
+        ],
+        "formation_unit_type_selected": [
+          472,
+          484,
+          24,
+          {
+            "combat_unit_group": [
+              "combat_unit_group",
+              8
+            ],
+            "combat_unit_type": [
+              "combat_unit_type",
+              16
+            ]
+          },
+          null,
+          8
+        ]
+      },
+      "arrays": {
+        "formation_position": [
+          328,
+          2
+        ],
+        "formation_full_supply_path_path_target_position": [
+          1568,
+          2
+        ]
+      },
+      "strings": {
+        "name": 344,
+        "localizable_name": 392
+      }
+    },
+    "combat_unit": {
+      "rva": 93736600,
+      "fields": {
+        "current_manpower": [
+          "i",
+          24
+        ],
+        "num_demoralized": [
+          "i",
+          32
+        ],
+        "mobilization": [
+          "q",
+          40
+        ],
+        "xp_towards_next_level": [
+          "q",
+          56
+        ],
+        "country": [
+          "i",
+          72
+        ],
+        "building": [
+          "i",
+          76
+        ],
+        "battle": [
+          "i",
+          80
+        ],
+        "culture": [
+          "i",
+          84
+        ],
+        "formation": [
+          "i",
+          88
+        ],
+        "has_initial_supplies": [
+          "b",
+          92
+        ]
+      },
+      "keys": {
+        "combat_unit_type": [
+          48,
+          "combat_unit_type",
+          24
+        ],
+        "current_veterancy_level": [
+          64,
+          "veterancy_level",
+          24
+        ]
+      },
+      "size": 100,
+      "columns": {
+        "name_number": [
+          280,
+          104,
+          "i",
+          0
+        ]
+      }
+    },
+    "pact": {
+      "rva": 93743216,
+      "fields": {
+        "targets_first": [
+          "i",
+          24
+        ],
+        "targets_second": [
+          "i",
+          28
+        ],
+        "start_date": [
+          "i",
+          56
+        ],
+        "forced_duration": [
+          "i",
+          64
+        ],
+        "liberty_desire": [
+          "q",
+          72
+        ]
+      },
+      "keys": {
+        "pact_action": [
+          48,
+          "pact_action",
+          24
+        ]
+      },
+      "size": 80
+    },
+    "party": {
+      "rva": 93743232,
+      "fields": {
+        "activation_date": [
+          "i",
+          24
+        ],
+        "country": [
+          "i",
+          32
+        ],
+        "votes": [
+          "i",
+          104
+        ],
+        "num_voters": [
+          "i",
+          112
+        ],
+        "leader": [
+          "i",
+          96
+        ]
+      },
+      "keys": {
+        "party_definition": [
+          40,
+          "party_definition",
+          24
+        ]
+      },
+      "size": 120,
+      "vectors": {
+        "party_members": [
+          48,
+          60,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ]
+      }
+    },
+    "political_lobby": {
+      "rva": 93742960,
+      "fields": {
+        "country": [
+          "i",
+          24
+        ],
+        "target_country": [
+          "i",
+          28
+        ],
+        "appeasement": [
+          "i",
+          64
+        ],
+        "establishment_date": [
+          "i",
+          96
+        ],
+        "next_appeasement_decay_date": [
+          "i",
+          104
+        ],
+        "lobby_formation_reason": [
+          "b",
+          144
+        ]
+      },
+      "keys": {
+        "political_lobby_type": [
+          56,
+          "political_lobby_type",
+          24
+        ]
+      },
+      "size": 152,
+      "vectors": {
+        "political_lobby_variable": [
+          8,
+          20,
+          32,
+          {
+            "name": [
+              "token",
+              8
+            ],
+            "tick": [
+              "i",
+              12
+            ],
+            "value_type": [
+              "i",
+              16
+            ],
+            "value": [
+              "w",
+              24
+            ],
+            "flag": [
+              "optional_token",
+              24,
+              "value_type",
+              [
+                3
+              ]
+            ],
+            "definition": [
+              "scope_definition",
+              24,
+              "value_type"
+            ]
+          },
+          120
+        ],
+        "political_lobby_members": [
+          32,
+          44,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "political_lobby_appeasement_change": [
+          72,
+          84,
+          32,
+          {
+            "date": [
+              "i",
+              16
+            ],
+            "expiry_date": [
+              "i",
+              24
+            ]
+          }
+        ]
+      },
+      "variable_lists": {
+        "pointer": 128
+      }
+    },
+    "political_movement": {
+      "rva": 93742920,
+      "fields": {
+        "country": [
+          "i",
+          320
+        ],
+        "start_date": [
+          "i",
+          404
+        ],
+        "timed_modifiers_next_id": [
+          "i",
+          424
+        ],
+        "radicalism": [
+          "q",
+          840
+        ],
+        "managed_status": [
+          "b",
+          400
+        ],
+        "last_failed_civil_war_start_date": [
+          "i",
+          960
+        ],
+        "civil_war": [
+          "i",
+          324
+        ]
+      },
+      "keys": {
+        "ideology": [
+          288,
+          "ideology",
+          24
+        ],
+        "movement_type": [
+          376,
+          "movement_type",
+          24
+        ]
+      },
+      "size": 968,
+      "vectors": {
+        "political_movement_timed_modifier": [
+          416,
+          428,
+          8,
+          {
+            "modifier": [
+              "modifier",
+              0
+            ],
+            "multiplier": [
+              "q",
+              8
+            ],
+            "start_date": [
+              "i",
+              16
+            ],
+            "end_date": [
+              "i",
+              24
+            ],
+            "decay": [
+              "i",
+              32
+            ]
+          },
+          null,
+          null,
+          48
+        ],
+        "political_movement_pops": [
+          352,
+          364,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "political_movement_character_ideologies": [
+          296,
+          308,
+          8,
+          {
+            "value": [
+              "political_movement_character_ideologies",
+              0
+            ]
+          }
+        ],
+        "political_movement_characters": [
+          328,
+          340,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ]
+      },
+      "movement_identity": [
+        384,
+        392
+      ]
+    },
+    "pop": {
+      "rva": 93736648,
+      "fields": {
+        "wealth_progress": [
+          "q",
+          40
+        ],
+        "num_literate": [
+          "i",
+          48
+        ],
+        "loyalists_and_radicals": [
+          "i",
+          56
+        ],
+        "location": [
+          "i",
+          64
+        ],
+        "workplace": [
+          "i",
+          68
+        ],
+        "culture": [
+          "i",
+          72
+        ],
+        "assimilation_culture": [
+          "i",
+          76
+        ],
+        "wealth": [
+          "i",
+          80
+        ],
+        "previous_quality_of_life": [
+          "i",
+          84
+        ]
+      },
+      "keys": {
+        "pop_type": [
+          16,
+          "pop_type",
+          24
+        ],
+        "religion": [
+          24,
+          "religion",
+          24
+        ],
+        "conversion_religion": [
+          32,
+          "conversion_religion",
+          24
+        ]
+      },
+      "size": 92,
+      "columns": {
+        "food_security": [
+          1336,
+          24,
+          "q",
+          0
+        ],
+        "acceptance": [
+          1384,
+          16,
+          "i",
+          0
+        ],
+        "political_strength": [
+          1408,
+          8,
+          "i",
+          0
+        ],
+        "workforce": [
+          1432,
+          16,
+          "i",
+          0
+        ],
+        "dependents": [
+          1432,
+          16,
+          "i",
+          8
+        ],
+        "job_satisfaction": [
+          1456,
+          8,
+          "q",
+          0
+        ],
+        "growth_workforce": [
+          1480,
+          16,
+          "q",
+          0
+        ],
+        "growth_dependents": [
+          1480,
+          16,
+          "q",
+          8
+        ],
+        "weekly_budget_0": [
+          1576,
+          104,
+          "q",
+          0
+        ],
+        "weekly_budget_1": [
+          1576,
+          104,
+          "q",
+          8
+        ],
+        "weekly_budget_2": [
+          1576,
+          104,
+          "q",
+          16
+        ],
+        "weekly_budget_3": [
+          1576,
+          104,
+          "q",
+          24
+        ],
+        "weekly_budget_4": [
+          1576,
+          104,
+          "q",
+          32
+        ],
+        "weekly_budget_5": [
+          1576,
+          104,
+          "q",
+          40
+        ],
+        "weekly_budget_6": [
+          1576,
+          104,
+          "q",
+          48
+        ],
+        "weekly_budget_7": [
+          1576,
+          104,
+          "q",
+          56
+        ],
+        "weekly_budget_8": [
+          1576,
+          104,
+          "q",
+          64
+        ],
+        "weekly_budget_9": [
+          1576,
+          104,
+          "q",
+          72
+        ],
+        "weekly_budget_10": [
+          1576,
+          104,
+          "q",
+          80
+        ],
+        "weekly_budget_11": [
+          1576,
+          104,
+          "q",
+          88
+        ],
+        "weekly_budget_12": [
+          1576,
+          104,
+          "q",
+          96
+        ],
+        "ig_support_0": [
+          1528,
+          104,
+          "w",
+          32
+        ],
+        "ig_support_1": [
+          1528,
+          104,
+          "w",
+          40
+        ],
+        "ig_support_2": [
+          1528,
+          104,
+          "w",
+          48
+        ],
+        "ig_support_3": [
+          1528,
+          104,
+          "w",
+          56
+        ],
+        "ig_support_4": [
+          1528,
+          104,
+          "w",
+          64
+        ],
+        "ig_support_5": [
+          1528,
+          104,
+          "w",
+          72
+        ],
+        "ig_support_6": [
+          1528,
+          104,
+          "w",
+          80
+        ],
+        "ig_support_7": [
+          1528,
+          104,
+          "w",
+          88
+        ],
+        "acceptance_status": [
+          1384,
+          16,
+          "acceptance_status",
+          8
+        ],
+        "social_class": [
+          1360,
+          8,
+          "social_class",
+          0
+        ]
+      },
+      "column_arrays": {
+        "pop_qualification": [
+          1552,
+          15
+        ]
+      },
+      "column_vectors": {
+        "pop_movement_support": [
+          1504,
+          40,
+          8,
+          20,
+          24,
+          {
+            "political_movement": [
+              "i",
+              8
+            ],
+            "supporters": [
+              "w",
+              16
+            ]
+          },
+          null,
+          -1
+        ]
+      }
+    },
+    "power_bloc": {
+      "rva": 93742984,
+      "fields": {
+        "founding_date": [
+          "i",
+          452
+        ],
+        "cohesion": [
+          "q",
+          616
+        ],
+        "mandate_progress": [
+          "q",
+          640
+        ],
+        "founder": [
+          "i",
+          608
+        ]
+      },
+      "keys": {
+        "map_texture": [
+          120,
+          "map_texture",
+          24
+        ],
+        "power_bloc_identity": [
+          544,
+          "power_bloc_identity",
+          24
+        ],
+        "founder_definition": [
+          600,
+          "founder_definition",
+          24
+        ]
+      },
+      "size": 648,
+      "vectors": {
+        "power_bloc_principles": [
+          552,
+          564,
+          8,
+          {
+            "value": [
+              "power_bloc_principles",
+              0
+            ]
+          }
+        ]
+      }
+    },
+    "relation": {
+      "rva": 93743144,
+      "fields": {
+        "relations": [
+          "i",
+          24
+        ],
+        "improve_relations": [
+          "q",
+          32
+        ],
+        "tension": [
+          "q",
+          40
+        ],
+        "first_truce": [
+          "i",
+          48
+        ],
+        "first_country": [
+          "i",
+          64
+        ],
+        "first_last_action": [
+          "i",
+          68
+        ],
+        "second_country": [
+          "i",
+          104
+        ],
+        "second_last_action": [
+          "i",
+          108
+        ],
+        "second_truce": [
+          "i",
+          56
+        ]
+      },
+      "keys": {},
+      "size": 116
+    },
+    "ship_construction": {
+      "rva": 93743160,
+      "fields": {
+        "version": [
+          "i",
+          60
+        ],
+        "construction_left": [
+          "q",
+          72
+        ],
+        "index": [
+          "i",
+          80
+        ],
+        "queue": [
+          "i",
+          48
+        ]
+      },
+      "keys": {
+        "ship_construction_type": [
+          64,
+          "ship_construction_type",
+          24
+        ]
+      },
+      "size": 88
+    },
+    "ship_queue": {
+      "rva": 93742968,
+      "fields": {
+        "paused": [
+          "b",
+          84
+        ],
+        "country": [
+          "i",
+          80
+        ]
+      },
+      "keys": {},
+      "size": 92
+    },
+    "supply_ship": {
+      "rva": 93743320,
+      "fields": {
+        "construction_left": [
+          "q",
+          16
+        ]
+      },
+      "keys": {},
+      "size": 24
+    },
+    "ship": {
+      "rva": 93742976,
+      "fields": {
+        "hit_points": [
+          "q",
+          48
+        ],
+        "veterancy_experience": [
+          "q",
+          64
+        ],
+        "version": [
+          "i",
+          72
+        ],
+        "fleet": [
+          "i",
+          76
+        ]
+      },
+      "keys": {},
+      "size": 104,
+      "vectors": {
+        "ship_crew": [
+          88,
+          100,
+          12,
+          {
+            "index": [
+              "i",
+              0
+            ],
+            "state": [
+              "i",
+              4
+            ],
+            "crew": [
+              "i",
+              8
+            ]
+          }
+        ]
+      }
+    },
+    "ship_templates": {
+      "rva": 93742936,
+      "fields": {
+        "country": [
+          "i",
+          16
+        ],
+        "ordinal_number": [
+          "i",
+          200
+        ],
+        "year": [
+          "i",
+          204
+        ],
+        "flags": [
+          "b",
+          40
+        ],
+        "base": [
+          "b",
+          40,
+          1
+        ]
+      },
+      "keys": {
+        "ship_templates_type": [
+          24,
+          "ship_templates_type",
+          24
+        ]
+      },
+      "size": 208,
+      "vectors": {
+        "ship_templates_fleets": [
+          48,
+          60,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "ship_template_version_ids": [
+          72,
+          84,
+          4,
+          {}
+        ]
+      }
+    },
+    "shipping_lane": {
+      "rva": 93742944,
+      "fields": {
+        "country": [
+          "i",
+          24
+        ],
+        "object_identity": [
+          "i",
+          40
+        ],
+        "begin_point": [
+          "i",
+          72
+        ],
+        "end_point": [
+          "i",
+          76
+        ],
+        "convoy_cost": [
+          "q",
+          88
+        ],
+        "travel_distance": [
+          "q",
+          96
+        ],
+        "shipping_lane_type": [
+          "b",
+          28
+        ]
+      },
+      "keys": {},
+      "size": 104
+    },
+    "state_region": {
+      "rva": 93742752,
+      "fields": {
+        "arable_land": [
+          "i",
+          192
+        ],
+        "pollution": [
+          "q",
+          200
+        ]
+      },
+      "keys": {
+        "state_region_template": [
+          144,
+          "state_region_template",
+          24
+        ]
+      },
+      "size": 232,
+      "vectors": {
+        "state_region_variable": [
+          8,
+          20,
+          32,
+          {
+            "name": [
+              "token",
+              8
+            ],
+            "tick": [
+              "i",
+              12
+            ],
+            "value_type": [
+              "i",
+              16
+            ],
+            "value": [
+              "w",
+              24
+            ],
+            "flag": [
+              "optional_token",
+              24,
+              "value_type",
+              [
+                3
+              ]
+            ],
+            "definition": [
+              "scope_definition",
+              24,
+              "value_type"
+            ]
+          },
+          216
+        ],
+        "state_region_traits": [
+          120,
+          132,
+          8,
+          {
+            "value": [
+              "state_region_traits",
+              0
+            ]
+          }
+        ],
+        "state_region_resource": [
+          168,
+          180,
+          120,
+          {
+            "building_type": [
+              "building_type",
+              8
+            ],
+            "amount": [
+              "i",
+              88
+            ],
+            "undiscovered_amount": [
+              "i",
+              92
+            ]
+          }
+        ]
+      },
+      "variable_lists": {
+        "pointer": 224
+      }
+    },
+    "state": {
+      "rva": 93736688,
+      "fields": {
+        "country": [
+          "i",
+          3656
+        ],
+        "previous_country": [
+          "i",
+          3660
+        ],
+        "last_owner_change": [
+          "i",
+          3672
+        ],
+        "mass_migration_culture": [
+          "i",
+          3720
+        ],
+        "mass_migration_country": [
+          "i",
+          3724
+        ],
+        "slave_import_marker": [
+          "i",
+          3728
+        ],
+        "state_building_budget_expense": [
+          "q",
+          3760
+        ],
+        "state_building_budget_income": [
+          "q",
+          3768
+        ],
+        "land": [
+          "q",
+          4480
+        ],
+        "arable_land": [
+          "i",
+          4488
+        ],
+        "incorporation": [
+          "q",
+          4528
+        ],
+        "pop_statistics_population_lower_strata": [
+          "i",
+          4552
+        ],
+        "pop_statistics_population_middle_strata": [
+          "i",
+          4560
+        ],
+        "pop_statistics_population_upper_strata": [
+          "i",
+          4568
+        ],
+        "pop_statistics_population_radicals": [
+          "i",
+          4576
+        ],
+        "pop_statistics_population_loyalists": [
+          "i",
+          4584
+        ],
+        "pop_statistics_population_slaves": [
+          "i",
+          4592
+        ],
+        "pop_statistics_population_salaried_workforce": [
+          "i",
+          4600
+        ],
+        "pop_statistics_population_subsisting_workforce": [
+          "i",
+          4608
+        ],
+        "pop_statistics_population_unemployed_workforce": [
+          "i",
+          4616
+        ],
+        "pop_statistics_population_laborer_workforce": [
+          "i",
+          4624
+        ],
+        "pop_statistics_population_slave_workforce": [
+          "i",
+          4632
+        ],
+        "pop_statistics_population_government_workforce": [
+          "i",
+          4640
+        ],
+        "pop_statistics_population_military_workforce": [
+          "i",
+          4648
+        ],
+        "pop_statistics_population_political_participants": [
+          "i",
+          4656
+        ],
+        "pop_statistics_population_eligible_voters": [
+          "i",
+          4664
+        ],
+        "pop_statistics_primary_cultures_population": [
+          "i",
+          4672
+        ],
+        "pop_statistics_vacancies_new_culture": [
+          "i",
+          4680
+        ],
+        "pop_statistics_wage": [
+          "q",
+          4688
+        ],
+        "pop_statistics_military_political_strength": [
+          "i",
+          4696
+        ],
+        "pop_statistics_total_wealth": [
+          "i",
+          4704
+        ],
+        "pop_statistics_primary_cultures_standard_of_living": [
+          "i",
+          4712
+        ],
+        "pop_statistics_slave_standard_of_living": [
+          "i",
+          4720
+        ],
+        "last_week_pop_migration_statistics_weekly_emigration": [
+          "i",
+          5720
+        ],
+        "last_week_pop_migration_statistics_weekly_immigration": [
+          "i",
+          5728
+        ],
+        "pop_migration_statistics_weekly_emigration": [
+          "i",
+          5792
+        ],
+        "pop_migration_statistics_weekly_immigration": [
+          "i",
+          5800
+        ],
+        "last_week_slave_trade_statistics_weekly_emigration": [
+          "i",
+          5864
+        ],
+        "last_week_slave_trade_statistics_weekly_immigration": [
+          "i",
+          5872
+        ],
+        "slave_trade_statistics_weekly_emigration": [
+          "i",
+          5936
+        ],
+        "slave_trade_statistics_weekly_immigration": [
+          "i",
+          5944
+        ],
+        "capital": [
+          "i",
+          6000
+        ],
+        "timed_modifiers_next_id": [
+          "i",
+          6072
+        ],
+        "next_colony_province": [
+          "i",
+          6720
+        ],
+        "colony_progress": [
+          "q",
+          6728
+        ],
+        "infrastructure": [
+          "q",
+          7456
+        ],
+        "infrastructure_usage": [
+          "q",
+          7504
+        ],
+        "trade_capacity": [
+          "i",
+          7512
+        ],
+        "trade_capacity_usage": [
+          "i",
+          7516
+        ],
+        "base_pop_bureaucracy_cost": [
+          "q",
+          7528
+        ],
+        "devastation": [
+          "q",
+          7752
+        ],
+        "treaty_port": [
+          "b",
+          4536
+        ]
+      },
+      "keys": {
+        "state_region": [
+          3704,
+          "state_region",
+          24
+        ],
+        "previous_country_definition": [
+          3664,
+          "country_definition",
+          24
+        ]
+      },
+      "size": 7760,
+      "vectors": {
+        "state_variable": [
+          8,
+          20,
+          32,
+          {
+            "name": [
+              "token",
+              8
+            ],
+            "tick": [
+              "i",
+              12
+            ],
+            "value_type": [
+              "i",
+              16
+            ],
+            "value": [
+              "w",
+              24
+            ],
+            "flag": [
+              "optional_token",
+              24,
+              "value_type",
+              [
+                3
+              ]
+            ],
+            "definition": [
+              "scope_definition",
+              24,
+              "value_type"
+            ]
+          },
+          4504
+        ],
+        "state_timed_modifier": [
+          6008,
+          6020,
+          8,
+          {
+            "modifier": [
+              "modifier",
+              0
+            ],
+            "multiplier": [
+              "q",
+              8
+            ],
+            "start_date": [
+              "i",
+              16
+            ],
+            "end_date": [
+              "i",
+              24
+            ],
+            "decay": [
+              "i",
+              32
+            ]
+          },
+          null,
+          null,
+          48
+        ],
+        "state_traded_goods": [
+          7640,
+          7652,
+          8,
+          {
+            "value": [
+              "state_traded_goods",
+              0
+            ]
+          }
+        ],
+        "state_slave_export_markers": [
+          3736,
+          3748,
+          4,
+          {
+            "value": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "state_last_week_pop_migration_statistics_emigration_states": [
+          5760,
+          5772,
+          4,
+          {}
+        ],
+        "state_last_week_pop_migration_statistics_immigration_states": [
+          5736,
+          5748,
+          4,
+          {}
+        ],
+        "state_pop_migration_statistics_emigration_states": [
+          5832,
+          5844,
+          4,
+          {}
+        ],
+        "state_last_trade_volume_increase": [
+          7672,
+          7684,
+          24,
+          {
+            "goods": [
+              "goods",
+              8
+            ],
+            "date": [
+              "i",
+              16
+            ]
+          },
+          null,
+          8
+        ],
+        "state_counter": [
+          7536,
+          7548,
+          4,
+          {}
+        ]
+      },
+      "goods_arrays": {
+        "state_trade": 7568,
+        "state_local_price": 2536,
+        "state_building_production": 288,
+        "state_building_consumption": 864,
+        "state_supply_inferred": 208,
+        "state_demand_inferred": 128
+      },
+      "pop_needs": 7472,
+      "province_runs": 3680,
+      "strings": {
+        "localized_name": 6760,
+        "custom_name": 7224,
+        "localized_hub_city": 6864,
+        "custom_hub_city": 7288,
+        "localized_hub_port": 6936,
+        "custom_hub_port": 7320,
+        "localized_hub_farm": 7008,
+        "custom_hub_farm": 7352,
+        "localized_hub_mine": 7080,
+        "custom_hub_mine": 7384,
+        "localized_hub_wood": 7152,
+        "custom_hub_wood": 7416
+      },
+      "variable_lists": {
+        "pointer": 4512
+      }
+    },
+    "technology": {
+      "rva": 93743304,
+      "fields": {
+        "country": [
+          "i",
+          288
+        ]
+      },
+      "keys": {
+        "research_technology": [
+          24,
+          "technology",
+          24
+        ]
+      },
+      "size": 296,
+      "vectors": {
+        "technology_acquired": [
+          104,
+          116,
+          8,
+          {
+            "technology": [
+              "technology",
+              0
+            ]
+          }
+        ],
+        "technology_spreading": [
+          56,
+          68,
+          8,
+          {
+            "technology": [
+              "technology",
+              0
+            ]
+          }
+        ],
+        "technology_progress": [
+          80,
+          92,
+          32,
+          {
+            "technology": [
+              "technology",
+              8
+            ],
+            "progress": [
+              "q",
+              16
+            ]
+          }
+        ],
+        "technology_research_queue": [
+          32,
+          44,
+          8,
+          {
+            "technology": [
+              "technology",
+              0
+            ]
+          }
+        ]
+      }
+    },
+    "theater": {
+      "rva": 93743064,
+      "fields": {
+        "country": [
+          "i",
+          64
+        ]
+      },
+      "keys": {},
+      "size": 88,
+      "province_runs": 72
+    },
+    "treaty_article": {
+      "rva": 93743136,
+      "fields": {
+        "treaty": [
+          "i",
+          32
+        ],
+        "source_country": [
+          "i",
+          36
+        ],
+        "target_country": [
+          "i",
+          40
+        ]
+      },
+      "keys": {
+        "treaty_article_article": [
+          24,
+          "treaty_article_article",
+          24
+        ]
+      },
+      "size": 48
+    },
+    "treaty": {
+      "rva": 93743024,
+      "fields": {
+        "name_dynamic_context_first_country": [
+          "i",
+          56
+        ],
+        "name_dynamic_context_second_country": [
+          "i",
+          60
+        ],
+        "name_dynamic_context_date": [
+          "i",
+          64
+        ],
+        "name_scripted_context_first_country": [
+          "i",
+          80
+        ],
+        "name_scripted_context_second_country": [
+          "i",
+          84
+        ],
+        "name_scripted_context_date": [
+          "i",
+          88
+        ],
+        "first_country": [
+          "i",
+          128
+        ],
+        "second_country": [
+          "i",
+          132
+        ],
+        "entered_into_force_on": [
+          "i",
+          240
+        ],
+        "binding_period": [
+          "i",
+          256
+        ],
+        "withdrawn_by": [
+          "i",
+          152
+        ],
+        "withdrawn": [
+          "i",
+          156
+        ]
+      },
+      "keys": {},
+      "size": 264,
+      "vectors": {}
+    },
+    "war_goal": {
+      "rva": 93743104,
+      "fields": {
+        "holder": [
+          "i",
+          40
+        ],
+        "diplomatic_play": [
+          "i",
+          48
+        ],
+        "target_state": [
+          "i",
+          64
+        ],
+        "target_country": [
+          "i",
+          68
+        ],
+        "target_other": [
+          "i",
+          128
+        ],
+        "initial_war_goal": [
+          "b",
+          162
+        ],
+        "demand_type": [
+          "b",
+          136
+        ],
+        "status": [
+          "b",
+          160
+        ],
+        "creator": [
+          "i",
+          44
+        ],
+        "pressed": [
+          "b",
+          144
+        ]
+      },
+      "keys": {
+        "war_goal_type": [
+          32,
+          "war_goal_type",
+          24
+        ]
+      },
+      "size": 170
+    },
+    "war": {
+      "rva": 93742816,
+      "fields": {
+        "days_since_exhaustion": [
+          "i",
+          200
+        ],
+        "start_date": [
+          "i",
+          204
+        ],
+        "peace_date": [
+          "i",
+          212
+        ],
+        "diplomatic_play": [
+          "i",
+          24
+        ],
+        "dead": [
+          "b",
+          220
+        ],
+        "peace_proposer": [
+          "i",
+          112
+        ],
+        "peace_proposal_date": [
+          "i",
+          116
+        ]
+      },
+      "keys": {},
+      "size": 224,
+      "vectors": {
+        "war_participant": [
+          32,
+          44,
+          80,
+          {
+            "diplomatic_play": [
+              "i",
+              8
+            ],
+            "country": [
+              "i",
+              12
+            ],
+            "violator": [
+              "i",
+              16
+            ],
+            "war_support": [
+              "q",
+              24
+            ]
+          }
+        ]
+      }
+    },
+    "occupation": {
+      "rva": 93743128,
+      "fields": {
+        "state": [
+          "i",
+          20
+        ],
+        "controller": [
+          "i",
+          16
+        ]
+      },
+      "keys": {},
+      "size": 56,
+      "vectors": {
+        "occupation_country": [
+          32,
+          44,
+          16,
+          {
+            "country": [
+              "i",
+              0
+            ],
+            "fraction": [
+              "q",
+              8
+            ]
+          }
+        ]
+      }
+    },
+    "proposal": {
+      "rva": 93743200,
+      "fields": {
+        "scope_seed": [
+          "i",
+          48
+        ],
+        "date": [
+          "i",
+          352
+        ],
+        "runtime_id": [
+          "i",
+          8
+        ]
+      },
+      "keys": {},
+      "size": 360,
+      "vectors": {
+        "proposal_target": [
+          56,
+          68,
+          24,
+          {
+            "name": [
+              "token",
+              0
+            ],
+            "scope_type": [
+              "i",
+              8
+            ],
+            "identity": [
+              "w",
+              16
+            ],
+            "flag": [
+              "optional_token",
+              16,
+              "scope_type",
+              [
+                3
+              ]
+            ],
+            "definition": [
+              "scope_definition",
+              16,
+              "scope_type"
+            ]
+          }
+        ]
+      },
+      "scopes": {
+        "scope_root": [
+          32,
+          40
+        ]
+      }
+    },
+    "strait": {
+      "rva": 93743096,
+      "fields": {
+        "first_last_access_change": [
+          "i",
+          192
+        ],
+        "second_last_access_change": [
+          "i",
+          200
+        ],
+        "first_toll_rate": [
+          "b",
+          172
+        ],
+        "second_toll_rate": [
+          "b",
+          173
+        ]
+      },
+      "keys": {
+        "strait_definition": [
+          160,
+          "strait_definition",
+          24
+        ]
+      },
+      "size": 208
+    },
+    "casualties": {
+      "rva": 93743248,
+      "size": 48,
+      "fields": {
+        "unit": [
+          "i",
+          24
+        ],
+        "building": [
+          "i",
+          28
+        ]
+      },
+      "keys": {},
+      "vectors": {
+        "casualties_event": [
+          32,
+          44,
+          40,
+          {
+            "num_casualties": [
+              "w",
+              8
+            ],
+            "num_wounded": [
+              "w",
+              16
+            ],
+            "date": [
+              "i",
+              24
+            ],
+            "battle": [
+              "i",
+              32
+            ],
+            "reason": [
+              "i",
+              36
+            ]
+          }
+        ]
+      }
+    },
+    "player": {
+      "rva": 93743272,
+      "size": 64,
+      "fields": {
+        "country": [
+          "i",
+          56
+        ]
+      },
+      "keys": {}
+    },
+    "naval_mission": {
+      "rva": 93743080,
+      "size": 64,
+      "fields": {
+        "invalid_date": [
+          "i",
+          56
+        ]
+      },
+      "keys": {
+        "naval_mission_type": [
+          24,
+          "naval_mission_type",
+          24
+        ]
+      }
+    },
+    "harvest_condition": {
+      "rva": 93743152,
+      "size": 72,
+      "fields": {},
+      "keys": {
+        "harvest_type": [
+          32,
+          "harvest_type",
+          24
+        ],
+        "state_region": [
+          40,
+          "state_region",
+          24
+        ]
+      },
+      "vectors": {
+        "harvest_condition_area": [
+          48,
+          60,
+          48,
+          {
+            "start_date": [
+              "i",
+              24
+            ],
+            "intensity": [
+              "q",
+              32
+            ],
+            "duration": [
+              "i",
+              40
+            ]
+          }
+        ]
+      }
+    },
+    "front": {
+      "rva": 93745768,
+      "size": 576,
+      "fields": {
+        "x": [
+          "q",
+          560
+        ],
+        "y": [
+          "q",
+          568
+        ]
+      },
+      "keys": {},
+      "vectors": {
+        "front_sides": [
+          512,
+          524,
+          4,
+          {}
+        ]
+      }
+    },
+    "travel_node": {
+      "rva": 93743088,
+      "size": 128,
+      "fields": {},
+      "keys": {
+        "definition": [
+          120,
+          "travel_node_definition",
+          24
+        ]
+      }
+    },
+    "global_variable_store": {
+      "root": [
+        93507880,
+        1544,
+        440
+      ],
+      "size": 24,
+      "fields": {},
+      "keys": {},
+      "vectors": {
+        "global_variable_data": [
+          8,
+          20,
+          32,
+          {
+            "name": [
+              "token",
+              8
+            ],
+            "tick": [
+              "i",
+              12
+            ],
+            "type": [
+              "i",
+              16
+            ],
+            "value": [
+              "w",
+              24
+            ],
+            "flag": [
+              "optional_token",
+              24,
+              "type",
+              [
+                3
+              ]
+            ],
+            "definition": [
+              "scope_definition",
+              24,
+              "type"
+            ]
+          }
+        ]
+      }
+    },
+    "global_variable_lists": {
+      "root": [
+        93507880,
+        1544,
+        448
+      ],
+      "size": 16,
+      "fields": {},
+      "keys": {},
+      "variable_lists": {}
+    },
+    "ship_template_version": {
+      "rva": 93743168,
+      "size": 128,
+      "fields": {},
+      "keys": {
+        "type": [
+          120,
+          "ship_type",
+          24
+        ]
+      },
+      "vectors": {
+        "ship_template_modification": [
+          96,
+          108,
+          8,
+          {
+            "type": [
+              "ship_modification",
+              0
+            ]
+          }
+        ]
+      }
+    },
+    "civil_war": {
+      "rva": 93742912,
+      "size": 304,
+      "fields": {
+        "origin_country": [
+          "i",
+          24
+        ],
+        "uprisen_country": [
+          "i",
+          28
+        ],
+        "type": [
+          "i",
+          32
+        ],
+        "progress": [
+          "q",
+          40
+        ],
+        "time": [
+          "q",
+          48
+        ],
+        "political_movement": [
+          "i",
+          56
+        ],
+        "diplomatic_play": [
+          "i",
+          60
+        ],
+        "conscription_rate": [
+          "q",
+          200
+        ]
+      },
+      "keys": {
+        "capital": [
+          112,
+          "state_region_definition",
+          24
+        ]
+      },
+      "vectors": {
+        "civil_war_state": [
+          64,
+          76,
+          64,
+          {
+            "state": [
+              "i",
+              0
+            ],
+            "score": [
+              "q",
+              8
+            ],
+            "army": [
+              "i",
+              16
+            ],
+            "navy": [
+              "i",
+              20
+            ],
+            "conscript": [
+              "i",
+              24
+            ],
+            "clout": [
+              "q",
+              32
+            ]
+          }
+        ],
+        "civil_war_interest_group": [
+          280,
+          292,
+          4,
+          {}
+        ],
+        "civil_war_seceded_state": [
+          88,
+          100,
+          104,
+          {
+            "state_region": [
+              "state_region_definition",
+              8
+            ],
+            "incorporated": [
+              "b",
+              16
+            ]
+          }
+        ]
+      },
+      "nested_vectors": {
+        "civil_war_state_ig": {
+          "outer": [
+            64,
+            76,
+            64,
+            {
+              "state": [
+                "i",
+                0
+              ],
+              "_pointer": [
+                "w",
+                40
+              ],
+              "_counts": [
+                "w",
+                48
+              ]
+            }
+          ],
+          "inner": [
+            0,
+            12,
+            16,
+            {
+              "interest_group": [
+                "i",
+                0
+              ],
+              "political_strength": [
+                "q",
+                8
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "world_market": {
+      "root": [
+        93507880,
+        1544,
+        288
+      ],
+      "size": 2224,
+      "save_path": [
+        "market_manager",
+        "world_market"
+      ],
+      "fields": {
+        "markets_counter": [
+          "i",
+          1284
+        ]
+      },
+      "trends": {
+        "price_trend": 2144
+      },
+      "vectors": {
+        "world_market_hub": [
+          2200,
+          2212,
+          72,
+          {
+            "state": [
+              "i",
+              0
+            ]
+          }
+        ]
+      },
+      "nested_vectors": {
+        "world_market_hub_trade_center": {
+          "outer": [
+            2200,
+            2212,
+            72,
+            {
+              "state": [
+                "i",
+                0
+              ],
+              "_pointer": [
+                "w",
+                8
+              ],
+              "_counts": [
+                "w",
+                16
+              ]
+            }
+          ],
+          "inner": [
+            0,
+            12,
+            4,
+            {
+              "trade_center": [
+                "i",
+                0
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "country_rankings": {
+      "root": [
+        93507880,
+        1544,
+        288
+      ],
+      "size": 4712,
+      "fields": {
+        "average_prestige": [
+          "i",
+          4680
+        ],
+        "highest_prestige": [
+          "i",
+          4684
+        ]
+      },
+      "vectors": {
+        "country_ranking": [
+          4688,
+          4700,
+          48,
+          {
+            "rank": [
+              "country_rank",
+              8
+            ],
+            "target": [
+              "country_rank",
+              16
+            ],
+            "prestige": [
+              "i",
+              24
+            ],
+            "score": [
+              "i",
+              28
+            ],
+            "country": [
+              "i",
+              32
+            ],
+            "date": [
+              "i",
+              36
+            ]
+          }
+        ]
+      }
+    },
+    "game_state": {
+      "root": [
+        93507880,
+        1544
+      ],
+      "size": 496,
+      "fields": {
+        "date": [
+          "i",
+          8
+        ],
+        "speed": [
+          "i",
+          112
+        ],
+        "save_game_version": [
+          "i",
+          488
+        ],
+        "first_start": [
+          "b",
+          336
+        ],
+        "local_date_time": [
+          "w",
+          252
+        ]
+      },
+      "strings": {
+        "playthrough_id": 16,
+        "custom_rng_seed": 400
+      },
+      "vectors": {
+        "game_state_counter": [
+          264,
+          276,
+          4,
+          {}
+        ],
+        "game_rule_setting": [
+          352,
+          364,
+          8,
+          {
+            "setting": [
+              "game_rule_setting",
+              0
+            ]
+          }
+        ],
+        "game_state_previous_player": [
+          88,
+          100,
+          48,
+          {
+            "idtype": [
+              "i",
+              8
+            ],
+            "name": [
+              "inline_string",
+              16
+            ]
+          }
+        ]
+      }
+    },
+    "ai": {
+      "rva": 93745776,
+      "size": 1656,
+      "fields": {
+        "country": [
+          "i",
+          80
+        ],
+        "spending_country": [
+          "i",
+          600
+        ],
+        "enabled": [
+          "b",
+          320
+        ],
+        "num_failed_money_spending_attempts": [
+          "i",
+          440
+        ],
+        "num_failed_autonomous_investments": [
+          "i",
+          560
+        ],
+        "spending_authority": [
+          "q",
+          632
+        ],
+        "spending_authority_balance": [
+          "q",
+          640
+        ],
+        "next_private_investment": [
+          "i",
+          528
+        ],
+        "spending_expenses": [
+          "q",
+          608
+        ],
+        "spending_gold_reserve_limit": [
+          "q",
+          624
+        ],
+        "spending_conscript_spending_target": [
+          "q",
+          688
+        ],
+        "spending_construction_output": [
+          "q",
+          704
+        ],
+        "spending_bureaucracy_income": [
+          "q",
+          648
+        ],
+        "spending_bureaucracy_expenses": [
+          "q",
+          656
+        ],
+        "spending_prestige": [
+          "q",
+          664
+        ],
+        "spending_innovation": [
+          "q",
+          672
+        ],
+        "spending_max_innovation": [
+          "q",
+          680
+        ],
+        "spending_population_total": [
+          "w",
+          728
+        ],
+        "spending_population_total_coastal": [
+          "w",
+          736
+        ],
+        "spending_population_incorporated": [
+          "w",
+          744
+        ],
+        "spending_population_incorporated_coastal": [
+          "w",
+          752
+        ],
+        "random_seed": [
+          "i",
+          312
+        ],
+        "company_formation_random_seed": [
+          "i",
+          316
+        ],
+        "num_failed_authority_spending_attempts": [
+          "i",
+          472
+        ],
+        "next_foreign_domestic_investment_reset": [
+          "i",
+          584
+        ],
+        "spending_naval_base_levels": [
+          "i",
+          720
+        ],
+        "spending_population_unincorporated": [
+          "w",
+          760
+        ],
+        "spending_population_unincorporated_coastal": [
+          "w",
+          768
+        ],
+        "spending_num_taxed_goods": [
+          "i",
+          696
+        ],
+        "spending_ship_construction": [
+          "q",
+          712
+        ],
+        "spending_population_in_subjects": [
+          "w",
+          776
+        ],
+        "spending_income": [
+          "q",
+          616
+        ],
+        "total_domestic_investment": [
+          "q",
+          568
+        ],
+        "spending_population_in_overseas_subjects": [
+          "w",
+          784
+        ],
+        "total_foreign_investment": [
+          "q",
+          576
+        ],
+        "strategic_region_stances_dirty": [
+          "b",
+          323
+        ],
+        "authority_spending_changed": [
+          "b",
+          326
+        ],
+        "spending_goods_consumption_mask": [
+          "w",
+          1024
+        ],
+        "spending_unused_resource_mask": [
+          "w",
+          1344
+        ],
+        "strategy_0_progress": [
+          "i",
+          104
+        ],
+        "strategy_0_flag": [
+          "b",
+          108
+        ],
+        "strategy_1_progress": [
+          "i",
+          128
+        ],
+        "strategy_1_flag": [
+          "b",
+          132
+        ],
+        "strategy_2_progress": [
+          "i",
+          152
+        ],
+        "strategy_2_flag": [
+          "b",
+          156
+        ]
+      },
+      "vectors": {
+        "ai_goal": [
+          240,
+          252,
+          24,
+          {
+            "type": [
+              "i",
+              12
+            ]
+          }
+        ],
+        "ai_cached_weight": [
+          264,
+          276,
+          40,
+          {
+            "type": [
+              "i",
+              8
+            ],
+            "value": [
+              "q",
+              16
+            ],
+            "target": [
+              "i",
+              24
+            ],
+            "date": [
+              "i",
+              28
+            ]
+          }
+        ],
+        "ai_consumption_tax": [
+          792,
+          804,
+          8,
+          {
+            "value": [
+              "q",
+              0
+            ]
+          }
+        ],
+        "ai_pro_interest_group": [
+          816,
+          828,
+          8,
+          {
+            "type": [
+              "interest_group_type",
+              0
+            ]
+          }
+        ],
+        "ai_anti_interest_group": [
+          840,
+          852,
+          8,
+          {
+            "type": [
+              "interest_group_type",
+              0
+            ]
+          }
+        ],
+        "ai_pro_movement": [
+          864,
+          876,
+          8,
+          {
+            "type": [
+              "political_movement_type",
+              0
+            ]
+          }
+        ],
+        "ai_anti_movement": [
+          888,
+          900,
+          8,
+          {
+            "type": [
+              "political_movement_type",
+              0
+            ]
+          }
+        ],
+        "ai_goods_consumption": [
+          1000,
+          1012,
+          8,
+          {
+            "value": [
+              "q",
+              0
+            ]
+          }
+        ],
+        "ai_unused_resource": [
+          1320,
+          1332,
+          8,
+          {
+            "value": [
+              "q",
+              0
+            ]
+          }
+        ],
+        "ai_goods_stance": [
+          1552,
+          1564,
+          4,
+          {
+            "stance": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "ai_investment_weight": [
+          1584,
+          1596,
+          24,
+          {
+            "building_group": [
+              "building_group",
+              8
+            ],
+            "value": [
+              "q",
+              16
+            ]
+          },
+          null,
+          8
+        ],
+        "ai_goods_consumption_prestige": [
+          1040,
+          1052,
+          32,
+          {
+            "goods": [
+              "b",
+              0
+            ],
+            "prestige_0": [
+              "q",
+              8
+            ],
+            "prestige_1": [
+              "q",
+              16
+            ],
+            "prestige_2": [
+              "q",
+              24
+            ]
+          }
+        ],
+        "ai_unused_resource_prestige": [
+          1360,
+          1372,
+          32,
+          {
+            "goods": [
+              "b",
+              0
+            ],
+            "prestige_0": [
+              "q",
+              8
+            ],
+            "prestige_1": [
+              "q",
+              16
+            ],
+            "prestige_2": [
+              "q",
+              24
+            ]
+          }
+        ],
+        "ai_infrastructure": [
+          1400,
+          1412,
+          24,
+          {
+            "state": [
+              "i",
+              8
+            ],
+            "value": [
+              "q",
+              16
+            ]
+          },
+          null,
+          -1
+        ],
+        "ai_infrastructure_usage": [
+          1440,
+          1452,
+          24,
+          {
+            "state": [
+              "i",
+              8
+            ],
+            "value": [
+              "q",
+              16
+            ]
+          },
+          null,
+          -1
+        ],
+        "ai_trade_capacity": [
+          1480,
+          1492,
+          24,
+          {
+            "state": [
+              "i",
+              8
+            ],
+            "value": [
+              "q",
+              16
+            ]
+          },
+          null,
+          -1
+        ],
+        "ai_has_other_market_area_port": [
+          1520,
+          1532,
+          12,
+          {
+            "state": [
+              "i",
+              4
+            ],
+            "value": [
+              "b",
+              8
+            ]
+          },
+          null,
+          -1,
+          null,
+          0
+        ],
+        "ai_money_spending": [
+          416,
+          428,
+          104,
+          {
+            "direction": [
+              "i",
+              8
+            ],
+            "score": [
+              "q",
+              24
+            ],
+            "score_before_random": [
+              "q",
+              32
+            ],
+            "priority": [
+              "i",
+              40
+            ],
+            "cost": [
+              "q",
+              48
+            ],
+            "budget_impact": [
+              "q",
+              56
+            ],
+            "state": [
+              "i",
+              64
+            ],
+            "country": [
+              "i",
+              68
+            ],
+            "valid": [
+              "b",
+              72
+            ],
+            "next_state_update": [
+              "i",
+              76
+            ],
+            "type": [
+              "i",
+              96
+            ],
+            "building_type": [
+              "building_type",
+              88
+            ]
+          }
+        ],
+        "ai_authority_spending": [
+          448,
+          460,
+          144,
+          {
+            "direction": [
+              "i",
+              8
+            ],
+            "score": [
+              "q",
+              24
+            ],
+            "score_before_random": [
+              "q",
+              32
+            ],
+            "priority": [
+              "i",
+              40
+            ],
+            "cost": [
+              "q",
+              48
+            ],
+            "budget_impact": [
+              "q",
+              56
+            ],
+            "state": [
+              "i",
+              64
+            ],
+            "country": [
+              "i",
+              68
+            ],
+            "valid": [
+              "b",
+              72
+            ],
+            "next_state_update": [
+              "i",
+              76
+            ],
+            "type": [
+              "i",
+              136
+            ],
+            "goods": [
+              "goods",
+              88,
+              "type",
+              [
+                3
+              ]
+            ],
+            "decree_type": [
+              "decree_type",
+              96,
+              "type",
+              [
+                0
+              ]
+            ],
+            "political_movement": [
+              "i",
+              104,
+              "type",
+              [
+                1,
+                2
+              ]
+            ]
+          }
+        ],
+        "ai_local_goods_production": [
+          1080,
+          1092,
+          96,
+          {
+            "state": [
+              "i",
+              8
+            ],
+            "mask": [
+              "w",
+              48
+            ]
+          },
+          null,
+          -1
+        ],
+        "ai_local_goods_consumption": [
+          1120,
+          1132,
+          96,
+          {
+            "state": [
+              "i",
+              8
+            ],
+            "mask": [
+              "w",
+              48
+            ]
+          },
+          null,
+          -1
+        ],
+        "ai_building_construction": [
+          480,
+          492,
+          144,
+          {
+            "state": [
+              "i",
+              8
+            ],
+            "country": [
+              "i",
+              12
+            ],
+            "construction_type": [
+              "i",
+              132
+            ],
+            "building_type": [
+              "building_type",
+              16
+            ],
+            "identity_type": [
+              "b",
+              40
+            ],
+            "identity_country": [
+              "i",
+              24,
+              "identity_type",
+              [
+                2
+              ]
+            ],
+            "identity_potential_owner_state": [
+              "i",
+              32,
+              "identity_type",
+              [
+                3
+              ]
+            ],
+            "identity_potential_owner_building_type": [
+              "building_type",
+              24,
+              "identity_type",
+              [
+                3
+              ]
+            ],
+            "score": [
+              "q",
+              56
+            ],
+            "score_before_random": [
+              "q",
+              64
+            ],
+            "profit": [
+              "q",
+              72
+            ],
+            "infrastructure_cost": [
+              "q",
+              80
+            ],
+            "infrastructure_state_delta": [
+              "q",
+              96
+            ],
+            "employment": [
+              "q",
+              104
+            ],
+            "workforce": [
+              "b",
+              118
+            ],
+            "failed_hires": [
+              "b",
+              116
+            ],
+            "critical_port_connection": [
+              "b",
+              117
+            ],
+            "low_pop_method": [
+              "b",
+              119
+            ],
+            "subsidies": [
+              "b",
+              120
+            ],
+            "valid": [
+              "b",
+              128
+            ],
+            "next_state_update": [
+              "i",
+              136
+            ]
+          }
+        ],
+        "ai_private_building_construction": [
+          504,
+          516,
+          144,
+          {
+            "state": [
+              "i",
+              8
+            ],
+            "country": [
+              "i",
+              12
+            ],
+            "construction_type": [
+              "i",
+              132
+            ],
+            "building_type": [
+              "building_type",
+              16
+            ],
+            "identity_type": [
+              "b",
+              40
+            ],
+            "identity_country": [
+              "i",
+              24,
+              "identity_type",
+              [
+                2
+              ]
+            ],
+            "identity_potential_owner_state": [
+              "i",
+              32,
+              "identity_type",
+              [
+                3
+              ]
+            ],
+            "identity_potential_owner_building_type": [
+              "building_type",
+              24,
+              "identity_type",
+              [
+                3
+              ]
+            ],
+            "score": [
+              "q",
+              56
+            ],
+            "score_before_random": [
+              "q",
+              64
+            ],
+            "profit": [
+              "q",
+              72
+            ],
+            "infrastructure_cost": [
+              "q",
+              80
+            ],
+            "infrastructure_state_delta": [
+              "q",
+              96
+            ],
+            "employment": [
+              "q",
+              104
+            ],
+            "workforce": [
+              "b",
+              118
+            ],
+            "failed_hires": [
+              "b",
+              116
+            ],
+            "critical_port_connection": [
+              "b",
+              117
+            ],
+            "low_pop_method": [
+              "b",
+              119
+            ],
+            "subsidies": [
+              "b",
+              120
+            ],
+            "valid": [
+              "b",
+              128
+            ],
+            "next_state_update": [
+              "i",
+              136
+            ]
+          }
+        ],
+        "ai_country_goal": [
+          168,
+          180,
+          256,
+          {
+            "target": [
+              "i",
+              8
+            ],
+            "country": [
+              "i",
+              32
+            ],
+            "target_country": [
+              "i",
+              36
+            ],
+            "threat_value": [
+              "q",
+              48
+            ],
+            "threat_natural_threat": [
+              "q",
+              56
+            ],
+            "threat_my_sp": [
+              "q",
+              64
+            ],
+            "threat_their_sp": [
+              "q",
+              72
+            ],
+            "antagonize_value": [
+              "q",
+              112
+            ],
+            "befriend_value": [
+              "q",
+              152
+            ],
+            "protect_value": [
+              "q",
+              192
+            ],
+            "neighbour": [
+              "b",
+              224
+            ],
+            "diplomatic_relevance": [
+              "b",
+              225
+            ],
+            "initialized": [
+              "b",
+              226
+            ],
+            "secret_goal_initialized": [
+              "b",
+              227
+            ],
+            "attitude": [
+              "i",
+              232
+            ],
+            "previous_attitude": [
+              "i",
+              236
+            ],
+            "secret_goal_change_catalyst": [
+              "catalyst",
+              240
+            ],
+            "secret_goal": [
+              "i",
+              248
+            ],
+            "diplomacy_random_seed": [
+              "i",
+              252
+            ]
+          },
+          null,
+          -1
+        ],
+        "ai_strategic_region_stance": [
+          208,
+          220,
+          24,
+          {
+            "strategic_region": [
+              "strategic_region",
+              8
+            ],
+            "stance": [
+              "ai_strategic_region_stance",
+              16
+            ]
+          },
+          null,
+          8
+        ]
+      },
+      "nested_vectors": {
+        "ai_local_goods_production_value": {
+          "outer": [
+            1080,
+            1092,
+            96,
+            {
+              "state": [
+                "i",
+                8
+              ],
+              "_pointer": [
+                "w",
+                24
+              ],
+              "_counts": [
+                "w",
+                32
+              ]
+            },
+            null,
+            -1
+          ],
+          "inner": [
+            0,
+            12,
+            8,
+            {
+              "value": [
+                "q",
+                0
+              ]
+            }
+          ]
+        },
+        "ai_local_goods_production_prestige": {
+          "outer": [
+            1080,
+            1092,
+            96,
+            {
+              "state": [
+                "i",
+                8
+              ],
+              "_pointer": [
+                "w",
+                64
+              ],
+              "_counts": [
+                "w",
+                72
+              ]
+            },
+            null,
+            -1
+          ],
+          "inner": [
+            0,
+            12,
+            32,
+            {
+              "goods": [
+                "b",
+                0
+              ],
+              "prestige_0": [
+                "q",
+                8
+              ],
+              "prestige_1": [
+                "q",
+                16
+              ],
+              "prestige_2": [
+                "q",
+                24
+              ]
+            }
+          ]
+        },
+        "ai_local_goods_consumption_value": {
+          "outer": [
+            1120,
+            1132,
+            96,
+            {
+              "state": [
+                "i",
+                8
+              ],
+              "_pointer": [
+                "w",
+                24
+              ],
+              "_counts": [
+                "w",
+                32
+              ]
+            },
+            null,
+            -1
+          ],
+          "inner": [
+            0,
+            12,
+            8,
+            {
+              "value": [
+                "q",
+                0
+              ]
+            }
+          ]
+        },
+        "ai_local_goods_consumption_prestige": {
+          "outer": [
+            1120,
+            1132,
+            96,
+            {
+              "state": [
+                "i",
+                8
+              ],
+              "_pointer": [
+                "w",
+                64
+              ],
+              "_counts": [
+                "w",
+                72
+              ]
+            },
+            null,
+            -1
+          ],
+          "inner": [
+            0,
+            12,
+            32,
+            {
+              "goods": [
+                "b",
+                0
+              ],
+              "prestige_0": [
+                "q",
+                8
+              ],
+              "prestige_1": [
+                "q",
+                16
+              ],
+              "prestige_2": [
+                "q",
+                24
+              ]
+            }
+          ]
+        },
+        "ai_country_goal_threat_reason": {
+          "outer": [
+            168,
+            180,
+            256,
+            {
+              "target": [
+                "i",
+                8
+              ],
+              "_pointer": [
+                "w",
+                80
+              ],
+              "_counts": [
+                "w",
+                88
+              ]
+            },
+            null,
+            -1
+          ],
+          "inner": [
+            0,
+            12,
+            120,
+            {
+              "reason": [
+                "inline_string",
+                8
+              ],
+              "attitude": [
+                "i",
+                40
+              ],
+              "country": [
+                "i",
+                44
+              ],
+              "score": [
+                "q",
+                48
+              ]
+            }
+          ]
+        },
+        "ai_country_goal_antagonize_reason": {
+          "outer": [
+            168,
+            180,
+            256,
+            {
+              "target": [
+                "i",
+                8
+              ],
+              "_pointer": [
+                "w",
+                120
+              ],
+              "_counts": [
+                "w",
+                128
+              ]
+            },
+            null,
+            -1
+          ],
+          "inner": [
+            0,
+            12,
+            120,
+            {
+              "reason": [
+                "inline_string",
+                8
+              ],
+              "attitude": [
+                "i",
+                40
+              ],
+              "country": [
+                "i",
+                44
+              ],
+              "score": [
+                "q",
+                48
+              ]
+            }
+          ]
+        },
+        "ai_country_goal_befriend_reason": {
+          "outer": [
+            168,
+            180,
+            256,
+            {
+              "target": [
+                "i",
+                8
+              ],
+              "_pointer": [
+                "w",
+                160
+              ],
+              "_counts": [
+                "w",
+                168
+              ]
+            },
+            null,
+            -1
+          ],
+          "inner": [
+            0,
+            12,
+            120,
+            {
+              "reason": [
+                "inline_string",
+                8
+              ],
+              "attitude": [
+                "i",
+                40
+              ],
+              "country": [
+                "i",
+                44
+              ],
+              "score": [
+                "q",
+                48
+              ]
+            }
+          ]
+        },
+        "ai_country_goal_protect_reason": {
+          "outer": [
+            168,
+            180,
+            256,
+            {
+              "target": [
+                "i",
+                8
+              ],
+              "_pointer": [
+                "w",
+                200
+              ],
+              "_counts": [
+                "w",
+                208
+              ]
+            },
+            null,
+            -1
+          ],
+          "inner": [
+            0,
+            12,
+            120,
+            {
+              "reason": [
+                "inline_string",
+                8
+              ],
+              "attitude": [
+                "i",
+                40
+              ],
+              "country": [
+                "i",
+                44
+              ],
+              "score": [
+                "q",
+                48
+              ]
+            }
+          ]
+        }
+      },
+      "keys": {
+        "strategy_0": [
+          96,
+          "ai_strategy",
+          24
+        ],
+        "strategy_1": [
+          120,
+          "ai_strategy",
+          24
+        ],
+        "strategy_2": [
+          144,
+          "ai_strategy",
+          24
+        ]
+      }
+    },
+    "navy_ai": {
+      "rva": 93747712,
+      "size": 440,
+      "fields": {
+        "runtime_id": [
+          "i",
+          8
+        ],
+        "country": [
+          "i",
+          16
+        ],
+        "expedited": [
+          "b",
+          432
+        ],
+        "expedite_this_tick": [
+          "b",
+          433
+        ],
+        "dead": [
+          "b",
+          434
+        ]
+      },
+      "keys": {},
+      "vectors": {
+        "navy_ai_template": [
+          24,
+          36,
+          64,
+          {
+            "template": [
+              "i",
+              0
+            ],
+            "ship_type": [
+              "ship_type",
+              32,
+              "template",
+              [
+                -1
+              ]
+            ],
+            "ships_wanted": [
+              "i",
+              44
+            ],
+            "score": [
+              "q",
+              48
+            ],
+            "construction_costs": [
+              "q",
+              56
+            ]
+          }
+        ],
+        "navy_ai_hq": [
+          48,
+          60,
+          32,
+          {
+            "hq": [
+              "i",
+              0
+            ],
+            "score": [
+              "q",
+              8
+            ],
+            "ships": [
+              "i",
+              16
+            ]
+          }
+        ],
+        "navy_ai_country": [
+          72,
+          84,
+          16,
+          {
+            "country": [
+              "i",
+              0
+            ],
+            "score": [
+              "q",
+              8
+            ]
+          }
+        ],
+        "navy_ai_shipping_lane": [
+          96,
+          108,
+          32,
+          {
+            "shipping_lane": [
+              "i",
+              0
+            ],
+            "score": [
+              "q",
+              8
+            ],
+            "enemy": [
+              "b",
+              24
+            ]
+          }
+        ],
+        "navy_ai_supply_path": [
+          120,
+          132,
+          56,
+          {
+            "country": [
+              "i",
+              0
+            ],
+            "fleet": [
+              "i",
+              4
+            ],
+            "score": [
+              "q",
+              32
+            ],
+            "enemy": [
+              "b",
+              48
+            ]
+          }
+        ],
+        "navy_ai_coast": [
+          144,
+          156,
+          32,
+          {
+            "hq": [
+              "i",
+              0
+            ],
+            "region": [
+              "strategic_region",
+              8,
+              "hq",
+              [
+                -1
+              ]
+            ],
+            "score": [
+              "q",
+              16
+            ]
+          }
+        ],
+        "navy_ai_sea": [
+          168,
+          180,
+          424,
+          {
+            "province": [
+              "h0",
+              0
+            ],
+            "score": [
+              "q",
+              8
+            ],
+            "block": [
+              "q",
+              16
+            ],
+            "power_projection": [
+              "q",
+              24
+            ],
+            "blockade_strength": [
+              "q",
+              32
+            ],
+            "hostile_strength": [
+              "q",
+              40
+            ],
+            "friendly_strength": [
+              "q",
+              48
+            ],
+            "piracy_heat": [
+              "q",
+              56
+            ],
+            "raid_heat": [
+              "q",
+              64
+            ],
+            "mission_score_0": [
+              "q",
+              72
+            ],
+            "mission_score_1": [
+              "q",
+              80
+            ],
+            "mission_score_2": [
+              "q",
+              88
+            ],
+            "mission_score_3": [
+              "q",
+              96
+            ],
+            "mission_score_4": [
+              "q",
+              104
+            ],
+            "mission_score_5": [
+              "q",
+              112
+            ],
+            "mission_score_6": [
+              "q",
+              120
+            ],
+            "mission_score_7": [
+              "q",
+              128
+            ],
+            "mission_score_8": [
+              "q",
+              136
+            ],
+            "designated_project_power_node": [
+              "b",
+              416
+            ]
+          }
+        ],
+        "navy_ai_assignment": [
+          192,
+          204,
+          184,
+          {
+            "fleet": [
+              "i",
+              0
+            ],
+            "fleet_composition": [
+              "string_pointer",
+              32
+            ],
+            "hq": [
+              "i",
+              120
+            ],
+            "primary_province": [
+              "h0",
+              152
+            ],
+            "mission": [
+              "naval_mission_type",
+              160
+            ],
+            "score": [
+              "q",
+              168
+            ],
+            "mission_start_day": [
+              "i",
+              176
+            ]
+          }
+        ],
+        "navy_ai_active_fleet_creation": [
+          288,
+          300,
+          48,
+          {
+            "hq": [
+              "i",
+              0
+            ],
+            "fleet_composition": [
+              "string_pointer",
+              8
+            ]
+          }
+        ],
+        "navy_ai_pending_fleet_creation": [
+          264,
+          276,
+          48,
+          {
+            "hq": [
+              "i",
+              0
+            ],
+            "fleet_composition": [
+              "string_pointer",
+              8
+            ]
+          }
+        ],
+        "navy_ai_active_transfer": [
+          216,
+          228,
+          8,
+          {
+            "from": [
+              "i",
+              0
+            ],
+            "to": [
+              "i",
+              4
+            ]
+          }
+        ],
+        "navy_ai_pending_transfer": [
+          240,
+          252,
+          32,
+          {
+            "from": [
+              "i",
+              0
+            ],
+            "to": [
+              "i",
+              4
+            ]
+          }
+        ],
+        "navy_ai_sea_node_piracy_heat": [
+          320,
+          332,
+          24,
+          {
+            "key": [
+              "h0",
+              8
+            ],
+            "value": [
+              "q",
+              16
+            ]
+          },
+          null,
+          -1,
+          null,
+          4
+        ],
+        "navy_ai_supply_path_raid_heat": [
+          360,
+          372,
+          24,
+          {
+            "key": [
+              "i",
+              8
+            ],
+            "value": [
+              "q",
+              16
+            ]
+          },
+          null,
+          -1,
+          null,
+          4
+        ],
+        "navy_ai_lost_supply_ships": [
+          400,
+          412,
+          12,
+          {
+            "key": [
+              "i",
+              4
+            ],
+            "value": [
+              "i",
+              8
+            ]
+          },
+          null,
+          -1,
+          null,
+          0
+        ]
+      },
+      "nested_vectors": {
+        "navy_ai_template_modification": {
+          "outer": [
+            24,
+            36,
+            64,
+            {
+              "_pointer": [
+                "w",
+                8
+              ],
+              "_counts": [
+                "w",
+                16
+              ]
+            }
+          ],
+          "inner": [
+            0,
+            12,
+            8,
+            {
+              "modification": [
+                "ship_modification",
+                0
+              ]
+            }
+          ]
+        },
+        "navy_ai_sea_project_power_region": {
+          "outer": [
+            168,
+            180,
+            424,
+            {
+              "_pointer": [
+                "w",
+                288
+              ],
+              "_counts": [
+                "w",
+                296
+              ]
+            }
+          ],
+          "inner": [
+            0,
+            12,
+            8,
+            {
+              "region": [
+                "strategic_region",
+                0
+              ]
+            }
+          ]
+        },
+        "navy_ai_assignment_wanted_ratio": {
+          "outer": [
+            192,
+            204,
+            184,
+            {
+              "_pointer": [
+                "w",
+                8
+              ],
+              "_counts": [
+                "w",
+                16
+              ]
+            }
+          ],
+          "inner": [
+            0,
+            12,
+            8,
+            {
+              "value": [
+                "q",
+                0
+              ]
+            }
+          ]
+        },
+        "navy_ai_assignment_current_ships": {
+          "outer": [
+            192,
+            204,
+            184,
+            {
+              "_pointer": [
+                "w",
+                72
+              ],
+              "_counts": [
+                "w",
+                80
+              ]
+            }
+          ],
+          "inner": [
+            0,
+            12,
+            4,
+            {
+              "value": [
+                "i",
+                0
+              ]
+            }
+          ]
+        },
+        "navy_ai_assignment_wanted_ships": {
+          "outer": [
+            192,
+            204,
+            184,
+            {
+              "_pointer": [
+                "w",
+                96
+              ],
+              "_counts": [
+                "w",
+                104
+              ]
+            }
+          ],
+          "inner": [
+            0,
+            12,
+            4,
+            {
+              "value": [
+                "i",
+                0
+              ]
+            }
+          ]
+        },
+        "navy_ai_assignment_province_range": {
+          "outer": [
+            192,
+            204,
+            184,
+            {
+              "_pointer": [
+                "w",
+                128
+              ],
+              "_counts": [
+                "w",
+                136
+              ]
+            }
+          ],
+          "inner": [
+            0,
+            12,
+            4,
+            {
+              "first_province": [
+                "h0",
+                0
+              ],
+              "additional_provinces": [
+                "h1",
+                0
+              ]
+            }
+          ]
+        },
+        "navy_ai_pending_transfer_ship": {
+          "outer": [
+            240,
+            252,
+            32,
+            {
+              "_pointer": [
+                "w",
+                8
+              ],
+              "_counts": [
+                "w",
+                16
+              ]
+            }
+          ],
+          "inner": [
+            0,
+            12,
+            4,
+            {
+              "ship": [
+                "i",
+                0
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "market_area": {
+      "rva": 93736608,
+      "size": 80,
+      "fields": {
+        "runtime_id": [
+          "i",
+          8
+        ],
+        "market": [
+          "i",
+          16
+        ],
+        "hub_state": [
+          "i",
+          72
+        ]
+      },
+      "keys": {},
+      "vectors": {
+        "market_area_state": [
+          24,
+          36,
+          4,
+          {
+            "state": [
+              "i",
+              0
+            ]
+          }
+        ],
+        "market_area_port": [
+          48,
+          60,
+          4,
+          {
+            "state": [
+              "i",
+              0
+            ]
+          }
+        ]
+      }
+    },
+    "global_rng": {
+      "root": [],
+      "offset": 93507856,
+      "size": 8,
+      "fields": {
+        "seed": [
+          "u",
+          0
+        ],
+        "seed_count": [
+          "u",
+          4
+        ]
+      },
+      "keys": {}
+    },
+    "ironman": {
+      "root": [
+        93507880,
+        1544,
+        288
+      ],
+      "offset": 15552,
+      "size": 120,
+      "fields": {
+        "date": [
+          "i",
+          8
+        ],
+        "save_interval": [
+          "i",
+          16
+        ],
+        "storage": [
+          "i",
+          20
+        ]
+      },
+      "strings": {
+        "save_game": 88
+      }
+    },
+    "ironman_setting": {
+      "root": [
+        93331520
+      ],
+      "size": 280,
+      "fields": {
+        "enabled": [
+          "b",
+          274
+        ]
+      }
+    },
+    "ironman_override": {
+      "root": [],
+      "offset": 93312268,
+      "size": 8,
+      "fields": {
+        "disabled": [
+          "b",
+          0
+        ]
+      }
+    },
+    "game_session": {
+      "root": [
+        93507880
+      ],
+      "size": 1400,
+      "fields": {
+        "number_of_players": [
+          "i",
+          1396
+        ]
+      }
+    },
+    "charter": {
+      "rva": 93743176,
+      "fields": {
+        "company": [
+          "i",
+          56
+        ],
+        "unlock": [
+          "i",
+          48
+        ]
+      },
+      "keys": {
+        "charter_type": [
+          24,
+          "company_charter_type",
+          24
+        ]
+      },
+      "size": 88
+    }
+  },
+  "key_sentinels": {
+    "catalyst": 93736104,
+    "ai_strategy": 93733560,
+    "naval_mission_type": 93734112
+  },
+  "scope_definitions": {
+    "61": [
+      "political_movement_type",
+      "common/political_movements"
+    ]
+  },
+  "key_vtables": {
+    "building": 72369264
+  }
+}

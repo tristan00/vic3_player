@@ -1,0 +1,2967 @@
+{
+  "metrics": {
+    "country|CalcBaseConstructionSpeed": "ANY",
+    "country|CalcConscriptableBattalions": "ANY",
+    "country|CalcNumStatesInTurmoil": "OWN",
+    "country|CalcRelativeUsedGovernmentConstruction": "NONE",
+    "country|CalcRelativeUsedPrivateConstruction": "NONE",
+    "country|CalcUsedConstruction": "ANY",
+    "country|CalcUsedGovernmentConstruction": "NONE",
+    "country|CalcUsedPrivateConstruction": "NONE",
+    "country|GetArableLand": "ANY",
+    "country|GetArmyGoodsExpenses": "NONE",
+    "country|GetArmyPowerProjection": "NONE",
+    "country|GetArmyWagesExpenses": "OWN",
+    "country|GetAverageSoLByPoliticalStrength": "ANY",
+    "country|GetAverageSoLByPopulation": "ANY",
+    "country|GetAverageStandardOfLivingMiddle": "ANY",
+    "country|GetAverageStandardOfLivingPoor": "ANY",
+    "country|GetAverageStandardOfLivingRich": "ANY",
+    "country|GetAverageStateTaxCollectionMult": "OWN",
+    "country|GetAverageTaxWaste": "OWN",
+    "country|GetBaseWeeklyTechnologySpread": "NONE",
+    "country|GetBattalions": "ANY",
+    "country|GetBattalionsMobilizing": "NONE",
+    "country|GetConscriptedBattalions": "NONE",
+    "country|GetConscriptionRatio": "UNRESOLVED",
+    "country|GetConstructionGoodsExpenses": "OWN",
+    "country|GetConsumptionTaxIncome": "NONE",
+    "country|GetCountryScorePosition": "ANY",
+    "country|GetCreditRatio": "OWN",
+    "country|GetCurrentPowerStruggleMonth": "ANY",
+    "country|GetCurrentSailors": "OWN",
+    "country|GetDaysUntilElection": "OWN",
+    "country|GetDaysUntilRankLoss": "OWN",
+    "country|GetDependents": "ANY",
+    "country|GetDomesticallyOwnedGDP": "DERIVED",
+    "country|GetDomesticallyOwnedGDPFraction": "ANY",
+    "country|GetElectoralConfidence": "OWN",
+    "country|GetEmployedWorkingAdults": "NONE",
+    "country|GetEmptyAgitatorSlots": "OWN",
+    "country|GetEnemyOccupation": "ANY",
+    "country|GetExpectedSoLByPopulation": "ANY",
+    "country|GetExpectedStandardOfLivingMiddle": "ANY",
+    "country|GetExpectedStandardOfLivingPoor": "ANY",
+    "country|GetExpectedStandardOfLivingRich": "ANY",
+    "country|GetForeignOwnedGDP": "ANY",
+    "country|GetForeignOwnedGDPFraction": "ANY",
+    "country|GetFreeArableLand": "NONE",
+    "country|GetFreeMilitaryConstructionCapacity": "OWN",
+    "country|GetFreeSupplyConstructionCapacity": "OWN",
+    "country|GetGDP": "ANY",
+    "country|GetGDPOwnedInForeignCountries": "ANY",
+    "country|GetGDPPerCapita": "ANY",
+    "country|GetGDPWithOwnershipsInForeignCountries": "ANY",
+    "country|GetGoldReserveLimit": "NONE",
+    "country|GetGoldReserveRatio": "OWN",
+    "country|GetGoldReserves": "OWN",
+    "country|GetGovernmentConstructionGoodsExpenses": "OWN",
+    "country|GetGovernmentGoodsExpenses": "OWN",
+    "country|GetGovernmentLegitimacy": "ANY",
+    "country|GetGovernmentSelfDebt": "OWN",
+    "country|GetGovernmentSelfDebtFraction": "OWN",
+    "country|GetGovernmentSlavesExpenses": "OWN",
+    "country|GetGovernmentWagesExpenses": "OWN",
+    "country|GetInactivePopulation": "ANY",
+    "country|GetIncomeTaxIncome": "OWN",
+    "country|GetIncorporatedLiteracyRate": "ANY",
+    "country|GetIncorporatedPopulation": "ANY",
+    "country|GetInfamy": "ANY",
+    "country|GetInstitutionInvestment": "OWN",
+    "country|GetInstitutionInvestmentBureaucracyCost": "OWN",
+    "country|GetInstitutionInvestmentBureaucracyFactor": "OWN",
+    "country|GetInterestPayment": "OWN",
+    "country|GetInvestmentIncome": "OWN",
+    "country|GetInvestmentPool": "OWN",
+    "country|GetInvestmentPoolChange": "OWN",
+    "country|GetKillRateNavy": "NONE",
+    "country|GetLawEnactmentProgress": "ANY",
+    "country|GetLeaderReligionPercentage": "NONE",
+    "country|GetLeverageResistance": "ANY",
+    "country|GetLibertyDesireRaw": "ANY",
+    "country|GetLimitedMassMigrationCountryAttraction": "ANY",
+    "country|GetLoyalistsOrRadicalsGainedFromLegitimacy": "OWN",
+    "country|GetLoyaltiesGain": "OWN",
+    "country|GetMarketFeesIncome": "OWN",
+    "country|GetMaxCredit": "OWN",
+    "country|GetMaxFreeCharters": "NONE",
+    "country|GetMaxLawEnactmentSetbacks": "OWN",
+    "country|GetMaxNumCompanies": "OWN",
+    "country|GetMaxPowerStruggleMonth": "ANY",
+    "country|GetMaxUnassignedAdmirals": "OWN",
+    "country|GetMaxUnassignedGenerals": "OWN",
+    "country|GetMaxWeeklyTechnologySpread": "NONE",
+    "country|GetMerchantMarineShortage": "OWN",
+    "country|GetMerchantMarineShortageTarget": "NONE",
+    "country|GetMilitaryConstructionCapacity": "OWN",
+    "country|GetMilitaryConstructionQueueCount": "NONE",
+    "country|GetMilitaryConstructionQueueUsage": "OWN",
+    "country|GetMilitaryConstructionUsageTotal": "OWN",
+    "country|GetMilitaryGoodsExpenses": "OWN",
+    "country|GetMilitaryMaintenanceDemand": "OWN",
+    "country|GetMilitaryMaintenanceFulfillment": "OWN",
+    "country|GetMilitaryMaintenanceUsage": "NONE",
+    "country|GetMilitaryShipConstructionGoodsExpenses": "OWN",
+    "country|GetMilitaryShipCount": "OWN",
+    "country|GetMilitaryShipMaintenanceExpenses": "OWN",
+    "country|GetMilitarySlavesExpenses": "OWN",
+    "country|GetMilitaryWagesExpenses": "OWN",
+    "country|GetMinWeeklyTechnologySpread": "NONE",
+    "country|GetMobilizationRatio": "ANY",
+    "country|GetNavyCombatPower": "NONE",
+    "country|GetNavyGoodsExpenses": "NONE",
+    "country|GetNavyPowerProjection": "NONE",
+    "country|GetNavyWagesExpenses": "OWN",
+    "country|GetNeededSailors": "OWN",
+    "country|GetNextRankNumber": "NONE",
+    "country|GetNumActiveConstructionQueueElements": "OWN",
+    "country|GetNumActiveGovernmentConstructionQueueElements": "OWN",
+    "country|GetNumActivePrivateConstructionQueueElements": "OWN",
+    "country|GetNumActiveShownConstructionQueueElements": "NONE",
+    "country|GetNumActiveShownGovernmentConstructionQueueElements": "NONE",
+    "country|GetNumActiveShownPrivateConstructionQueueElements": "NONE",
+    "country|GetNumAssignedSupplyShips": "OWN",
+    "country|GetNumAssignedSupplyShipsToArmies": "NONE",
+    "country|GetNumAssignedSupplyShipsToFleets": "OWN",
+    "country|GetNumAvailableCompanies": "NONE",
+    "country|GetNumAvailableNegotiations": "OWN",
+    "country|IsNegotiating": "OWN",
+    "country|GetNumAvailableSupplyShips": "OWN",
+    "country|GetNumBattalions": "NONE",
+    "country|GetNumCombatUnitsAndShips": "ANY",
+    "country|GetNumCompanies": "OWN",
+    "country|GetNumGovernmentConstructionsInQueue": "OWN",
+    "country|GetNumInactiveAndNonShownGovernmentConstructionQueueElements": "OWN",
+    "country|GetNumInactiveAndNonShownPrivateConstructionQueueElements": "OWN",
+    "country|GetNumInactiveConstructionQueueElements": "OWN",
+    "country|GetNumInactiveGovernmentConstructionQueueElements": "NONE",
+    "country|GetNumInactivePrivateConstructionQueueElements": "OWN",
+    "country|GetNumIncorporatedLiteratePops": "ANY",
+    "country|GetNumIncorporatedStates": "NONE",
+    "country|GetNumInsufficientTaxCapacityStates": "OWN",
+    "country|GetNumInterestGroupMembers": "OWN",
+    "country|GetNumIsolatedStates": "OWN",
+    "country|GetNumLowMarketAccessStates": "OWN",
+    "country|GetNumLoyalists": "OWN",
+    "country|GetNumNeutrals": "OWN",
+    "country|GetNumPoliticallyInactiveLoyalists": "NONE",
+    "country|GetNumPoliticallyInactiveNeutrals": "NONE",
+    "country|GetNumPoliticallyInactiveRadicals": "NONE",
+    "country|GetNumPreviousAutonomousInvestments": "OWN",
+    "country|GetNumPreviousAutonomousPrivateConstructions": "NONE",
+    "country|GetNumPreviousAutonomousPrivatizations": "NONE",
+    "country|GetNumPrivateConstructionsInQueue": "OWN",
+    "country|GetNumRadicals": "OWN",
+    "country|GetNumRequiredSupplyShips": "NONE",
+    "country|GetNumRequiredSupplyShipsToArmies": "NONE",
+    "country|GetNumRequiredSupplyShipsToFleets": "OWN",
+    "country|GetNumShips": "ANY",
+    "country|GetNumStatesThatCanBeIncorporated": "OWN",
+    "country|GetNumStatesWithConstruction": "NONE",
+    "country|GetNumStatesWithoutConstruction": "NONE",
+    "country|GetNumSupplyShips": "OWN",
+    "country|GetNumTotalLiteratePops": "ANY",
+    "country|GetNumTurmoilStates": "OWN",
+    "country|GetNumUnassignedAdmirals": "OWN",
+    "country|GetNumUnassignedGenerals": "OWN",
+    "country|GetNumUnincorporatedStates": "NONE",
+    "country|GetNumberOfActiveConscriptionCenters": "NONE",
+    "country|GetNumberOfInactiveConscriptionCenters": "NONE",
+    "country|GetPeopleAbroad": "ANY",
+    "country|GetPiracyIncome": "OWN",
+    "country|GetPoliticallyInvolvedPercentage": "NONE",
+    "country|GetPoliticallyInvolvedPopulation": "ANY",
+    "country|GetPollTaxIncome": "OWN",
+    "country|GetPortConnectionExpenses": "OWN",
+    "country|GetPotentialLabor": "NONE",
+    "country|GetPowerBlocExpenseRaw": "OWN",
+    "country|GetPowerBlocIncomeRaw": "OWN",
+    "country|GetPowerBlocsTotalLeverageShare": "ANY",
+    "country|GetPredictedBalanceFromBankruptcy": "NONE",
+    "country|GetPrestige": "ANY",
+    "country|GetPrestigeForCurrentRank": "NONE",
+    "country|GetPrestigeForNextRank": "NONE",
+    "country|GetPrestigeToMaintainRank": "OWN",
+    "country|GetPrincipal": "OWN",
+    "country|GetPrivateConstructionGoodsExpenses": "OWN",
+    "country|GetRadicalizationFromBankruptcy": "OWN",
+    "country|GetRankNumber": "NONE",
+    "country|GetRankProgress": "ANY",
+    "country|GetRegularBattalions": "ANY",
+    "country|GetReinforcementRateArmy": "NONE",
+    "country|GetReinforcementRateNavy": "NONE",
+    "country|GetRemainingCredit": "OWN",
+    "country|GetRetrofitCost": "NONE",
+    "country|GetSalariedWorkingAdults": "ANY",
+    "country|GetShipConstruction": "OWN",
+    "country|GetShipConstructionGoodsExpenses": "OWN",
+    "country|GetShipConstructionUsage": "OWN",
+    "country|GetShipConstructionWeeksLeft": "OWN",
+    "country|GetSubsidiesExpenses": "OWN",
+    "country|GetSubsistingWorkingAdults": "ANY",
+    "country|GetSubventionsExpenses": "OWN",
+    "country|GetSupplyConstructionCapacity": "OWN",
+    "country|GetSupplyConstructionQueueCount": "NONE",
+    "country|GetSupplyConstructionQueueUsage": "OWN",
+    "country|GetSupplyConstructionUsageTotal": "NONE",
+    "country|GetSupplyMaintenanceDemand": "OWN",
+    "country|GetSupplyMaintenanceFulfillment": "OWN",
+    "country|GetSupplyMaintenanceUsage": "NONE",
+    "country|GetSupplyNetworkNumSeaNodes": "ANY",
+    "country|GetSupplyNetworkStrength": "ANY",
+    "country|GetSupplyNetworkStrengthTarget": "ANY",
+    "country|GetSupplyNetworkStrengthWeeklyChange": "ANY",
+    "country|GetSupplyShipConstructionGoodsExpenses": "OWN",
+    "country|GetSupplyShipMaintenanceExpenses": "OWN",
+    "country|GetTotalAgitatorSlots": "NONE",
+    "country|GetTotalExportedAmount": "ANY",
+    "country|GetTotalForeignConstructions": "OWN",
+    "country|GetTotalImportedAmount": "ANY",
+    "country|GetTotalLeverageFactors": "NONE",
+    "country|GetTotalLeverageFactorsWithResistance": "ANY",
+    "country|GetTotalLiteracyRate": "ANY",
+    "country|GetTotalMaintenanceDemand": "OWN",
+    "country|GetTotalNumLoyalistsChange": "OWN",
+    "country|GetTotalNumLoyalistsDecrease": "OWN",
+    "country|GetTotalNumLoyalistsIncrease": "OWN",
+    "country|GetTotalNumRadicalsChange": "OWN",
+    "country|GetTotalNumRadicalsDecrease": "OWN",
+    "country|GetTotalNumRadicalsIncrease": "OWN",
+    "country|GetTotalPopulation": "ANY",
+    "country|GetTotalSupplyShipCount": "OWN",
+    "country|GetTotalUrbanization": "NONE",
+    "country|GetUnclaimedLeverage": "ANY",
+    "country|GetUnclaimedLeverageShare": "ANY",
+    "country|GetUnclaimedLeverageShareTarget": "ANY",
+    "country|GetUnclaimedLeverageTarget": "ANY",
+    "country|GetUnemployedWorkingAdults": "ANY",
+    "country|GetUnrealizedTaxes": "OWN",
+    "country|GetUsedAgitatorSlots": "NONE",
+    "country|GetUsedFreeCharters": "ANY",
+    "country|GetWeeklyBalance": "NONE",
+    "country|GetWeeklyCostArmy": "NONE",
+    "country|GetWeeklyCostNavy": "NONE",
+    "country|GetWeeklyExpenses": "OWN",
+    "country|GetWeeklyFixedExpenses": "OWN",
+    "country|GetWeeklyGDP": "NONE",
+    "country|GetWeeklyIncome": "NONE",
+    "country|GetWeeklyInnovation": "OWN",
+    "country|GetWeeklyInterestRate": "NONE",
+    "country|GetWeeklyLibertyDesireChange": "ANY",
+    "country|GetWeeklyLibertyDesireChangeFromSupportIndependence": "ANY",
+    "country|GetWeeklyMaxInnovation": "OWN",
+    "country|GetWeeklyRawInnovation": "NONE",
+    "country|GetWeeklyResearchSpeed": "OWN",
+    "country|GetWeeklyTemporaryExpenses": "OWN",
+    "country|GetWeeklyTemporaryIncome": "OWN",
+    "country|GetWelfarePaymentsExpenses": "OWN",
+    "country|GetWorkingAdults": "NONE",
+    "country|GetYearlyInterestRate": "OWN",
+    "country|HasActiveDiplomacy": "ANY",
+    "country|HasAnySlavery": "NONE",
+    "country|HasAnyTaxes": "OWN",
+    "country|HasConstructionQueued": "ANY",
+    "country|HasCurrentlyResearchedTechnology": "OWN",
+    "country|HasDecreasingInterests": "NONE",
+    "country|HasDefaultConstructionFleet": "OWN",
+    "country|HasElections": "OWN",
+    "country|HasGovernmentWages": "OWN",
+    "country|HasHigherUnclaimedLeverage": "ANY",
+    "country|HasIGApprovalFromLoyalists": "OWN",
+    "country|HasIGApprovalFromRadicals": "OWN",
+    "country|HasInsufficientMaxSailors": "OWN",
+    "country|IsColonizable": "ANY",
+    "country|IsConstructionPaused": "ANY",
+    "country|IsInPowerBloc": "ANY",
+    "country|IsPowerStruggling": "ANY",
+    "country|IsShipConstructionPaused": "ANY",
+    "state|CalcPopInstitutionBureaucracyCost": "ANY",
+    "state|CalcTaxCapacity": "ANY",
+    "state|CalcTaxCapacityBalance": "ANY",
+    "state|CalcTaxCapacityUsage": "ANY",
+    "state|CalcTurmoil": "ANY",
+    "state|GetArableLandCapacity": "ANY",
+    "state|GetAverageAnnualWage": "ANY",
+    "state|GetAverageStandardOfLivingAll": "ANY",
+    "state|GetAverageStandardOfLivingMiddle": "ANY",
+    "state|GetAverageStandardOfLivingPoor": "ANY",
+    "state|GetAverageStandardOfLivingRich": "ANY",
+    "state|GetBaseBureaucracyCostRaw": "ANY",
+    "state|GetBasePopBureaucracyCostRaw": "ANY",
+    "state|GetBlockadeLevel": "ANY",
+    "state|GetBureaucracyCost": "ANY",
+    "state|GetColonyProgress": "ANY",
+    "state|GetColonyProgressAsDays": "ANY",
+    "state|GetColonyProgressAsFloat": "ANY",
+    "state|GetConscriptionLimit": "ANY",
+    "state|GetConstructionEfficiency": "NONE",
+    "state|GetCurrentBlockadeStrength": "ANY",
+    "state|GetDailyColonyProgress": "ANY",
+    "state|GetDailyDevastationIncreaseFromBombardment": "ANY",
+    "state|GetDevastationDailyChange": "ANY",
+    "state|GetDevastationLevel": "ANY",
+    "state|GetExpectedStandardOfLivingAll": "ANY",
+    "state|GetExpectedStandardOfLivingMiddle": "ANY",
+    "state|GetExpectedStandardOfLivingPoor": "ANY",
+    "state|GetExpectedStandardOfLivingRich": "ANY",
+    "state|GetGDPContribution": "ANY",
+    "state|GetGDPContributionPercentage": "ANY",
+    "state|GetGovernmentExpenses": "ANY",
+    "state|GetIncorporationProgress": "ANY",
+    "state|GetInfrastructure": "ANY",
+    "state|GetInfrastructureBalance": "ANY",
+    "state|GetInfrastructureUsage": "ANY",
+    "state|GetLiteracy": "ANY",
+    "state|GetMarketAccess": "ANY",
+    "state|GetMaxBattalions": "NONE",
+    "state|GetMigrationPull": "ANY",
+    "state|GetNumArableLandReservedForSubsistence": "ANY",
+    "state|GetNumBaseFreeArableLand": "ANY",
+    "state|GetNumBuildingsAffectedByGoodsShortage": "ANY",
+    "state|GetNumColonizers": "ANY",
+    "state|GetNumFreeArableLand": "ANY",
+    "state|GetNumJobseekers": "ANY",
+    "state|GetNumLoyalists": "ANY",
+    "state|GetNumObstinanceSupporters": "ANY",
+    "state|GetNumRadicals": "ANY",
+    "state|GetNumSubsistenceWorkingAdults": "ANY",
+    "state|GetNumUnemployedWorkingAdults": "ANY",
+    "state|GetNumUsedArableLand": "NONE",
+    "state|GetNumberOfPopsMiddle": "ANY",
+    "state|GetNumberOfPopsPoor": "ANY",
+    "state|GetNumberOfPopsRich": "ANY",
+    "state|GetObstinance": "ANY",
+    "state|GetPollutionGeneration": "ANY",
+    "state|GetPopBirthrate": "ANY",
+    "state|GetPopMortality": "ANY",
+    "state|GetPopNetGrowth": "ANY",
+    "state|GetPopTotalChange": "ANY",
+    "state|GetPopulationRatioBelowExpectedStandardOfLiving": "ANY",
+    "state|GetPopulationSize": "ANY",
+    "state|GetPotentialLabor": "NONE",
+    "state|GetRequiredBlockadeStrength": "ANY",
+    "state|GetTaxationRevenue": "ANY",
+    "state|GetTotalConsumption": "NONE",
+    "state|GetTotalLabor": "ANY",
+    "state|GetTotalProduction": "NONE",
+    "state|GetTradeCapacity": "ANY",
+    "state|GetTradeCapacityBalance": "ANY",
+    "state|GetTradeCapacityUsage": "ANY",
+    "state|GetTradePotential": "ANY",
+    "state|GetUrbanization": "ANY",
+    "state|GetUrbanizationNeededPerLevelRaw": "ANY",
+    "state|GetWeeklyPopNetMigration": "ANY",
+    "state|GetWorldMarketAccess": "ANY",
+    "state|GetYearlyGDP": "ANY",
+    "state|GetYearsToIncorporate": "ANY",
+    "state|HasFamine": "ANY",
+    "state|HasInsufficientQualificationsForAvailablePositions": "ANY",
+    "state|HasOccupation": "ANY",
+    "state|HasTurmoilEffects": "ANY",
+    "state|IsCapitalState": "ANY",
+    "state|IsCoastal": "DEBUG",
+    "state|IsColonyProgressBlockedByInactiveInterest": "ANY",
+    "state|IsCompanyColony": "ANY",
+    "state|IsIncorporated": "ANY",
+    "state|IsIncorporating": "ANY",
+    "state|IsIsolatedFromMarket": "NONE",
+    "state|IsMarketCapital": "ANY",
+    "state|IsSlaveState": "ANY",
+    "state|IsSplitState": "ANY",
+    "state|IsTreatyPort": "ANY",
+    "country|GetPowerDelta('authority')": "OWN",
+    "country|GetPowerDelta('influence')": "OWN",
+    "country|GetPowerDelta('bureaucracy')": "OWN",
+    "country|GetPowerIncome('authority')": "OWN",
+    "country|GetPowerIncome('influence')": "OWN",
+    "country|GetPowerIncome('bureaucracy')": "OWN",
+    "country|InDefault": "OWN"
+  },
+  "tables": {
+    "ai": {
+      "disposition": "public",
+      "drop": [
+        "authority_spending_changed",
+        "company_formation_random_seed",
+        "enabled",
+        "next_foreign_domestic_investment_reset",
+        "next_private_investment",
+        "num_failed_authority_spending_attempts",
+        "num_failed_autonomous_investments",
+        "num_failed_money_spending_attempts",
+        "random_seed",
+        "spending_authority",
+        "spending_authority_balance",
+        "spending_bureaucracy_expenses",
+        "spending_bureaucracy_income",
+        "spending_conscript_spending_target",
+        "spending_construction_output",
+        "spending_expenses",
+        "spending_gold_reserve_limit",
+        "spending_goods_consumption_mask",
+        "spending_income",
+        "spending_innovation",
+        "spending_max_innovation",
+        "spending_naval_base_levels",
+        "spending_num_taxed_goods",
+        "spending_population_in_overseas_subjects",
+        "spending_population_in_subjects",
+        "spending_population_incorporated",
+        "spending_population_incorporated_coastal",
+        "spending_population_total",
+        "spending_population_total_coastal",
+        "spending_population_unincorporated",
+        "spending_population_unincorporated_coastal",
+        "spending_prestige",
+        "spending_ship_construction",
+        "spending_unused_resource_mask",
+        "strategic_region_stances_dirty",
+        "strategy_0_flag",
+        "strategy_0_progress",
+        "strategy_1_flag",
+        "strategy_1_progress",
+        "strategy_2_flag",
+        "strategy_2_progress",
+        "total_domestic_investment",
+        "total_foreign_investment"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "ai_anti_interest_group": {
+      "disposition": "drop"
+    },
+    "ai_anti_movement": {
+      "disposition": "drop"
+    },
+    "ai_authority_spending": {
+      "disposition": "drop"
+    },
+    "ai_building_construction": {
+      "disposition": "drop"
+    },
+    "ai_cached_weight": {
+      "disposition": "drop"
+    },
+    "ai_consumption_tax": {
+      "disposition": "drop"
+    },
+    "ai_country_goal": {
+      "disposition": "public",
+      "drop": [
+        "antagonize_value",
+        "befriend_value",
+        "diplomacy_random_seed",
+        "initialized",
+        "previous_attitude",
+        "protect_value",
+        "secret_goal",
+        "secret_goal_change_catalyst",
+        "secret_goal_initialized",
+        "target",
+        "threat_my_sp",
+        "threat_natural_threat",
+        "threat_their_sp",
+        "threat_value"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "ai_country_goal_antagonize_reason": {
+      "disposition": "public",
+      "drop": [
+        "parent_ord"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "ai_country_goal_befriend_reason": {
+      "disposition": "drop"
+    },
+    "ai_country_goal_protect_reason": {
+      "disposition": "drop"
+    },
+    "ai_country_goal_threat_reason": {
+      "disposition": "drop"
+    },
+    "ai_goal": {
+      "disposition": "drop"
+    },
+    "ai_goods_consumption": {
+      "disposition": "drop"
+    },
+    "ai_goods_consumption_prestige": {
+      "disposition": "drop"
+    },
+    "ai_goods_stance": {
+      "disposition": "drop"
+    },
+    "ai_has_other_market_area_port": {
+      "disposition": "drop"
+    },
+    "ai_infrastructure": {
+      "disposition": "drop"
+    },
+    "ai_infrastructure_usage": {
+      "disposition": "drop"
+    },
+    "ai_investment_weight": {
+      "disposition": "drop"
+    },
+    "ai_local_goods_consumption": {
+      "disposition": "drop"
+    },
+    "ai_local_goods_consumption_prestige": {
+      "disposition": "drop"
+    },
+    "ai_local_goods_consumption_value": {
+      "disposition": "drop"
+    },
+    "ai_local_goods_production": {
+      "disposition": "drop"
+    },
+    "ai_local_goods_production_prestige": {
+      "disposition": "drop"
+    },
+    "ai_local_goods_production_value": {
+      "disposition": "drop"
+    },
+    "ai_money_spending": {
+      "disposition": "drop"
+    },
+    "ai_private_building_construction": {
+      "disposition": "drop"
+    },
+    "ai_pro_interest_group": {
+      "disposition": "drop"
+    },
+    "ai_pro_movement": {
+      "disposition": "drop"
+    },
+    "ai_strategic_region_stance": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "ai"
+      ]
+    },
+    "ai_trade_capacity": {
+      "disposition": "drop"
+    },
+    "ai_unused_resource": {
+      "disposition": "drop"
+    },
+    "ai_unused_resource_prestige": {
+      "disposition": "drop"
+    },
+    "amendment": {
+      "disposition": "public",
+      "drop": [
+        "cooldown",
+        "cooldown_end_date"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "battle": {
+      "disposition": "public",
+      "drop": [
+        "attacker_end_ce",
+        "attacker_manpower_trend_count",
+        "attacker_manpower_trend_sample_rate",
+        "attacker_province",
+        "attacker_start_ce",
+        "attacker_still_fighting_trend_count",
+        "attacker_still_fighting_trend_sample_rate",
+        "attacker_trend_count",
+        "attacker_trend_sample_rate",
+        "battle_data_attacker_initial_battle_size_script_v_d358072e",
+        "battle_data_attacker_last_condition_update",
+        "battle_data_defender_initial_battle_size_script_v_16d3d9ca",
+        "battle_data_defender_last_condition_update",
+        "capturing_country",
+        "defender_end_ce",
+        "defender_manpower_trend_count",
+        "defender_manpower_trend_sample_rate",
+        "defender_start_ce",
+        "defender_still_fighting_trend_count",
+        "defender_still_fighting_trend_sample_rate",
+        "defender_trend_count",
+        "defender_trend_sample_rate",
+        "initial_power_ratio",
+        "lost_provinces_country",
+        "num_captured_provinces"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "battle_attacker_manpower_trend": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "battle_attacker_manpower_trend_channel": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "battle_attacker_still_fighting_trend": {
+      "disposition": "public",
+      "drop": [
+        "value"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "battle_attacker_still_fighting_trend_channel": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "battle_attacker_trend": {
+      "disposition": "drop"
+    },
+    "battle_attacker_trend_channel": {
+      "disposition": "drop"
+    },
+    "battle_defender_manpower_trend": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "battle_defender_manpower_trend_channel": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "battle_defender_still_fighting_trend": {
+      "disposition": "drop"
+    },
+    "battle_defender_still_fighting_trend_channel": {
+      "disposition": "drop"
+    },
+    "battle_defender_trend": {
+      "disposition": "drop"
+    },
+    "battle_defender_trend_channel": {
+      "disposition": "drop"
+    },
+    "battle_occupation": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "battle"
+      ]
+    },
+    "budget_line": {
+      "disposition": "drop"
+    },
+    "building": {
+      "disposition": "public",
+      "drop": [
+        "auto_downsize_start_date",
+        "construction_province",
+        "dead",
+        "establishment_date",
+        "government_dividends",
+        "government_reinvestment",
+        "hiring_rate",
+        "hiring_rate_changed_last_week",
+        "last_failed_hire_date",
+        "last_layoff_date",
+        "last_updated_level",
+        "other_building_dividends",
+        "ownership_income",
+        "previous_staffing",
+        "privatization_override_value",
+        "privatization_should_override_default",
+        "profit_after_investments",
+        "profit_after_reserves"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "building_assets": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "building"
+      ]
+    },
+    "building_employee_transfer": {
+      "disposition": "drop"
+    },
+    "building_enable_privatization": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "building_failed_hire": {
+      "disposition": "public",
+      "drop": [
+        "min_acceptable_wage",
+        "qualifying_workforce"
+      ],
+      "owner": [
+        "via",
+        "building"
+      ]
+    },
+    "building_goods_derived": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "building_input_goods": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "building_output_goods": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "building_owners": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "building"
+      ]
+    },
+    "building_ownership": {
+      "disposition": "public",
+      "drop": [
+        "employed_levels"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "building_pm": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "building"
+      ]
+    },
+    "building_slave_goods": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "casualties": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "casualties_event": {
+      "disposition": "public",
+      "drop": [
+        "date",
+        "num_casualties",
+        "num_wounded",
+        "reason"
+      ],
+      "owner": [
+        "via",
+        "casualties"
+      ]
+    },
+    "casualty_reason": {
+      "disposition": "drop"
+    },
+    "character": {
+      "disposition": "split",
+      "drop": [
+        "advancement",
+        "character_template",
+        "expected_trait_value",
+        "future_ideology",
+        "future_interest_group",
+        "holding_type",
+        "home_region",
+        "last_health_value",
+        "recruitment_date"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ],
+      "private": [
+        "loyalty",
+        "recruitable"
+      ]
+    },
+    "character_career_end": {
+      "disposition": "drop"
+    },
+    "character_character_roles": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "character"
+      ]
+    },
+    "character_dna": {
+      "disposition": "drop"
+    },
+    "character_list": {
+      "basis": "script variable list; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "character_list_item": {
+      "basis": "script variable list; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "character_timed_modifier": {
+      "disposition": "public",
+      "drop": [
+        "decay",
+        "end_date",
+        "multiplier",
+        "start_date"
+      ],
+      "owner": [
+        "via",
+        "character"
+      ]
+    },
+    "character_traits": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "character"
+      ]
+    },
+    "character_variable": {
+      "disposition": "drop"
+    },
+    "civil_war": {
+      "disposition": "public",
+      "drop": [
+        "capital",
+        "diplomatic_play",
+        "uprisen_country"
+      ],
+      "owner": [
+        "column",
+        "origin_country"
+      ]
+    },
+    "civil_war_interest_group": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "via",
+        "civil_war"
+      ]
+    },
+    "civil_war_seceded_state": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "civil_war"
+      ]
+    },
+    "civil_war_state": {
+      "disposition": "drop"
+    },
+    "civil_war_state_ig": {
+      "disposition": "drop"
+    },
+    "combat_unit": {
+      "disposition": "public",
+      "drop": [
+        "culture",
+        "has_initial_supplies",
+        "name_number",
+        "num_demoralized"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "company": {
+      "disposition": "public",
+      "drop": [
+        "state_region"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "construction_queue": {
+      "disposition": "player",
+      "drop": [
+        "base_speed"
+      ],
+      "owner": [
+        "via",
+        "country"
+      ]
+    },
+    "counter_name": {
+      "disposition": "drop"
+    },
+    "country": {
+      "disposition": "split",
+      "drop": [
+        "avgsoltrend_count",
+        "avgsoltrend_sample_rate",
+        "budget_additional_income_counter",
+        "budget_average_productivity",
+        "budget_balance_trend_num_samples",
+        "budget_balance_trend_sample_index",
+        "budget_base_wage",
+        "budget_building_tax_waste",
+        "budget_consumption_tax_waste",
+        "budget_country_building_budget_expense",
+        "budget_country_building_budget_expenses_construct_57ff67ab",
+        "budget_country_building_budget_expenses_governmen_484983aa",
+        "budget_country_building_budget_income",
+        "budget_diplo_pact_counter",
+        "budget_diplomacy_expenses_43",
+        "budget_government_cash_reserves_ownership",
+        "budget_interest_counter",
+        "budget_money_trend_num_samples",
+        "budget_money_trend_sample_index",
+        "budget_previous_building_group_investments_bg_com_3453aaa5",
+        "budget_state_budget_counter",
+        "budget_tariffs_counter",
+        "budget_tax_level_counter",
+        "budget_treaty_counter",
+        "budget_weekly_counter",
+        "company_name_random_seed",
+        "country_type",
+        "gdp_count",
+        "gdp_sample_rate",
+        "hierarchy_override",
+        "is_main_tag",
+        "literacy_count",
+        "literacy_sample_rate",
+        "pop_radicals_and_loyalists_statistics_week",
+        "pop_statistics_military_political_strength",
+        "pop_statistics_population_government_workforce",
+        "pop_statistics_population_laborer_workforce",
+        "pop_statistics_population_military_workforce",
+        "pop_statistics_population_political_participants",
+        "pop_statistics_population_salaried_workforce",
+        "pop_statistics_population_slave_workforce",
+        "pop_statistics_population_slaves",
+        "pop_statistics_population_subsisting_workforce",
+        "pop_statistics_population_unemployed_workforce",
+        "pop_statistics_primary_cultures_population",
+        "pop_statistics_primary_cultures_standard_of_living",
+        "pop_statistics_slave_standard_of_living",
+        "pop_statistics_standard_of_living_by_culture_196",
+        "pop_statistics_total_wealth",
+        "pop_statistics_vacancies_new_culture",
+        "power_bloc_join_date",
+        "power_bloc_leave_date",
+        "prestige_count",
+        "prestige_sample_rate",
+        "timed_enactment_modifiers_next_id",
+        "timed_modifiers_next_id",
+        "trend_loyalists_count",
+        "trend_loyalists_sample_rate",
+        "trend_population_count",
+        "trend_population_lower_strata_count",
+        "trend_population_lower_strata_sample_rate",
+        "trend_population_middle_strata_count",
+        "trend_population_middle_strata_sample_rate",
+        "trend_population_sample_rate",
+        "trend_population_upper_strata_count",
+        "trend_population_upper_strata_sample_rate",
+        "trend_radicals_count",
+        "trend_radicals_sample_rate"
+      ],
+      "owner": [
+        "self"
+      ],
+      "private": [
+        "budget_balance_trend_current",
+        "budget_balance_trend_latest_sample",
+        "budget_credit",
+        "budget_investment_pool",
+        "budget_money",
+        "budget_money_trend_current",
+        "budget_money_trend_latest_sample",
+        "budget_principal",
+        "budget_weekly_investment_pool_change_from_construction",
+        "budget_weekly_investment_pool_change_from_investment",
+        "construction_paused",
+        "heir",
+        "pop_statistics_population_eligible_voters",
+        "pop_statistics_population_lower_strata",
+        "pop_statistics_population_loyalists",
+        "pop_statistics_population_middle_strata",
+        "pop_statistics_population_radicals",
+        "pop_statistics_population_upper_strata",
+        "supply_ship_construction_level",
+        "supply_ships",
+        "tax_level",
+        "government_wage_level",
+        "military_wage_level"
+      ]
+    },
+    "country_avgsoltrend": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_avgsoltrend_channel": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_budget_balance_trend": {
+      "disposition": "drop"
+    },
+    "country_budget_money_trend": {
+      "disposition": "drop"
+    },
+    "country_budget_weekly_expenses": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_budget_weekly_income": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_claims": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_counter": {
+      "disposition": "drop"
+    },
+    "country_culture_types_present": {
+      "disposition": "drop"
+    },
+    "country_cultures": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_dividend_buildings": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_enactment_modifier": {
+      "disposition": "drop"
+    },
+    "country_export_tariff": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_fully_accepted_population_by_strata": {
+      "disposition": "drop"
+    },
+    "country_gdp": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_gdp_channel": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_ignored_decisions": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_import_tariff": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_interaction_cooldown": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_leverage": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_list": {
+      "basis": "script variable list; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "country_list_item": {
+      "basis": "script variable list; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "country_literacy": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_literacy_channel": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_military_pol_str_by_culture": {
+      "disposition": "drop"
+    },
+    "country_military_pol_str_by_religion_array": {
+      "disposition": "drop"
+    },
+    "country_political_participants_by_culture": {
+      "disposition": "drop"
+    },
+    "country_political_participants_by_religion_array": {
+      "disposition": "drop"
+    },
+    "country_population_by_culture": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_population_by_profession": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_population_by_religion": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_population_by_religion_culture": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_population_by_strata": {
+      "disposition": "drop",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_population_employable_qualifications": {
+      "disposition": "drop"
+    },
+    "country_population_workforce_by_profession": {
+      "disposition": "drop"
+    },
+    "country_prestige": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_prestige_channel": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_ranking": {
+      "disposition": "drop"
+    },
+    "country_rankings": {
+      "disposition": "drop"
+    },
+    "country_religions_present": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_standard_of_living_by_culture": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_standard_of_living_by_religion_array": {
+      "disposition": "drop"
+    },
+    "country_states": {
+      "disposition": "drop",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_taxed_goods": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_timed_modifier": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_total_pol_str_by_culture": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_total_pol_str_by_pop_type": {
+      "disposition": "drop"
+    },
+    "country_total_pol_str_by_religion": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_trend_loyalists": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_trend_loyalists_channel": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_trend_population": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_trend_population_channel": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_trend_population_lower_strata": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_trend_population_lower_strata_channel": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_trend_population_middle_strata": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_trend_population_middle_strata_channel": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_trend_population_upper_strata": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_trend_population_upper_strata_channel": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_trend_radicals": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_trend_radicals_channel": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "self"
+      ]
+    },
+    "country_vacancies_by_culture": {
+      "disposition": "drop"
+    },
+    "country_variable": {
+      "disposition": "drop"
+    },
+    "country_wealth_by_culture": {
+      "disposition": "drop"
+    },
+    "country_wealth_by_religion_array": {
+      "disposition": "drop"
+    },
+    "country_wealth_pol_str_by_pop_type": {
+      "disposition": "drop"
+    },
+    "cultural_community": {
+      "disposition": "public",
+      "drop": [
+        "date"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "culture": {
+      "disposition": "public",
+      "drop": [
+        "name_format",
+        "national_awakening_expiry_date",
+        "random_seed"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "culture_core_states": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "culture"
+      ]
+    },
+    "culture_migration": {
+      "disposition": "drop"
+    },
+    "culture_obsessions": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "culture"
+      ]
+    },
+    "culture_potential_migration": {
+      "disposition": "drop"
+    },
+    "culture_taboos": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "culture"
+      ]
+    },
+    "culture_traditions": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "culture"
+      ]
+    },
+    "culture_type_order": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "decree": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "delayed_event": {
+      "disposition": "drop"
+    },
+    "delayed_event_target": {
+      "disposition": "drop"
+    },
+    "diplomatic_action": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "diplomatic_catalyst": {
+      "disposition": "split",
+      "drop": [],
+      "private": [
+        "country",
+        "date",
+        "target_country"
+      ],
+      "owner": [
+        "either",
+        "country",
+        "target_country"
+      ]
+    },
+    "diplomatic_demand": {
+      "basis": "player-only record with no resolvable owner",
+      "disposition": "drop"
+    },
+    "diplomatic_play": {
+      "disposition": "public",
+      "drop": [
+        "start_date",
+        "state"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "diplomatic_play_country_goods": {
+      "disposition": "drop"
+    },
+    "diplomatic_play_country_record": {
+      "disposition": "public",
+      "drop": [
+        "wage_cost_of_war"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "diplomatic_play_involved": {
+      "disposition": "public",
+      "owner": [
+        "none"
+      ]
+    },
+    "diplomatic_play_lean_initiator": {
+      "disposition": "public",
+      "owner": [
+        "none"
+      ]
+    },
+    "diplomatic_play_lean_target": {
+      "disposition": "public",
+      "owner": [
+        "none"
+      ]
+    },
+    "diplomatic_play_targets": {
+      "disposition": "public",
+      "owner": [
+        "none"
+      ]
+    },
+    "election": {
+      "disposition": "player",
+      "drop": [
+        "government_reform"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "election_vote": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "via",
+        "election"
+      ]
+    },
+    "enum_value": {
+      "disposition": "drop"
+    },
+    "event": {
+      "disposition": "player",
+      "drop": [
+        "creation_date",
+        "expiry_date",
+        "runtime_id",
+        "scope_root_flag",
+        "scope_root_type",
+        "scope_root_value",
+        "scope_seed"
+      ],
+      "owner": [
+        "column",
+        "origin_country"
+      ]
+    },
+    "event_option": {
+      "basis": "player-only record with no resolvable owner",
+      "disposition": "drop"
+    },
+    "event_option_state": {
+      "disposition": "split",
+      "drop": [
+        "shown_date"
+      ],
+      "owner": [
+        "via",
+        "event"
+      ],
+      "private": [
+        "default_option",
+        "description",
+        "enabled",
+        "event",
+        "text"
+      ]
+    },
+    "event_target": {
+      "disposition": "player",
+      "drop": [
+        "flag"
+      ],
+      "owner": [
+        "via",
+        "event"
+      ]
+    },
+    "famine": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "formation": {
+      "disposition": "split",
+      "drop": [
+        "ai_tag",
+        "basecamp",
+        "creation_date",
+        "dead",
+        "flags",
+        "full_supply_path_path_cost",
+        "full_supply_path_path_distance",
+        "full_supply_path_path_start_node",
+        "last_split_date",
+        "naval_supply_path_path_cost",
+        "naval_supply_path_path_distance",
+        "naval_supply_path_path_start_node",
+        "naval_supply_path_path_target_node",
+        "ordinal_number",
+        "origin",
+        "travel_progress_cost_progress",
+        "travel_progress_current_move",
+        "travel_progress_distance_progress",
+        "travel_progress_path_cost",
+        "travel_progress_path_target_node",
+        "travel_progress_total_cost_progress",
+        "travel_progress_total_distance_progress",
+        "units_name_type"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ],
+      "private": [
+        "home_hq",
+        "strategic_objective",
+        "travel_progress_path_distance"
+      ]
+    },
+    "formation_active_mobilization_options": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "formation"
+      ]
+    },
+    "formation_full_supply_path_path_target_position": {
+      "disposition": "drop"
+    },
+    "formation_position": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "formation_regular_unit_types_to_upgrade": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "formation"
+      ]
+    },
+    "formation_unit_type_selected": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "formation"
+      ]
+    },
+    "front": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "front_side": {
+      "disposition": "public",
+      "drop": [
+        "theaters_first",
+        "theaters_second"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "front_side_province_range": {
+      "disposition": "drop"
+    },
+    "front_sides": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "front"
+      ]
+    },
+    "game_rule_setting": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "game_state"
+      ]
+    },
+    "game_session": {
+      "basis": "multiplayer session metadata, not world state",
+      "disposition": "drop"
+    },
+    "game_state": {
+      "disposition": "public",
+      "drop": [
+        "playthrough_id",
+        "save_game_version"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "game_state_counter": {
+      "disposition": "drop"
+    },
+    "game_state_previous_player": {
+      "disposition": "drop"
+    },
+    "global_rng": {
+      "basis": "engine RNG state; no gui binding, and knowing it predicts the simulation",
+      "disposition": "drop"
+    },
+    "global_variable": {
+      "disposition": "drop"
+    },
+    "global_variable_data": {
+      "disposition": "drop"
+    },
+    "global_variable_lists": {
+      "basis": "script variable container; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "global_variable_lists_list": {
+      "disposition": "drop"
+    },
+    "global_variable_lists_list_item": {
+      "disposition": "drop"
+    },
+    "global_variable_store": {
+      "basis": "script variable container; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "goods_order": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "harvest_condition": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "harvest_condition_area": {
+      "disposition": "public",
+      "drop": [
+        "start_date"
+      ],
+      "owner": [
+        "via",
+        "harvest_condition"
+      ]
+    },
+    "hq": {
+      "disposition": "split",
+      "drop": [],
+      "owner": [
+        "column",
+        "country"
+      ],
+      "private": [
+        "hq_region",
+        "type"
+      ]
+    },
+    "institution": {
+      "disposition": "split",
+      "drop": [],
+      "owner": [
+        "column",
+        "country"
+      ],
+      "private": [
+        "growth",
+        "target"
+      ]
+    },
+    "interest": {
+      "disposition": "public",
+      "drop": [
+        "grace_period_end_date"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "interest_group": {
+      "disposition": "split",
+      "drop": [
+        "clout_trend_count",
+        "clout_trend_sample_rate",
+        "loyalist_trend_count",
+        "loyalist_trend_sample_rate",
+        "radical_trend_count",
+        "radical_trend_sample_rate"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ],
+      "private": [
+        "civil_war",
+        "party_to_join",
+        "wants_to_leave_party"
+      ]
+    },
+    "interest_group_character_ideologies": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "interest_group"
+      ]
+    },
+    "interest_group_clout_trend": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "interest_group_clout_trend_channel": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "interest_group_counter": {
+      "disposition": "drop"
+    },
+    "interest_group_enabled_traits": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "interest_group"
+      ]
+    },
+    "interest_group_ideologies": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "interest_group"
+      ]
+    },
+    "interest_group_influencing_movements": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "interest_group"
+      ]
+    },
+    "interest_group_list": {
+      "basis": "script variable list; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "interest_group_list_item": {
+      "basis": "script variable list; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "interest_group_loyalist_trend": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "interest_group_loyalist_trend_channel": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "interest_group_movement_support": {
+      "disposition": "public",
+      "drop": [
+        "individuals",
+        "political_strength"
+      ],
+      "owner": [
+        "via",
+        "interest_group"
+      ]
+    },
+    "interest_group_pops": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "interest_group"
+      ]
+    },
+    "interest_group_radical_trend": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "interest_group_radical_trend_channel": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "interest_group_timed_modifier": {
+      "disposition": "drop"
+    },
+    "interest_group_traits": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "interest_group"
+      ]
+    },
+    "interest_group_variable": {
+      "disposition": "drop"
+    },
+    "ironman": {
+      "basis": "save configuration, not world state",
+      "disposition": "drop"
+    },
+    "ironman_override": {
+      "basis": "save configuration, not world state",
+      "disposition": "drop"
+    },
+    "ironman_setting": {
+      "basis": "save configuration, not world state",
+      "disposition": "drop"
+    },
+    "journal_entry": {
+      "disposition": "player",
+      "drop": [
+        "date_added",
+        "runtime_id",
+        "scope_event_targets_government_petition_ig_identity",
+        "scope_event_targets_journal_entry_identity",
+        "scope_event_targets_landowners_ig_identity",
+        "scope_root_flag",
+        "scope_root_type",
+        "scope_root_value",
+        "scope_seed"
+      ],
+      "owner": [
+        "involved",
+        "country",
+        "journal_entry_involved_countries"
+      ]
+    },
+    "journal_entry_involved_countries": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "via",
+        "journal_entry"
+      ]
+    },
+    "journal_entry_list": {
+      "basis": "script variable list; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "journal_entry_list_item": {
+      "basis": "script variable list; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "journal_entry_progress_bar": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "via",
+        "journal_entry"
+      ]
+    },
+    "journal_entry_target": {
+      "disposition": "player",
+      "drop": [
+        "flag"
+      ],
+      "owner": [
+        "via",
+        "journal_entry"
+      ]
+    },
+    "journal_entry_timed_modifier": {
+      "disposition": "player",
+      "drop": [
+        "decay",
+        "end_date",
+        "multiplier",
+        "start_date"
+      ],
+      "owner": [
+        "via",
+        "journal_entry"
+      ]
+    },
+    "journal_entry_variable": {
+      "disposition": "drop"
+    },
+    "key": {
+      "disposition": "drop"
+    },
+    "law": {
+      "disposition": "split",
+      "drop": [
+        "activation_date",
+        "random_seed",
+        "was_enacted"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ],
+      "private": [
+        "enactment_last_checkpoint_result",
+        "replace",
+        "enactment_start_date"
+      ]
+    },
+    "market": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "market_area": {
+      "disposition": "public",
+      "drop": [
+        "hub_state",
+        "runtime_id"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "market_area_port": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "market_area"
+      ]
+    },
+    "market_area_state": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "market_area"
+      ]
+    },
+    "market_goods": {
+      "disposition": "public",
+      "drop": [
+        "consumption_orders",
+        "other_buy_orders"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "naval_mission": {
+      "disposition": "public",
+      "drop": [
+        "invalid_date"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "navy_ai": {
+      "disposition": "drop"
+    },
+    "navy_ai_active_fleet_creation": {
+      "disposition": "drop"
+    },
+    "navy_ai_active_transfer": {
+      "basis": "naval AI internals; no gui binding",
+      "disposition": "drop"
+    },
+    "navy_ai_assignment": {
+      "disposition": "drop"
+    },
+    "navy_ai_assignment_current_ships": {
+      "disposition": "drop"
+    },
+    "navy_ai_assignment_province": {
+      "disposition": "drop"
+    },
+    "navy_ai_assignment_province_range": {
+      "basis": "naval AI internals; no gui binding",
+      "disposition": "drop"
+    },
+    "navy_ai_assignment_wanted_ratio": {
+      "disposition": "drop"
+    },
+    "navy_ai_assignment_wanted_ships": {
+      "disposition": "drop"
+    },
+    "navy_ai_coast": {
+      "disposition": "drop"
+    },
+    "navy_ai_country": {
+      "disposition": "drop"
+    },
+    "navy_ai_hq": {
+      "disposition": "drop"
+    },
+    "navy_ai_lost_supply_ships": {
+      "basis": "naval AI internals; no gui binding",
+      "disposition": "drop"
+    },
+    "navy_ai_pending_fleet_creation": {
+      "basis": "naval AI internals; no gui binding",
+      "disposition": "drop"
+    },
+    "navy_ai_pending_transfer": {
+      "basis": "naval AI internals; no gui binding",
+      "disposition": "drop"
+    },
+    "navy_ai_pending_transfer_ship": {
+      "basis": "naval AI internals; no gui binding",
+      "disposition": "drop"
+    },
+    "navy_ai_sea": {
+      "disposition": "drop"
+    },
+    "navy_ai_sea_node_piracy_heat": {
+      "basis": "naval AI internals; no gui binding",
+      "disposition": "drop"
+    },
+    "navy_ai_sea_project_power_region": {
+      "disposition": "drop"
+    },
+    "navy_ai_shipping_lane": {
+      "basis": "naval AI internals; no gui binding",
+      "disposition": "drop"
+    },
+    "navy_ai_supply_path": {
+      "basis": "naval AI internals; no gui binding",
+      "disposition": "drop"
+    },
+    "navy_ai_supply_path_raid_heat": {
+      "basis": "naval AI internals; no gui binding",
+      "disposition": "drop"
+    },
+    "navy_ai_template": {
+      "disposition": "drop"
+    },
+    "navy_ai_template_modification": {
+      "disposition": "drop"
+    },
+    "occupation": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "occupation_country": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "pact": {
+      "disposition": "public",
+      "drop": [
+        "forced_duration",
+        "start_date"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "party": {
+      "disposition": "split",
+      "drop": [
+        "activation_date"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ],
+      "private": [
+        "leader",
+        "num_voters"
+      ]
+    },
+    "party_members": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "via",
+        "party"
+      ]
+    },
+    "player": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "all"
+      ]
+    },
+    "political_lobby": {
+      "disposition": "public",
+      "drop": [
+        "establishment_date",
+        "lobby_formation_reason",
+        "next_appeasement_decay_date"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "political_lobby_appeasement_change": {
+      "disposition": "drop"
+    },
+    "political_lobby_list": {
+      "basis": "script variable list; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "political_lobby_list_item": {
+      "basis": "script variable list; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "political_lobby_members": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "political_lobby"
+      ]
+    },
+    "political_lobby_variable": {
+      "disposition": "drop"
+    },
+    "political_movement": {
+      "disposition": "public",
+      "drop": [
+        "culture",
+        "last_failed_civil_war_start_date",
+        "religion",
+        "start_date",
+        "timed_modifiers_next_id"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "political_movement_character_ideologies": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "political_movement"
+      ]
+    },
+    "political_movement_characters": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "political_movement"
+      ]
+    },
+    "political_movement_pops": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "political_movement"
+      ]
+    },
+    "political_movement_timed_modifier": {
+      "disposition": "public",
+      "drop": [
+        "decay",
+        "multiplier",
+        "start_date"
+      ],
+      "owner": [
+        "via",
+        "political_movement"
+      ]
+    },
+    "pop": {
+      "disposition": "public",
+      "drop": [
+        "acceptance",
+        "growth_dependents",
+        "growth_workforce",
+        "ig_support_0",
+        "ig_support_1",
+        "ig_support_2",
+        "ig_support_3",
+        "ig_support_4",
+        "ig_support_5",
+        "ig_support_6",
+        "ig_support_7",
+        "previous_quality_of_life",
+        "weekly_budget_0",
+        "weekly_budget_1",
+        "weekly_budget_10",
+        "weekly_budget_11",
+        "weekly_budget_12",
+        "weekly_budget_2",
+        "weekly_budget_3",
+        "weekly_budget_4",
+        "weekly_budget_5",
+        "weekly_budget_6",
+        "weekly_budget_7",
+        "weekly_budget_8",
+        "weekly_budget_9"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "pop_movement_support": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "pop_qualification": {
+      "disposition": "drop"
+    },
+    "pop_type_order": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "power_bloc": {
+      "disposition": "public",
+      "drop": [
+        "founder",
+        "founder_definition",
+        "founding_date"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "power_bloc_principles": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "power_bloc"
+      ]
+    },
+    "private_construction_queue": {
+      "disposition": "player",
+      "drop": [
+        "base_speed"
+      ],
+      "owner": [
+        "via",
+        "country"
+      ]
+    },
+    "proposal": {
+      "basis": "player-only record with no resolvable owner",
+      "disposition": "drop"
+    },
+    "proposal_target": {
+      "disposition": "drop"
+    },
+    "province_state": {
+      "disposition": "public",
+      "drop": [
+        "area",
+        "color",
+        "controller",
+        "province_index"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "relation": {
+      "disposition": "split",
+      "drop": [
+        "first_last_action",
+        "second_last_action"
+      ],
+      "owner": [
+        "either",
+        "first_country",
+        "second_country"
+      ],
+      "private": [
+        "improve_relations",
+        "relations",
+        "tension"
+      ]
+    },
+    "religion_order": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "scope_type": {
+      "disposition": "drop"
+    },
+    "ship": {
+      "disposition": "public",
+      "drop": [
+        "version"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "ship_construction": {
+      "disposition": "player",
+      "drop": [
+        "version"
+      ],
+      "owner": [
+        "through",
+        "ship_queue",
+        "queue"
+      ]
+    },
+    "ship_crew": {
+      "disposition": "public",
+      "drop": [
+        "index"
+      ],
+      "owner": [
+        "via",
+        "ship"
+      ]
+    },
+    "ship_queue": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "ship_template_modification": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "ship_template_version"
+      ]
+    },
+    "ship_template_version": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "ship_template_version_ids": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "ship_templates": {
+      "disposition": "split",
+      "drop": [],
+      "owner": [
+        "column",
+        "country"
+      ],
+      "private": [
+        "base",
+        "flags"
+      ]
+    },
+    "ship_templates_fleets": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "via",
+        "ship_templates"
+      ]
+    },
+    "shipping_lane": {
+      "disposition": "public",
+      "drop": [
+        "object_identity",
+        "travel_distance"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "snapshot": {
+      "disposition": "public",
+      "drop": [
+        "read_ms",
+        "reference_ids",
+        "source_session",
+        "taken_at",
+        "world_id"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "social_stratum": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "state": {
+      "disposition": "split",
+      "drop": [
+        "base_pop_bureaucracy_cost",
+        "capital",
+        "custom_hub_city",
+        "custom_hub_farm",
+        "custom_hub_mine",
+        "custom_hub_port",
+        "custom_hub_wood",
+        "land",
+        "last_owner_change",
+        "localized_hub_city",
+        "localized_hub_farm",
+        "localized_hub_mine",
+        "localized_hub_port",
+        "localized_hub_wood",
+        "pop_migration_statistics_weekly_emigration",
+        "pop_migration_statistics_weekly_immigration",
+        "pop_statistics_military_political_strength",
+        "pop_statistics_population_eligible_voters",
+        "pop_statistics_population_government_workforce",
+        "pop_statistics_population_laborer_workforce",
+        "pop_statistics_population_military_workforce",
+        "pop_statistics_population_political_participants",
+        "pop_statistics_population_salaried_workforce",
+        "pop_statistics_population_slave_workforce",
+        "pop_statistics_population_slaves",
+        "pop_statistics_primary_cultures_population",
+        "pop_statistics_primary_cultures_standard_of_living",
+        "pop_statistics_slave_standard_of_living",
+        "pop_statistics_total_wealth",
+        "pop_statistics_vacancies_new_culture",
+        "previous_country",
+        "previous_country_definition",
+        "slave_trade_statistics_weekly_emigration",
+        "slave_trade_statistics_weekly_immigration",
+        "state_building_budget_expense",
+        "state_building_budget_income",
+        "timed_modifiers_next_id"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ],
+      "private": [
+        "pop_statistics_wage"
+      ]
+    },
+    "state_building_consumption": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "state_building_production": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "state_counter": {
+      "disposition": "drop"
+    },
+    "state_demand_inferred": {
+      "disposition": "drop"
+    },
+    "state_last_trade_volume_increase": {
+      "disposition": "drop"
+    },
+    "state_last_week_pop_migration_statistics_emigration_states": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "state"
+      ]
+    },
+    "state_last_week_pop_migration_statistics_immigration_states": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "state"
+      ]
+    },
+    "state_list": {
+      "basis": "script variable list; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "state_list_item": {
+      "basis": "script variable list; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "state_local_price": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "state_pop_migration_statistics_emigration_states": {
+      "disposition": "drop"
+    },
+    "state_pop_need": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "state_province_range": {
+      "disposition": "drop"
+    },
+    "state_region": {
+      "disposition": "public",
+      "drop": [
+        "arable_land",
+        "pollution"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "state_region_list": {
+      "basis": "script variable list; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "state_region_list_item": {
+      "basis": "script variable list; script variables are never rendered generically",
+      "disposition": "drop"
+    },
+    "state_region_resource": {
+      "disposition": "public",
+      "drop": [
+        "undiscovered_amount"
+      ]
+    },
+    "state_region_traits": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "state_region"
+      ]
+    },
+    "state_region_variable": {
+      "disposition": "drop"
+    },
+    "state_slave_export_markers": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "state"
+      ]
+    },
+    "state_supply_inferred": {
+      "disposition": "drop"
+    },
+    "state_timed_modifier": {
+      "disposition": "public",
+      "drop": [
+        "decay",
+        "end_date",
+        "multiplier",
+        "start_date"
+      ],
+      "owner": [
+        "via",
+        "state"
+      ]
+    },
+    "state_trade": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "state_traded_goods": {
+      "disposition": "drop"
+    },
+    "state_variable": {
+      "disposition": "drop"
+    },
+    "strait": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "supply_ship": {
+      "basis": "player-only record with no resolvable owner",
+      "disposition": "drop"
+    },
+    "tariff_level": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "technology": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "technology_acquired": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "via",
+        "technology"
+      ]
+    },
+    "technology_progress": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "via",
+        "technology"
+      ]
+    },
+    "technology_research_queue": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "via",
+        "technology"
+      ]
+    },
+    "technology_spreading": {
+      "disposition": "player",
+      "drop": [],
+      "owner": [
+        "via",
+        "technology"
+      ]
+    },
+    "theater": {
+      "disposition": "drop"
+    },
+    "theater_province_range": {
+      "disposition": "drop"
+    },
+    "travel_node": {
+      "disposition": "drop"
+    },
+    "treaty": {
+      "disposition": "public",
+      "drop": [
+        "name_dynamic_context_date",
+        "name_dynamic_context_first_country",
+        "name_dynamic_context_second_country",
+        "name_scripted_context_date",
+        "name_scripted_context_first_country",
+        "name_scripted_context_second_country"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "treaty_article": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "war": {
+      "disposition": "public",
+      "drop": [
+        "dead",
+        "start_date"
+      ]
+    },
+    "war_goal": {
+      "disposition": "public",
+      "drop": [
+        "initial_war_goal"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "war_participant": {
+      "disposition": "public",
+      "drop": [
+        "violator"
+      ],
+      "owner": [
+        "column",
+        "country"
+      ]
+    },
+    "world": {
+      "disposition": "drop"
+    },
+    "world_asset": {
+      "disposition": "drop"
+    },
+    "world_market": {
+      "disposition": "drop"
+    },
+    "world_market_hub": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "world_market"
+      ]
+    },
+    "world_market_hub_trade_center": {
+      "disposition": "public",
+      "drop": [
+        "parent_ord",
+        "trade_center"
+      ],
+      "owner": [
+        "none"
+      ]
+    },
+    "world_market_price_trend": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "world_market_price_trend_channel": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "none"
+      ]
+    },
+    "diplomatic_play_initiators": {
+      "disposition": "public",
+      "owner": [
+        "none"
+      ]
+    },
+    "law_amendments": {
+      "disposition": "public",
+      "drop": [],
+      "owner": [
+        "via",
+        "law"
+      ]
+    },
+    "charter": {
+      "disposition": "split",
+      "drop": [],
+      "private": [
+        "unlock"
+      ],
+      "owner": [
+        "through",
+        "company",
+        "company"
+      ]
+    }
+  }
+}
