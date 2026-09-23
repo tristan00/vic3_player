@@ -121,6 +121,7 @@ def main():
            '\n'+(HERE/'schema_meta.sql').open().read().rstrip()+'\n\n','\n'.join(anchor(name) for name in ENTITIES),'\n'+'\n'.join(emit(t) for t in TABLES),
            '\n'+'\n'.join(at_function(t) for t in order),
            '\n'+''.join(f'create index {t.name}_seq on {t.name} using brin (run_id, seq) with (autosummarize = on);\n' for t in TABLES),
+           '\n'+name_columns(),
            '\n'+(HERE/'schema_tail.sql').open().read().rstrip()+'\n']
     sql=''.join(parts)
     names=re.findall(r'create table (\w+)',sql)

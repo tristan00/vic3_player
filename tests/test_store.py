@@ -3,6 +3,7 @@ import unittest
 
 import psycopg
 
+from interface.options.stored import Stored
 from interface.recording.store import Store, install
 from interface.recording.spec import TABLES
 from interface.recording.tables import Built
@@ -103,6 +104,9 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(c.execute('select province,color from province where run_id=%s',(run,)).fetchall(),[(PROVINCE,1)])
         self.assertEqual(c.execute("select l.name from law_history h join law_type l using (law_type) where run_id=%s and law=%s limit 1",(run,LAW)).fetchone(),
                          ('law_one',))
+        stored=Stored(c,run,2)
+        self.assertEqual(stored.rows('law','law,law_type',country=PLAYER),[(LAW,'law_one')])
+        self.assertEqual(stored.states(),[STATE])
 
     def test_references_must_name_captured_objects(self):
         step=dict(STEPS[0])
