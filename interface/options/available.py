@@ -360,6 +360,11 @@ def sectors(s):
     return [ident for ident,kind,_ in s.buildings() if kind in CONSTRUCTION]
 
 
+def uncrewed_fleets(s):
+    crew=s.grouped('ship_crew','ship,crew')
+    return {fleet for ship,fleet in s.rows('ship','ship,fleet') if not sum(crew.get(ship,[]))}
+
+
 def mission_types(s,fleet):
     missions=s.map('naval_mission','naval_mission,naval_mission_type')
     current=missions.get(s.map('formation_status','formation,naval_mission').get(fleet))
@@ -1793,7 +1798,8 @@ RULES={
                                  for formation in s.formations() if s.map('character','character,formation',country=s.player).get(character)!=formation
                                  and fits(s,character,formation)],
     'unassign_commander':lambda s:product(character=[c for c in commanders_where(s,lambda formation,recruitable:formation in set(s.mine('formation'))) if assigned(s,c) and idle_room(s,c)]),
-    'start_naval_mission':lambda s:[{'military_formation':fleet,'naval_mission_type':kind} for fleet in s.formations('fleet') for kind in mission_types(s,fleet)],
+    'start_naval_mission':lambda s:[{'military_formation':fleet,'naval_mission_type':kind} for fleet in s.formations('fleet') if not formation_report(s,fleet,'retrofitting')
+                                    and fleet not in uncrewed_fleets(s) for kind in mission_types(s,fleet)],
     'start_naval_mission_selected':lambda s:RULES['start_naval_mission'](s),
     'end_naval_mission_selected':lambda s:RULES['end_naval_mission'](s),
     'end_naval_mission':lambda s:product(military_formation=[i for fleets in [set(s.formations('fleet'))] for i,m in s.rows('formation_status','formation,naval_mission') if i in fleets and m is not None]),
