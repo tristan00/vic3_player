@@ -60,7 +60,7 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
        'money':('nationalize','bulk_nationalize','bulk_nationalize_state','declare_bankruptcy'),
        'companies':('create_company','remove_company'),
        'decisions':('take_decision',),
-       'retrofit':('retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all','decommission_ship'),
+       'retrofit':('retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all','decommission_ship','disband_formation'),
        'influence':('diplomatic_action','diplomatic_action_state','diplomatic_action_obligation'),
        'research':('research','queue_research','dequeue_research'),
        'imposition':('impose_law',),
@@ -70,7 +70,7 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
        'commanders':('hire_commander','hire_commander_for','unassign_commander'),
        'army_state':('mobilize','mobilize_all','mobilize_selected','demobilize','demobilize_all','demobilize_selected','station_formation','rehome_formation','back_down','capitulate','disband_formation','disband_regulars'),
        'shipbuilding':('build_ship','build_ship_for','cancel_ship','pause_ship_construction','resume_ship_construction','raise_ship_item',
-                       'lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item','declare_bankruptcy','decommission_ship'),
+                       'lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item','declare_bankruptcy','decommission_ship','disband_formation'),
        'templates':('design_ship_template','edit_ship_template','set_default_ship_template','set_fleet_ship_template','delete_ship_template')}
 
 

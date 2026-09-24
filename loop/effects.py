@@ -282,6 +282,10 @@ def relation_changed(a,b,country):
     return a.hours==b.hours and relation_with(a,country)!=relation_with(b,country)
 
 
+def infamy(snapshot):
+    return snapshot.map('country_diplomacy','country,infamy').get(snapshot.player)
+
+
 def pair_pacts(snapshot,country):
     return {row for row in pacts(snapshot) if {row[0],row[1]}=={snapshot.player,country}}
 
@@ -407,7 +411,8 @@ EFFECTS={
     'diplomatic_action_obligation':('country',lambda a,b,p,n:obligations_with(a,p[n])!=obligations_with(b,p[n]) or pair_pacts(a,p[n])!=pair_pacts(b,p[n])
                                     or relation_changed(a,b,p[n])),
     'diplomatic_action':('country',lambda a,b,p,n:(p[n],'of_player') in set(b.rows('player_diplomat_expulsion','country,direction'))
-                         if p['diplomatic_action']=='expel_diplomats' else pair_pacts(a,p[n])!=pair_pacts(b,p[n]) or relation_changed(a,b,p[n])),
+                         if p['diplomatic_action']=='expel_diplomats' else infamy(b)>infamy(a)
+                         if p['diplomatic_action']=='violate_sovereignty' else pair_pacts(a,p[n])!=pair_pacts(b,p[n]) or relation_changed(a,b,p[n])),
     'make_primary_demand':(None,lambda a,b,p,n:maneuvers(b,p['diplomatic_play'])<maneuvers(a,p['diplomatic_play'])),
     'toggle_pause_colonization':('state',lambda a,b,p,n:((p[n],) in a.rows('player_colonization_paused','state'))!=((p[n],) in b.rows('player_colonization_paused','state'))),
     'set_default_unit_type':('military_formation',becomes(lambda s,p,n:p['combat_unit_type'] in members(s,'formation_selected_unit_type',p[n],'combat_unit_type'),lambda p:True)),
