@@ -47,7 +47,7 @@ def built(step):
     rows['province_history']=[(PROVINCE,STATE,PLAYER)]
     rows['law_history']=[(LAW,PLAYER,'law_one',step['progress'],1,None,True,-1)]+([(LAW+1,PLAYER,'law_two',0.0,1,None,False,-1)] if step['second'] else [])
     rows['interest_group_history']=[(GROUP,PLAYER,'ig_test','ig_name',-1,-1,0,0,True,0)]
-    rows['interest_group_sample']=[(GROUP,n,100*n if n==step['head'] else None,value,1,2) for n,value in step['samples']]
+    rows['interest_group_clout_sample']=[(GROUP,n,100*n if n==step['head'] else None,value) for n,value in step['samples']]
     return Built(rows,{'player_country':PLAYER,'game_speed':1,'first_start':True,'custom_rng_seed':'seed','game_rules':[]},
                  {'game_date':1000+step['head'],'local_date_time':0,'paused':None,'speed':None,'ui_panel_open':False,'ui_interaction_open':False,
                   'ui_map_list_open':False},{PROVINCE:1})
@@ -100,7 +100,7 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(c.execute('select law,progress from law_at(%s,2) order by law',(run,)).fetchall(),[(LAW,0.2)])
         self.assertEqual(c.execute('select law from law_at(%s,1) order by law',(run,)).fetchall(),[(LAW,),(LAW+1,)])
         self.assertEqual(c.execute('select state,seq,wage from state_private_at(%s,2)',(run,)).fetchall(),[(STATE,0,1.5)])
-        self.assertEqual(c.execute('select n,seq,date,clout from interest_group_sample where run_id=%s order by n',(run,)).fetchall(),
+        self.assertEqual(c.execute('select n,seq,date,clout from interest_group_clout_sample where run_id=%s order by n',(run,)).fetchall(),
                          [(1,0,100,0.5),(2,1,200,0.6)])
         self.assertEqual(c.execute('select province,color from province where run_id=%s',(run,)).fetchall(),[(PROVINCE,1)])
         self.assertEqual(c.execute("select l.name from law_history h join law_type l using (law_type) where run_id=%s and law=%s limit 1",(run,LAW)).fetchone(),

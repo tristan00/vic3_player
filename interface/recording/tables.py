@@ -152,42 +152,31 @@ def countries(c):
         c.add('country_religion_culture_population',country=ids[i],religion=religions[parent],culture=culture,population=value)
     c.tables.get('country_population_by_religion')
     c.tables.get('country_population_by_culture')
-    weekly=samples(c,'country',('gdp','avgsoltrend'),ids)
-    for (owner,n),(date,gdp,sol) in weekly.items():
-        c.add('country_weekly_sample',country=owner,n=n,date=date,gdp=gdp,average_standard_of_living=sol)
-    for (owner,n),(date,population) in samples(c,'country',('trend_population',),ids).items():
+    for (owner,n),(date,gdp) in samples(c,'country','gdp',ids).items():
+        c.add('country_gdp_sample',country=owner,n=n,date=date,gdp=gdp)
+    for (owner,n),(date,sol) in samples(c,'country','avgsoltrend',ids).items():
+        c.add('country_standard_of_living_sample',country=owner,n=n,date=date,average_standard_of_living=sol)
+    for (owner,n),(date,population) in samples(c,'country','trend_population',ids).items():
         c.add('country_population_sample',country=owner,n=n,date=date,population=int(population))
 
 
-def samples(c,owner,trends,ids):
+def samples(c,owner,trend,ids):
     heads={}
-    for index,trend in enumerate(trends):
-        for i,ord_,channel,date,n in c.rows(f'{owner}_{trend}_channel','id','ord','channel','date','index'):
-            if ord_!=5 or channel!=0:
-                raise RuntimeError(f'{owner}_{trend} channel ({ord_}, {channel}) is not the single channel (5, 0)')
-            if index==0:
-                heads[i]=(n,date)
-            elif heads.get(i)!=(n,date):
-                raise RuntimeError(f'{owner}_{trend} does not share the clock of {trends[0]} for {i}')
-    series=[]
-    for trend in trends:
-        values={}
-        for i,items in c.children(f'{owner}_{trend}','id','channel','value').items():
-            if {channel for channel,_ in items}!={0}:
-                raise RuntimeError(f'{owner}_{trend} of {i} has channels other than 0')
-            n,_=heads[i]
-            size=len(items)
-            if size>n:
-                raise RuntimeError(f'{owner}_{trend} of {i} holds {size} values for {n} samples')
-            for position,(_,value) in enumerate(items):
-                values[i,n-((n-1-position)%size)]=value
-        series.append(values)
+    for i,ord_,channel,date,n in c.rows(f'{owner}_{trend}_channel','id','ord','channel','date','index'):
+        if ord_!=5 or channel!=0:
+            raise RuntimeError(f'{owner}_{trend} channel ({ord_}, {channel}) is not the single channel (5, 0)')
+        heads[i]=(n,date)
     result={}
-    for (i,n),first in series[0].items():
-        if any((i,n) not in values for values in series[1:]):
-            raise RuntimeError(f'{owner} sample {n} of {i} is missing from some of {trends}')
-        head_n,head_date=heads[i]
-        result[(ids[i] if ids else i),n]=(head_date if n==head_n else None,first,*(values[i,n] for values in series[1:]))
+    for i,items in c.children(f'{owner}_{trend}','id','channel','value').items():
+        if {channel for channel,_ in items}!={0}:
+            raise RuntimeError(f'{owner}_{trend} of {i} has channels other than 0')
+        n,date=heads[i]
+        size=len(items)
+        if size>n:
+            raise RuntimeError(f'{owner}_{trend} of {i} holds {size} values for {n} samples')
+        for position,(_,value) in enumerate(items):
+            sample=n-((n-1-position)%size)
+            result[(ids[i] if ids else i),sample]=(date if sample==n else None,value)
     return result
 
 
@@ -303,17 +292,15 @@ def player(c):
     for state,kind in sorted(set(c.rows('decree_active','state','decree_type'))):
         c.add('player_active_decree',state=c.ident('state',state),decree_type=kind)
     ids=idents(c.table('country')) if c.table('country') else {}
-    weekly=samples(c,'country',('prestige','literacy'),ids)
-    for (owner,n),(date,prestige,literacy) in weekly.items():
-        if owner&SLOT!=c.player:
-            raise RuntimeError(f'Player trend samples belong to {owner}')
-        c.add('player_weekly_sample',n=n,date=date,prestige=int(prestige),literacy=literacy)
-    strata=samples(c,'country',('trend_population_lower_strata','trend_population_middle_strata','trend_population_upper_strata','trend_radicals',
-                                'trend_loyalists'),ids)
-    for (owner,n),(date,*values) in strata.items():
-        if owner&SLOT!=c.player:
-            raise RuntimeError(f'Player trend samples belong to {owner}')
-        c.add('player_population_sample',n=n,date=date,**dict(zip(('lower_strata','middle_strata','upper_strata','radicals','loyalists'),map(int,values))))
+    for table,trend,column,convert in (('player_prestige_sample','prestige','prestige',int),('player_literacy_sample','literacy','literacy',float),
+                                       ('player_lower_strata_sample','trend_population_lower_strata','lower_strata',int),
+                                       ('player_middle_strata_sample','trend_population_middle_strata','middle_strata',int),
+                                       ('player_upper_strata_sample','trend_population_upper_strata','upper_strata',int),
+                                       ('player_radicals_sample','trend_radicals','radicals',int),('player_loyalists_sample','trend_loyalists','loyalists',int)):
+        for (owner,n),(date,value) in samples(c,'country',trend,ids).items():
+            if owner&SLOT!=c.player:
+                raise RuntimeError(f'Player trend samples belong to {owner}')
+            c.add(table,n=n,date=date,**{column:convert(value)})
 
 
 def straits(c):
@@ -848,8 +835,12 @@ def politics(c):
         for i,items in c.children('interest_group_pops','id','value').items():
             for pop, in items:
                 c.add('interest_group_pop',interest_group=ids[i],pop=pop)
-        for (group,n),(date,clout,radicals,loyalists) in samples(c,'interest_group',('clout_trend','radical_trend','loyalist_trend'),ids).items():
-            c.add('interest_group_sample',interest_group=group,n=n,date=date,clout=clout,radicals=int(radicals),loyalists=int(loyalists))
+        for (group,n),(date,clout) in samples(c,'interest_group','clout_trend',ids).items():
+            c.add('interest_group_clout_sample',interest_group=group,n=n,date=date,clout=clout)
+        for (group,n),(date,radicals) in samples(c,'interest_group','radical_trend',ids).items():
+            c.add('interest_group_radicals_sample',interest_group=group,n=n,date=date,radicals=int(radicals))
+        for (group,n),(date,loyalists) in samples(c,'interest_group','loyalist_trend',ids).items():
+            c.add('interest_group_loyalists_sample',interest_group=group,n=n,date=date,loyalists=int(loyalists))
     t=c.table('political_movement')
     if t:
         ids=idents(t)
@@ -1165,8 +1156,10 @@ def wars(c):
         for i,items in c.children('battle_occupation','id','state','fraction','occupation').items():
             for state,fraction,occupation in items:
                 c.add('battle_occupation',battle=ids[i],state=state,fraction=fraction,occupation_progress=occupation)
-        for (battle,n),(date,attacker,defender) in samples(c,'battle',('attacker_manpower_trend','defender_manpower_trend'),ids).items():
-            c.add('battle_manpower_sample',battle=battle,n=n,date=date,attacker_manpower=int(attacker),defender_manpower=int(defender))
+        for (battle,n),(date,attacker) in samples(c,'battle','attacker_manpower_trend',ids).items():
+            c.add('battle_attacker_manpower_sample',battle=battle,n=n,date=date,attacker_manpower=int(attacker))
+        for (battle,n),(date,defender) in samples(c,'battle','defender_manpower_trend',ids).items():
+            c.add('battle_defender_manpower_sample',battle=battle,n=n,date=date,defender_manpower=int(defender))
 
 
 def ai(c):

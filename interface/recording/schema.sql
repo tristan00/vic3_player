@@ -1351,13 +1351,24 @@ create table country_diplomacy (
   foreign key (run_id, seq) references snapshot
 );
 
-create table country_weekly_sample (
+create table country_gdp_sample (
   run_id int4 not null,
   country int4 not null,
   n int4 not null,
   seq int4 not null,
   date game_hours,
   gdp float8 not null,
+  primary key (run_id, country, n),
+  foreign key (run_id, country) references country,
+  foreign key (run_id, seq) references snapshot
+);
+
+create table country_standard_of_living_sample (
+  run_id int4 not null,
+  country int4 not null,
+  n int4 not null,
+  seq int4 not null,
+  date game_hours,
   average_standard_of_living float8 not null,
   primary key (run_id, country, n),
   foreign key (run_id, country) references country,
@@ -1467,26 +1478,71 @@ create table player_military (
   foreign key (run_id, seq) references snapshot
 );
 
-create table player_weekly_sample (
+create table player_prestige_sample (
   run_id int4 not null,
   n int4 not null,
   seq int4 not null,
   date game_hours,
   prestige int4 not null,
+  primary key (run_id, n),
+  foreign key (run_id, seq) references snapshot
+);
+
+create table player_literacy_sample (
+  run_id int4 not null,
+  n int4 not null,
+  seq int4 not null,
+  date game_hours,
   literacy float8 not null,
   primary key (run_id, n),
   foreign key (run_id, seq) references snapshot
 );
 
-create table player_population_sample (
+create table player_lower_strata_sample (
   run_id int4 not null,
   n int4 not null,
   seq int4 not null,
   date game_hours,
   lower_strata int8 not null,
+  primary key (run_id, n),
+  foreign key (run_id, seq) references snapshot
+);
+
+create table player_middle_strata_sample (
+  run_id int4 not null,
+  n int4 not null,
+  seq int4 not null,
+  date game_hours,
   middle_strata int8 not null,
+  primary key (run_id, n),
+  foreign key (run_id, seq) references snapshot
+);
+
+create table player_upper_strata_sample (
+  run_id int4 not null,
+  n int4 not null,
+  seq int4 not null,
+  date game_hours,
   upper_strata int8 not null,
+  primary key (run_id, n),
+  foreign key (run_id, seq) references snapshot
+);
+
+create table player_radicals_sample (
+  run_id int4 not null,
+  n int4 not null,
+  seq int4 not null,
+  date game_hours,
   radicals int8 not null,
+  primary key (run_id, n),
+  foreign key (run_id, seq) references snapshot
+);
+
+create table player_loyalists_sample (
+  run_id int4 not null,
+  n int4 not null,
+  seq int4 not null,
+  date game_hours,
   loyalists int8 not null,
   primary key (run_id, n),
   foreign key (run_id, seq) references snapshot
@@ -3175,14 +3231,36 @@ create table interest_group_pop (
   foreign key (run_id, pop) references pop
 );
 
-create table interest_group_sample (
+create table interest_group_clout_sample (
   run_id int4 not null,
   interest_group int4 not null,
   n int4 not null,
   seq int4 not null,
   date game_hours,
   clout float8 not null,
+  primary key (run_id, interest_group, n),
+  foreign key (run_id, interest_group) references interest_group,
+  foreign key (run_id, seq) references snapshot
+);
+
+create table interest_group_radicals_sample (
+  run_id int4 not null,
+  interest_group int4 not null,
+  n int4 not null,
+  seq int4 not null,
+  date game_hours,
   radicals int8 not null,
+  primary key (run_id, interest_group, n),
+  foreign key (run_id, interest_group) references interest_group,
+  foreign key (run_id, seq) references snapshot
+);
+
+create table interest_group_loyalists_sample (
+  run_id int4 not null,
+  interest_group int4 not null,
+  n int4 not null,
+  seq int4 not null,
+  date game_hours,
   loyalists int8 not null,
   primary key (run_id, interest_group, n),
   foreign key (run_id, interest_group) references interest_group,
@@ -4231,13 +4309,24 @@ create table battle_occupation (
   check (present or num_nonnulls(fraction, occupation_progress) = 0)
 );
 
-create table battle_manpower_sample (
+create table battle_attacker_manpower_sample (
   run_id int4 not null,
   battle int4 not null,
   n int4 not null,
   seq int4 not null,
   date game_hours,
   attacker_manpower int4 not null,
+  primary key (run_id, battle, n),
+  foreign key (run_id, battle) references battle,
+  foreign key (run_id, seq) references snapshot
+);
+
+create table battle_defender_manpower_sample (
+  run_id int4 not null,
+  battle int4 not null,
+  n int4 not null,
+  seq int4 not null,
+  date game_hours,
   defender_manpower int4 not null,
   primary key (run_id, battle, n),
   foreign key (run_id, battle) references battle,
@@ -5697,14 +5786,20 @@ create index country_profession_population_seq on country_profession_population 
 create index country_religion_culture_population_seq on country_religion_culture_population using brin (run_id, seq) with (autosummarize = on);
 create index country_population_seq on country_population using brin (run_id, seq) with (autosummarize = on);
 create index country_diplomacy_seq on country_diplomacy using brin (run_id, seq) with (autosummarize = on);
-create index country_weekly_sample_seq on country_weekly_sample using brin (run_id, seq) with (autosummarize = on);
+create index country_gdp_sample_seq on country_gdp_sample using brin (run_id, seq) with (autosummarize = on);
+create index country_standard_of_living_sample_seq on country_standard_of_living_sample using brin (run_id, seq) with (autosummarize = on);
 create index country_population_sample_seq on country_population_sample using brin (run_id, seq) with (autosummarize = on);
 create index player_policy_seq on player_policy using brin (run_id, seq) with (autosummarize = on);
 create index player_treasury_seq on player_treasury using brin (run_id, seq) with (autosummarize = on);
 create index player_population_seq on player_population using brin (run_id, seq) with (autosummarize = on);
 create index player_military_seq on player_military using brin (run_id, seq) with (autosummarize = on);
-create index player_weekly_sample_seq on player_weekly_sample using brin (run_id, seq) with (autosummarize = on);
-create index player_population_sample_seq on player_population_sample using brin (run_id, seq) with (autosummarize = on);
+create index player_prestige_sample_seq on player_prestige_sample using brin (run_id, seq) with (autosummarize = on);
+create index player_literacy_sample_seq on player_literacy_sample using brin (run_id, seq) with (autosummarize = on);
+create index player_lower_strata_sample_seq on player_lower_strata_sample using brin (run_id, seq) with (autosummarize = on);
+create index player_middle_strata_sample_seq on player_middle_strata_sample using brin (run_id, seq) with (autosummarize = on);
+create index player_upper_strata_sample_seq on player_upper_strata_sample using brin (run_id, seq) with (autosummarize = on);
+create index player_radicals_sample_seq on player_radicals_sample using brin (run_id, seq) with (autosummarize = on);
+create index player_loyalists_sample_seq on player_loyalists_sample using brin (run_id, seq) with (autosummarize = on);
 create index player_budget_line_seq on player_budget_line using brin (run_id, seq) with (autosummarize = on);
 create index player_taxed_goods_seq on player_taxed_goods using brin (run_id, seq) with (autosummarize = on);
 create index player_ignored_decision_seq on player_ignored_decision using brin (run_id, seq) with (autosummarize = on);
@@ -5816,7 +5911,9 @@ create index interest_group_held_trait_seq on interest_group_held_trait using br
 create index interest_group_influencing_movement_seq on interest_group_influencing_movement using brin (run_id, seq) with (autosummarize = on);
 create index interest_group_movement_support_seq on interest_group_movement_support using brin (run_id, seq) with (autosummarize = on);
 create index interest_group_pop_seq on interest_group_pop using brin (run_id, seq) with (autosummarize = on);
-create index interest_group_sample_seq on interest_group_sample using brin (run_id, seq) with (autosummarize = on);
+create index interest_group_clout_sample_seq on interest_group_clout_sample using brin (run_id, seq) with (autosummarize = on);
+create index interest_group_radicals_sample_seq on interest_group_radicals_sample using brin (run_id, seq) with (autosummarize = on);
+create index interest_group_loyalists_sample_seq on interest_group_loyalists_sample using brin (run_id, seq) with (autosummarize = on);
 create index political_movement_history_seq on political_movement_history using brin (run_id, seq) with (autosummarize = on);
 create index political_movement_character_seq on political_movement_character using brin (run_id, seq) with (autosummarize = on);
 create index political_movement_character_ideology_seq on political_movement_character_ideology using brin (run_id, seq) with (autosummarize = on);
@@ -5877,7 +5974,8 @@ create index occupation_country_seq on occupation_country using brin (run_id, se
 create index battle_history_seq on battle_history using brin (run_id, seq) with (autosummarize = on);
 create index battle_side_seq on battle_side using brin (run_id, seq) with (autosummarize = on);
 create index battle_occupation_seq on battle_occupation using brin (run_id, seq) with (autosummarize = on);
-create index battle_manpower_sample_seq on battle_manpower_sample using brin (run_id, seq) with (autosummarize = on);
+create index battle_attacker_manpower_sample_seq on battle_attacker_manpower_sample using brin (run_id, seq) with (autosummarize = on);
+create index battle_defender_manpower_sample_seq on battle_defender_manpower_sample using brin (run_id, seq) with (autosummarize = on);
 create index country_ai_history_seq on country_ai_history using brin (run_id, seq) with (autosummarize = on);
 create index country_ai_strategy_seq on country_ai_strategy using brin (run_id, seq) with (autosummarize = on);
 create index country_ai_region_stance_seq on country_ai_region_stance using brin (run_id, seq) with (autosummarize = on);
