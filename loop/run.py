@@ -73,7 +73,8 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
 
 
 def targets(name,params,links={}):
-    objects={(key,value) for key,value in params.items() if key in BY_NAME[name].params}
+    kinds=dict(spec.partition(':')[::2] if ':' in spec else (spec,spec) for spec in BY_NAME[name].params)
+    objects={(kinds[key],value) for key,value in params.items() if kinds.get(key) not in (None,'int','choice')}
     objects|={links[item] for item in objects if item in links}
     return (objects or {('group',GROUP[name])})|{('shared',slot) for slot,names in SLOTS.items() if name in names}
 
