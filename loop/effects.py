@@ -1,6 +1,6 @@
 import collections
 from interface.actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, LEVELS, TOLL_LEVELS
-from interface.options.available import COUNTRY_OWNER, overlords, subject_pairs, own_templates, latest_design, in_default, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, privatizable, privatization_requested, PRIVATIZATION_REQUESTED, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
+from interface.options.available import COUNTRY_OWNER, metric, overlords, subject_pairs, own_templates, latest_design, in_default, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, privatizable, privatization_requested, PRIVATIZATION_REQUESTED, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
 from interface.recording.spec import TABLE
 
 SLOT=0xFFFFFF
@@ -267,6 +267,11 @@ def relation_with(snapshot,country):
     return {row for row in relations(snapshot) if row[0]==country}
 
 
+def bloc_principles(snapshot):
+    bloc=value(snapshot,'country','power_bloc',snapshot.player)
+    return {principle for owner,principle in snapshot.rows('power_bloc_adopted_principle','power_bloc,power_bloc_principle') if owner==bloc}
+
+
 def relation_changed(a,b,country):
     return a.hours==b.hours and relation_with(a,country)!=relation_with(b,country)
 
@@ -440,14 +445,12 @@ EFFECTS={
     'repeal_amendment':('amendment',lambda a,b,p,n:p[n] in {item for item, in a.rows('law_amendment','amendment')}
                         and p[n] not in {item for item, in b.rows('law_amendment','amendment')}),
     'pick_principle':(None,becomes(lambda s,p,n:p['power_bloc_principle'] in {kind for kind, in s.rows('power_bloc_adopted_principle','power_bloc_principle')},lambda p:True)),
-    'upgrade_principle':(None,lambda a,b,p,n:set(a.rows('power_bloc_adopted_principle','power_bloc,power_bloc_principle'))
-                         !=set(b.rows('power_bloc_adopted_principle','power_bloc,power_bloc_principle'))),
+    'upgrade_principle':(None,lambda a,b,p,n:bloc_principles(a)!=bloc_principles(b)),
     'request_join_power_bloc':(None,lambda a,b,p,n:value(a,'country','power_bloc',a.player)!=value(b,'country','power_bloc',b.player)
                                or set(a.rows('player_relation','country,relations'))!=set(b.rows('player_relation','country,relations'))),
-    'negotiate':(None,lambda a,b,p,n:country_state(a)!=country_state(b)
-                 or {g:value(a,'interest_group_stats','approval',g) for g in a.mine('interest_group')}!={g:value(b,'interest_group_stats','approval',g) for g in b.mine('interest_group')}),
-    'take_decision':(None,lambda a,b,p,n:country_state(a)!=country_state(b)),
-    'press_journal_button':(None,lambda a,b,p,n:country_state(a)!=country_state(b)),
+    'negotiate':(None,lambda a,b,p,n:not metric(a,'IsNegotiating') and bool(metric(b,'IsNegotiating'))),
+    'take_decision':(None,lambda a,b,p,n:a.hours==b.hours and country_state(a)!=country_state(b)),
+    'press_journal_button':(None,lambda a,b,p,n:a.hours==b.hours and country_state(a)!=country_state(b)),
     'declare_bankruptcy':(None,lambda a,b,p,n:in_default(a) and not in_default(b)),
     'design_ship_template':(None,more('ship_template',True)),
     'edit_ship_template':(None,lambda a,b,p,n:(template:=own_templates(a).get((p['ship_type'],p['index']))) is not None
