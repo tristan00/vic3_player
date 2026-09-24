@@ -1387,6 +1387,10 @@ def goal_targets(s,play,kind):
         targets-={target for _,target,_,holder in goals if holder==s.player}
     if 'validate_independence' in settings:
         targets&=overlords(s,s.player)
+    if 'validate_increase_autonomy' in settings:
+        targets&=overlords(s,s.player) if definition(s,'common/subject_types',own_subject_type(s),'higher_autonomy_subject_type_alternatives') else set()
+    if next(iter(definition(s,'common/war_goal_types',kind,'kind')),'')=='reduce_autonomy':
+        targets&={target for target in subjects(s) if definition(s,'common/subject_types',subject_type_of(s,target),'lower_autonomy_subject_type_alternatives')}
     if 'turns_into_subject' in settings:
         subject_type='subject_type_'+next(iter(definition(s,'common/war_goal_types',kind,'kind')),'').removeprefix('make_')
         targets={target for target in targets if subject_fits(s,subject_type,target)}
