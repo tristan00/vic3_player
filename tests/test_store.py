@@ -170,6 +170,19 @@ class StoreTests(unittest.TestCase):
         rows=dict((a,(r,v,f,w,ok)) for a,r,v,f,w,ok in c.execute('select action,runs,verified,failed,worlds,verified_by_standard from action_verification').fetchall())
         self.assertEqual(rows['build'],(1,3,0,1,False))
         self.assertEqual(rows['research'],(1,0,1,0,False))
+        for run in range(2,4):
+            with c.transaction():
+                c.execute("insert into run (kind,source_session,started_at,heartbeat_at,world_id,ruleset_id,player_country,game_speed,first_start,custom_rng_seed) "
+                          "select 'attached',source_session,started_at,now(),world_id,ruleset_id,player_country,game_speed,first_start,custom_rng_seed from run where run_id=%s",(self.store.run_id,))
+                new=c.execute('select max(run_id) from run').fetchone()[0]
+                c.execute("insert into snapshot select %s,seq,phase,game_date,taken_at,read_ms,local_date_time,paused,speed,ui_panel_open,ui_interaction_open,ui_map_list_open from snapshot where run_id=%s",(new,self.store.run_id))
+                c.execute("insert into country (run_id,country,first_seq) select %s,country,first_seq from country where run_id=%s",(new,self.store.run_id))
+                c.execute("insert into loop_action select %s,n,turn,advisor,action,before_seq,after_seq,status,detail,ms,logged_at from loop_action where run_id=%s",(new,self.store.run_id))
+        rows=dict((a,(r,v,ok)) for a,r,v,ok in c.execute('select action,runs,verified,verified_by_standard from action_verification').fetchall())
+        self.assertEqual(rows['build'],(3,9,True))
+        self.assertEqual(rows['research'],(3,0,False))
+        for run in c.execute('select run_id from run where run_id<>%s',(self.store.run_id,)).fetchall():
+            c.execute('select delete_run(%s)',run)
         self.assertEqual(c.execute('select verified_actions,catalogue_actions,never_attempted from verification_summary').fetchone(),(0,2,0))
         self.assertEqual(c.execute('select world from action_run_outcome').fetchone(),('attached',))
 

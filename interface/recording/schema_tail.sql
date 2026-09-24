@@ -19,11 +19,11 @@ create view action_verification as
     select * from (select o.*, row_number() over (partition by action order by run_id desc) as recency from action_run_outcome o) ranked
     where recency <= 3)
   select a.action as action_id, a.name as action,
-         (select count(*) from action_run_outcome o where o.action = a.action) as runs,
-         coalesce(sum(t.verified), 0) as verified, coalesce(sum(t.unverified), 0) as unverified, coalesce(sum(t.failed), 0) as failed,
-         count(distinct t.world) filter (where t.verified > 0) as worlds,
-         coalesce(sum(t.verified), 0) >= 3 and count(distinct t.world) filter (where t.verified > 0) >= 2
-           and coalesce(sum(t.verified), 0) >= 0.95 * (coalesce(sum(t.verified), 0) + coalesce(sum(t.failed), 0)) as verified_by_standard
+         (select count(*) from action_run_outcome o where o.action = a.action)::int as runs,
+         coalesce(sum(t.verified), 0)::int as verified, coalesce(sum(t.unverified), 0)::int as unverified, coalesce(sum(t.failed), 0)::int as failed,
+         count(distinct t.world) filter (where t.verified > 0)::int as worlds,
+         (select count(*) from action_run_outcome o where o.action = a.action) >= 3
+           and coalesce(sum(t.verified), 0) >= 0.95 * (coalesce(sum(t.verified), 0) + coalesce(sum(t.unverified), 0) + coalesce(sum(t.failed), 0)) as verified_by_standard
   from catalogue_action ca join action a using (action) left join recent t on t.action = a.action
   group by a.action, a.name;
 
