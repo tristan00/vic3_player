@@ -233,7 +233,8 @@ def key_codes(table):
 
 
 CONFIRM_ANSWERS=(('onclick = "[PopupManager.AnswerYes(ConfirmationWindow.Self)]"','PopupManager.AnswerYes(ConfirmationWindow.Self)'),
-                 ('onclick = "[ProductionMethodConfirmationPopup.Continue]"','ProductionMethodConfirmationPopup.Continue'))
+                 ('onclick = "[ProductionMethodConfirmationPopup.Continue]"','ProductionMethodConfirmationPopup.Continue'),
+                 ('onclick = "[PopupManager.CloseMessage(PlayerMessageItem.AccessSelf)]"','PopupManager.CloseMessage(PlayerMessageItem.AccessSelf)'))
 
 
 def confirm_answer(call):
