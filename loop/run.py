@@ -50,7 +50,8 @@ class Stuck(Exception):
 
 
 SHARED={**{name:'queue' for name in ('raise_queue_item','lower_queue_item','first_queue_item','last_queue_item')},
-        **{name:'authority' for name in ('toggle_bolster_movement','toggle_suppress_movement','issue_decree','toggle_monopoly','toggle_charter','toggle_consumption_tax')},
+        **{name:'authority' for name in ('toggle_bolster_movement','toggle_suppress_movement','issue_decree','toggle_monopoly','toggle_charter','toggle_consumption_tax',
+                                         'set_government_wages','character_interaction')},
         **{name:'money' for name in ('nationalize','bulk_nationalize','bulk_nationalize_state')},
         **{name:'research' for name in ('research','queue_research','dequeue_research')},
         'impose_law':'imposition','start_play_country':'play','start_play_state':'play','start_play_confirmed':'play',
