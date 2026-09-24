@@ -361,10 +361,10 @@ class RuleTests(unittest.TestCase):
         self.assertEqual(RULES['retrofit_all'](idle),[])
         self.assertEqual(RULES['cancel_retrofit_all'](idle),[])
 
-    def test_template_management_offers_custom_templates_by_ordinal_index(self):
-        s=snapshot(ship_template_history=[{'ship_template':9,'country':PLAYER,'ship_type':'ship_type_frigate','ordinal_number':1},
-                                          {'ship_template':11,'country':PLAYER,'ship_type':'ship_type_frigate','ordinal_number':3},
-                                          {'ship_template':10,'country':PLAYER,'ship_type':'ship_type_frigate','ordinal_number':2},
+    def test_template_management_indexes_the_base_template_first_then_by_creation(self):
+        s=snapshot(ship_template_history=[{'ship_template':10,'country':PLAYER,'ship_type':'ship_type_frigate','ordinal_number':2},
+                                          {'ship_template':9,'country':PLAYER,'ship_type':'ship_type_frigate','ordinal_number':3},
+                                          {'ship_template':11,'country':PLAYER,'ship_type':'ship_type_frigate','ordinal_number':1},
                                           {'ship_template':12,'country':OTHER,'ship_type':'ship_type_frigate','ordinal_number':1}],
                    ship_template_private=[{'ship_template':9,'base':True,'flags':3},{'ship_template':10,'base':False,'flags':0},{'ship_template':11,'base':False,'flags':0}],
                    formation_history=[{'formation':5,'country':PLAYER,'formation_type':1}],ship_history=[{'ship':1,'fleet':5}],

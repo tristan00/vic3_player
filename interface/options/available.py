@@ -1290,8 +1290,10 @@ def ship_designs(s):
 
 
 def own_templates(s):
-    mine=sorted((kind,ordinal,template) for template,owner,kind,ordinal in s.rows('ship_template','ship_template,country,ship_type,ordinal_number') if owner==s.player)
-    return {(kind,index):template for kind in {kind for kind,_,_ in mine} for index,(_,_,template) in enumerate(item for item in mine if item[0]==kind)}
+    base=s.map('ship_template_private','ship_template,base')
+    first=s.first_seen('ship_template')
+    mine=sorted((kind,not base.get(template),first[template],template) for template,owner,kind in s.rows('ship_template','ship_template,country,ship_type') if owner==s.player)
+    return {(kind,index):template for kind in {item[0] for item in mine} for index,(*_,template) in enumerate(item for item in mine if item[0]==kind)}
 
 
 def custom_templates(s):

@@ -479,5 +479,6 @@ EFFECTS.update({**{f'{name}_selected':EFFECTS[name] for name in ('mobilize','dem
 def verify(name,params,before,after):
     if name in EFFECTS:
         owner,test=EFFECTS[name]
-        return test(before,after,params,owner)
+        verdict=test(before,after,params,owner)
+        return None if verdict is None else bool(verdict)
     return None

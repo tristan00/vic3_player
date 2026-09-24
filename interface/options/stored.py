@@ -87,6 +87,9 @@ class Stored:
             self.cache[signature]=result
         return self.cache[signature]
 
+    def first_seen(self,table):
+        return self.memo(('first_seen',table),lambda:dict(self.connection.execute(f'select {table},first_seq from {table} where run_id=%s',(self.run_id,)).fetchall()))
+
     def memo(self,key,compute):
         if key not in self.cache:
             self.cache[key]=compute()

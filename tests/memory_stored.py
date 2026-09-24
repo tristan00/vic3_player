@@ -24,6 +24,10 @@ class Memory(Stored):
         names=layout.keys+['seq']+layout.data
         return names,[tuple(row.get(name) for name in names) for row in self.given.get(stored,[])]
 
+    def first_seen(self,table):
+        stored=table+'_history' if table+'_history' in self.tables else table
+        return {row[table]:position for position,row in enumerate(self.given.get(stored,[]))}
+
     def definitions(self,folder):
         return self.given_definitions.get(folder,{})
 
