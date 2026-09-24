@@ -35,6 +35,7 @@ def market_owner(s):
 TARIFF_CODES={'tariff':{'None':3,'Low':4,'High':5,'Max':6},'subvention':{'Low':2,'High':1,'Max':0}}
 DEFAULT_TARIFF=3
 COMPANY_LOCK_MONTHS=60
+COMPANY_DISBAND_MONTHS=48
 GRACE_HOURS=7*24
 COOLDOWN_MONTHS=3
 
@@ -300,6 +301,17 @@ def play_allowed(s,play,**saved):
             and all(passes(s,'common/war_goal_types',goal,('possible','valid'),scope) for goal in goals))
 
 
+def recently_disbanded(s):
+    def compute():
+        rows=s.connection.execute('''select t.name,g.game_date from company_history h
+            join snapshot g on g.run_id=h.run_id and g.seq=h.seq
+            join lateral (select p.country,p.company_type from company_history p where p.run_id=h.run_id and p.company=h.company and p.seq<h.seq order by p.seq desc limit 1) last on true
+            join company_type t on t.company_type=last.company_type
+            where h.run_id=%s and h.seq<=%s and not h.present and last.country=%s''',(s.run_id,s.seq,s.player)).fetchall()
+        return {kind for kind,disbanded in rows if now(s)<months_later(disbanded,COMPANY_DISBAND_MONTHS)}
+    return s.memo('recently_disbanded',compute)
+
+
 def companies(s):
     if metric(s,'GetNumCompanies')>=metric(s,'GetMaxNumCompanies'):
         return []
@@ -309,7 +321,7 @@ def companies(s):
     held={kind for kind, in s.rows('company','company_type')}
     potential={combo['building_type'] for combo in buildable(s)}|{kind for _,kind,_ in s.buildings()}
     scope=country_scope(s)
-    return [name for name in s.keys('company_type') if name not in held
+    return [name for name in s.keys('company_type') if name not in held and name not in recently_disbanded(s)
             and any(set(definition(s,'common/buildings',kind,'unlocking_technologies'))<=acquired and kind in potential
                     for block in definition(s,'common/company_types',name,'building_types') for kind in block.split())
             and company_levels(s,{kind for block in definition(s,'common/company_types',name,'building_types') for kind in block.split()})>=COMPANY_MIN_LEVELS
