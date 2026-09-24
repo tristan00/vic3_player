@@ -6,7 +6,7 @@ import threading
 
 import psycopg
 
-from ..common import timed
+from ..common import STALL_LIMIT, progress, progress_age, timed
 from .spec import CLOSED,ENTITIES,TABLES,VOCABULARIES
 
 DSN='host=127.0.0.1 port=55433 dbname=vic3 user=postgres'
@@ -194,9 +194,9 @@ class Store:
 
     def open_run(self,cursor,constants):
         pending=self.pending
-        run_id=cursor.execute('insert into run (kind,source_session,started_at,heartbeat_at,world_id,ruleset_id,player_country,game_speed,first_start,'
-                              'custom_rng_seed) values (%s,%s,%s,now(),%s,%s,%s,%s,%s,%s) returning run_id',
-                              (pending['kind'],self.session,pending['started_at'],self.world_id,self.ruleset_id,constants['player_country'],
+        run_id=cursor.execute('insert into run (kind,source_session,started_at,heartbeat_at,progress_at,progress_step,world_id,ruleset_id,player_country,'
+                              'game_speed,first_start,custom_rng_seed) values (%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s) returning run_id',
+                              (pending['kind'],self.session,pending['started_at'],'open_run',self.world_id,self.ruleset_id,constants['player_country'],
                                constants['game_speed'],constants['first_start'],constants['custom_rng_seed'])).fetchone()[0]
         if pending['kind']!='attached':
             tag=self.names('country_definition',[pending['tag']])[0]
@@ -340,8 +340,9 @@ class Store:
                 out,current=self.versions(layout,rows,seq,present)
                 staged[name]=(out,current)
         anchors={entity:sorted((idents|referenced[entity])-self.anchored[entity]) for entity,idents in present.items()}
+        opening=self.run_id is None
         with self.connection.transaction(),self.connection.cursor() as cursor:
-            if self.run_id is None:
+            if opening:
                 self.open_run(cursor,built.constants)
             elif built.constants!=self.constants:
                 raise RuntimeError(f'Run constants changed from {self.constants} to {built.constants}')
@@ -351,6 +352,7 @@ class Store:
                            (self.run_id,seq,phase,meta['game_date'],taken_at,read_ms,meta['local_date_time'],meta['paused'],meta['speed'],meta['ui_panel_open'],
                             meta['ui_interaction_open'],meta['ui_map_list_open']))
             cursor.execute('set local session_replication_role = replica')
+            cursor.execute('set local enable_nestloop = off')
             for entity,idents in anchors.items():
                 if entity=='province':
                     self.copy(cursor,'province',('run_id','province','first_seq','world_id','color'),
@@ -366,6 +368,8 @@ class Store:
                     width=len(layout.keys)
                     self.copy(cursor,name,layout.names,[(self.run_id,*row[:width],seq,*row[width:]) for row in stored])
             self.validate(cursor,seq)
+        if opening:
+            self.start_heartbeat()
         for entity,idents in anchors.items():
             self.anchored[entity].update(idents)
         for name,(_,current) in staged.items():
@@ -376,7 +380,11 @@ class Store:
 
     @timed
     def validate(self,cursor,seq):
-        broken=[label for label,sql in self.checks if cursor.execute(sql,{'run':self.run_id,'seq':seq}).fetchone()[0]]
+        broken=[]
+        for label,sql in self.checks:
+            progress(f'validate {label}')
+            if cursor.execute(sql,{'run':self.run_id,'seq':seq}).fetchone()[0]:
+                broken.append(label)
         if broken:
             raise RuntimeError(f'Snapshot {seq} breaks foreign keys: {broken[:5]}')
 
@@ -404,13 +412,24 @@ class Store:
 
     def start_heartbeat(self):
         self.beating=threading.Event()
+        self.longest=0
         self.beater=threading.Thread(target=self.beat,daemon=True,name='heartbeat')
         self.beater.start()
 
     def beat(self):
         with psycopg.connect(self.dsn,autocommit=True) as connection:
             while not self.beating.wait(HEARTBEAT):
-                connection.execute('update run set heartbeat_at=now() where run_id=%s',(self.run_id,))
+                step,age=progress_age()
+                if age>self.longest:
+                    self.longest=age
+                    connection.execute('update run set longest_step=%s,longest_step_ms=%s where run_id=%s',(step,round(age*1000),self.run_id))
+                connection.execute("update run set heartbeat_at=now(),progress_at=now()-%s*interval '1 second',progress_step=%s where run_id=%s",
+                                   (age,step,self.run_id))
+
+    def flag_stalled(self,step,age):
+        with psycopg.connect(self.dsn,autocommit=True) as connection:
+            connection.execute("update run set ended_at=now(),end_reason='loop_stalled',end_detail=%s where run_id=%s and ended_at is null",
+                               (f'{step} made no progress for {age:.1f} s; the limit is {STALL_LIMIT} s',self.run_id))
 
     def flag_game_exit(self,exited_at):
         with psycopg.connect(self.dsn,autocommit=True) as connection:

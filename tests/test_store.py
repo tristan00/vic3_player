@@ -136,19 +136,37 @@ class StoreTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'not a law_type'):
             self.store.write(bad,'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
 
-    def test_heartbeat_marks_a_live_run_and_ending_stops_it(self):
+    def test_the_first_write_opens_the_run_and_starts_the_heartbeat_with_progress(self):
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
         c=self.store.connection
         run=self.store.run_id
-        c.execute("update run set heartbeat_at=now()-interval '5 seconds' where run_id=%s",(run,))
-        self.assertEqual([r for r, in c.execute('select run_id from run_lost')],[run])
-        self.store.start_heartbeat()
+        self.assertTrue(self.store.beater.is_alive())
         time.sleep(.6)
         self.assertEqual(c.execute('select count(*) from run_lost').fetchone(),(0,))
-        self.assertLess(c.execute('select now()-heartbeat_at from run where run_id=%s',(run,)).fetchone()[0].total_seconds(),1)
+        self.assertEqual(c.execute('select count(*) from run_stalled').fetchone(),(0,))
+        beat,age,step,longest=c.execute('select now()-heartbeat_at,now()-progress_at,progress_step,longest_step_ms from run where run_id=%s',(run,)).fetchone()
+        self.assertLess(beat.total_seconds(),1)
+        self.assertLess(age.total_seconds(),2)
+        self.assertTrue(step.startswith('write'))
+        self.assertLess(longest,2000)
         self.store.end_run('time')
         self.assertIsNone(self.store.beater)
         self.assertEqual(c.execute('select end_reason,ended_at is not null from run where run_id=%s',(run,)).fetchone(),('time',True))
+
+    def test_a_stalled_run_is_listed_and_the_watchdog_flag_ends_it(self):
+        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+        c=self.store.connection
+        run=self.store.run_id
+        self.store.beating.set()
+        self.store.beater.join()
+        c.execute("update run set progress_at=now()-interval '31 seconds',progress_step='validate x' where run_id=%s",(run,))
+        self.assertEqual([(r,s) for r,s,_ in c.execute('select run_id,progress_step,stalled_for from run_stalled')],[(run,'validate x')])
+        self.store.flag_stalled('validate x',31.2)
+        self.assertEqual(c.execute('select end_reason,end_detail from run where run_id=%s',(run,)).fetchone(),
+                         ('loop_stalled','validate x made no progress for 31.2 s; the limit is 30 s'))
+        self.assertEqual(c.execute('select count(*) from run_stalled').fetchone(),(0,))
+        self.store.end_run('time')
+        self.assertEqual(c.execute('select end_reason from run where run_id=%s',(run,)).fetchone(),('loop_stalled',))
 
     def test_a_run_whose_loop_vanished_is_closed_by_the_next_loop_with_its_last_heartbeat(self):
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
@@ -172,8 +190,9 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(rows['research'],(1,0,1,0,False))
         for run in range(2,4):
             with c.transaction():
-                c.execute("insert into run (kind,source_session,started_at,heartbeat_at,world_id,ruleset_id,player_country,game_speed,first_start,custom_rng_seed) "
-                          "select 'attached',source_session,started_at,now(),world_id,ruleset_id,player_country,game_speed,first_start,custom_rng_seed from run where run_id=%s",(self.store.run_id,))
+                c.execute("insert into run (kind,source_session,started_at,heartbeat_at,progress_at,progress_step,world_id,ruleset_id,player_country,game_speed,first_start,"
+                          "custom_rng_seed) select 'attached',source_session,started_at,now(),now(),'copy',world_id,ruleset_id,player_country,game_speed,first_start,"
+                          "custom_rng_seed from run where run_id=%s",(self.store.run_id,))
                 new=c.execute('select max(run_id) from run').fetchone()[0]
                 c.execute("insert into snapshot select %s,seq,phase,game_date,taken_at,read_ms,local_date_time,paused,speed,ui_panel_open,ui_interaction_open,ui_map_list_open from snapshot where run_id=%s",(new,self.store.run_id))
                 c.execute("insert into country (run_id,country,first_seq) select %s,country,first_seq from country where run_id=%s",(new,self.store.run_id))

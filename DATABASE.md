@@ -91,31 +91,40 @@ Whether an action attempt worked is decided at runtime by `verify()` in `loop/ef
 | `action_verification` | per catalogue action, over the last 3 runs that attempted it: attempts, distinct worlds with a verified attempt, and `verified_by_standard` |
 | `verification_summary` | verified actions, catalogue actions, actions never attempted |
 
-The standard: at least 3 verified attempts, on at least 2 distinct worlds, and verified attempts at least 95 percent of verified plus failed attempts, over the last 3 runs containing the action. `python -m loop.report` prints these views and the static catalogue rows.
+The standard: the action occurred in at least 3 runs, and verified attempts are at least 95 percent of all attempts over the last 3 runs containing the action. `python -m loop.report` prints these views and the static catalogue rows.
 
 ## Run liveness
-Every run row says whether its loop is alive and how it ended, with the timestamps needed to measure detection.
+Every run row says whether its loop is alive, whether it is making progress, and how it ended, with the timestamps needed to measure detection.
 
 | Column | Meaning |
 |---|---|
 | `started_at` | the loop began the run |
-| `heartbeat_at` | the loop's last sign of life, refreshed every 100 ms by a thread with its own connection |
+| `heartbeat_at` | the loop process's last sign of life, refreshed every 100 ms by a thread with its own connection |
+| `progress_at` | the wall time of the main thread's last progress stamp, written by the same thread on every beat |
+| `progress_step` | what the main thread was doing at that stamp |
+| `longest_step`, `longest_step_ms` | the longest gap between two stamps seen so far in the run, and the step it was in |
 | `ended_at` | the run was flagged as over |
-| `end_reason` | `time`, `years`, `defeated`, `ui_stuck`, `game_crashed`, `loop_crashed` or `loop_lost` |
-| `end_detail` | the error text for `loop_crashed` and `game_crashed` |
+| `end_reason` | `time`, `years`, `defeated`, `ui_stuck`, `game_crashed`, `loop_crashed`, `loop_stalled` or `loop_lost` |
+| `end_detail` | the error text for `loop_crashed` and `game_crashed`, the step and duration for `loop_stalled` |
 | `game_exited_at` | the process exit time reported by the OS, for `game_crashed` |
+
+A progress stamp (`interface.common.progress`) is written by the main thread on entry and exit of every `@timed` function, on every tick of the run-days loop, on every poll while waiting for the game to load, close or answer, on every foreign-key check of a snapshot write, and every second while a world is generated. The process's own liveness and its progress are separate signals on purpose: a thread that beats while the main thread is stuck in a nine-minute query is exactly the failure that motivated the second one.
 
 - **Game exit.** A watcher thread checks the game's process handle every 50 ms: whether the process object is signaled and whether one word of the executable is still readable. Memory becomes unreadable at the start of teardown, hundreds of milliseconds before a large process is signaled, so the watcher flags at teardown start: it writes `ended_at` and `end_reason = 'game_crashed'` at once through its own connection, then waits for the OS exit time and records it in `game_exited_at`. The loop itself also stops at its next game access and logs when it did.
 - **Loop crash.** An exception ends the run as `loop_crashed` with the error text, unless the game process is gone or exits within a second, in which case the exception is attributed to the game.
-- **Loop killed.** Nothing inside the process can write. `run_lost` lists runs with no `ended_at` whose heartbeat is older than half a second; the next `Store.begin_run` closes them as `loop_lost` with `ended_at = heartbeat_at`.
+- **Loop stall.** The `Watchdog` thread in `loop/run.py` checks the stamp every 100 ms from process start, before any run exists. When the stamp is older than `STALL_LIMIT` (30 s, `interface/common.py`) it logs `LOOP STALLED` with the step, writes `loop_stalled` and the detail through its own connection if a run row exists, closes the game and exits the process with code 3. A stall before the first snapshot commits leaves no run row; the round log and the launcher's exit code are the record.
+- **Loop killed.** Nothing inside the process can write. `run_lost` lists runs with no `ended_at` whose heartbeat is older than half a second; `run_stalled` lists runs with no `ended_at` whose progress stamp is older than 30 s. The next `Store.begin_run` closes lost runs as `loop_lost` with `ended_at = heartbeat_at`.
 - **Late detection.** `run_late_flag` lists `game_crashed` runs with no OS exit time or flagged more than a second after it. It must stay empty; a row is a critical bug.
 - **Refused captures.** When the builders or the writer refuse a snapshot, `record` dumps the whole capture (memory tables, script lists and maps) to `D:\vic3_data\interface\refusals\<time>.pkl` before raising, so the cause can be read from the data instead of reproduced.
 
 ```sql
 select * from run_lost;
+select * from run_stalled;
 select * from run_late_flag;
-select run_id, end_reason, end_detail, ended_at - game_exited_at from run where end_reason = 'game_crashed';
+select run_id, end_reason, end_detail, longest_step, longest_step_ms from run order by run_id;
 ```
+
+Outside the process, `loop/watch.py` polls the round log, these views and the process list four times a second and prints every event; `loop/launch.py` spawns a round detached and runs that watcher on it. The agent runs `loop.launch` under its Monitor tool so every printed line reaches it as it happens.
 
 ## Querying
 Every timed table except samples has an inlinable function `<table>_at(run, seq)`; a history table's function is named after its entity, as in `pop_at`. It returns the rows live at `seq`, without `run_id` or `present`:
@@ -138,19 +147,22 @@ The rules and the verifier read through `Stored(connection, run_id, seq)`, which
 ## Writing
 The writer (`Store.write`) handles each snapshot in one transaction:
 1. It resolves references, sentinels and names, and diffs every table against the previous snapshot.
-2. It inserts the snapshot row.
-3. It suspends foreign-key triggers for the transaction (`set local session_replication_role = replica`).
+2. It inserts the run row on the first snapshot, then the snapshot row.
+3. It suspends foreign-key triggers for the transaction (`set local session_replication_role = replica`) and nested-loop joins (`set local enable_nestloop = off`).
 4. It inserts new anchors (identities present or referenced for the first time) and changed rows, then runs one generated check per foreign key over this snapshot's rows.
 5. Any violation raises and rolls back.
 
-Primary keys, NOT NULL and check constraints are never suspended. Any other writer gets row-by-row foreign-key checks as usual. The connection uses no server-side prepared statements, so every check is planned with its actual run and snapshot values and uses the indexes.
+The heartbeat thread starts once the first snapshot has committed, because the run row exists only then.
+
+Primary keys, NOT NULL and check constraints are never suspended. Any other writer gets row-by-row foreign-key checks as usual. The connection uses no server-side prepared statements, so every check is planned with its actual run and snapshot values. Nested loops are off because the rows a check reads were inserted in the same transaction and have no statistics: the planner estimates one row, chooses a nested loop over a materialized inner list, and a 57,000-row check then compares 57,000 by 57,000 rows, which took over 100 s per check and nine minutes per snapshot on a vanilla world. With hash and merge joins the same checks take 0.3 s in total.
 
 The checks read only the latest block ranges through the `brin (run_id, seq)` index on every timed table.
 
 `select delete_run(run_id)` removes a run. The open vocabularies are kept.
 
 ## Tests
-- `tests/test_store.py` round-trips the writer on `vic3_test`, reinstalls that schema first, and checks references and anchors, the heartbeat, `run_lost`, the closing of lost runs and the verification views.
+- `tests/test_store.py` round-trips the writer on `vic3_test`, reinstalls that schema first, and checks references and anchors, the heartbeat and progress columns, `run_lost`, `run_stalled`, the stall flag, the closing of lost runs and the verification views.
 - `tests/test_liveness.py` kills a child process and checks that the process handle reports the exit, its readability, its OS exit time and the watcher alert within a second.
+- `tests/test_watchdog.py` checks the progress stamps of `@timed` functions, the watchdog's trip (flag, log, game close) with and without a run row, and the watcher's log event parsing.
 - `tests/test_coverage.py` pushes a complete synthetic capture through every builder, and fails if a captured table has no stored table.
 - `tests/memory_stored.py` is an in-memory `Stored` for rule tests: rows are dicts keyed by the schema's column names.

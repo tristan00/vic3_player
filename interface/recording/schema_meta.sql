@@ -103,8 +103,12 @@ create table run (
   source_session text not null,
   started_at timestamptz not null,
   heartbeat_at timestamptz not null,
+  progress_at timestamptz not null,
+  progress_step text not null,
+  longest_step text,
+  longest_step_ms int4,
   ended_at timestamptz,
-  end_reason text check (end_reason in ('time', 'years', 'defeated', 'ui_stuck', 'game_crashed', 'loop_crashed', 'loop_lost')),
+  end_reason text check (end_reason in ('time', 'years', 'defeated', 'ui_stuck', 'game_crashed', 'loop_crashed', 'loop_lost', 'loop_stalled')),
   end_detail text,
   game_exited_at timestamptz,
   world_id int4 not null references world,
@@ -116,7 +120,8 @@ create table run (
   unique (run_id, world_id),
   unique (run_id, kind),
   check ((ended_at is null) = (end_reason is null)),
-  check (end_detail is null or end_reason in ('loop_crashed', 'game_crashed'))
+  check (end_detail is null or end_reason in ('loop_crashed', 'game_crashed', 'loop_stalled')),
+  check ((longest_step is null) = (longest_step_ms is null))
 );
 
 create table run_generated (

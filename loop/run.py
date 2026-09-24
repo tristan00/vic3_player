@@ -1,17 +1,19 @@
 import argparse
 from datetime import datetime, timezone
-from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, ThreadPoolExecutor, wait
 import json
 import logging
+import os
 import random
 import shutil
+import threading
 import time
 
 from advisors import ADVISORS
 from interface import GameInterface, generate, record
 from interface.actions import Executor
 from interface.actions.catalogue import BY_NAME, GROUP
-from interface.common import DEFAULT_DATA, GameCrashed, timed
+from interface.common import DEFAULT_DATA, STALL_LIMIT, GameCrashed, progress, progress_age, timed
 from interface.recording.store import Store
 from interface.runner.screen import shot
 from interface.options import available
@@ -24,7 +26,7 @@ LOG=logging.getLogger('loop')
 from interface.options.available import FASTEST_SPEED as FASTEST
 SETTLE=.25
 SETTLE_LIMIT=3
-STALL_LIMIT=5
+TICK_LIMIT=5
 NO_OBJECT_STREAK=5
 STUCK_SNAPSHOTS=2
 ACTIONS_PER_PAUSE=(6,16)
@@ -220,10 +222,11 @@ class Loop:
             if reader.date()[0]!=hours:
                 longest_gap=max(longest_gap,time.monotonic()-moved)
                 hours,moved=reader.date()[0],time.monotonic()
-            elif time.monotonic()-moved>STALL_LIMIT:
+            elif time.monotonic()-moved>TICK_LIMIT:
                 reader.check()
-                raise RuntimeError(f'The game date stopped at {reader.date()[1]} for {STALL_LIMIT} s after unpausing; '
+                raise RuntimeError(f'The game date stopped at {reader.date()[1]} for {TICK_LIMIT} s after unpausing; '
                                    f'the longest earlier gap between ticks was {longest_gap*1000:.0f} ms')
+            progress('run_days')
             time.sleep(.02)
         paused=[]
         if running(reader):
@@ -298,7 +301,6 @@ class Loop:
         deadline=time.monotonic()+seconds
         self.executor.run('pause')
         snapshot=self.snapshot('start')
-        self.store.start_heartbeat()
         left=self.open_ui(snapshot)
         if left:
             raise RuntimeError(f'The round starts with {"+".join(left)} open')
@@ -340,10 +342,42 @@ class WorldPool:
 
     @timed
     def take(self):
-        done,self.pending=wait(self.pending,return_when=FIRST_COMPLETED)
+        while not (done:=wait(self.pending,timeout=1,return_when=FIRST_COMPLETED)[0]):
+            progress('world generation')
+        self.pending-=done
         finished=done.pop()
         self.pending|=done|{self.submit()}
         return finished.result()
+
+
+WATCH=.1
+STALLED_EXIT=3
+
+
+class Watchdog:
+    def __init__(self,game):
+        self.game=game
+        self.store=None
+
+    def start(self):
+        threading.Thread(target=self.watch,daemon=True,name='watchdog').start()
+
+    def watch(self):
+        while True:
+            time.sleep(WATCH)
+            step,age=progress_age()
+            if age>STALL_LIMIT:
+                self.trip(step,age)
+                os._exit(STALLED_EXIT)
+
+    def trip(self,step,age):
+        LOG.critical('LOOP STALLED: %s made no progress for %.1f s; the limit is %d s',step,age,STALL_LIMIT)
+        try:
+            if self.store is not None and self.store.run_id is not None:
+                self.store.flag_stalled(step,age)
+        except Exception:
+            LOG.exception('The stall could not be written to the run row')
+        self.game.close()
 
 
 RUNNING_PROBE=1
@@ -393,7 +427,11 @@ class Fresh:
 
     @timed
     def take(self):
-        return build(*world_size(self.rng,self.levels))
+        with ThreadPoolExecutor(1) as executor:
+            future=executor.submit(build,*world_size(self.rng,self.levels))
+            while not wait([future],timeout=1)[0]:
+                progress('world generation')
+        return future.result()
 
 
 class Vanilla:
@@ -424,7 +462,7 @@ def recent_tags():
 
 
 @timed
-def session(game,rng,worlds,advisors,arguments,chosen,seconds):
+def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds):
     world=worlds.take()
     recent=recent_tags()
     if chosen in recent:
@@ -437,6 +475,7 @@ def session(game,rng,worlds,advisors,arguments,chosen,seconds):
     name=world.parent.name if world else 'vanilla'
     loop=Loop(game,advisors,random.Random(seed),run_record(arguments,'vanilla' if world is None else 'mini',name,tag,seed),
               context={'world':name,'tag':tag})
+    watchdog.store=loop.store
     counts=loop.run(arguments.years,seconds)
     if isinstance(worlds,(WorldPool,Fresh)):
         game.close()
@@ -473,12 +512,15 @@ def main():
     logging.getLogger('interface').setLevel(logging.INFO)
     logging.getLogger('loop').setLevel(logging.INFO)
     game=GameInterface(arguments.profile)
+    watchdog=Watchdog(game)
+    watchdog.start()
     rng=random.Random(arguments.seed)
     weights={**WEIGHTS,**{name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}}
     advisors=[ADVISORS[name](rng.randrange(10**9),weights) for name in arguments.advisors]
     if arguments.attach:
         seed=rng.randrange(10**9)
         loop=Loop(game,advisors,random.Random(seed),run_record(arguments,'attached',None,None,seed))
+        watchdog.store=loop.store
         print(json.dumps(loop.run(arguments.years,arguments.minutes*60)),loop.journal)
         return
     worlds=Vanilla(rng) if arguments.vanilla else WorldPool(rng,arguments.pool,levels) if arguments.pool else Fresh(rng,levels)
@@ -487,7 +529,7 @@ def main():
     crashes=0
     while (remaining:=deadline-time.monotonic())>=MIN_SESSION_SECONDS:
         try:
-            counts,journal=session(game,rng,worlds,advisors,arguments,chosen,remaining)
+            counts,journal=session(game,watchdog,rng,worlds,advisors,arguments,chosen,remaining)
         except GameCrashed as error:
             crashes+=1
             LOG.error('GAME CRASHED (%d in a row): %s',crashes,error)

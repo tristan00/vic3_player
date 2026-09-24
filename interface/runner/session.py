@@ -10,7 +10,7 @@ import uuid
 
 import psutil
 
-from ..common import DEFAULT_DATA, DEFAULT_GAME, GameCrashed, timed, write_json, write_script
+from ..common import DEFAULT_DATA, DEFAULT_GAME, GameCrashed, progress, timed, write_json, write_script
 from .tail import LogTail
 
 STARTUP_QUIET=30
@@ -152,7 +152,10 @@ class GameInterface:
         process=self.process()
         if process:
             process.terminate()
-            process.wait(90)
+            deadline=time.monotonic()+90
+            while process.is_running() and time.monotonic()<deadline:
+                progress('close')
+                time.sleep(.1)
         return {'closed':process is not None}
 
     def log(self):
@@ -172,6 +175,7 @@ class GameInterface:
     def _wait(self,text,timeout):
         deadline=time.monotonic()+timeout
         while time.monotonic()<deadline:
+            progress('_wait')
             self.check(STARTUP_QUIET)
             if text in self.log():
                 return
@@ -262,6 +266,7 @@ class GameInterface:
         deadline=time.monotonic()+timeout
         reason=None
         while True:
+            progress('ready')
             self.check(STARTUP_QUIET)
             try:
                 started=self._started()

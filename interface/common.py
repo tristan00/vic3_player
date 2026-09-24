@@ -16,13 +16,27 @@ def slot(value):
     return int(value)&0xffffff if int(value)!=-1 else -1
 
 
+STALL_LIMIT=30
+PROGRESS={'step':'start','at':time.monotonic()}
+
+
+def progress(step):
+    PROGRESS.update(step=step,at=time.monotonic())
+
+
+def progress_age():
+    return PROGRESS['step'],time.monotonic()-PROGRESS['at']
+
+
 def timed(method):
     @wraps(method)
     def call(*args,**kwargs):
         started=time.monotonic()
+        progress(method.__name__)
         try:
             return method(*args,**kwargs)
         finally:
+            progress(f'{method.__name__} done')
             logging.getLogger('interface').info('%s %.3fs',method.__name__,time.monotonic()-started)
     return call
 

@@ -4,6 +4,10 @@ create view run_lost as
   select run_id, kind, started_at, heartbeat_at, now() - heartbeat_at as silent_for
   from run where ended_at is null and heartbeat_at < now() - interval '0.5 second';
 
+create view run_stalled as
+  select run_id, kind, started_at, progress_step, now() - progress_at as stalled_for
+  from run where ended_at is null and progress_at < now() - interval '30 seconds';
+
 create view action_run_outcome as
   select l.run_id, l.action, r.started_at,
          case when g.run_id is null then 'attached' when g.world_file = 'vanilla' then 'vanilla_' || d.name else g.world_file end as world,
