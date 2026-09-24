@@ -1,3 +1,4 @@
+from collections import defaultdict
 import hashlib
 import logging
 from pathlib import Path
@@ -216,7 +217,7 @@ class Store:
             live[entity]=slots
         return live
 
-    def resolve(self,layout,rows,live):
+    def resolve(self,layout,rows,live,referenced):
         offset=len(layout.key_columns)+(2 if layout.kind=='sample' else 0)
         fields=list(enumerate(layout.key_columns))+[(offset+i,c) for i,c in enumerate(layout.table.columns)]
         out=[]
@@ -232,7 +233,10 @@ class Store:
                 if value is not None and value in column.sentinels:
                     value=None
                 if column.entity and value is not None:
-                    value=loose_identity(live,column.entity,value) if column.loose else identity(live,column.entity,value,layout.name,column.name)
+                    if column.loose:
+                        referenced[column.entity].add(value)
+                    else:
+                        value=identity(live,column.entity,value,layout.name,column.name)
                 if column.vocabulary and value is not None and column.vocabulary in CLOSED and value not in self.members[column.vocabulary]:
                     raise RuntimeError(f'{layout.name}.{column.name}: {value} is not a {column.vocabulary} of this ruleset')
                 values[index]=value
@@ -316,10 +320,13 @@ class Store:
         if set(colors)!=present['province']:
             raise RuntimeError('Province colours and captured provinces differ')
         resolved={}
+        referenced=defaultdict(set)
         for name,rows in built.rows.items():
             layout=self.layouts[name]
-            resolved[name]=self.resolve(layout,rows,live)
+            resolved[name]=self.resolve(layout,rows,live,referenced)
             self.check_fixed(layout,resolved[name])
+        if referenced['province']:
+            raise RuntimeError('A loose reference names a province')
         missing=set(self.layouts)-set(resolved)
         if missing:
             raise RuntimeError(f'The capture built no rows for {sorted(missing)}')
@@ -332,7 +339,7 @@ class Store:
             else:
                 out,current=self.versions(layout,rows,seq,present)
                 staged[name]=(out,current)
-        anchors={entity:sorted(idents-self.anchored[entity]) for entity,idents in present.items()}
+        anchors={entity:sorted((idents|referenced[entity])-self.anchored[entity]) for entity,idents in present.items()}
         with self.connection.transaction(),self.connection.cursor() as cursor:
             if self.run_id is None:
                 self.open_run(cursor,built.constants)
@@ -420,10 +427,6 @@ class Store:
 
 def enumerate_rows(run_id,values):
     return [(run_id,position,value) for position,value in enumerate(values)]
-
-
-def loose_identity(live,entity,value):
-    return value if live[entity].get(value&SLOT)==value else None
 
 
 def identity(live,entity,value,table,column):

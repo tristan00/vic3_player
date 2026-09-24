@@ -64,8 +64,8 @@ def r(name,entity=None,optional=True,sentinel=None,loose=False):
     return Col(name,I4,optional,entity=entity or name,sentinel=sentinel,loose=loose)
 
 
-def rr(name,entity=None):
-    return r(name,entity,False)
+def rr(name,entity=None,loose=False):
+    return r(name,entity,False,loose=loose)
 
 
 def v(name,vocabulary=None,optional=False):
@@ -360,7 +360,7 @@ entity('front',[f('x',F),f('y',F)])
 subject('front_advantage','front',[f('advantage',F)],'player')
 child('front_listed_side','front',[rr('front_side')])
 child('invasion','front',[rr('invader','country'),rr('invaded','country'),rr('state')],[f('ended',B)])
-entity('front_side',[rr('front'),rr('war'),e('play_side')])
+entity('front_side',[rr('front'),rr('war',loose=True),e('play_side')])
 entity('occupation',[rr('state'),rr('controller','country')])
 child('occupation_country','occupation',[rr('country')],[f('fraction',F)])
 entity('battle',[rr('war'),r('front'),rr('province'),e('battle_type'),e('status','battle_status'),o('invasion',I4,-1),v('name_key','localization_key'),
