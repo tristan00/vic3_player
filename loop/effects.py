@@ -388,8 +388,7 @@ EFFECTS={
     'unpause':(None,lambda a,b,p,n:hours(b)>hours(a)),
     'set_speed':(None,lambda a,b,p,n:None),
     **{name:('diplomatic_play',lambda a,b,p,n:side(a,p[n])!=side(b,p[n])) for name in ('support_initiator','support_target')},
-    'stay_on_fence':('diplomatic_play',lambda a,b,p,n:len(set(a.rows('player_proposal','country,kind')))>len(set(b.rows('player_proposal','country,kind')))
-                     and not roles(b,p[n])&{'initiator_ally','target_ally'}),
+    'stay_on_fence':('diplomatic_play',lambda a,b,p,n:bool(roles(a,p[n])&{'initiator_ally','target_ally'}) and not roles(b,p[n])&{'initiator_ally','target_ally'}),
     'declare_neutrality':('diplomatic_play',lambda a,b,p,n:'interested' in roles(a,p[n]) and 'interested' not in roles(b,p[n])),
     **{f'lean_{side}':('diplomatic_play',lambda a,b,p,n,side=side:f'{side}_ally' not in roles(a,p[n]) and f'{side}_ally' in roles(b,p[n])) for side in ('initiator','target')},
     'back_down':('diplomatic_play',lambda a,b,p,n:value(a,'diplomatic_play','end_date',p[n])!=value(b,'diplomatic_play','end_date',p[n])
