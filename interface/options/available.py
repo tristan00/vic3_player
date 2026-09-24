@@ -1291,19 +1291,39 @@ def war_goals(s):
             if s.player in sides.get(play,()) and holder==s.player and creator==s.player and status==1 and target is not None]
 
 
+UNMODELED_GOAL_SETTINGS={'validate_conflicts_annex_country','country_creation','validate_sole_formation_candidate','validate_take_treaty_port'}
+
+
 def goal_targets(s,play,kind):
-    if definition(s,'common/war_goal_types',kind,'target_type')!=['country']:
-        return True
-    leaders=involved(s)[0].get(play,())
-    targets={leader for leader in leaders if leader!=s.player} if s.player in leaders else set()
+    target_type=definition(s,'common/war_goal_types',kind,'target_type')
     settings=set(definition(s,'common/war_goal_types',kind,'settings'))
-    goals=[(target,holder) for other,goal_kind,target,holder in live_goals(s,'war_goal_type,target_country,holder') if other==play and goal_kind==kind]
+    if target_type not in (['country'],['state']):
+        return True
+    if settings&UNMODELED_GOAL_SETTINGS:
+        return set()
+    leaders=involved(s)[0].get(play,())
+    opponents={leader for leader in leaders if leader!=s.player} if s.player in leaders else set()
+    goals=[row[1:] for row in live_goals(s,'war_goal_type,target_country,target_state,holder') if row[0]==play and row[1]==kind]
+    if target_type==['state']:
+        regions=s.map('state','state,state_region')
+        targets={state for state,owner in s.rows('state','state,country') if owner in opponents}
+        if 'requires_interest' in settings:
+            targets={state for state in targets if state_regions(s).get(state) in interests(s)}
+        if next(iter(definition(s,'common/war_goal_types',kind,'kind')),'')=='return_state':
+            targets={state for state in targets if regions.get(state) in claims(s)}
+        if 'validate_conflicts_conquer_state' in settings:
+            targets-={state for _,_,state,_ in goals}
+        return targets
+    targets=set(opponents)
     if 'validate_conflicts_war_goals_all' in settings:
-        targets-={target for target,_ in goals}
+        targets-={target for _,target,_,_ in goals}
     if 'validate_conflicts_war_goals_holder' in settings:
-        targets-={target for target,holder in goals if holder==s.player}
+        targets-={target for _,target,_,holder in goals if holder==s.player}
     if 'validate_independence' in settings:
         targets&=overlords(s,s.player)
+    if 'turns_into_subject' in settings:
+        subject_type='subject_type_'+next(iter(definition(s,'common/war_goal_types',kind,'kind')),'').removeprefix('make_')
+        targets={target for target in targets if subject_fits(s,subject_type,target)}
     if 'validate_revoke_claims' in settings:
         regions={region for region, in s.rows('state','state_region',country=s.player)}
         targets&={country for country,region in s.rows('country_claim','country,state_region') if region in regions}
