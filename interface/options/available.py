@@ -166,7 +166,7 @@ def reachable_state(s,state):
 def reachable_country(s,country):
     capital=s.map('country','country,capital').get(country)
     return (not busy(s) and not truce(s,country) and country not in decentralized(s) and country not in guaranteed(s)
-            and country not in opposed(s) and capital is not None and plays_permitted(s,country,state_regions(s).get(capital)))
+            and not in_play(s,country) and not s.map('country','country,in_civil_war').get(country) and capital is not None and plays_permitted(s,country,state_regions(s).get(capital)))
 
 
 def opposed(s):
@@ -1180,13 +1180,10 @@ def leaning(s,side):
     return s.memo(('leaning',side),lambda:{play for play, in s.rows('diplomatic_play_country','diplomatic_play',country=s.player,role=side+'_ally')})
 
 
-OPEN_PLAY_END=43808760
-
-
 def principal(s):
     sides,_=involved(s)
     ends=s.map('diplomatic_play','diplomatic_play,end_date')
-    return sorted(ident for ident,pair in sides.items() if s.player in pair and ends.get(ident)==OPEN_PLAY_END)
+    return sorted(ident for ident,pair in sides.items() if s.player in pair and ends.get(ident) is None)
 
 
 def backable(s):
