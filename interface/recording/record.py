@@ -144,7 +144,8 @@ def register(game,session,world,store):
             members[folder]=message_groups(root,mods)
         else:
             members[folder]=keys(root,folder,mods)
-    members['common/buildings']+=['building_'+company for company in members['common/company_types'] if 'building_'+company not in members['common/buildings']]
+    members['common/buildings']+=[name for company in members['common/company_types'] for name in ('building_'+company,'building_regional_'+company)
+                                  if name not in members['common/buildings']]
     for folder,name,*_ in rows:
         if name not in members[folder]:
             members[folder].append(name)
