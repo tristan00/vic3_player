@@ -260,6 +260,11 @@ def own_subject_type(s):
     return next((next(iter(definition(s,'common/diplomatic_actions',action,'subject_type')),None) for action,_ in own_subject_pacts(s)),None)
 
 
+def subject_type_of(s,country):
+    return next((next(iter(definition(s,'common/diplomatic_actions',action,'subject_type')),None) for action, in s.rows('pact','pact_type',second_country=country)
+                 if definition(s,'common/diplomatic_actions',action,'subject_pact')),None)
+
+
 def subject_permits(s,field):
     kind=own_subject_type(s)
     return kind is None or definition(s,'common/subject_types',kind,field)!=['no']
@@ -279,7 +284,7 @@ def play_allowed(s,play,**saved):
     if any(kind.startswith('make_') for kind in kinds):
         if not subject_permits(s,'can_have_subjects') or target in {subject for _,subject in subject_pairs(s)}:
             return False
-    if 'reduce_autonomy' in kinds and target not in subjects(s):
+    if 'reduce_autonomy' in kinds and (target not in subjects(s) or not definition(s,'common/subject_types',subject_type_of(s,target),'lower_autonomy_subject_type_alternatives')):
         return False
     state=saved.get('target_state',(None,None))[1]
     if 'return_state' in kinds and s.map('state','state,state_region').get(state) not in claims(s):
