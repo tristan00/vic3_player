@@ -157,6 +157,10 @@ def units(snapshot,formation,kind):
     return sum(1 for unit, in snapshot.rows('combat_unit','combat_unit_type',formation=formation) if unit==kind)
 
 
+def events_of(snapshot,kind):
+    return {event for event,found in snapshot.rows('event','event,event_type') if found==kind}
+
+
 def button_hidden(a,b,p):
     pressed=journal_button(a,p['journal_entry'],p['button'])
     return (pressed is not None and p['journal_entry'] in b.map('journal_entry','journal_entry,journal_entry_type')
@@ -499,7 +503,7 @@ EFFECTS={
     'cancel_strategic_objective_selected':('military_formation',lambda a,b,p,n:objective(a,p[n])==p['state']&SLOT and objective(b,p[n])!=p['state']&SLOT),
     'set_strategic_objective':('military_formation',becomes(lambda s,p,n:objective(s,p[n]),lambda p:p['state']&SLOT)),
     'station_formation':('military_formation',becomes(lambda s,p,n:value(s,'formation_status','target_location',p[n]),lambda p:p['state'])),
-    'choose_event_option':(None,lambda a,b,p,n:p['event'] in {kind for kind, in a.rows('event','event_type')} and p['event'] not in {kind for kind, in b.rows('event','event_type')}),
+    'choose_event_option':(None,lambda a,b,p,n:bool(events_of(a,p['event'])-events_of(b,p['event']))),
 }
 
 
