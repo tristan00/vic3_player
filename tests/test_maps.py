@@ -154,6 +154,26 @@ class NationTests(unittest.TestCase):
         strategic = [{'key': 'region_interface_1', 'states': cls.regions}]
         cls.world = nations(random.Random(5), cls.data, cls.regions, cls.groups, [1, 4, 6, 7], neighbours, strategic, .5, .5)
 
+    @staticmethod
+    def governed(world):
+        return [c for c in world['countries'] if c['country_type'] != 'decentralized']
+
+    def test_decentralized_nations_follow_vanilla_natives_and_stay_out_of_diplomacy(self):
+        neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
+        worlds = [nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
+                          [{'key': 'region_interface_1', 'states': self.regions}], .5, .5) for seed in range(12)]
+        natives = [(w, c) for w in worlds for c in w['countries'] if c['country_type'] == 'decentralized']
+        self.assertTrue(natives)
+        self.assertTrue(all(self.governed(w) for w in worlds))
+        histories = {n['history'] for n in self.data['natives']}
+        for world, country in natives:
+            files, tag = world['files'], country['tag']
+            self.assertIn(re.search(rf'^c:{tag} \?= \{{ (.*) \}}$', files['common/history/countries/interface.txt'], re.M)[1], histories)
+            self.assertNotIn(f'{tag}_character', files['common/character_templates/interface.txt'])
+            self.assertIn(f'region_state:{tag} = {{ }}', files['common/history/buildings/interface.txt'])
+            for folder in ('diplomacy', 'treaties', 'diplomatic_plays', 'power_blocs', 'lobbies'):
+                self.assertNotIn(f'c:{tag} ', files[f'common/history/{folder}/interface.txt'], folder)
+
     def test_every_state_is_owned_by_its_group(self):
         tags = [c['tag'] for c in self.world['countries']]
         for tag, members in zip(tags, self.groups):
@@ -172,14 +192,16 @@ class NationTests(unittest.TestCase):
             self.assertEqual(text.count('{'), text.count('}'), path)
         for folder in ['countries', 'population', 'characters', 'military_formations', 'states', 'pops', 'buildings', 'diplomacy', 'trade', 'ai']:
             self.assertIn(f'common/history/{folder}/interface.txt', files)
-        for tag in (c['tag'] for c in self.world['countries']):
+        for country in self.world['countries']:
+            tag = country['tag']
             self.assertIn(f'c:{tag} ?=', files['common/history/countries/interface.txt'])
             self.assertIn(f'region_state:{tag}', files['common/history/pops/interface.txt'])
-            self.assertIn(f'{tag}_character_1', files['common/character_templates/interface.txt'])
+            if country['country_type'] != 'decentralized':
+                self.assertIn(f'{tag}_character_1', files['common/character_templates/interface.txt'])
 
     def test_trade_follows_a_vanilla_country_of_similar_size(self):
         files = self.world['files']
-        for country in self.world['countries']:
+        for country in self.governed(self.world):
             trade = country['trade']
             self.assertIn(trade, self.data['trade'])
             tag = country['tag']
@@ -206,11 +228,11 @@ class NationTests(unittest.TestCase):
 
     def test_country_types_are_vanilla_country_types(self):
         for country in self.world['countries']:
-            self.assertIn(country['country_type'], {p['type'] for p in self.data['profiles']})
+            self.assertIn(country['country_type'], {p['type'] for p in self.data['profiles']} | {'decentralized'})
 
     def test_armies_match_the_vanilla_country_of_similar_size(self):
         buildings = self.world['files']['common/history/buildings/interface.txt']
-        for country in self.world['countries']:
+        for country in self.governed(self.world):
             barracks = re.findall(rf'building_barrack" add_ownership = {{ \w+ = {{ (?:type = "\w+" )?country = "c:{country["tag"]}" levels = (\d+)', buildings)
             law = next((law for law in country['laws'] if law in self.data['barracks_cap']), self.data['politics_army'][country['politics']])
             cap = self.data['barracks_cap'][law]
@@ -245,8 +267,10 @@ class NationTests(unittest.TestCase):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
         world = nations(random.Random(5), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
                         [{'key': 'region_interface_1', 'states': self.regions}], 0, .5)
-        counts = [line.count('add_technology_researched') for line in world['files']['common/history/countries/interface.txt'].splitlines() if line.startswith('c:')]
-        self.assertEqual(counts, [self.data['tech_range'][0]] * len(self.groups))
+        governed = {c['tag'] for c in self.governed(world)}
+        counts = [line.count('add_technology_researched') for line in world['files']['common/history/countries/interface.txt'].splitlines()
+                  if line.startswith('c:') and line[2:5] in governed and 'add_technology_researched' in line]
+        self.assertEqual(counts, [self.data['tech_range'][0]] * len(governed))
 
     def test_extra_technologies_have_their_prerequisites(self):
         base = self.data['tier_techs'][max(self.data['tier_techs'])]

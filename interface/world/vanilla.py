@@ -298,6 +298,18 @@ def _companies(game):
             for key,value in read(game,'common/company_types') if re.search(r'flavored_company\s*=\s*no',value)}
 
 
+def _natives(game):
+    types={tag:scalar(value,'country_type') for tag,value in read(game,'common/country_definitions')}
+    owners=set()
+    for _,_,value in entries(game,'common/history/states'):
+        owners|=set(re.findall(r'country\s*=\s*c:(\w+)',value))
+    counted=[types.get(tag) for tag in owners if types.get(tag) in ('recognized','unrecognized','decentralized')]
+    population={tag:' '.join(body(value).split()) for _,tag,value in entries(game,'common/history/population')}
+    natives=[{'history':' '.join(body(value).split()),'population':population.get(tag,'')} for _,tag,value in entries(game,'common/history/countries')
+             if types.get(tag)=='decentralized' and tag in owners and not _foreign(body(value))]
+    return {'natives':natives,'native_share':counted.count('decentralized')/len(counted)}
+
+
 def _rates(game):
     states=history=0
     for _,_,value in entries(game,'common/history/states'):
@@ -343,7 +355,7 @@ def vanilla(game):
     counts=[len(rules['tier_techs'][p['tier']]) for p in profiles]
     density=np.sort(np.repeat([t['population']/len(t['provinces']) for t in templates],[len(t['provinces']) for t in templates]))
     return {'templates':templates,'seas_per_state':_seas(game)/len(every),'straits_per_crossing':_straits(game),'crossings_per_state':_crossings(game)/len(every),'trade':trade,'profiles':profiles,'amendments':amendments,'allowed':allowed,'owners':owners,'law_groups':groups,'cultures':cultures,'religions':religions,
-            'companies':_companies(game),**_rates(game),**_mixes(game,bands),**_characters(game),**_armies(game,groups),**rules,**_relations(game),
+            'companies':_companies(game),**_rates(game),**_natives(game),**_mixes(game,bands),**_characters(game),**_armies(game,groups),**rules,**_relations(game),
             'tech_range':(min(counts),sum(counts)/len(counts),max(counts)),
             'province_population_range':(float(density[int(len(density)*TRIM)]),float(density.mean()),float(density[len(density)-1-int(len(density)*TRIM)])),
             'strategies':strategies,'goals':goals,'roots':roots,'universal':universal,'terrains':terrains,'regions':regions,

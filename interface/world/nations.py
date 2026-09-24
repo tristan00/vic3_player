@@ -256,6 +256,9 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
     for folder in ['diplomacy','diplomatic_plays','military_deployments','power_blocs','treaties','lobbies','trade','states','pops','buildings']:
         history.setdefault(folder,[])
     definitions=[];templates=[]
+    natives={i for i in range(count) if rng.random()<data['native_share']}
+    if len(natives)==count:
+        natives.discard(max(range(count),key=lambda i:len(groups[i])))
     for i,(tag,members) in enumerate(zip(tags,groups)):
         band=rng.choices(list(band_weights),weights=list(band_weights.values()))[0]
         pool=[p for p in data['profiles'] if p['band']==band]
@@ -264,7 +267,7 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
         capital=by_id[capitals[i]]
         name=word(rng,used,culture['phonology'])
         tier=next(t for limit,t in TIERS if len(states)<=limit)
-        country_type=_pick(rng,pool,'type')
+        country_type='decentralized' if i in natives else _pick(rng,pool,'type')
         politics=_pick(rng,pool,'politics')
         ruling=rng.choice([p['ruling'] for p in pool if p['ruling']])
         tax,wealth,literacy=(_pick(rng,pool,k) for k in ('tax','wealth','literacy'))
@@ -278,6 +281,9 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
         files[f'common/coat_of_arms/coat_of_arms/{tag}.txt']=(f'{tag} = {{ pattern = "{rng.choice(data["patterns"])}" color1 = "{one}" color2 = "{two}" '
             f'colored_emblem = {{ texture = "{rng.choice(data["emblems"])}" color1 = "{three}" color2 = "{one}" instance = {{ position = {{ 0.5 0.5 }} scale = {{ 0.6 0.6 }} }} }} }}')
         localization+=[f' {tag}: "{name}"',f' {tag}_ADJ: "{name}"']
+        if i in natives:
+            countries.append(_native(rng,data,tag,name,culture,states,capital,[c for c in cultures if c is not culture],religions,band,factor,history,color))
+            continue
         lines=[f'add_technology_researched = {name}' for name in sorted(techs)]+[f'effect_starting_politics_{politics} = yes']
         lines+=[f'set_tax_level = {tax}'] if tax else []
         lines+=[f'activate_law = law_type:{law}' for law in laws]
@@ -366,7 +372,7 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
                           'country_type':country_type,'tier':tier,'politics':politics,'laws':laws,'ruling':ruling,'produced':produced,'trade':trade,'holdings':holdings,'armed':bool(units),'army':sum(count for _,count in units),'navy':navy,'monarchs':monarchs,
                           'provinces':[p for s in states for p in s['province_codes']]})
     _diplomacy(rng,data,countries,neighbours,history,localization)
-    _claims(rng,data,regions,state_neighbours,history)
+    _claims(rng,data,regions,state_neighbours,history,{c['tag'] for c in countries if c['country_type']=='decentralized'})
     _companies(rng,data,countries,history)
     _amendments(rng,data,countries,history)
     for culture in cultures:
@@ -395,6 +401,22 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
     return {'countries':countries,'files':files,'localization':localization}
 
 
+def _native(rng,data,tag,name,culture,states,capital,others,religions,band,factor,history,color):
+    profile=rng.choice(data['natives'])
+    history['countries'].append(f'c:{tag} ?= {{ {profile["history"]} }}')
+    history['population'].append(f'c:{tag} ?= {{ {profile["population"]} }}')
+    for state in states:
+        _,pops,homelands=_pops(rng,state,culture,rng.sample(others,len(others)),religions,rng.choice(data['mixes']['incorporated'][band]),factor)
+        state['country']=tag
+        history['states'].append(f's:{state["key"]} = {{ create_state = {{ country = c:{tag} owned_provinces = {{ {" ".join(state["province_codes"])} }} }} '
+                                 f'{" ".join("add_homeland = cu:"+h for h in homelands)} }}')
+        history['pops'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {pops} }} }}')
+        history['buildings'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ }} }}')
+    return {'tag':tag,'name':name,'states':[s['key'] for s in states],'capital':capital['key'],'culture':culture['key'],'religion':culture['religion'],
+            'color':[int(c) for c in color.split()],'band':band,'country_type':'decentralized','laws':[],'ruling':[],'produced':{},'holdings':[],
+            'armed':False,'army':0,'navy':0,'monarchs':[],'provinces':[p for s in states for p in s['province_codes']]}
+
+
 def _chance(data,count):
     return count/len(data['trade'])
 
@@ -404,10 +426,10 @@ def _picked(rng,data,count,total,eligible):
     return rng.sample(chosen,len(chosen))
 
 
-def _claims(rng,data,regions,state_neighbours,history):
+def _claims(rng,data,regions,state_neighbours,history,natives):
     owner={s['id']:s['country'] for s in regions}
     for state in regions:
-        rivals=sorted({owner[n] for n in state_neighbours[state['id']]}-{state['country']})
+        rivals=sorted({owner[n] for n in state_neighbours[state['id']]}-{state['country']}-natives)
         if rivals and rng.random()<data['claims_per_state']:
             history['states'].append(f's:{state["key"]} = {{ add_claim = c:{rng.choice(rivals)} }}')
 
@@ -436,6 +458,9 @@ def _partner(rng,size,i,candidates,ratio):
 
 def _diplomacy(rng,data,countries,neighbours,history,localization):
     n=len(countries);size=[len(c['states']) for c in countries];tags=[c['tag'] for c in countries]
+    natives={i for i,c in enumerate(countries) if c['country_type']=='decentralized'}
+    active=[i for i in range(n) if i not in natives]
+    neighbours=[set() if i in natives else set(others)-natives for i,others in enumerate(neighbours)]
     say=lambda folder,i,text:history[folder].append(f'c:{tags[i]} ?= {{ {text} }}')
     pacts=collections.defaultdict(list)
     for kind,first,second in data['pacts']:
@@ -443,23 +468,23 @@ def _diplomacy(rng,data,countries,neighbours,history,localization):
     overlord={}
     kinds=[kind for kind in sorted(pacts) if kind in data['subject_types']]
     subjects=sum(len(pacts[kind]) for kind in kinds)
-    for j in _picked(rng,data,subjects,n,[j for j in range(n) if size[j]<max(size)]):
+    for j in _picked(rng,data,subjects,n,[j for j in active if size[j]<max(size)]):
         if j in overlord.values():
             continue
         kind=rng.choices(kinds,weights=[len(pacts[k]) for k in kinds])[0]
-        i=_partner(rng,size,j,[i for i in range(n) if i not in overlord],1/rng.choice(pacts[kind]))
+        i=_partner(rng,size,j,[i for i in active if i not in overlord],1/rng.choice(pacts[kind]))
         if i is not None:
             overlord[j]=i
             say('diplomacy',i,f'create_diplomatic_pact = {{ country = c:{tags[j]} type = {kind} }}')
             if kind=='personal_union':
                 history['characters']=[line for line in history['characters'] if not any(f'template = {key} ' in line for key in countries[j]['monarchs'])]
     relation={}
-    for i in range(n):
+    for i in active:
         count=len(data['relation_values'])/len(data['trade'])
         for j in rng.sample(sorted(neighbours[i]),min(len(neighbours[i]),int(count)+(rng.random()<count%1))):
             relation[(i,j)]=relation[(j,i)]=rng.choice(data['relation_values'])
             say('diplomacy',i,f'set_relations = {{ country = c:{tags[j]} value = {relation[(i,j)]} }}')
-    free=lambda i:i not in overlord
+    free=lambda i:i not in overlord and i not in natives
     feeling=lambda i,j:relation.get((i,j),0)
     for kind,ratios in sorted(pacts.items()):
         if kind in data['subject_types'] or kind not in ('rivalry','embargo'):
@@ -481,7 +506,7 @@ def _diplomacy(rng,data,countries,neighbours,history,localization):
              'antagonize':lambda i:[j for j in neighbours[i] if feeling(i,j)<0] or sorted(neighbours[i]),
              'defy':lambda i:[overlord[i]] if i in overlord else []}
     for goal,count in sorted(data['goals'].items()):
-        for i in _picked(rng,data,count,n,[i for i in range(n) if goal in targets and targets[goal](i)]):
+        for i in _picked(rng,data,count,n,[i for i in active if goal in targets and targets[goal](i)]):
             say('ai',i,f'set_secret_goal = {{ country = c:{tags[rng.choice(sorted(targets[goal](i)))]} secret_goal = {goal} }}')
     lobbies=collections.defaultdict(list)
     for kind,group in data['lobbies']:
@@ -491,14 +516,14 @@ def _diplomacy(rng,data,countries,neighbours,history,localization):
          'lobby_anti_overlord':lambda i:overlord.get(i),'lobby_pro_overlord':lambda i:overlord.get(i)}
     for kind,groups in sorted(lobbies.items()):
         rate=len(groups)/subjects if kind.endswith('overlord') else _chance(data,len(groups))
-        for i in range(n):
+        for i in active:
             j=aim[kind](i)
             if j is not None and rng.random()<rate:
                 say('lobbies',i,f'create_political_lobby = {{ type = {kind} target = c:{tags[j]} add_interest_group = ig:{rng.choice(groups)} }}')
     for _ in range(int(n*data['treaty_count']/len(data['trade']))+(rng.random()<n*data['treaty_count']/len(data['trade'])%1)):
         treaty=rng.choice(data['treaties'])
         first,second=treaty['sizes']
-        pairs=[(i,j) for i in range(n) for j in range(n) if i!=j and (size[i]>size[j])==(first>second) and (size[i]<size[j])==(first<second)
+        pairs=[(i,j) for i in active for j in active if i!=j and (size[i]>size[j])==(first>second) and (size[i]<size[j])==(first<second)
                and (i in overlord,j in overlord)==treaty['subjects'] and overlord.get(i)!=j and overlord.get(j)!=i]
         if not pairs:
             continue
@@ -532,7 +557,7 @@ def _diplomacy(rng,data,countries,neighbours,history,localization):
             history['power_blocs'].append(f'c:{tags[i]} ?= {{ create_power_bloc = {{ name = POWER_BLOC_{tags[i]} map_color = {{ {_rgb(rng)} }} founding_date = 1820.1.1 '
                                           f'identity = {identity} principle = {principle} {" ".join("member = c:"+tags[j] for j in joined)} }} }}')
             localization.append(f' POWER_BLOC_{tags[i]}: "{countries[i]["name"]} Bloc"')
-    for country in countries:
+    for country in (countries[i] for i in active):
         tag=country['tag']
         for good,amount in zip(rng.sample(sorted(country['produced']),len(country['produced'])),country['trade']['exports']):
             history['trade'].append(f's:{country["produced"][good]} = {{ region_state:{tag} = {{ sg:{good} = {{ add_exports = {amount} }} }} }}')

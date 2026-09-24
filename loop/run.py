@@ -481,7 +481,7 @@ def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds):
     recent=recent_tags()
     if chosen in recent:
         raise ValueError(f'{chosen} was played in one of the last {RECENT_ROUNDS} rounds: {recent}')
-    countries=json.loads(world.read_text(encoding='utf-8'))['countries'] if world else []
+    countries=[country for country in json.loads(world.read_text(encoding='utf-8'))['countries'] if country['country_type']!='decentralized'] if world else []
     tag=chosen or (rng.choices([country['tag'] for country in countries],weights=[NAVY_WEIGHT if country['navy'] else 1 for country in countries])[0] if world else
                    rng.choice([tag for tag in TOP_PRESTIGE if tag not in recent]))
     game.close()
