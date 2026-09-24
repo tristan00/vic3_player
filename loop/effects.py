@@ -409,7 +409,8 @@ EFFECTS={
                      and not roles(b,p[n])&{'initiator_ally','target_ally'}),
     'declare_neutrality':('diplomatic_play',lambda a,b,p,n:'interested' in roles(a,p[n]) and 'interested' not in roles(b,p[n])),
     **{f'lean_{side}':('diplomatic_play',lambda a,b,p,n,side=side:f'{side}_ally' not in roles(a,p[n]) and f'{side}_ally' in roles(b,p[n])) for side in ('initiator','target')},
-    'back_down':('diplomatic_play',lambda a,b,p,n:value(a,'diplomatic_play','end_date',p[n])!=value(b,'diplomatic_play','end_date',p[n])),
+    'back_down':('diplomatic_play',lambda a,b,p,n:value(a,'diplomatic_play','end_date',p[n])!=value(b,'diplomatic_play','end_date',p[n])
+                 or bool(roles(a,p[n])) and not roles(b,p[n])),
     'add_war_goal':(None,lambda a,b,p,n:held_goals(b,p['diplomatic_play'])>held_goals(a,p['diplomatic_play'])),
     'toggle_press_war_goal':(None,lambda a,b,p,n:goal_status(a,p)!=goal_status(b,p)),
     'mobilize':('military_formation',lambda a,b,p,n:mobilized(a).get(p[n]) is False and mobilized(b).get(p[n]) is True),
