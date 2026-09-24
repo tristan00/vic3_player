@@ -77,7 +77,7 @@ class Loop:
         self.advisors=advisors
         self.rng=rng
         self.store=Store()
-        self.store.catalogue(BY_NAME)
+        self.store.catalogue([name for name in BY_NAME if GROUP[name]!='time'])
         self.executor=Executor(game)
         self.process=game.reader().process
         self.watching=self.process.watch(self.crashed)

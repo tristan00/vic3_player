@@ -749,7 +749,12 @@ class Reader:
         return int(rows['country'][0])&0xffffff
 
     def alive(self):
-        rows,_=self.table('state',{'state':set(self.tables['state']['fields'])-{'country'}})
+        try:
+            rows,_=self.table('state',{'state':set(self.tables['state']['fields'])-{'country'}})
+        except RuntimeError as error:
+            if 'does not hold the slot' in str(error):
+                return True
+            raise
         return self.player() in {int(country)&0xffffff for country in rows['country'].tolist()}
 
     def _decode(self,roots,visible=None):
