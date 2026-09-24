@@ -46,10 +46,9 @@ CHECKS={'budget_direction':('income','expense'),'tariff_direction':('import','ex
 
 
 class Col:
-    def __init__(self,name,kind,optional=False,entity=None,vocabulary=None,enum=None,check=None,sentinel=None,loose=False):
+    def __init__(self,name,kind,optional=False,entity=None,vocabulary=None,enum=None,check=None,sentinel=None):
         self.name,self.kind,self.optional,self.entity,self.vocabulary,self.enum,self.check=name,kind,optional,entity,vocabulary,enum,check
         self.sentinels=((-1,) if entity else ())+(() if sentinel is None else (sentinel,))
-        self.loose=loose
 
 
 def f(name,kind,sentinel=None):
@@ -60,12 +59,12 @@ def o(name,kind,sentinel=None):
     return Col(name,kind,True,sentinel=sentinel)
 
 
-def r(name,entity=None,optional=True,sentinel=None,loose=False):
-    return Col(name,I4,optional,entity=entity or name,sentinel=sentinel,loose=loose)
+def r(name,entity=None,optional=True,sentinel=None):
+    return Col(name,I4,optional,entity=entity or name,sentinel=sentinel)
 
 
-def rr(name,entity=None,loose=False):
-    return r(name,entity,False,loose=loose)
+def rr(name,entity=None):
+    return r(name,entity,False)
 
 
 def v(name,vocabulary=None,optional=False):
@@ -305,7 +304,7 @@ private('law',[e('checkpoint_result','law_checkpoint_result'),ov('replacing_law_
 child('law_amendment','law',[rr('amendment')])
 entity('amendment',[rr('law'),v('amendment_type'),r('sponsor','interest_group'),f('timeout',I4),d('timeout_date',NULL_DATE)])
 entity('party',[rr('country'),v('party_type'),f('votes',I4)])
-private('party',[f('num_voters',I4),r('leader','character',loose=True)])
+private('party',[f('num_voters',I4),r('leader','character')])
 child('party_member','party',[rr('interest_group')],(),'player')
 entity('election',[rr('country'),d('next_election'),d('last_election'),f('electoral_confidence',F),f('campaign_period',B)],'player')
 child('election_vote','election',[rr('party')],[f('momentum',F),f('raw_votes',I4),f('raw_num_voters',I4),f('last_votes',I4),f('last_num_voters',I4),
@@ -320,7 +319,7 @@ child('civil_war_seceded_state','civil_war',[v('state_region')],[f('incorporated
 
 entity('character',[rr('culture'),v('religion'),f('birth_date',H),v('first_name_key','localization_key'),v('last_name_key','localization_key'),f('noble',B),
                     f('historical',B),f('adult',B),r('country'),r('interest_group'),v('ideology'),f('prominence',I4),ov('order_type','commander_order'),
-                    ov('rank','commander_rank'),r('formation',loose=True),d('travel_arrival_date'),r('assigned_state','state')])
+                    ov('rank','commander_rank'),r('formation'),d('travel_arrival_date'),r('assigned_state','state')])
 private('character',[f('loyalty',I2),f('recruitable',B)])
 child('character_status','character',[],[f('popularity',F),f('has_formation',B)],'player')
 child('character_assigned_trait','character',[v('character_trait')])
@@ -353,14 +352,14 @@ entity('ship_template_version',[rr('ship_template'),f('position',I2),v('ship_typ
 child('ship_template_version_modification','ship_template_version',[f('position',I2)],[v('ship_modification')])
 entity('naval_mission',[v('naval_mission_type')])
 entity('war',[r('diplomatic_play'),f('days_since_exhaustion',I4),d('peace_date'),r('peace_proposer','country'),d('peace_proposal_date'),f('dead',B)])
-child('war_participant','war',[rr('country')],[rr('diplomatic_play',loose=True),f('war_support',F)])
-entity('war_goal',[rr('holder','country'),rr('creator','country'),rr('diplomatic_play',loose=True),v('war_goal_type'),r('target_state','state'),r('target_country','country'),
+child('war_participant','war',[rr('country')],[rr('diplomatic_play'),f('war_support',F)])
+entity('war_goal',[rr('holder','country'),rr('creator','country'),rr('diplomatic_play'),v('war_goal_type'),r('target_state','state'),r('target_country','country'),
                    o('target_other',I4,-1),e('demand_type','war_goal_demand_type'),e('status','war_goal_status'),e('pressed','war_goal_pressed')])
 entity('front',[f('x',F),f('y',F)])
 subject('front_advantage','front',[f('advantage',F)],'player')
 child('front_listed_side','front',[rr('front_side')])
 child('invasion','front',[rr('invader','country'),rr('invaded','country'),rr('state')],[f('ended',B)])
-entity('front_side',[rr('front'),rr('war',loose=True),e('play_side')])
+entity('front_side',[rr('front'),rr('war'),e('play_side')])
 entity('occupation',[rr('state'),rr('controller','country')])
 child('occupation_country','occupation',[rr('country')],[f('fraction',F)])
 entity('battle',[rr('war'),r('front'),rr('province'),e('battle_type'),e('status','battle_status'),o('invasion',I4,-1),v('name_key','localization_key'),

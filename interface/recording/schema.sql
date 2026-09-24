@@ -6153,6 +6153,169 @@ insert into name_column values
   ('event_history', 'event_type', 'event_type'),
   ('event_target', 'name_key', 'scope_name');
 
+create view referenced_only as
+  select run_id, 'country' as entity, country as identity, first_seq from country a
+  where not exists (select 1 from country_history h where h.run_id = a.run_id and h.country = a.country)
+  union all
+  select run_id, 'pact' as entity, pact as identity, first_seq from pact a
+  where not exists (select 1 from pact_history h where h.run_id = a.run_id and h.pact = a.pact)
+  union all
+  select run_id, 'diplomatic_catalyst' as entity, diplomatic_catalyst as identity, first_seq from diplomatic_catalyst a
+  where not exists (select 1 from diplomatic_catalyst_history h where h.run_id = a.run_id and h.diplomatic_catalyst = a.diplomatic_catalyst)
+  union all
+  select run_id, 'diplomatic_action' as entity, diplomatic_action as identity, first_seq from diplomatic_action a
+  where not exists (select 1 from diplomatic_action_history h where h.run_id = a.run_id and h.diplomatic_action = a.diplomatic_action)
+  union all
+  select run_id, 'diplomatic_play' as entity, diplomatic_play as identity, first_seq from diplomatic_play a
+  where not exists (select 1 from diplomatic_play_history h where h.run_id = a.run_id and h.diplomatic_play = a.diplomatic_play)
+  union all
+  select run_id, 'treaty' as entity, treaty as identity, first_seq from treaty a
+  where not exists (select 1 from treaty_history h where h.run_id = a.run_id and h.treaty = a.treaty)
+  union all
+  select run_id, 'treaty_article' as entity, treaty_article as identity, first_seq from treaty_article a
+  where not exists (select 1 from treaty_article_history h where h.run_id = a.run_id and h.treaty_article = a.treaty_article)
+  union all
+  select run_id, 'power_bloc' as entity, power_bloc as identity, first_seq from power_bloc a
+  where not exists (select 1 from power_bloc_history h where h.run_id = a.run_id and h.power_bloc = a.power_bloc)
+  union all
+  select run_id, 'interest' as entity, interest as identity, first_seq from interest a
+  where not exists (select 1 from interest_history h where h.run_id = a.run_id and h.interest = a.interest)
+  union all
+  select run_id, 'state' as entity, state as identity, first_seq from state a
+  where not exists (select 1 from state_history h where h.run_id = a.run_id and h.state = a.state)
+  union all
+  select run_id, 'decree' as entity, decree as identity, first_seq from decree a
+  where not exists (select 1 from decree_history h where h.run_id = a.run_id and h.decree = a.decree)
+  union all
+  select run_id, 'pop' as entity, pop as identity, first_seq from pop a
+  where not exists (select 1 from pop_history h where h.run_id = a.run_id and h.pop = a.pop)
+  union all
+  select run_id, 'culture' as entity, culture as identity, first_seq from culture a
+  where not exists (select 1 from culture_history h where h.run_id = a.run_id and h.culture = a.culture)
+  union all
+  select run_id, 'cultural_community' as entity, cultural_community as identity, first_seq from cultural_community a
+  where not exists (select 1 from cultural_community_history h where h.run_id = a.run_id and h.cultural_community = a.cultural_community)
+  union all
+  select run_id, 'harvest_condition' as entity, harvest_condition as identity, first_seq from harvest_condition a
+  where not exists (select 1 from harvest_condition_history h where h.run_id = a.run_id and h.harvest_condition = a.harvest_condition)
+  union all
+  select run_id, 'famine' as entity, famine as identity, first_seq from famine a
+  where not exists (select 1 from famine_history h where h.run_id = a.run_id and h.famine = a.famine)
+  union all
+  select run_id, 'building' as entity, building as identity, first_seq from building a
+  where not exists (select 1 from building_history h where h.run_id = a.run_id and h.building = a.building)
+  union all
+  select run_id, 'building_ownership' as entity, building_ownership as identity, first_seq from building_ownership a
+  where not exists (select 1 from building_ownership_history h where h.run_id = a.run_id and h.building_ownership = a.building_ownership)
+  union all
+  select run_id, 'market' as entity, market as identity, first_seq from market a
+  where not exists (select 1 from market_history h where h.run_id = a.run_id and h.market = a.market)
+  union all
+  select run_id, 'market_area' as entity, market_area as identity, first_seq from market_area a
+  where not exists (select 1 from market_area_history h where h.run_id = a.run_id and h.market_area = a.market_area)
+  union all
+  select run_id, 'company' as entity, company as identity, first_seq from company a
+  where not exists (select 1 from company_history h where h.run_id = a.run_id and h.company = a.company)
+  union all
+  select run_id, 'charter' as entity, charter as identity, first_seq from charter a
+  where not exists (select 1 from charter_history h where h.run_id = a.run_id and h.charter = a.charter)
+  union all
+  select run_id, 'hq' as entity, hq as identity, first_seq from hq a
+  where not exists (select 1 from hq_history h where h.run_id = a.run_id and h.hq = a.hq)
+  union all
+  select run_id, 'shipping_lane' as entity, shipping_lane as identity, first_seq from shipping_lane a
+  where not exists (select 1 from shipping_lane_history h where h.run_id = a.run_id and h.shipping_lane = a.shipping_lane)
+  union all
+  select run_id, 'strait' as entity, strait as identity, first_seq from strait a
+  where not exists (select 1 from strait_history h where h.run_id = a.run_id and h.strait = a.strait)
+  union all
+  select run_id, 'country_research' as entity, country_research as identity, first_seq from country_research a
+  where not exists (select 1 from country_research_history h where h.run_id = a.run_id and h.country_research = a.country_research)
+  union all
+  select run_id, 'interest_group' as entity, interest_group as identity, first_seq from interest_group a
+  where not exists (select 1 from interest_group_history h where h.run_id = a.run_id and h.interest_group = a.interest_group)
+  union all
+  select run_id, 'political_movement' as entity, political_movement as identity, first_seq from political_movement a
+  where not exists (select 1 from political_movement_history h where h.run_id = a.run_id and h.political_movement = a.political_movement)
+  union all
+  select run_id, 'law' as entity, law as identity, first_seq from law a
+  where not exists (select 1 from law_history h where h.run_id = a.run_id and h.law = a.law)
+  union all
+  select run_id, 'amendment' as entity, amendment as identity, first_seq from amendment a
+  where not exists (select 1 from amendment_history h where h.run_id = a.run_id and h.amendment = a.amendment)
+  union all
+  select run_id, 'party' as entity, party as identity, first_seq from party a
+  where not exists (select 1 from party_history h where h.run_id = a.run_id and h.party = a.party)
+  union all
+  select run_id, 'election' as entity, election as identity, first_seq from election a
+  where not exists (select 1 from election_history h where h.run_id = a.run_id and h.election = a.election)
+  union all
+  select run_id, 'institution' as entity, institution as identity, first_seq from institution a
+  where not exists (select 1 from institution_history h where h.run_id = a.run_id and h.institution = a.institution)
+  union all
+  select run_id, 'political_lobby' as entity, political_lobby as identity, first_seq from political_lobby a
+  where not exists (select 1 from political_lobby_history h where h.run_id = a.run_id and h.political_lobby = a.political_lobby)
+  union all
+  select run_id, 'civil_war' as entity, civil_war as identity, first_seq from civil_war a
+  where not exists (select 1 from civil_war_history h where h.run_id = a.run_id and h.civil_war = a.civil_war)
+  union all
+  select run_id, 'character' as entity, character as identity, first_seq from character a
+  where not exists (select 1 from character_history h where h.run_id = a.run_id and h.character = a.character)
+  union all
+  select run_id, 'combat_unit' as entity, combat_unit as identity, first_seq from combat_unit a
+  where not exists (select 1 from combat_unit_history h where h.run_id = a.run_id and h.combat_unit = a.combat_unit)
+  union all
+  select run_id, 'casualties' as entity, casualties as identity, first_seq from casualties a
+  where not exists (select 1 from casualties_history h where h.run_id = a.run_id and h.casualties = a.casualties)
+  union all
+  select run_id, 'formation' as entity, formation as identity, first_seq from formation a
+  where not exists (select 1 from formation_history h where h.run_id = a.run_id and h.formation = a.formation)
+  union all
+  select run_id, 'ship' as entity, ship as identity, first_seq from ship a
+  where not exists (select 1 from ship_history h where h.run_id = a.run_id and h.ship = a.ship)
+  union all
+  select run_id, 'ship_construction' as entity, ship_construction as identity, first_seq from ship_construction a
+  where not exists (select 1 from ship_construction_history h where h.run_id = a.run_id and h.ship_construction = a.ship_construction)
+  union all
+  select run_id, 'ship_queue' as entity, ship_queue as identity, first_seq from ship_queue a
+  where not exists (select 1 from ship_queue_history h where h.run_id = a.run_id and h.ship_queue = a.ship_queue)
+  union all
+  select run_id, 'ship_template' as entity, ship_template as identity, first_seq from ship_template a
+  where not exists (select 1 from ship_template_history h where h.run_id = a.run_id and h.ship_template = a.ship_template)
+  union all
+  select run_id, 'ship_template_version' as entity, ship_template_version as identity, first_seq from ship_template_version a
+  where not exists (select 1 from ship_template_version_history h where h.run_id = a.run_id and h.ship_template_version = a.ship_template_version)
+  union all
+  select run_id, 'naval_mission' as entity, naval_mission as identity, first_seq from naval_mission a
+  where not exists (select 1 from naval_mission_history h where h.run_id = a.run_id and h.naval_mission = a.naval_mission)
+  union all
+  select run_id, 'war' as entity, war as identity, first_seq from war a
+  where not exists (select 1 from war_history h where h.run_id = a.run_id and h.war = a.war)
+  union all
+  select run_id, 'war_goal' as entity, war_goal as identity, first_seq from war_goal a
+  where not exists (select 1 from war_goal_history h where h.run_id = a.run_id and h.war_goal = a.war_goal)
+  union all
+  select run_id, 'front' as entity, front as identity, first_seq from front a
+  where not exists (select 1 from front_history h where h.run_id = a.run_id and h.front = a.front)
+  union all
+  select run_id, 'front_side' as entity, front_side as identity, first_seq from front_side a
+  where not exists (select 1 from front_side_history h where h.run_id = a.run_id and h.front_side = a.front_side)
+  union all
+  select run_id, 'occupation' as entity, occupation as identity, first_seq from occupation a
+  where not exists (select 1 from occupation_history h where h.run_id = a.run_id and h.occupation = a.occupation)
+  union all
+  select run_id, 'battle' as entity, battle as identity, first_seq from battle a
+  where not exists (select 1 from battle_history h where h.run_id = a.run_id and h.battle = a.battle)
+  union all
+  select run_id, 'country_ai' as entity, country_ai as identity, first_seq from country_ai a
+  where not exists (select 1 from country_ai_history h where h.run_id = a.run_id and h.country_ai = a.country_ai)
+  union all
+  select run_id, 'journal_entry' as entity, journal_entry as identity, first_seq from journal_entry a
+  where not exists (select 1 from journal_entry_history h where h.run_id = a.run_id and h.journal_entry = a.journal_entry)
+  union all
+  select run_id, 'event' as entity, event as identity, first_seq from event a
+  where not exists (select 1 from event_history h where h.run_id = a.run_id and h.event = a.event);
+
 alter table run add foreign key (run_id, player_country) references country deferrable initially deferred;
 
 create view run_lost as

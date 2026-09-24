@@ -109,6 +109,12 @@ def enum(name):
     return f'create table {name} (\n  {name} int2 primary key,\n  name text unique\n);\n'
 
 
+def referenced_only():
+    parts=[f"  select run_id, '{name}' as entity, {name} as identity, first_seq from {name} a\n"
+           f"  where not exists (select 1 from {name}_history h where h.run_id = a.run_id and h.{name} = a.{name})" for name in ENTITIES if name!='province']
+    return 'create view referenced_only as\n'+'\n  union all\n'.join(parts)+';\n'
+
+
 def name_columns():
     rows=[(t.name,c.name,c.vocabulary) for t in TABLES for c in key_columns(t)+t.columns if c.vocabulary]
     return ('create table name_column (\n  table_name text not null,\n  column_name text not null,\n  vocabulary text not null,\n'
@@ -121,7 +127,7 @@ def main():
            '\n'+(HERE/'schema_meta.sql').open().read().rstrip()+'\n\n','\n'.join(anchor(name) for name in ENTITIES),'\n'+'\n'.join(emit(t) for t in TABLES),
            '\n'+'\n'.join(at_function(t) for t in order),
            '\n'+''.join(f'create index {t.name}_seq on {t.name} using brin (run_id, seq) with (autosummarize = on);\n' for t in TABLES),
-           '\n'+name_columns(),
+           '\n'+name_columns(),'\n'+referenced_only(),
            '\n'+(HERE/'schema_tail.sql').open().read().rstrip()+'\n']
     sql=''.join(parts)
     names=re.findall(r'create table (\w+)',sql)

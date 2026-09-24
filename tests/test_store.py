@@ -109,28 +109,25 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(stored.rows('law','law,law_type',country=PLAYER),[(LAW,'law_one')])
         self.assertEqual(stored.states(),[STATE])
 
-    def test_references_must_name_captured_objects(self):
-        step=dict(STEPS[0])
-        bad=built(step)
-        bad.rows['law_history'][0]=(LAW,3|GEN,'law_one',0.1,1,None,True,-1)
-        with self.assertRaisesRegex(RuntimeError,'did not capture'):
-            self.store.write(bad,'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
-
-    def test_a_loose_reference_keeps_its_identity_and_anchors_it_before_the_object_exists(self):
+    def test_a_handle_keeps_its_identity_and_anchors_it_even_without_the_object(self):
         early=built(STEPS[0])
         early.rows['front_history']=[(3,1.0,2.0)]
         early.rows['front_side_history']=[(4,3,6,0)]
+        early.rows['law_history'][0]=(LAW,PLAYER&0xffffff,'law_one',0.1,1,None,True,-1)
         self.store.write(early,'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
         c=self.store.connection
         run=self.store.run_id
         self.assertEqual(c.execute('select war,first_seq from war where run_id=%s',(run,)).fetchall(),[(6,0)])
         self.assertEqual(c.execute('select count(*) from war_history where run_id=%s',(run,)).fetchone(),(0,))
         self.assertEqual(c.execute('select front,war from front_side_at(%s,0)',(run,)).fetchall(),[(3,6)])
+        self.assertEqual(c.execute('select country from law_at(%s,0) where law=%s',(run,LAW)).fetchall(),[(PLAYER&0xffffff,)])
+        self.assertEqual(c.execute('select entity,identity from referenced_only where run_id=%s order by entity',(run,)).fetchall(),
+                         [('country',PLAYER&0xffffff),('war',6)])
 
-    def test_a_stale_handle_to_a_reused_slot_is_not_resolved_to_the_new_object(self):
+    def test_a_province_reference_must_name_a_captured_province(self):
         bad=built(STEPS[0])
-        bad.rows['law_history'][0]=(LAW,PLAYER&0xffffff,'law_one',0.1,1,None,True,-1)
-        with self.assertRaisesRegex(RuntimeError,'generation 0'):
+        bad.rows['battle_history']=[(8,6,None,PROVINCE+1,0,0,None,'key',0,None,0.0,0.0,None,None)]
+        with self.assertRaisesRegex(RuntimeError,'did not capture'):
             self.store.write(bad,'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
 
     def test_names_must_belong_to_the_ruleset(self):

@@ -233,10 +233,10 @@ class Store:
                 if value is not None and value in column.sentinels:
                     value=None
                 if column.entity and value is not None:
-                    if column.loose:
-                        referenced[column.entity].add(value)
+                    if column.entity=='province':
+                        value=identity(live,'province',value,layout.name,column.name)
                     else:
-                        value=identity(live,column.entity,value,layout.name,column.name)
+                        referenced[column.entity].add(value)
                 if column.vocabulary and value is not None and column.vocabulary in CLOSED and value not in self.members[column.vocabulary]:
                     raise RuntimeError(f'{layout.name}.{column.name}: {value} is not a {column.vocabulary} of this ruleset')
                 values[index]=value
@@ -325,8 +325,6 @@ class Store:
             layout=self.layouts[name]
             resolved[name]=self.resolve(layout,rows,live,referenced)
             self.check_fixed(layout,resolved[name])
-        if referenced['province']:
-            raise RuntimeError('A loose reference names a province')
         missing=set(self.layouts)-set(resolved)
         if missing:
             raise RuntimeError(f'The capture built no rows for {sorted(missing)}')
