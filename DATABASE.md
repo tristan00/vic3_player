@@ -158,7 +158,7 @@ The writer (`Store.write`) handles each snapshot in one transaction:
 5. On the first snapshot it sets `heartbeat_at` and `progress_at` to `clock_timestamp()` as the transaction's last statement. `now()` would be the transaction's start, seconds earlier on a large first snapshot, and the run would be listed as lost the moment it appears.
 6. Any violation raises and rolls back.
 
-After the first snapshot commits, the writer hands the run id to the heartbeat process, which beats from then on.
+After the first snapshot commits, the writer hands the run id to the heartbeat process, which beats from then on, and runs `ANALYZE` on every table that snapshot wrote, one progress stamp per table. The first snapshot adds tens of thousands of rows for a run the statistics have never seen; on a vanilla world the rules' first pass over the stored snapshot took 5 s with those stale statistics and 2 s once autovacuum had analyzed the tables.
 
 Primary keys, NOT NULL and check constraints are never suspended. Any other writer gets row-by-row foreign-key checks as usual. The connection uses no server-side prepared statements, so every check is planned with its actual run and snapshot values. Nested loops are off because the rows a check reads were inserted in the same transaction and have no statistics: the planner estimates one row, chooses a nested loop over a materialized inner list, and a 57,000-row check then compares 57,000 by 57,000 rows, which took over 100 s per check and nine minutes per snapshot on a vanilla world. With hash and merge joins the same checks take 0.3 s in total.
 
