@@ -32,11 +32,11 @@ def timed(method):
     @wraps(method)
     def call(*args,**kwargs):
         started=time.monotonic()
-        progress(method.__name__)
+        progress(method.__qualname__)
         try:
             return method(*args,**kwargs)
         finally:
-            progress(f'{method.__name__} done')
+            progress(f'{method.__qualname__} done')
             logging.getLogger('interface').info('%s %.3fs',method.__name__,time.monotonic()-started)
     return call
 

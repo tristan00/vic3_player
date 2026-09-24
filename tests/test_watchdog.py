@@ -27,11 +27,11 @@ class WatchdogTests(unittest.TestCase):
     def test_timed_functions_stamp_progress_on_entry_and_exit(self):
         @timed
         def slow():
-            self.assertEqual(progress_age()[0],'slow')
+            self.assertTrue(progress_age()[0].endswith('.slow'))
         progress('before')
         slow()
         step,age=progress_age()
-        self.assertEqual(step,'slow done')
+        self.assertTrue(step.endswith('.slow done'))
         self.assertLess(age,1)
         self.assertLessEqual(STALL_LIMIT,5)
 
