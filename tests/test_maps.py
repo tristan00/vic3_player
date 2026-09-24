@@ -132,6 +132,11 @@ class SamplingTests(unittest.TestCase):
         self.assertAlmostEqual(sum(picks) / len(picks) / 50, 0.1, delta=0.01)
         self.assertEqual(_picked(random.Random(1), data, 10, 50, []), [])
 
+    def test_a_rare_situation_still_lands_on_one_eligible_country(self):
+        data = {'trade': [None] * 100}
+        for seed in range(50):
+            self.assertEqual(len(_picked(random.Random(seed), data, 1, 3, [0, 1, 2])), 1)
+
     def test_a_partner_respects_the_direction_of_a_lopsided_ratio(self):
         size = [1, 2, 8, 9]
         self.assertEqual(_partner(random.Random(1), size, 0, [1, 2, 3], 1 / 8), 2)
@@ -240,6 +245,20 @@ class NationTests(unittest.TestCase):
             buildable = self.data['building_techs']['building_barrack'] <= self.data['tier_techs'][country['technology_tier']]
             self.assertEqual(sum(map(int, barracks)), min(country['trade']['barracks'], cap * len(country['states'])) if buildable else 0)
             self.assertEqual(country['trade']['tier'], country['technology_tier'])
+
+    def test_situations_are_counted_on_the_countries_they_land_on(self):
+        neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
+        treaties = 0
+        for seed in range(12):
+            world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
+                            [{'key': 'region_interface_1', 'states': self.regions}], .5, .5)
+            files = world['files']
+            history = ''.join(files[f'common/history/{folder}/interface.txt'] for folder in ('diplomacy', 'treaties', 'diplomatic_plays', 'power_blocs'))
+            treaties += history.count('create_treaty')
+            involved = set(re.findall(r'c:(\w+)', re.sub(r'set_relations = \{[^}]*\}', '', history)))
+            involved |= set(re.findall(r'^c:(\w+) \?= \{ (?:add_company|active_law)', files['common/history/countries/interface.txt'], re.M))
+            self.assertEqual({c['tag'] for c in world['countries'] if c['situations']}, involved)
+        self.assertGreater(treaties, 2)
 
     def test_personal_union_subjects_have_no_ruler_or_heir_of_their_own(self):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
