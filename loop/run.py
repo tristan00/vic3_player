@@ -34,6 +34,7 @@ ACTIONS_PER_PAUSE=(6,16)
 ENDS_PAUSE={'capitulate','back_down','white_peace','declare_bankruptcy','leave_power_bloc'}
 PARKED=set()
 RUN_DAYS=(10,90)
+WORLD_STATES=(80,150)
 PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
 WEIGHTS={'cancel_enactment':.1,'nationalize':.1,'bulk_nationalize_state':.1,'build':3,'research':3,'enact_law':2,'switch_production_method':3,'bulk_switch_production_method_state':3,'deploy_to_front':5,'set_strategic_objective':3,'start_play_country':.1,'start_play_state':.1,'mobilize':5,'mobilize_all':5,'raise_conscripts':3,'demobilize':.2,'demobilize_all':.2,'cancel_construction':.1,'cancel_queue_item':.1,'downsize':.1,'pause_construction':.1,'dequeue_research':.1,'pause_all_construction':.05}
 UNVERIFIED_WEIGHT=10
@@ -349,9 +350,9 @@ def build(seed,countries,states,tech,pop):
 
 
 def world_size(rng,levels):
-    states=rng.randint(10,150)
+    states=rng.randint(*WORLD_STATES)
     tech,pop=levels
-    return (rng.randrange(10**9),rng.randint(2,max(2,states//3)),states,
+    return (rng.randrange(10**9),rng.randint(states//6,states//3),states,
             round(rng.uniform(0,MAX_TECH),2) if tech is None else tech,round(rng.uniform(0,1),2) if pop is None else pop)
 
 
