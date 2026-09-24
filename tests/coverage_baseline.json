@@ -111,7 +111,9 @@
    "embarked",
    "docked",
    "recalled",
-   "hit_points_percent"
+   "hit_points_percent",
+   "retrofittable",
+   "retrofitting"
   ],
   "front_advantage": [
    "front",

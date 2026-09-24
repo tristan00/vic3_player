@@ -2481,18 +2481,14 @@
     },
     "ship": {
       "disposition": "public",
-      "drop": [
-        "version"
-      ],
+      "drop": [],
       "owner": [
         "none"
       ]
     },
     "ship_construction": {
       "disposition": "player",
-      "drop": [
-        "version"
-      ],
+      "drop": [],
       "owner": [
         "through",
         "ship_queue",

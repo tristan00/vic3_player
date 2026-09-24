@@ -24,7 +24,7 @@ COVERED={
     'M26':('cancel_invasion',),
     'N1':('start_naval_mission',),'N4':('start_naval_mission_selected','end_naval_mission_selected'),'N2':('end_naval_mission',),'N9':('decommission_ship',),'N13':('build_ship','build_ship_for'),
     'N14':('cancel_ship','cancel_ship_item'),'N16':('pause_ship_construction','resume_ship_construction'),
-    'N17':('set_default_construction_fleet','clear_default_construction_fleet'),'N21':('set_supply_ship_construction',),'N19':('design_ship_template',),
+    'N17':('set_default_construction_fleet','clear_default_construction_fleet'),'N21':('set_supply_ship_construction',),'N19':('design_ship_template','edit_ship_template'),'N7':('retrofit_fleet','cancel_retrofit_fleet'),'N8':('retrofit_all','cancel_retrofit_all'),
     'C1':('character_interaction',),'L9':('character_interaction',),'PB2':('diplomatic_action',),'C2':('hire_commander','hire_commander_for'),'C3':('promote_commander',),
     'C4':('assign_commander',),'C5':('unassign_commander',),
     'D1':('diplomatic_action',),'D3':('diplomatic_action_obligation',),'D2':('diplomatic_action_state',),'D4':('accept_action_proposal','decline_action_proposal'),'D5':('accept_demand','reject_demand'),'D6':('quick_decline_proposal',),

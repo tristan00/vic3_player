@@ -1289,6 +1289,16 @@ def ship_designs(s):
     return combos
 
 
+def custom_templates(s):
+    base=s.map('ship_template_private','ship_template,base')
+    mine=sorted((kind,ordinal,template) for template,owner,kind,ordinal in s.rows('ship_template','ship_template,country,ship_type,ordinal_number') if owner==s.player)
+    return {(kind,index) for kind in {kind for kind,_,_ in mine} for index,(_,_,template) in enumerate(item for item in mine if item[0]==kind) if base.get(template) is False}
+
+
+def retrofit_fleets(s,retrofitting):
+    return [f for f in s.formations('fleet') if formation_report(s,f,'retrofitting')==retrofitting and (retrofitting or formation_report(s,f,'retrofittable'))]
+
+
 JOIN_LEVERAGE=200
 
 
@@ -1621,6 +1631,11 @@ RULES={
     'resume_ship_construction':lambda s:[{}] if ship_paused(s) and not construction_paused(s) and not in_default(s) else [],
     'set_supply_ship_construction':lambda s:product(level=other_levels(s,'supply_ship_construction_level')),
     'design_ship_template':ship_designs,
+    'edit_ship_template':lambda s:[{**combo,'index':index} for combo in ship_designs(s) for kind,index in sorted(custom_templates(s)) if kind==combo['ship_type']],
+    'retrofit_fleet':lambda s:product(military_formation=retrofit_fleets(s,False)),
+    'cancel_retrofit_fleet':lambda s:product(military_formation=retrofit_fleets(s,True)),
+    'retrofit_all':lambda s:[{}] if retrofit_fleets(s,False) else [],
+    'cancel_retrofit_all':lambda s:[{}] if retrofit_fleets(s,True) else [],
     'character_interaction':lambda s:[{'character':character,'interaction':interaction}
                                       for chosen in [set(s.characters('character_role_ruler','character_role_heir','character_role_general','character_role_admiral',
                                                                       'character_role_ig_leader'))]

@@ -81,6 +81,15 @@ def ignoring(snapshot,index):
     return flags[index] if index is not None and index<len(flags) else None
 
 
+def own_versions(snapshot):
+    mine={template for template, in snapshot.rows('ship_template','ship_template',country=snapshot.player)}
+    return [row for row in snapshot.rows('ship_template_version_list','ship_template,ship_template_version') if row[0] in mine]
+
+
+def retrofitting_fleets(snapshot):
+    return sum(1 for flag, in snapshot.rows('formation_report','retrofitting') if flag)
+
+
 def strait_becomes(column,target):
     return lambda a,b,p,n:any(value(a,'strait',f'{side}_{column}',p[n])!=value(b,'strait',f'{side}_{column}',p[n])==target(p) for side in ('first','second'))
 
@@ -408,6 +417,11 @@ EFFECTS={
     'press_journal_button':(None,lambda a,b,p,n:country_state(a)!=country_state(b)),
     'declare_bankruptcy':(None,lambda a,b,p,n:in_default(a) and not in_default(b)),
     'design_ship_template':(None,more('ship_template',True)),
+    'edit_ship_template':(None,lambda a,b,p,n:len(own_versions(b))>len(own_versions(a))),
+    'retrofit_fleet':('military_formation',equals('formation_report','retrofitting',True)),
+    'cancel_retrofit_fleet':('military_formation',equals('formation_report','retrofitting',False)),
+    'retrofit_all':(None,lambda a,b,p,n:retrofitting_fleets(a)<retrofitting_fleets(b)),
+    'cancel_retrofit_all':(None,lambda a,b,p,n:retrofitting_fleets(a)>retrofitting_fleets(b)),
     'set_strait_toll':('strait',strait_becomes('toll_rate',lambda p:TOLL_LEVELS.index(p['level']))),
     'set_strait_access':('strait',strait_becomes('access_status',lambda p:ACCESS_STATUSES.index(p['access']))),
     'set_strait_allowed':('strait',strait_becomes('access_permissions',lambda p:ACCESS_PERMISSIONS.index(p['allowed'])+1)),

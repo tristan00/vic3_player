@@ -1008,7 +1008,7 @@ def military(c):
                   organization=t['organization'][index],sea_presence=t['sea_presence'][index],supply=t['supply'][index],
                   delivered_supply=t['delivered_supply'][index],supply_ships=t['supply_ships'][index],mobilized=flag(t['is_mobilized'][index]),
                   raised_conscripts=flag(t['has_raised_conscripts'][index]))
-        settings={f:values for f,*values in c.rows('formation_setting','formation',*FORMATION_PRIVATE,'hit_points_percent')}
+        settings={f:values for f,*values in c.rows('formation_setting','formation',*FORMATION_PRIVATE,'hit_points_percent','retrofittable','retrofitting')}
         deployable={f for f, in c.rows('formation_deployable','formation')}
         display=dict(c.rows('formation_name','formation','name'))
         private={i:values for i,*values in c.rows('formation_private','id','home_hq','strategic_objective','travel_progress_path_distance')}
@@ -1023,7 +1023,7 @@ def military(c):
             c.add('formation_private',formation=ids[i],home_hq=home,strategic_objective=objective,travel_distance=distance)
         for i,values in settings.items():
             c.add('formation_report',formation=ids[i],**{name:flag(value) for name,value in zip(FORMATION_PRIVATE,values[:6])},hit_points_percent=values[6],
-                  deployable=i in deployable,display_name=display[i])
+                  deployable=i in deployable,display_name=display[i],retrofittable=int(values[7]),retrofitting=flag(values[8]))
         for name,table,column in (('formation_mobilization_option','active_mobilization_options','mobilization_option'),
                                   ('formation_upgrade_unit_type','regular_unit_types_to_upgrade','combat_unit_type')):
             for i,items in c.children('formation_'+table,'id','value').items():
@@ -1037,15 +1037,15 @@ def military(c):
     t=c.table('ship')
     if t:
         ids=idents(t)
-        for ident,fleet,hp,xp in zip(t['ident'],t['fleet'],t['hit_points'],t['veterancy_experience']):
-            c.add('ship_history',ship=ident,fleet=fleet,hit_points=hp,experience=xp)
+        for ident,fleet,version,hp,xp in zip(t['ident'],t['fleet'],t['version'],t['hit_points'],t['veterancy_experience']):
+            c.add('ship_history',ship=ident,fleet=fleet,version=version,hit_points=hp,experience=xp)
         for i,items in c.children('ship_crew','id','state','crew').items():
             for position,(state,crew) in enumerate(items):
                 c.add('ship_crew',ship=ids[i],position=position,state=state,crew=crew)
     t=c.table('ship_construction')
     if t:
-        for ident,queue,position,kind,left in zip(t['ident'],t['queue'],t['index'],t['ship_construction_type'],t['construction_left']):
-            c.add('ship_construction_history',ship_construction=ident,queue=queue,list_index=position,ship_type=c.label(kind),construction_left=left)
+        for ident,queue,position,kind,version,left in zip(t['ident'],t['queue'],t['index'],t['ship_construction_type'],t['version'],t['construction_left']):
+            c.add('ship_construction_history',ship_construction=ident,queue=queue,list_index=position,ship_type=c.label(kind),version=version,construction_left=left)
     t=c.table('ship_queue')
     if t:
         c.ship_queue_paused={country&SLOT:flag(paused) for country,paused in zip(t['country'],t['paused'])}

@@ -349,6 +349,18 @@ class RuleTests(unittest.TestCase):
                    ship_template_version_modification=[{'ship_template_version':21,'position':0,'ship_modification':'mod_c'},{'ship_template_version':22,'position':0,'ship_modification':'mod_a'}])
         self.assertEqual(RULES['design_ship_template'](s),[{'ship_type':'ship_type_frigate','ship_modification':'mod_c'},{'ship_type':'ship_type_frigate','ship_modification':'mod_d'}])
 
+    def test_retrofit_offers_follow_the_fleet_report(self):
+        s=snapshot(formation_history=[{'formation':5,'country':PLAYER,'formation_type':1},{'formation':6,'country':PLAYER,'formation_type':1},{'formation':7,'country':PLAYER,'formation_type':1}],
+                   ship_history=[{'ship':1,'fleet':5},{'ship':2,'fleet':6},{'ship':3,'fleet':7}],
+                   formation_report=[{'formation':5,'retrofittable':2,'retrofitting':False},{'formation':6,'retrofittable':0,'retrofitting':False},{'formation':7,'retrofittable':1,'retrofitting':True}])
+        self.assertEqual(RULES['retrofit_fleet'](s),[{'military_formation':5}])
+        self.assertEqual(RULES['cancel_retrofit_fleet'](s),[{'military_formation':7}])
+        self.assertEqual(RULES['retrofit_all'](s),[{}])
+        self.assertEqual(RULES['cancel_retrofit_all'](s),[{}])
+        idle=snapshot(formation_history=[{'formation':6,'country':PLAYER,'formation_type':1}],ship_history=[{'ship':2,'fleet':6}],formation_report=[{'formation':6,'retrofittable':0,'retrofitting':False}])
+        self.assertEqual(RULES['retrofit_all'](idle),[])
+        self.assertEqual(RULES['cancel_retrofit_all'](idle),[])
+
     def test_tariff_level_reads_the_player_tariff_by_direction(self):
         s=snapshot(player_tariff=[{'direction':'import','goods':'grain','level':5},{'direction':'export','goods':'grain','level':1}])
         self.assertEqual(trade_level(s,'import','grain'),5)

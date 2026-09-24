@@ -305,10 +305,10 @@ def _scripted(tables,snapshot,held,tags,label,player,living,world,maps):
                sorted((building,*map(flag,values)) for building,*values in
                       held.fields('building',held.listed('cap_obj_building'),('auto_expand','output_paused','monopoly','privatizable'))))
     formations=held.fields('formation',held.listed('cap_obj_formation'),
-                           ('default_fleet','demobilizing','invading','embarked','docked','recalled','hit_points_percent','deployable','name'))
+                           ('default_fleet','demobilizing','invading','embarked','docked','recalled','hit_points_percent','deployable','name','retrofittable','retrofitting'))
     put(tables,'formation_setting',[('formation','int4'),('default_fleet','int4'),('demobilizing','int4'),('invading','int4'),('embarked','int4'),
-                                                     ('docked','int4'),('recalled','int4'),('hit_points_percent','float8')],
-               sorted((formation,*map(flag,values[:6]),number(values[6])) for formation,*values in formations))
+                                                     ('docked','int4'),('recalled','int4'),('hit_points_percent','float8'),('retrofittable','int4'),('retrofitting','int4')],
+               sorted((formation,*map(flag,values[:6]),number(values[6]),number(values[9]),flag(values[10])) for formation,*values in formations))
     put(tables,'formation_deployable',[('formation','int4')],sorted((formation,) for formation,*values in formations if flag(values[7])))
     put(tables,'formation_name',[('formation','int4'),('name','text')],sorted((formation,plain(text(values[8]))) for formation,*values in formations))
     put(tables,'state_goods_supply',[('state','int4'),('goods','text')],

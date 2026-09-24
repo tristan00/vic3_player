@@ -3874,11 +3874,13 @@ create table formation_report (
   hit_points_percent float8,
   deployable bool,
   display_name text,
+  retrofittable int4,
+  retrofitting bool,
   primary key (run_id, formation, seq),
   foreign key (run_id, formation) references formation,
   foreign key (run_id, seq) references snapshot,
-  check (present = (num_nulls(default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name) = 0)),
-  check (present or num_nonnulls(default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name) = 0)
+  check (present = (num_nulls(default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name, retrofittable, retrofitting) = 0)),
+  check (present or num_nonnulls(default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name, retrofittable, retrofitting) = 0)
 );
 
 create table formation_mobilization_option (
@@ -3942,14 +3944,16 @@ create table ship_history (
   seq int4 not null,
   present bool not null,
   fleet int4,
+  version int4,
   hit_points float8,
   experience float8,
   primary key (run_id, ship, seq),
   foreign key (run_id, ship) references ship,
   foreign key (run_id, seq) references snapshot,
   foreign key (run_id, fleet) references formation,
+  foreign key (run_id, version) references ship_template_version,
   check (present = (num_nulls(hit_points, experience) = 0)),
-  check (present or num_nonnulls(fleet, hit_points, experience) = 0)
+  check (present or num_nonnulls(fleet, version, hit_points, experience) = 0)
 );
 
 create table ship_crew (
@@ -3976,14 +3980,16 @@ create table ship_construction_history (
   queue int4,
   list_index int4,
   ship_type int2,
+  version int4,
   construction_left float8,
   primary key (run_id, ship_construction, seq),
   foreign key (run_id, ship_construction) references ship_construction,
   foreign key (run_id, seq) references snapshot,
   foreign key (run_id, queue) references ship_queue,
   foreign key (ship_type) references ship_type,
+  foreign key (run_id, version) references ship_template_version,
   check (present = (num_nulls(queue, ship_type, construction_left) = 0)),
-  check (present or num_nonnulls(queue, list_index, ship_type, construction_left) = 0)
+  check (present or num_nonnulls(queue, list_index, ship_type, version, construction_left) = 0)
 );
 
 create table ship_queue_history (
@@ -5552,8 +5558,8 @@ create function formation_private_at(run int4, at int4) returns table ("formatio
   select l.formation, l.seq, l.home_hq, l.strategic_objective, l.travel_distance from formation a, lateral (select formation, seq, home_hq, strategic_objective, travel_distance, present from formation_private t where t.run_id = run and t.formation = a.formation and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
-create function formation_report_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "default_fleet" bool, "demobilizing" bool, "invading" bool, "embarked" bool, "docked" bool, "recalled" bool, "hit_points_percent" float8, "deployable" bool, "display_name" text) language sql stable as $$
-  select l.formation, l.seq, l.default_fleet, l.demobilizing, l.invading, l.embarked, l.docked, l.recalled, l.hit_points_percent, l.deployable, l.display_name from formation a, lateral (select formation, seq, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name, present from formation_report t where t.run_id = run and t.formation = a.formation and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
+create function formation_report_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "default_fleet" bool, "demobilizing" bool, "invading" bool, "embarked" bool, "docked" bool, "recalled" bool, "hit_points_percent" float8, "deployable" bool, "display_name" text, "retrofittable" int4, "retrofitting" bool) language sql stable as $$
+  select l.formation, l.seq, l.default_fleet, l.demobilizing, l.invading, l.embarked, l.docked, l.recalled, l.hit_points_percent, l.deployable, l.display_name, l.retrofittable, l.retrofitting from formation a, lateral (select formation, seq, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name, retrofittable, retrofitting, present from formation_report t where t.run_id = run and t.formation = a.formation and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function formation_mobilization_option_at(run int4, at int4) returns table ("formation" int4, "mobilization_option" int2, "seq" int4) language sql stable as $$
@@ -5572,16 +5578,16 @@ create function formation_borrow_setting_at(run int4, at int4) returns table ("f
   select l.formation, l.name, l.seq, l.position, l.selected from formation a, lateral (select distinct on (name) formation, name, seq, position, selected, present from formation_borrow_setting t where t.run_id = run and t.formation = a.formation and t.seq <= at order by name desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
-create function ship_at(run int4, at int4) returns table ("ship" int4, "seq" int4, "fleet" int4, "hit_points" float8, "experience" float8) language sql stable as $$
-  select l.ship, l.seq, l.fleet, l.hit_points, l.experience from ship a, lateral (select ship, seq, fleet, hit_points, experience, present from ship_history t where t.run_id = run and t.ship = a.ship and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
+create function ship_at(run int4, at int4) returns table ("ship" int4, "seq" int4, "fleet" int4, "version" int4, "hit_points" float8, "experience" float8) language sql stable as $$
+  select l.ship, l.seq, l.fleet, l.version, l.hit_points, l.experience from ship a, lateral (select ship, seq, fleet, version, hit_points, experience, present from ship_history t where t.run_id = run and t.ship = a.ship and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function ship_crew_at(run int4, at int4) returns table ("ship" int4, "position" int2, "seq" int4, "state" int4, "crew" int4) language sql stable as $$
   select l.ship, l.position, l.seq, l.state, l.crew from ship a, lateral (select distinct on (position) ship, position, seq, state, crew, present from ship_crew t where t.run_id = run and t.ship = a.ship and t.seq <= at order by position desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
-create function ship_construction_at(run int4, at int4) returns table ("ship_construction" int4, "seq" int4, "queue" int4, "list_index" int4, "ship_type" int2, "construction_left" float8) language sql stable as $$
-  select l.ship_construction, l.seq, l.queue, l.list_index, l.ship_type, l.construction_left from ship_construction a, lateral (select ship_construction, seq, queue, list_index, ship_type, construction_left, present from ship_construction_history t where t.run_id = run and t.ship_construction = a.ship_construction and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
+create function ship_construction_at(run int4, at int4) returns table ("ship_construction" int4, "seq" int4, "queue" int4, "list_index" int4, "ship_type" int2, "version" int4, "construction_left" float8) language sql stable as $$
+  select l.ship_construction, l.seq, l.queue, l.list_index, l.ship_type, l.version, l.construction_left from ship_construction a, lateral (select ship_construction, seq, queue, list_index, ship_type, version, construction_left, present from ship_construction_history t where t.run_id = run and t.ship_construction = a.ship_construction and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function ship_queue_at(run int4, at int4) returns table ("ship_queue" int4, "seq" int4, "country" int4) language sql stable as $$
