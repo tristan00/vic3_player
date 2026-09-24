@@ -691,6 +691,10 @@ create table snapshot (
   check ((paused is null) = (speed is null))
 );
 
+create table catalogue_action (
+  action int4 primary key references action
+);
+
 create table action_parameter (
   action int4 not null references action,
   name text not null,
@@ -4018,16 +4022,28 @@ create table ship_template_version_history (
   ship_template_version int4 not null,
   seq int4 not null,
   present bool not null,
-  ship_template int4,
-  position int2,
   ship_type int2,
   primary key (run_id, ship_template_version, seq),
   foreign key (run_id, ship_template_version) references ship_template_version,
   foreign key (run_id, seq) references snapshot,
-  foreign key (run_id, ship_template) references ship_template,
   foreign key (ship_type) references ship_type,
-  check (present = (num_nulls(ship_template, position, ship_type) = 0)),
-  check (present or num_nonnulls(ship_template, position, ship_type) = 0)
+  check (present = (num_nulls(ship_type) = 0)),
+  check (present or num_nonnulls(ship_type) = 0)
+);
+
+create table ship_template_version_list (
+  run_id int4 not null,
+  ship_template int4 not null,
+  position int2 not null,
+  seq int4 not null,
+  present bool not null,
+  ship_template_version int4,
+  primary key (run_id, ship_template, position, seq),
+  foreign key (run_id, ship_template) references ship_template,
+  foreign key (run_id, seq) references snapshot,
+  foreign key (run_id, ship_template_version) references ship_template_version,
+  check (present = (num_nulls(ship_template_version) = 0)),
+  check (present or num_nonnulls(ship_template_version) = 0)
 );
 
 create table ship_template_version_modification (
@@ -5557,8 +5573,12 @@ create function ship_template_fleet_at(run int4, at int4) returns table ("ship_t
   select l.ship_template, l.fleet, l.seq from ship_template a, lateral (select distinct on (fleet) ship_template, fleet, seq, present from ship_template_fleet t where t.run_id = run and t.ship_template = a.ship_template and t.seq <= at order by fleet desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
-create function ship_template_version_at(run int4, at int4) returns table ("ship_template_version" int4, "seq" int4, "ship_template" int4, "position" int2, "ship_type" int2) language sql stable as $$
-  select l.ship_template_version, l.seq, l.ship_template, l.position, l.ship_type from ship_template_version a, lateral (select ship_template_version, seq, ship_template, position, ship_type, present from ship_template_version_history t where t.run_id = run and t.ship_template_version = a.ship_template_version and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
+create function ship_template_version_at(run int4, at int4) returns table ("ship_template_version" int4, "seq" int4, "ship_type" int2) language sql stable as $$
+  select l.ship_template_version, l.seq, l.ship_type from ship_template_version a, lateral (select ship_template_version, seq, ship_type, present from ship_template_version_history t where t.run_id = run and t.ship_template_version = a.ship_template_version and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
+$$;
+
+create function ship_template_version_list_at(run int4, at int4) returns table ("ship_template" int4, "position" int2, "seq" int4, "ship_template_version" int4) language sql stable as $$
+  select l.ship_template, l.position, l.seq, l.ship_template_version from ship_template a, lateral (select distinct on (position) ship_template, position, seq, ship_template_version, present from ship_template_version_list t where t.run_id = run and t.ship_template = a.ship_template and t.seq <= at order by position desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function ship_template_version_modification_at(run int4, at int4) returns table ("ship_template_version" int4, "position" int2, "seq" int4, "ship_modification" int2) language sql stable as $$
@@ -5961,6 +5981,7 @@ create index ship_template_history_seq on ship_template_history using brin (run_
 create index ship_template_private_seq on ship_template_private using brin (run_id, seq) with (autosummarize = on);
 create index ship_template_fleet_seq on ship_template_fleet using brin (run_id, seq) with (autosummarize = on);
 create index ship_template_version_history_seq on ship_template_version_history using brin (run_id, seq) with (autosummarize = on);
+create index ship_template_version_list_seq on ship_template_version_list using brin (run_id, seq) with (autosummarize = on);
 create index ship_template_version_modification_seq on ship_template_version_modification using brin (run_id, seq) with (autosummarize = on);
 create index naval_mission_history_seq on naval_mission_history using brin (run_id, seq) with (autosummarize = on);
 create index war_history_seq on war_history using brin (run_id, seq) with (autosummarize = on);
@@ -6198,7 +6219,7 @@ create view action_verification as
          count(distinct t.world) filter (where t.verified > 0) as worlds,
          coalesce(sum(t.verified), 0) >= 3 and count(distinct t.world) filter (where t.verified > 0) >= 2
            and coalesce(sum(t.verified), 0) >= 0.95 * (coalesce(sum(t.verified), 0) + coalesce(sum(t.failed), 0)) as verified_by_standard
-  from action a left join recent t on t.action = a.action
+  from catalogue_action ca join action a using (action) left join recent t on t.action = a.action
   group by a.action, a.name;
 
 create view verification_summary as

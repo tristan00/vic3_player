@@ -24,7 +24,7 @@ create view action_verification as
          count(distinct t.world) filter (where t.verified > 0) as worlds,
          coalesce(sum(t.verified), 0) >= 3 and count(distinct t.world) filter (where t.verified > 0) >= 2
            and coalesce(sum(t.verified), 0) >= 0.95 * (coalesce(sum(t.verified), 0) + coalesce(sum(t.failed), 0)) as verified_by_standard
-  from action a left join recent t on t.action = a.action
+  from catalogue_action ca join action a using (action) left join recent t on t.action = a.action
   group by a.action, a.name;
 
 create view verification_summary as

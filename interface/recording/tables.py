@@ -1061,21 +1061,17 @@ def military(c):
         for i,items in c.children('ship_templates_fleets','id','value').items():
             for fleet, in items:
                 c.add('ship_template_fleet',ship_template=ids[i],fleet=fleet)
-    for version,items in c.children('ship_template_modification','id','type').items():
-        for position,(kind,) in enumerate(items):
-            c.add('ship_template_version_modification',ship_template_version=version,position=position,ship_modification=c.label(kind))
     t=c.table('ship_template_version')
     if t:
-        listed={}
-        for template,items in c.children('ship_template_version_ids','id','value').items():
-            for position,(version,) in enumerate(items):
-                if version&SLOT in listed:
-                    raise RuntimeError(f'Ship template version {version} is listed by two templates')
-                listed[version&SLOT]=templates[template],position
-        if set(listed)!=set(t['id']):
-            raise RuntimeError('Ship template versions and the versions templates list differ')
-        for i,ident,kind in zip(t['id'],t['ident'],t['type']):
-            c.add('ship_template_version_history',ship_template_version=ident,ship_template=listed[i][0],position=listed[i][1],ship_type=c.label(kind))
+        vids=idents(t)
+        for ident,kind in zip(t['ident'],t['type']):
+            c.add('ship_template_version_history',ship_template_version=ident,ship_type=c.label(kind))
+        for version,items in c.children('ship_template_modification','id','type').items():
+            for position,(kind,) in enumerate(items):
+                c.add('ship_template_version_modification',ship_template_version=vids[version],position=position,ship_modification=c.label(kind))
+    for template,items in c.children('ship_template_version_ids','id','value').items():
+        for position,(version,) in enumerate(items):
+            c.add('ship_template_version_list',ship_template=templates[template],position=position,ship_template_version=version)
     t=c.table('naval_mission')
     if t:
         for ident,kind in zip(t['ident'],t['naval_mission_type']):

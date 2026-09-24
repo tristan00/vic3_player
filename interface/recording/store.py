@@ -380,6 +380,9 @@ class Store:
         if broken:
             raise RuntimeError(f'Snapshot {seq} breaks foreign keys: {broken[:5]}')
 
+    def catalogue(self,names):
+        self.connection.execute('insert into catalogue_action (action) select unnest(%s::int4[]) on conflict do nothing',(self.names('action',list(names)),))
+
     def log_action(self,entry,after):
         action=self.names('action',[entry['action']])[0]
         advisor=self.names('advisor',[entry['advisor']])[0]

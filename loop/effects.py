@@ -368,7 +368,7 @@ EFFECTS={
        for direction in ('import','export') for kind in ('tariff','subvention')},
     'pause':(None,lambda a,b,p,n:hours(b)==hours(a) and b.meta['paused'] is True),
     'unpause':(None,lambda a,b,p,n:hours(b)>hours(a)),
-    'set_speed':(None,lambda a,b,p,n:b.meta['speed']==int(p['speed'])),
+    'set_speed':(None,lambda a,b,p,n:None),
     **{name:('diplomatic_play',lambda a,b,p,n:side(a,p[n])!=side(b,p[n])) for name in ('support_initiator','support_target')},
     'stay_on_fence':('diplomatic_play',lambda a,b,p,n:len(set(a.rows('player_proposal','country,kind')))>len(set(b.rows('player_proposal','country,kind')))
                      and not roles(b,p[n])&{'initiator_ally','target_ally'}),

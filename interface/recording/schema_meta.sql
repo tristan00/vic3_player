@@ -164,6 +164,10 @@ create table snapshot (
   check ((paused is null) = (speed is null))
 );
 
+create table catalogue_action (
+  action int4 primary key references action
+);
+
 create table action_parameter (
   action int4 not null references action,
   name text not null,
