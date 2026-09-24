@@ -70,7 +70,8 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
        'bloc':('form_power_bloc','leave_power_bloc','request_join_power_bloc','kick_from_power_bloc','pick_principle','upgrade_principle'),
        'enactment':('enact_law','cancel_enactment','negotiate','reform_government'),
        'commanders':('hire_commander','hire_commander_for','unassign_commander'),
-       'army_state':('raise_conscripts','raise_conscripts_selected','mobilize','mobilize_all','mobilize_selected','demobilize','demobilize_all','demobilize_selected','station_formation','rehome_formation','back_down','capitulate','disband_formation','disband_regulars','create_army'),
+       'army_state':('raise_conscripts','raise_conscripts_selected','mobilize','mobilize_all','mobilize_selected','demobilize','demobilize_all','demobilize_selected','station_formation','rehome_formation','back_down','capitulate','disband_formation','disband_regulars','create_army',
+                     'deploy_to_front','deploy_selected_to_front','defend_invasion'),
        'shipbuilding':('build_ship','build_ship_for','cancel_ship','pause_ship_construction','resume_ship_construction','raise_ship_item',
                        'lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item','declare_bankruptcy','decommission_ship','disband_formation'),
        'templates':('design_ship_template','edit_ship_template','set_default_ship_template','set_fleet_ship_template','delete_ship_template')}
