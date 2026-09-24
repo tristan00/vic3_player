@@ -464,10 +464,6 @@ def private_kinds(s):
     return {kind for kind in building_kinds(s,buildable=True) if inherited(s,kind,'is_government_funded')!=['yes'] and kind not in monopolized}
 
 
-def auto_expandable(s):
-    return {kind for kind in building_kinds(s,buildable=True,expandable=True) if inherited(s,kind,'should_auto_expand')}
-
-
 def monopolizable(s):
     held=monopolies(s)
     return sorted(kind for kind in building_kinds(s,buildable=True) if definition(s,'common/buildings',kind,'unique')!=['yes']
@@ -485,10 +481,6 @@ def arable_kinds(s):
 def free_arable(s,state):
     table,column=METRIC_COLUMNS['state','GetNumFreeArableLand']
     return need(s.map(table,'state,'+column).get(state),f'{column} of state {state}')
-
-
-def has_room(s,ident):
-    return s.map('building','building,building_type')[ident] not in arable_kinds(s) or free_arable(s,s.map('building','building,state')[ident])>=1
 
 
 def owned_of(s,kinds):
@@ -519,23 +511,19 @@ def bulk_subset(s,building_type,state,ownership):
             and (ownership=='any' or ownership in classes.get(ident,()))]
 
 
-def bulk_options(s,kinds,wanted):
-    return [{'building_type':kind} for kind in sorted({kind for ident,kind,_ in s.buildings() if kind in kinds and wanted(s,ident)})]
-
-
-def subset_options(s,kinds,wanted,by_state):
+def subset_options(s,kinds,wanted):
     classes=ownership_classes(s)
     located=s.map('building','building,state')
     groups={}
     for ident,kind,_ in s.buildings():
         if kind in kinds:
             for ownership in ('any',*classes.get(ident,())):
-                groups.setdefault((kind,located[ident] if by_state else None,ownership),[]).append(wanted(s,ident))
-    return [{'building_type':kind,**({'state':state} if by_state else {}),'ownership':ownership}
+                groups.setdefault((kind,located[ident],ownership),[]).append(wanted(s,ident))
+    return [{'building_type':kind,'state':state,'ownership':ownership}
             for (kind,state,ownership),members in sorted(groups.items(),key=str) if all(members)]
 
 
-def nationalizable_subsets(s,by_state):
+def nationalizable_subsets(s):
     levels=private_levels(s)
     classes=ownership_classes(s)
     located=s.map('building','building,state')
@@ -543,10 +531,10 @@ def nationalizable_subsets(s,by_state):
     costs={}
     for ident,count in levels.items():
         for ownership in ('any',*classes.get(ident,set())-{'owned_foreign'}):
-            key=(kinds[ident],located[ident] if by_state else None,ownership)
+            key=(kinds[ident],located[ident],ownership)
             costs[key]=costs.get(key,0)+nationalization_cost(s,ident)*count
     cash=money(s)
-    return [{'building_type':kind,**({'state':state} if by_state else {}),'ownership':ownership}
+    return [{'building_type':kind,'state':state,'ownership':ownership}
             for (kind,state,ownership),cost in sorted(costs.items(),key=str) if cost<=cash]
 
 
@@ -725,13 +713,13 @@ def switch_methods(s):
             for method in methods.get(kind,()) if method in allowed and method not in active.get(ident,())]
 
 
-def bulk_methods(s,by_state):
+def bulk_methods(s):
     classes=ownership_classes(s)
     located=s.map('building','building,state')
     kinds={ident:kind for ident,kind,_ in s.buildings()}
-    groups={(kinds[option['building']],located[option['building']] if by_state else None,ownership,option['production_method'])
+    groups={(kinds[option['building']],located[option['building']],ownership,option['production_method'])
             for option in switch_methods(s) for ownership in ('any',*classes.get(option['building'],()))}
-    return [{'building_type':kind,**({'state':state} if by_state else {}),'production_method':method,'ownership':ownership}
+    return [{'building_type':kind,'state':state,'production_method':method,'ownership':ownership}
             for kind,state,ownership,method in sorted(groups,key=str)]
 
 
@@ -1707,22 +1695,11 @@ RULES={
     'toggle_monopoly':lambda s:product(building_type=monopolizable(s)),
     'subsidies_on':lambda s:product(building=[i for i in subsidized(s,0) if i in owned_of(s,private_kinds(s))]),
     'subsidies_off':lambda s:product(building=subsidized(s,1)),
-    'auto_expand_on':lambda s:product(building=[i for i in owned_of(s,auto_expandable(s)) if not setting(s,i,'auto_expand') and has_room(s,i)]),
-    'auto_expand_off':lambda s:product(building=[i for i in owned_of(s,auto_expandable(s)) if setting(s,i,'auto_expand')]),
     'switch_production_method':switch_methods,
-    **{f'subset_{name}{suffix}':(lambda kinds,wanted,by_state:lambda s:subset_options(s,kinds(s),wanted,by_state))(kinds,wanted,suffix=='_state')
-       for name,kinds,wanted in (('subsidies_on',private_kinds,lambda s,i:not s.map('building','building,subsidized').get(i)),
-                                 ('subsidies_off',private_kinds,lambda s,i:bool(s.map('building','building,subsidized').get(i))),
-                                 ('auto_expand_on',auto_expandable,lambda s,i:not setting(s,i,'auto_expand') and has_room(s,i)),
-                                 ('auto_expand_off',auto_expandable,lambda s,i:bool(setting(s,i,'auto_expand'))))
-       for suffix in ('','_state')},
-    'bulk_nationalize':lambda s:[] if law_flag(s,'country_disable_nationalization_bool') else nationalizable_subsets(s,False),
-    'bulk_nationalize_state':lambda s:[] if law_flag(s,'country_disable_nationalization_bool') else nationalizable_subsets(s,True),
-    'bulk_switch_production_method':lambda s:bulk_methods(s,False),
-    'bulk_switch_production_method_state':lambda s:bulk_methods(s,True),
-    **{f'bulk_{name}':(lambda kinds,wanted:lambda s:bulk_options(s,kinds(s),wanted))(kinds,wanted)
-       for name,kinds,wanted in (('subsidies',private_kinds,lambda s,i:True),('auto_expand',auto_expandable,has_room),
-                                 ('privatization',private_kinds,privatizable),('remove_privatization',private_kinds,lambda s,i:privatization_requested(s,i) and not law_flag(s,'country_force_privatization_bool')))},
+    'subset_subsidies_on_state':lambda s:subset_options(s,private_kinds(s),lambda s,i:not s.map('building','building,subsidized').get(i)),
+    'subset_subsidies_off_state':lambda s:subset_options(s,private_kinds(s),lambda s,i:bool(s.map('building','building,subsidized').get(i))),
+    'bulk_nationalize_state':lambda s:[] if law_flag(s,'country_disable_nationalization_bool') else nationalizable_subsets(s),
+    'bulk_switch_production_method_state':bulk_methods,
     'cancel_queue_item':lambda s:queue_items(s,0,0),
     'raise_queue_item':lambda s:queue_items(s,1,0),
     'first_queue_item':lambda s:queue_items(s,1,0),

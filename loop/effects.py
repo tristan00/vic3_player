@@ -1,6 +1,6 @@
 import collections
 from interface.actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, LEVELS, TOLL_LEVELS
-from interface.options.available import COUNTRY_OWNER, metric, overlords, subject_pairs, own_templates, latest_design, in_default, journal_button, shown_buttons, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, privatizable, privatization_requested, PRIVATIZATION_REQUESTED, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
+from interface.options.available import COUNTRY_OWNER, metric, overlords, subject_pairs, own_templates, latest_design, in_default, journal_button, shown_buttons, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
 from interface.recording.spec import TABLE
 
 SLOT=0xFFFFFF
@@ -194,16 +194,6 @@ def flags(snapshot,table,column,key,buildings,mask=-1):
     return [bool((values.get(ident) or 0)&mask) for ident in buildings]
 
 
-def bulk_toggle(table,column,key='building',target=None,eligible=lambda s,ident:True,mask=-1):
-    def check(a,b,p,n):
-        subset=[ident for ident in bulk_subset(a,p['building_type'],None,'any') if eligible(a,ident)]
-        before,after=flags(a,table,column,key,subset,mask),flags(b,table,column,key,subset,mask)
-        if target is None:
-            return bool(subset) and len(set(after))==1 and after!=before
-        return bool(subset) and after!=before and all(value==target for value in after)
-    return check
-
-
 def methods(snapshot,building):
     return members(snapshot,'building_production_method_active',building,'production_method')
 
@@ -314,8 +304,7 @@ def colonies(snapshot):
     return {state:progress for state,progress in snapshot.rows('state_status','state,colony_progress') if state in mine}
 
 
-SUBSET_EFFECTS={'subsidies_on':('building','subsidized','building',True),'subsidies_off':('building','subsidized','building',False),
-                'auto_expand_on':('building_private','auto_expand','building',True),'auto_expand_off':('building_private','auto_expand','building',False)}
+SUBSET_EFFECTS={'subsidies_on':('building','subsidized','building',True),'subsidies_off':('building','subsidized','building',False)}
 
 
 def bulk_nationalized(a,b,p,n):
@@ -323,11 +312,6 @@ def bulk_nationalized(a,b,p,n):
     subset=[ident for ident in bulk_subset(a,p['building_type'],p.get('state'),p['ownership']) if before.get(ident)]
     others=[ident for ident in bulk_subset(a,p['building_type'],None,'any') if ident not in subset]
     return bool(subset) and not any(after.get(ident) for ident in subset) and all(before.get(ident,0)==after.get(ident,0) for ident in others)
-
-
-BULK_EFFECTS={'subsidies':('building','subsidized'),'auto_expand':('building_private','auto_expand'),
-              'privatization':('building','privatization_requested','building',None,lambda s,i:privatizable(s,i) or privatization_requested(s,i),PRIVATIZATION_REQUESTED),
-              'remove_privatization':('building','privatization_requested','building',False,lambda s,i:True,PRIVATIZATION_REQUESTED)}
 
 
 EFFECTS={
@@ -341,15 +325,12 @@ EFFECTS={
     'resume_all_construction':(None,construction_paused(False)),
     'subsidies_on':('building',equals('building','subsidized',True)),
     'subsidies_off':('building',equals('building','subsidized',False)),
-    'auto_expand_on':('building',equals('building_private','auto_expand',True)),
-    'auto_expand_off':('building',equals('building_private','auto_expand',False)),
     'pause_construction_output':('building',equals('building_private','output_paused',True)),
     'resume_construction_output':('building',equals('building_private','output_paused',False)),
     'toggle_privatization':('building',changed('building','privatization_requested')),
-    **{f'bulk_{name}':(None,bulk_toggle(*spec)) for name,spec in BULK_EFFECTS.items()},
-    **{f'subset_{name}{suffix}':(None,subset_setting(*spec)) for name,spec in SUBSET_EFFECTS.items() for suffix in ('','_state')},
-    'bulk_nationalize':(None,bulk_nationalized),'bulk_nationalize_state':(None,bulk_nationalized),
-    'bulk_switch_production_method':(None,bulk_method),'bulk_switch_production_method_state':(None,bulk_method),
+    **{f'subset_{name}_state':(None,subset_setting(*spec)) for name,spec in SUBSET_EFFECTS.items()},
+    'bulk_nationalize_state':(None,bulk_nationalized),
+    'bulk_switch_production_method_state':(None,bulk_method),
     'switch_production_method':('building',lambda a,b,p,n:p['production_method'] not in methods(a,p['building']) and p['production_method'] in methods(b,p['building'])),
     'downsize':('building',lambda a,b,p,n:value(a,'building','levels',p['building']) is not None
                 and (value(b,'building','levels',p['building']) is None or value(b,'building','levels',p['building'])<value(a,'building','levels',p['building']))),

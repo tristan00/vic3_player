@@ -106,10 +106,6 @@ def filter_stages(params):
     return ((BROWSER,(),browser_filters),)+((STATE_FILTER,) if 'state' in params.split() else ())
 
 
-BULK=(('subsidies','ToggleAllSubsidies'),('auto_expand','ToggleAllAutoExpand'),('privatization','ToggleAllPrivatization'),
-      ('remove_privatization','RemoveAllPrivatization'))
-
-
 TYPE_ITEM=('BuildingBrowserPanel.GetBuildingBrowserBuildingTypeItems','EqualTo_string(BuildingBrowserBuildingTypeItem.GetBuildingType.GetKey, {building_type}.GetKey)')
 
 
@@ -119,15 +115,7 @@ OPEN_BROWSER=(('InformationPanelBar.OpenBuildingBrowserPanel(GetPlayer.Self)',),
 PM_MENU=('gui/switch_production_method_menu.gui','name = "switch_production_method_menu"')
 
 
-UNFILTERED=(BROWSER,(),lambda values:['BuildingBrowserPanel.ResetAllFilters','BuildingBrowserPanel.StateFilterShowAllStates'])
-
-
-def bulk(name,command):
-    return Action(name,('building_type',),'BuildingBrowserBuildingTypeItem.'+command,datamodels=(TYPE_ITEM,),
-                  window=BROWSER,start=OPEN_BROWSER,stages=(UNFILTERED,))
-
-
-SUBSET=(('subsidies_on','ToggleSubsidiesOn'),('subsidies_off','ToggleSubsidiesOff'),('auto_expand_on','ToggleAutoExpandOn'),('auto_expand_off','ToggleAutoExpandOff'))
+SUBSET=(('subsidies_on','ToggleSubsidiesOn'),('subsidies_off','ToggleSubsidiesOff'))
 
 
 def subset(name,command,params):
@@ -248,14 +236,8 @@ ACTIONS=(
     act('toggle_monopoly','building_type','{building_type}.ToggleMonopoly'),
     act('subsidies_on','building','{building}.ToggleSubsidiesOn'),
     act('subsidies_off','building','{building}.ToggleSubsidiesOff'),
-    act('auto_expand_on','building','{building}.ToggleAutoExpandOn'),
-    act('auto_expand_off','building','{building}.ToggleAutoExpandOff'),
-    *(bulk(f'bulk_{name}',command) for name,command in BULK),
-    *(subset(f'subset_{name}{suffix}',command,params) for name,command in SUBSET
-      for suffix,params in (('','building_type ownership:choice'),('_state','building_type state ownership:choice'))),
-    bulk_nationalize('bulk_nationalize','building_type ownership:choice'),
+    *(subset(f'subset_{name}_state',command,'building_type state ownership:choice') for name,command in SUBSET),
     bulk_nationalize('bulk_nationalize_state','building_type state ownership:choice'),
-    bulk_method('bulk_switch_production_method','building_type production_method ownership:choice'),
     bulk_method('bulk_switch_production_method_state','building_type state production_method ownership:choice'),
     act('switch_production_method','building production_method','ProductionMethod.GetSwitch(Building.Self)',context='{building}',
         datamodels=(('Building.AccessProductionMethodGroups',''),
@@ -510,9 +492,8 @@ GROUPS={
     'construction':('build','cancel_construction','downsize','pause_construction','resume_construction','pause_all_construction','resume_all_construction','pause_construction_output','resume_construction_output',
                     'cancel_queue_item','raise_queue_item','lower_queue_item','first_queue_item','last_queue_item'),
     'buildings':('nationalize','toggle_privatization','toggle_monopoly','subsidies_on','subsidies_off',
-                 'auto_expand_on','auto_expand_off','switch_production_method',
-                 *(f'bulk_{name}' for name,_ in BULK),*(f'subset_{name}{suffix}' for name,_ in SUBSET for suffix in ('','_state')),
-                 'bulk_switch_production_method','bulk_switch_production_method_state','bulk_nationalize','bulk_nationalize_state'),
+                 'switch_production_method',*(f'subset_{name}_state' for name,_ in SUBSET),
+                 'bulk_switch_production_method_state','bulk_nationalize_state'),
     'budget':('set_tax_level','set_government_wages','set_military_wages','toggle_consumption_tax','set_import_tariff','set_export_tariff',
               'set_import_subvention','set_export_subvention','declare_bankruptcy','set_strait_toll','set_strait_access','set_strait_allowed'),
     'politics':('enact_law','cancel_enactment','impose_law','repeal_amendment','toggle_bolster_movement','toggle_suppress_movement','negotiate','reform_government',

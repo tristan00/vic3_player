@@ -82,8 +82,8 @@ class AdvisorTests(unittest.TestCase):
         self.assertIsNone(RandomAdvisor(0).choose({'research':[],'unpause':[{}]},Queue()))
 
     def test_a_zero_weight_action_is_never_picked(self):
-        options={'build':[{'state':1}],'auto_expand_on':[{'building':2}]}
-        advisor=RandomAdvisor(0,{'auto_expand_on':0})
+        options={'build':[{'state':1}],'subsidies_on':[{'building':2}]}
+        advisor=RandomAdvisor(0,{'subsidies_on':0})
         self.assertEqual({advisor.choose(options,Queue())[0] for _ in range(30)},{'build'})
 
     def test_building_waits_while_the_queue_exceeds_a_year_of_output(self):
@@ -110,7 +110,7 @@ class CoverageTests(unittest.TestCase):
 
     def test_rows_are_either_covered_infeasible_or_known(self):
         from loop.coverage import COVERED, INFEASIBLE, ROWS
-        self.assertEqual(len(ROWS),164)
+        self.assertEqual(len(ROWS),159)
         self.assertEqual((set(COVERED)|set(INFEASIBLE))-set(ROWS),set())
         self.assertEqual(set(COVERED)&set(INFEASIBLE),set())
 

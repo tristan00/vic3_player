@@ -35,8 +35,7 @@ ENDS_PAUSE={'capitulate','back_down','white_peace','declare_bankruptcy'}
 PARKED=set()
 RUN_DAYS=(10,90)
 PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
-WEIGHTS={'cancel_enactment':.1,'nationalize':.1,'bulk_nationalize':.1,'bulk_nationalize_state':.1,'build':3,'research':3,'enact_law':2,'switch_production_method':3,'bulk_switch_production_method':3,'bulk_switch_production_method_state':3,'deploy_to_front':5,'set_strategic_objective':3,'start_play_country':.1,'start_play_state':.1,'mobilize':5,'mobilize_all':5,'raise_conscripts':3,'demobilize':.2,'demobilize_all':.2,'cancel_construction':.1,'cancel_queue_item':.1,'downsize':.1,'pause_construction':.1,'dequeue_research':.1,'pause_all_construction':.05,**{name:.1 for name in ('auto_expand_on','auto_expand_off','bulk_auto_expand','subset_auto_expand_on',
-                                                                                'subset_auto_expand_on_state','subset_auto_expand_off','subset_auto_expand_off_state')}}
+WEIGHTS={'cancel_enactment':.1,'nationalize':.1,'bulk_nationalize_state':.1,'build':3,'research':3,'enact_law':2,'switch_production_method':3,'bulk_switch_production_method_state':3,'deploy_to_front':5,'set_strategic_objective':3,'start_play_country':.1,'start_play_state':.1,'mobilize':5,'mobilize_all':5,'raise_conscripts':3,'demobilize':.2,'demobilize_all':.2,'cancel_construction':.1,'cancel_queue_item':.1,'downsize':.1,'pause_construction':.1,'dequeue_research':.1,'pause_all_construction':.05}
 UNVERIFIED_WEIGHT=10
 NAVY_WEIGHT=3
 HOURS_PER_DAY=24
@@ -57,7 +56,7 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
                     'set_government_wages','character_interaction'),
        'pausing':('pause_all_construction','resume_all_construction','pause_ship_construction','resume_ship_construction','declare_bankruptcy'),
        'bureaucracy':('set_tax_level','set_institution_level'),
-       'money':('nationalize','bulk_nationalize','bulk_nationalize_state','declare_bankruptcy'),
+       'money':('nationalize','bulk_nationalize_state','declare_bankruptcy'),
        'companies':('create_company','remove_company'),
        'decisions':('take_decision',),
        'retrofit':('retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all','decommission_ship','disband_formation',
