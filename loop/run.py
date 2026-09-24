@@ -52,12 +52,12 @@ class Stuck(Exception):
     pass
 
 
-SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_queue_item','cancel_construction','cancel_queue_item'),
+SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_queue_item','cancel_construction','cancel_queue_item','declare_bankruptcy'),
        'authority':('toggle_bolster_movement','toggle_suppress_movement','issue_decree','toggle_monopoly','toggle_charter','toggle_consumption_tax',
                     'set_government_wages','character_interaction'),
-       'pausing':('pause_all_construction','resume_all_construction','pause_ship_construction','resume_ship_construction'),
+       'pausing':('pause_all_construction','resume_all_construction','pause_ship_construction','resume_ship_construction','declare_bankruptcy'),
        'bureaucracy':('set_tax_level','set_institution_level'),
-       'money':('nationalize','bulk_nationalize','bulk_nationalize_state'),
+       'money':('nationalize','bulk_nationalize','bulk_nationalize_state','declare_bankruptcy'),
        'companies':('create_company','remove_company'),
        'retrofit':('retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all'),
        'influence':('diplomatic_action','diplomatic_action_state','diplomatic_action_obligation'),
@@ -69,7 +69,7 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
        'commanders':('hire_commander','hire_commander_for','unassign_commander'),
        'army_state':('mobilize','mobilize_all','mobilize_selected','demobilize','demobilize_all','demobilize_selected','station_formation','rehome_formation','back_down','capitulate','disband_formation','disband_regulars'),
        'shipbuilding':('build_ship','build_ship_for','cancel_ship','pause_ship_construction','resume_ship_construction','raise_ship_item',
-                       'lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item'),
+                       'lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item','declare_bankruptcy'),
        'templates':('design_ship_template','edit_ship_template','set_default_ship_template','set_fleet_ship_template','delete_ship_template')}
 
 
