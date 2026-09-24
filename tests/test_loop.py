@@ -158,7 +158,8 @@ class TurnTests(unittest.TestCase):
 
     def test_actions_without_objects_conflict_within_their_group(self):
         from loop.run import targets
-        self.assertEqual(targets('pause_construction',{}),targets('resume_all_construction',{}))
+        self.assertTrue(targets('pause_construction',{})&targets('resume_all_construction',{}))
+        self.assertTrue(targets('pause_all_construction',{})&targets('pause_ship_construction',{}))
         self.assertEqual(targets('set_tax_level',{'level':'High'}),{('group','budget'),('shared','bureaucracy')})
         self.assertTrue(targets('set_tax_level',{'level':'High'})&targets('set_government_wages',{'level':'Low'}))
         self.assertTrue(targets('set_tax_level',{'level':'High'})&targets('set_institution_level',{'institution':3,'level':2}))

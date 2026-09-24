@@ -52,26 +52,28 @@ class Stuck(Exception):
     pass
 
 
-SHARED={**{name:'queue' for name in ('raise_queue_item','lower_queue_item','first_queue_item','last_queue_item','cancel_construction','cancel_queue_item')},
-        **{name:'authority' for name in ('toggle_bolster_movement','toggle_suppress_movement','issue_decree','toggle_monopoly','toggle_charter','toggle_consumption_tax',
-                                         'set_government_wages','character_interaction')},
-        **{name:'bureaucracy' for name in ('set_tax_level','set_institution_level')},
-        **{name:'money' for name in ('nationalize','bulk_nationalize','bulk_nationalize_state')},
-        **{name:'research' for name in ('research','queue_research','dequeue_research')},
-        'impose_law':'imposition','start_play_country':'play','start_play_state':'play','start_play_confirmed':'play',
-        **{name:'bloc' for name in ('form_power_bloc','leave_power_bloc','request_join_power_bloc','kick_from_power_bloc','pick_principle','upgrade_principle')},
-        **{name:'enactment' for name in ('enact_law','cancel_enactment','negotiate')},
-        **{name:'commanders' for name in ('hire_commander','hire_commander_for','unassign_commander')},
-        **{name:'army_state' for name in ('mobilize','mobilize_all','demobilize','demobilize_all','station_formation','rehome_formation','back_down','capitulate','disband_formation')},
-        **{name:'shipbuilding' for name in ('build_ship','build_ship_for','cancel_ship','pause_ship_construction','resume_ship_construction','raise_ship_item',
-                                            'lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item')},
-        **{name:'templates' for name in ('design_ship_template','edit_ship_template','set_default_ship_template','set_fleet_ship_template','delete_ship_template')}}
+SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_queue_item','cancel_construction','cancel_queue_item'),
+       'authority':('toggle_bolster_movement','toggle_suppress_movement','issue_decree','toggle_monopoly','toggle_charter','toggle_consumption_tax',
+                    'set_government_wages','character_interaction'),
+       'pausing':('pause_all_construction','resume_all_construction','pause_ship_construction','resume_ship_construction'),
+       'bureaucracy':('set_tax_level','set_institution_level'),
+       'money':('nationalize','bulk_nationalize','bulk_nationalize_state'),
+       'research':('research','queue_research','dequeue_research'),
+       'imposition':('impose_law',),
+       'play':('start_play_country','start_play_state','start_play_confirmed'),
+       'bloc':('form_power_bloc','leave_power_bloc','request_join_power_bloc','kick_from_power_bloc','pick_principle','upgrade_principle'),
+       'enactment':('enact_law','cancel_enactment','negotiate'),
+       'commanders':('hire_commander','hire_commander_for','unassign_commander'),
+       'army_state':('mobilize','mobilize_all','demobilize','demobilize_all','station_formation','rehome_formation','back_down','capitulate','disband_formation','disband_regulars'),
+       'shipbuilding':('build_ship','build_ship_for','cancel_ship','pause_ship_construction','resume_ship_construction','raise_ship_item',
+                       'lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item'),
+       'templates':('design_ship_template','edit_ship_template','set_default_ship_template','set_fleet_ship_template','delete_ship_template')}
 
 
 def targets(name,params,links={}):
     objects={(key,value) for key,value in params.items() if key in BY_NAME[name].params}
     objects|={links[item] for item in objects if item in links}
-    return (objects or {('group',GROUP[name])})|({('shared',SHARED[name])} if name in SHARED else set())
+    return (objects or {('group',GROUP[name])})|{('shared',slot) for slot,names in SLOTS.items() if name in names}
 
 
 @timed
