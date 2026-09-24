@@ -369,8 +369,10 @@ class RuleTests(unittest.TestCase):
                    ship_template_private=[{'ship_template':9,'base':True,'flags':3},{'ship_template':10,'base':False,'flags':0},{'ship_template':11,'base':False,'flags':0}],
                    formation_history=[{'formation':5,'country':PLAYER,'formation_type':1}],ship_history=[{'ship':1,'fleet':5}],
                    ship_template_fleet=[{'ship_template':10,'fleet':5}])
-        self.assertEqual(RULES['delete_ship_template'](s),[{'ship_type':'ship_type_frigate','index':1},{'ship_type':'ship_type_frigate','index':2}])
-        self.assertEqual(RULES['set_default_ship_template'](s),RULES['delete_ship_template'](s))
+        self.assertEqual(RULES['delete_ship_template'](s),[{'ship_type':'ship_type_frigate','index':i} for i in range(3)])
+        self.assertEqual(RULES['set_default_ship_template'](s),[{'ship_type':'ship_type_frigate','index':1},{'ship_type':'ship_type_frigate','index':2}])
+        self.assertEqual(RULES['delete_ship_template'](snapshot(**{**s.given,'ship_template_private':[{'ship_template':9,'base':True,'flags':3},{'ship_template':10,'base':False,'flags':4},
+                                                                                                      {'ship_template':11,'base':False,'flags':4}]})),[])
         self.assertEqual(RULES['set_default_ship_template'](snapshot(**{**s.given,'ship_template_private':[{'ship_template':9,'base':True,'flags':2},{'ship_template':10,'base':False,'flags':1},{'ship_template':11,'base':False,'flags':0}]})),[{'ship_type':'ship_type_frigate','index':0},{'ship_type':'ship_type_frigate','index':2}])
         self.assertEqual(RULES['set_fleet_ship_template'](s),[{'ship_type':'ship_type_frigate','index':0,'military_formation':5},{'ship_type':'ship_type_frigate','index':2,'military_formation':5}])
 

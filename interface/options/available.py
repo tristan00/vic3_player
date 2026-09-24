@@ -1271,34 +1271,36 @@ def ship_slots(s,kind):
     return [(slot,mods) for slot,mods in slots if definition(s,'common/ship_modification_slots',slot,'utility')!=['yes']]
 
 
+def latest_design(s,template):
+    versions=sorted(s.rows('ship_template_version_list','position,ship_template_version',ship_template=template))
+    return tuple(mod for _,mod in sorted(s.rows('ship_template_version_modification','position,ship_modification',ship_template_version=versions[-1][1]))) if versions else ()
+
+
 def designed(s,kind):
-    versions=s.grouped('ship_template_version_list','ship_template,ship_template_version')
-    latest=[versions[template][-1] for template,owner,ship_type in s.rows('ship_template','ship_template,country,ship_type') if owner==s.player and ship_type==kind and versions.get(template)]
-    return {tuple(mod for _,mod in sorted(s.rows('ship_template_version_modification','position,ship_modification',ship_template_version=version))) for version in latest}
+    return {latest_design(s,template) for template,owner,ship_type in s.rows('ship_template','ship_template,country,ship_type') if owner==s.player and ship_type==kind}
+
+
+def unlocked_modifications(s,kind):
+    acquired,_,_,_=technologies(s)
+    return [mod for _,mods in ship_slots(s,kind) for mod in mods
+            if not definition(s,'common/ship_modifications',mod,'unlocking_technologies') or set(definition(s,'common/ship_modifications',mod,'unlocking_technologies'))&acquired]
 
 
 def ship_designs(s):
-    acquired,_,_,_=technologies(s)
-    combos=[]
-    for kind in ship_types(s):
-        for _,mods in ship_slots(s,kind):
-            for mod in mods:
-                techs=definition(s,'common/ship_modifications',mod,'unlocking_technologies')
-                if (not techs or set(techs)&acquired) and not any(mod in design for design in designed(s,kind)):
-                    combos.append({'ship_type':kind,'ship_modification':mod})
-    return combos
+    return [{'ship_type':kind,'ship_modification':mod} for kind in ship_types(s) for mod in unlocked_modifications(s,kind)
+            if not any(mod in design for design in designed(s,kind))]
+
+
+TEMPLATE_DELETING=4
 
 
 def own_templates(s):
     base=s.map('ship_template_private','ship_template,base')
+    flags=s.map('ship_template_private','ship_template,flags')
     first=s.first_seen('ship_template')
-    mine=sorted((kind,not base.get(template),first[template],template) for template,owner,kind in s.rows('ship_template','ship_template,country,ship_type') if owner==s.player)
+    mine=sorted((kind,not base.get(template),first[template],template) for template,owner,kind in s.rows('ship_template','ship_template,country,ship_type')
+                if owner==s.player and not (flags.get(template) or 0)&TEMPLATE_DELETING)
     return {(kind,index):template for kind in {item[0] for item in mine} for index,(*_,template) in enumerate(item for item in mine if item[0]==kind)}
-
-
-def custom_templates(s):
-    base=s.map('ship_template_private','ship_template,base')
-    return {key for key,template in own_templates(s).items() if base.get(template) is False}
 
 
 def non_default_templates(s):
@@ -1648,10 +1650,11 @@ RULES={
     'resume_ship_construction':lambda s:[{}] if ship_paused(s) and not construction_paused(s) and not in_default(s) else [],
     'set_supply_ship_construction':lambda s:product(level=other_levels(s,'supply_ship_construction_level')),
     'design_ship_template':ship_designs,
-    'edit_ship_template':lambda s:[{**combo,'index':index} for combo in ship_designs(s) for kind,index in sorted(custom_templates(s)) if kind==combo['ship_type']],
+    'edit_ship_template':lambda s:[{'ship_type':kind,'ship_modification':mod,'index':index} for (kind,index),template in sorted(own_templates(s).items())
+                                   for mod in unlocked_modifications(s,kind) if mod not in latest_design(s,template)],
     'set_default_ship_template':lambda s:[{'ship_type':kind,'index':index} for kind,index in sorted(non_default_templates(s))],
     'set_fleet_ship_template':fleet_templates,
-    'delete_ship_template':lambda s:[{'ship_type':kind,'index':index} for kind,index in sorted(custom_templates(s))
+    'delete_ship_template':lambda s:[{'ship_type':kind,'index':index} for kind,index in sorted(own_templates(s))
                                      if sum(1 for other,_ in own_templates(s) if other==kind)>1],
     'retrofit_fleet':lambda s:product(military_formation=retrofit_fleets(s,False)),
     'cancel_retrofit_fleet':lambda s:product(military_formation=retrofit_fleets(s,True)),
