@@ -2,6 +2,7 @@ import unittest
 
 from interface.common import DEFAULT_GAME
 from tests.memory_stored import Memory
+from interface.options.stored import date_text, script_hours
 from interface.options.triggers import COMPARE, country_scope, evaluate, parse, unsupported
 from interface.script import BLOCK_FIELDS, body, fields, read
 
@@ -12,6 +13,19 @@ class TriggerTests(unittest.TestCase):
         self.assertEqual(nodes[0],('has_trait','=','brave'))
         self.assertEqual(nodes[1][2][1],('c','?=',[('value','>=','0.5')]))
         self.assertTrue(COMPARE['>='](0.5,0.5))
+
+    def test_game_date_and_liberty_desire_compare_against_the_snapshot(self):
+        self.assertEqual(date_text(script_hours('1850.3.7.5')),'1850.3.7.5')
+        snapshot=Memory(7,{'country_history':[{'country':7},{'country':9}],
+                           'pact_history':[{'first_country':9,'second_country':7,'pact_type':'puppet','liberty_desire':25.0}]},
+                        {'common/diplomatic_actions':{'puppet':{'subject_pact':['yes']}}})
+        snapshot.hours=script_hours('1849.6.1')
+        scope=country_scope(snapshot)
+        self.assertFalse(evaluate(parse('game_date > 1850.1.1'),scope))
+        self.assertTrue(evaluate(parse('game_date < 1850.1.1'),scope))
+        self.assertFalse(evaluate(parse('liberty_desire <= 10'),scope))
+        self.assertTrue(evaluate(parse('liberty_desire >= 20'),scope))
+        self.assertTrue(evaluate(parse('liberty_desire <= 10'),country_scope(Memory(9,{'country_history':[{'country':9}]}))))
 
     def test_every_captured_trigger_uses_supported_keys(self):
         for folder,wanted in BLOCK_FIELDS.items():

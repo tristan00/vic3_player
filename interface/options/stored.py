@@ -8,6 +8,11 @@ DAYS_PER_YEAR=365
 YEAR_OFFSET=5000
 
 
+def script_hours(text):
+    year,month,day,*hour=(int(part) for part in text.split('.'))
+    return ((year+YEAR_OFFSET)*DAYS_PER_YEAR+MONTH_STARTS[month-1]+day-1)*HOURS_PER_DAY+(hour[0] if hour else 0)
+
+
 def date_text(hours):
     days,hour=divmod(hours,HOURS_PER_DAY)
     year,day=divmod(days,DAYS_PER_YEAR)

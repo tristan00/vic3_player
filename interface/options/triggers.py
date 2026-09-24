@@ -2,6 +2,7 @@ import collections
 import re
 
 from ..recording.spec import DROPPED_COUNTRY_METRICS, METRIC_COLUMNS
+from .stored import script_hours
 
 TOKEN=re.compile(r'\?=|>=|<=|!=|[{}=<>]|[^\s{}=<>?!]+')
 COMPARE={'>=':lambda a,b:a>=b,'<=':lambda a,b:a<=b,'>':lambda a,b:a>b,'<':lambda a,b:a<b,'=':lambda a,b:a==b,'!=':lambda a,b:a!=b}
@@ -232,6 +233,10 @@ def autonomous(s,country):
 
 def overlords(s,country):
     return {first for first,second in subject_pairs(s) if second==country}
+
+
+def liberty_desire(s,country):
+    return next((desire for first,second,desire in s.rows('pact','first_country,second_country,liberty_desire') if second==country and first in overlords(s,country)),0)
 
 
 STANCES={'strongly_approve':2,'approve':1,'neutral':0,'disapprove':-1,'strongly_disapprove':-2}
@@ -850,6 +855,10 @@ def country_test(key,operator,value,scope):
         return value in modifiers(s,'country',country)
     if key=='is_country_type':
         return s.map('country','country,country_type').get(country)==value
+    if key=='game_date':
+        return COMPARE[operator](now(s),script_hours(value))
+    if key=='liberty_desire':
+        return COMPARE[operator](liberty_desire(s,country),amount(s,value))
     if key=='exists' and isinstance(value,str) and value.endswith(('land_hq','naval_hq')):
         wanted=0 if value.endswith('land_hq') else 1
         region=strategic_region(s,s.map('country','country,capital').get(country))
@@ -884,7 +893,7 @@ def modifiers(s,kind,ident):
 HANDLED={'AND','OR','NOT','NOR','NAND','any_scope_war','calc_true_if','amount','custom_tooltip','hidden_trigger','custom_description','has_dlc_feature','always','has_variable',
          'any_scope_state','any_scope_building','any_scope_character','any_subject_or_below','any_interest_group','count','limit',
          'trigger_if','trigger_else_if','trigger_else','text','target','value','has_technology_researched','has_law','has_law_or_variant',
-         'is_subject','is_subject_of','is_at_war','has_journal_entry','is_diplomatic_play_enemy_of','this','has_modifier','is_country_type',
+         'is_subject','is_subject_of','is_at_war','has_journal_entry','is_diplomatic_play_enemy_of','this','has_modifier','is_country_type','game_date','liberty_desire',
          'any_scope_treaty','any_scope_article','country_rank','is_revolutionary','is_insurrectionary','has_war_with','has_diplomatic_pact',
          'is_in_power_bloc','is_direct_subject_of','ruler_can_have_command','can_form_nation','exists','is_power_bloc_leader','is_in_same_power_bloc',
          'has_diplomatic_relevance','is_adjacent_to_country','has_diplomats_expelled',
