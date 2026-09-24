@@ -1,3 +1,4 @@
+import collections
 import re
 from functools import lru_cache
 
@@ -717,10 +718,19 @@ def state_supply(s):
     return {state:set(goods) for state,goods in s.grouped('state_goods_supply','state,goods').items()}
 
 
+def barracks_cap(s):
+    acquired,_,_,_=technologies(s)
+    blocks=[text for law in active_laws(s) for text in definition(s,'common/laws',law,'modifier')]
+    blocks+=[text for tech in acquired for text in definition(s,'common/technology/technologies',tech,'modifier')]
+    return sum(float(value) for text in blocks for value in re.findall(r'state_building_barrack_max_level_add\s*=\s*(-?[\d.]+)',text))
+
+
 def recruit(s):
     supplies=state_supply(s)
     located=s.map('building','building,state')
-    barracks=[(ident,located.get(ident)) for ident,kind,_ in s.buildings() if kind=='building_barrack']
+    cap=barracks_cap(s)
+    queued=collections.Counter(state for state,kind in s.rows('player_construction_queue_item','state,building_type') if kind=='building_barrack')
+    barracks=[(ident,located.get(ident)) for ident,kind,levels in s.buildings() if kind=='building_barrack' and levels+queued[located.get(ident)]<cap]
     return [{'building':ident,'military_formation':formation,'combat_unit_type':kind}
             for ident,state in barracks for kind in unit_types_unlocked(s)
             if unit_goods(s,'common/combat_unit_types',kind)<=supplies.get(state,set())
