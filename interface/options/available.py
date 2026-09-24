@@ -1423,6 +1423,17 @@ def ship_designs(s):
             if not any(mod in design for design in designed(s,kind))]
 
 
+def cancellable_types(s):
+    flags=s.map('ship_template_private','ship_template,flags')
+    base=s.map('ship_template_private','ship_template,base')
+    templates=own_templates(s)
+    flagged={kind for (kind,_),template in templates.items() if flags.get(template,0)&1}
+    defaults={template:kind for (kind,_),template in templates.items() if flags.get(template,0)&1 or kind not in flagged and base.get(template)}
+    versions={version:defaults[template] for template,version in s.rows('ship_template_version_list','ship_template,ship_template_version') if template in defaults}
+    queues=ship_queues(s)
+    return {versions[version] for version,queue in s.rows('ship_construction','version,queue') if queue in queues and version in versions}
+
+
 def templates_in_construction(s):
     building={version for version, in s.rows('ship_construction','version')}
     return {template for template,version in s.rows('ship_template_version_list','ship_template,ship_template_version') if version in building}
@@ -1884,7 +1895,7 @@ RULES={
     'decommission_ship':lambda s:[] if revolution_brewing(s) else product(ship=[ident for fleets in [set(s.formations('fleet'))] for ident,fleet in s.rows('ship','ship,fleet') if fleet in fleets]),
     'build_ship':lambda s:product(ship_type=ship_types(s) if metric(s,'GetShipConstruction')>0 else []),
     'build_ship_for':lambda s:product(ship_type=ship_types(s) if metric(s,'GetShipConstruction')>0 else [],military_formation=s.formations('fleet')),
-    'cancel_ship':lambda s:product(ship_type=sorted(set(my_ships(s)))),
+    'cancel_ship':lambda s:product(ship_type=sorted(cancellable_types(s))),
     'station_formation':lambda s:[{'military_formation':f,'state':st} for f in settled(s,s.formations('army')) if not demobilizing(s,f)
                                   for st in s.states() if st not in (located(s,f),s.map('formation_status','formation,target_location').get(f))
                                   and march_components(s).get(st,set())&march_components(s).get(located(s,f),set())],
