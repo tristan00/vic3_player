@@ -32,16 +32,18 @@ class EffectTests(unittest.TestCase):
 
     def test_retrofit_and_template_edit_verdicts(self):
         rows=lambda flag,versions:{'formation_history':[{'formation':5,'country':7}],'formation_report':[{'formation':5,'retrofitting':flag}],
-                                   'ship_template_history':[{'ship_template':9,'country':7},{'ship_template':10,'country':8}],
-                                   'ship_template_version_list':[{'ship_template':9,'position':i,'ship_template_version':20+i} for i in range(versions)]+[{'ship_template':10,'position':0,'ship_template_version':30}]}
+                                   'ship_template_history':[{'ship_template':9,'country':7,'ship_type':'x'},{'ship_template':10,'country':8,'ship_type':'x'}],
+                                   'ship_template_version_list':[{'ship_template':9,'position':i,'ship_template_version':20+i} for i in range(versions)]+[{'ship_template':10,'position':0,'ship_template_version':30}],
+                                   'ship_template_version_modification':[{'ship_template_version':20,'position':0,'ship_modification':'z'},{'ship_template_version':21,'position':0,'ship_modification':'y'},
+                                                                         {'ship_template_version':30,'position':0,'ship_modification':'y'}]}
         idle,busy=Memory(7,rows(False,1)),Memory(7,rows(True,1))
         self.assertTrue(verify('retrofit_fleet',{'military_formation':5},idle,busy))
         self.assertFalse(verify('retrofit_fleet',{'military_formation':5},busy,busy))
         self.assertTrue(verify('cancel_retrofit_fleet',{'military_formation':5},busy,idle))
         self.assertTrue(verify('retrofit_all',{},idle,busy))
         self.assertFalse(verify('cancel_retrofit_all',{},idle,busy))
-        self.assertTrue(verify('edit_ship_template',{'ship_type':'x','ship_modification':'y'},idle,Memory(7,rows(False,2))))
-        self.assertFalse(verify('edit_ship_template',{'ship_type':'x','ship_modification':'y'},idle,idle))
+        self.assertTrue(verify('edit_ship_template',{'ship_type':'x','ship_modification':'y','index':0},idle,Memory(7,rows(False,2))))
+        self.assertFalse(verify('edit_ship_template',{'ship_type':'x','ship_modification':'y','index':0},idle,idle))
 
     def test_template_management_verdicts(self):
         rows=lambda templates,flags,fleets:{'ship_template_history':[{'ship_template':t,'country':7,'ship_type':'x','ordinal_number':i+1} for i,t in enumerate(templates)],
