@@ -1200,10 +1200,10 @@ def journal(c):
         if set(t['scope_root_definition'])-{0}:
             raise RuntimeError('journal_entry.scope_root_definition is not always 0')
         by_type={}
-        for i,country,kind in zip(t['id'],t['country'],t['journal_entry_type']):
-            if country==-1 or country&SLOT==c.player:
+        for i,country,kind,active in zip(t['id'],t['country'],t['journal_entry_type'],t['active']):
+            if flag(active) and (country==-1 or country&SLOT==c.player):
                 if c.label(kind) in by_type:
-                    raise RuntimeError(f'Two journal entries of type {c.label(kind)} are visible to the player')
+                    raise RuntimeError(f'Two active journal entries of type {c.label(kind)} are visible to the player')
                 by_type[c.label(kind)]=i
         progress={by_type[kind]:(p,g,pc) for kind,p,g,pc in c.rows('journal_progress','journal','progress','goal','percent')}
         for index,i in enumerate(t['id']):
