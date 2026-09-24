@@ -1885,7 +1885,7 @@ RULES={
     'leave_power_bloc':lambda s:[{}] if power_bloc_of(s,s.player) and not overlords(s,s.player) and may_leave(s) else [],
     'create_company':lambda s:product(company_type=companies(s)),
     'remove_company':lambda s:product(company_type=remove_companies(s)),
-    'colonize':lambda s:[] if 'law_no_colonial_affairs' in active_laws(s) else
+    'colonize':lambda s:[] if 'law_no_colonial_affairs' in active_laws(s) or revolution_brewing(s) else
                         product(state=colonizable(s)),
     'toggle_pause_colonization':lambda s:product(state=colonies(s)),
     'abandon_colony':lambda s:product(state=abandonable(s)),
