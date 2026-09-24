@@ -359,7 +359,8 @@ EFFECTS={
     'form_country':(None,lambda a,b,p,n:value(a,'country','country_definition',a.player)!=value(b,'country','country_definition',b.player)),
     'toggle_ignore_decision':(None,lambda a,b,p,n:((p['decision'],) in a.rows('player_ignored_decision','decision'))
                               !=((p['decision'],) in b.rows('player_ignored_decision','decision'))),
-    'rehome_formation':('military_formation',becomes(lambda s,p,n:home_region(s,p[n]),lambda p:p['strategic_region'])),
+    'rehome_formation':('military_formation',lambda a,b,p,n:(home_region(a,p[n])!=p['strategic_region'] and home_region(b,p[n])==p['strategic_region'])
+                        or (not value(a,'formation_private','travel_distance',p[n]) and bool(value(b,'formation_private','travel_distance',p[n])))),
     'cancel_queue_item':(None,lambda a,b,p,n:queue(b).count((p['state'],p['building_type']))<queue(a).count((p['state'],p['building_type']))),
     'raise_queue_item':(None,moved(lambda index,rest:index-1)),
     'lower_queue_item':(None,moved(lambda index,rest:index+1)),

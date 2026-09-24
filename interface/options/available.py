@@ -885,10 +885,14 @@ def home_region(s,formation):
     return hq_regions(s).get(home_of(s,formation),(None,None))[1]
 
 
+def travelling(s,formation):
+    return bool(formation_setting(s,formation,'travel_distance'))
+
+
 def rehome(s):
     regions=hq_regions(s)
     kinds=s.map('formation','formation,formation_type',country=s.player)
-    return [{'military_formation':formation,'strategic_region':region} for formation in idle_armies(s)
+    return [{'military_formation':formation,'strategic_region':region} for formation in idle_armies(s) if not travelling(s,formation)
             for kind,region in sorted(set(regions.values())) if kind==kinds[formation] and region!=regions.get(home_of(s,formation),(None,None))[1]]
 
 
@@ -1499,7 +1503,8 @@ RULES={
     'demobilize_all':lambda s:[{}] if armies(s,True) else [],
     'toggle_mobilization_option':lambda s:[{'military_formation':formation,'mobilization_option':option} for formation in settled(s,s.formations('army'))
                                            for option in mobilization_options(s,formation)],
-    'set_supply_priority':lambda s:product(military_formation=s.formations('army'),level=('low','medium','high')),
+    'set_supply_priority':lambda s:[{'military_formation':f,'level':level} for f in s.formations('army') for index,level in enumerate(('low','medium','high'))
+                            if s.map('formation','formation,supply_priority').get(f)!=index],
     'disband_regulars':lambda s:formation_units(s,s.formations()),
     'disband_conscripts':lambda s:[{'military_formation':f,'combat_unit_type':k} for f in armies(s,True) for k in conscript_types(s,f)],
     'upgrade_regulars':lambda s:[combo for combo in formation_units(s,s.formations('army')) if upgradable(s,**combo)],
