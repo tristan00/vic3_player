@@ -51,6 +51,8 @@ Every trend buffer of the game is its own sample table with one value column. Th
 - Every reference to an entity has a foreign key to that entity's anchor. A reference to nothing is NULL.
 - A reference is stored as exactly the identity the game holds. The game keeps handles to objects that are gone (a general to a disbanded formation, a cultural community to a removed state, a war goal to a vanished play) and to objects that do not exist yet (a play's fronts carry the identity of the war that will start). Such an identity gets an anchor row on first sight, so its history may start later or have ended earlier. `referenced_only` lists identities with an anchor but no history row; a war reserved by a play is expected there, anything else is a capture gap.
 - Provinces are the exception: a province reference must name a captured province, because provinces never change.
+- A building ownership can outlive its building. The builders check that every ownership of a captured building is in that building's owner list, and that an ownership of a building no longer in the capture is in no owner list; such ownerships are stored as they are.
+- A civil war's list of seceded states can hold entries with no state region. They cannot be keyed, so the builder skips them and logs how many it skipped; the entries with a region are stored.
 - Game sentinels (−1, and 65535 for some province fields) are declared per column in `spec.py` and stored as NULL. A formation's province is a 16-bit field in memory; the 16 bits after it belong to another field.
 - Relations, pacts, treaties and diplomatic actions are keyed by their ordered country pair, which never changes within a run.
 - Provinces carry `(province, color)` per run, with a foreign key to `world_province`.
