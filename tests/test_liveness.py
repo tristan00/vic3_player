@@ -30,6 +30,7 @@ class ProcessTests(unittest.TestCase):
                 process.check()
             self.assertLess(time.monotonic()-started,1)
             self.assertTrue(process.exited())
+            self.assertTrue(process.exits_within(0))
             self.assertLess(abs((process.exit_time()-before).total_seconds()),1)
         finally:
             child.kill()

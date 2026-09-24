@@ -14,7 +14,7 @@
 | Capture wiring | `record.py` |
 | Reader used by the rules | `../options/stored.py` |
 
-`store.install(connection)` drops schema `public` and recreates it from `schema.sql`. `Store` refuses to open a database whose `schema_digest` differs from `schema.sql`, so regenerate the SQL and reinstall after any change to `spec.py`.
+`store.install(connection)` drops schema `public` and recreates it from `schema.sql`. `Store` refuses to open a database whose `schema_digest` differs from `schema.sql`, so regenerate the SQL and reinstall after any change to `spec.py` or the fixed SQL.
 
 ## Model
 Each run records a sequence of snapshots, numbered `seq` from 0. Every run-scoped table starts with `run_id`.
@@ -25,7 +25,7 @@ Each run records a sequence of snapshots, numbered `seq` from 0. Every run-scope
 | anchor | `<entity>(run_id, <entity>, first_seq)`: one row per game identity seen in the run | `pop` |
 | history | `<entity>_history(run_id, <entity>, seq, present, ...)`: the entity's own attributes | `pop_history` |
 | subject | `<entity>_<topic>(run_id, <entity>, seq, ...)`: a 1:1 attribute group, valid while the entity is present | `pop_status`, `country_economy` |
-| private subject | `<entity>_private`: columns the game shows only to the owner, with rows for the player's objects only | `law_private` |
+| private subject | `<entity>_private`: memory columns the game shows only to the owner, with rows for the player's objects only | `law_private`, `formation_private` |
 | child | `<owner>_<thing>(run_id, <owner>, <key...>, seq, present, ...)`: sets and lists an entity holds | `country_culture`, `state_goods` |
 | listing | `<name>(run_id, <key...>, seq, present, ...)`: sets with no owning entity, mostly the player's view | `player_alert`, `relation` |
 | singleton | `player_<topic>(run_id, seq, ...)`: one row per version, the player country's private data | `player_treasury` |
@@ -49,6 +49,9 @@ Samples are written once and never change; the writer raises if a stored sample 
 - Relations, pacts, treaties and diplomatic actions are keyed by their ordered country pair, which never changes within a run.
 - Provinces carry `(province, color)` per run, with a foreign key to `world_province`.
 
+### Dead objects
+Buildings, formations and wars stay in game memory for a while after they end, with the game's own `dead` flag set. The history tables of these three entities carry `dead`. Script-side captures (the GUI widgets and script lists evaluated in the player's scope) skip dead objects, so a player table filled from script covers exactly the live objects: `formation_report` and `building_private` have rows for the player's live objects only, and the builders refuse a capture where the two sides disagree.
+
 ### Names and codes
 - Every name column references a typed vocabulary table `(<name> identity, name unique)`, for example `goods`, `law_type` or `building_type`. `name_column` lists which column uses which vocabulary.
   - Closed vocabularies are filled from the game's definition folders when a ruleset is registered.
@@ -64,7 +67,7 @@ Samples are written once and never change; the writer raises if a stored sample 
 - `_private` subjects and the `player_*` tables hold the player's data only.
 - The player is `run.player_country`, fixed for the run.
 - Country metrics go to `country_<topic>` if they are public and to `player_<topic>` otherwise.
-- Script-side captures over the player's scope (for example `character_status`, taken from `every_scope_character`) cover a different set of objects than the memory-side `_private` tables, which follow the owner column. Neither set is a subset of the other.
+- Memory-side `_private` tables follow the owner column and include dead objects. Script-side player tables (`character_status`, `formation_report`, `building_private`, the `_report` metric tables) cover the objects the player's script scope iterates. The two sides are stored separately because their coverage differs.
 
 Dropped duplicate metrics are listed in `spec.DROPPED_COUNTRY_METRICS` and `spec.DROPPED_STATE_METRICS`. The builders assert each one equals its replacement at capture.
 
@@ -73,6 +76,28 @@ Dropped duplicate metrics are listed in `spec.DROPPED_COUNTRY_METRICS` and `spec
 - **Ruleset:** `ruleset`, `ruleset_definition` (the load order of each definition folder) and `game_definition` (a verbatim key/value mirror of script fields, read by the rules). Also `event_definition_option`, `building_production_method`, `dlc` and `capture_gap`.
 - **Run:** `run`, `run_generated` (generated worlds only), `run_advisor`, `run_game_rule`, `snapshot` and `ui_open_window`.
 - **Loop:** `loop_action`, `loop_action_param`, and `action_parameter` (the declared parameters of each action).
+
+## Run liveness
+Every run row says whether its loop is alive and how it ended, with the timestamps needed to measure detection.
+
+| Column | Meaning |
+|---|---|
+| `started_at` | the loop began the run |
+| `heartbeat_at` | the loop's last sign of life, refreshed every 0.25 s by a thread with its own connection |
+| `ended_at` | the run was flagged as over |
+| `end_reason` | `time`, `years`, `defeated`, `ui_stuck`, `game_crashed`, `loop_crashed: <error>` or `loop_lost` |
+| `game_exited_at` | the process exit time reported by the OS, for `game_crashed` |
+
+- **Game exit.** A watcher thread polls the game's process handle every 50 ms and, on exit, writes `ended_at`, `end_reason = 'game_crashed'` and `game_exited_at` at once. The loop itself also notices at its next game access and logs how long after the exit it reacted.
+- **Loop crash.** An exception ends the run as `loop_crashed` with the error text, unless the game process exits within a second, in which case the exception is attributed to the game.
+- **Loop killed.** Nothing inside the process can write. `run_lost` lists runs with no `ended_at` whose heartbeat is older than a second; the next `Store.begin_run` closes them as `loop_lost` with `ended_at = heartbeat_at`.
+- **Late detection.** `run_late_flag` lists runs flagged more than a second after `game_exited_at`. It must stay empty; a row is a critical bug.
+
+```sql
+select * from run_lost;
+select * from run_late_flag;
+select run_id, end_reason, ended_at - game_exited_at from run where end_reason = 'game_crashed';
+```
 
 ## Querying
 Every timed table except samples has an inlinable function `<table>_at(run, seq)`; a history table's function is named after its entity, as in `pop_at`. It returns the rows live at `seq`, without `run_id` or `present`:
@@ -111,6 +136,7 @@ The checks read only the latest block ranges through the `brin (run_id, seq)` in
 `select delete_run(run_id)` removes a run. The open vocabularies are kept.
 
 ## Tests
-- `tests/test_store.py` round-trips the writer on `vic3_test` and reinstalls that schema first.
+- `tests/test_store.py` round-trips the writer on `vic3_test`, reinstalls that schema first, and checks the heartbeat and `run_lost`.
+- `tests/test_liveness.py` kills a child process and checks that the process handle reports the exit, its OS exit time and the watcher alert within a second.
 - `tests/test_coverage.py` pushes a complete synthetic capture through every builder, and fails if a captured table has no stored table.
 - `tests/memory_stored.py` is an in-memory `Stored` for rule tests: rows are dicts keyed by the schema's column names.

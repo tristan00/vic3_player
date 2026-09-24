@@ -312,7 +312,7 @@ child('civil_war_seceded_state','civil_war',[v('state_region')],[f('incorporated
 
 entity('character',[rr('culture'),v('religion'),f('birth_date',H),v('first_name_key','localization_key'),v('last_name_key','localization_key'),f('noble',B),
                     f('historical',B),f('adult',B),r('country'),r('interest_group'),v('ideology'),f('prominence',I4),ov('order_type','commander_order'),
-                    ov('rank','commander_rank'),r('formation'),d('travel_arrival_date'),r('assigned_state','state')])
+                    ov('rank','commander_rank'),r('formation',loose=True),d('travel_arrival_date'),r('assigned_state','state')])
 private('character',[f('loyalty',I2),f('recruitable',B)])
 child('character_status','character',[],[f('popularity',F),f('has_formation',B)],'player')
 child('character_assigned_trait','character',[v('character_trait')])

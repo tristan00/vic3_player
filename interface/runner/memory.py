@@ -52,6 +52,9 @@ class Process:
     def exited(self):
         return kernel.WaitForSingleObject(self.handle,0)==WAIT_OBJECT_0
 
+    def exits_within(self,milliseconds):
+        return kernel.WaitForSingleObject(self.handle,milliseconds)==WAIT_OBJECT_0
+
     def exit_time(self):
         times=[wintypes.FILETIME() for _ in range(4)]
         if not kernel.GetProcessTimes(self.handle,*(ctypes.byref(t) for t in times)):

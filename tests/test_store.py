@@ -116,6 +116,12 @@ class StoreTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'did not capture'):
             self.store.write(bad,'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
 
+    def test_a_stale_handle_to_a_reused_slot_is_not_resolved_to_the_new_object(self):
+        bad=built(STEPS[0])
+        bad.rows['law_history'][0]=(LAW,PLAYER&0xffffff,'law_one',0.1,1,None,True,-1)
+        with self.assertRaisesRegex(RuntimeError,'generation 0'):
+            self.store.write(bad,'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+
     def test_names_must_belong_to_the_ruleset(self):
         bad=built(STEPS[0])
         bad.rows['law_history'][0]=(LAW,PLAYER,'law_unknown',0.1,1,None,True,-1)

@@ -264,15 +264,17 @@ class Loop:
             return self.end('defeated')
         except Stuck:
             return self.end('ui_stuck')
-        except GameCrashed as error:
+        except BaseException as error:
+            if not isinstance(error,GameCrashed) and not self.process.exits_within(EXIT_GRACE_MS):
+                LOG.error('LOOP CRASHED: %s: %s',type(error).__name__,error)
+                self.end(f'loop_crashed: {type(error).__name__}: {error}'[:200])
+                raise
             exited_at=self.process.exit_time()
             LOG.error('GAME CRASHED: %s; the loop reacted %d ms after the exit',error,latency_ms(exited_at))
             self.end('game_crashed',exited_at)
-            raise
-        except BaseException as error:
-            LOG.error('LOOP CRASHED: %s: %s',type(error).__name__,error)
-            self.end(f'loop_crashed: {type(error).__name__}: {error}'[:200])
-            raise
+            if isinstance(error,GameCrashed):
+                raise
+            raise GameCrashed(f'The game process {self.process.pid} exited while the loop hit {type(error).__name__}: {error}') from error
 
     def play(self,years,seconds):
         deadline=time.monotonic()+seconds
@@ -330,6 +332,7 @@ RUNNING_PROBE=1
 DEATH_READS=3
 DEATH_READ_GAP=.2
 LATE_FLAG_MS=1000
+EXIT_GRACE_MS=1000
 CRASHES_IN_A_ROW=3
 
 

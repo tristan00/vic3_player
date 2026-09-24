@@ -421,12 +421,10 @@ def enumerate_rows(run_id,values):
 
 
 def loose_identity(live,entity,value):
-    ident=live[entity].get(value&SLOT)
-    return None if ident is None or (value>SLOT and value!=ident) else ident
+    return value if live[entity].get(value&SLOT)==value else None
 
 
 def identity(live,entity,value,table,column):
-    ident=live[entity].get(value&SLOT)
-    if ident is None or (value>SLOT and value!=ident):
-        raise RuntimeError(f'{table}.{column} refers to {entity} {value}, which this snapshot did not capture')
-    return ident
+    if live[entity].get(value&SLOT)!=value:
+        raise RuntimeError(f'{table}.{column} refers to {entity} {value} (slot {value&SLOT}, generation {value>>24}), which this snapshot did not capture')
+    return value
