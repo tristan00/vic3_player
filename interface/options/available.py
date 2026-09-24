@@ -1310,14 +1310,24 @@ def charter_toggles(s):
             if (company,charter) not in granted or granted[company,charter] is not None and now(s)>=granted[company,charter]]
 
 
-def journal_buttons(s):
+def shown_buttons(s,entry):
     shown=set(s.rows('player_journal_button','journal_entry_type,scripted_button'))
+    return [button for button in definition(s,'common/journal_entries',entry,'scripted_button') if (entry,button) in shown]
+
+
+def journal_button(s,ident,index):
+    entry=s.map('journal_entry','journal_entry,journal_entry_type').get(ident)
+    visible=shown_buttons(s,entry)
+    return (entry,visible[index]) if index<len(visible) else None
+
+
+def journal_buttons(s):
     combos=[]
     involved={entry for entry, in s.rows('journal_entry_involved_country','journal_entry',country=s.player)}
     for ident,entry,owner,active in s.rows('journal_entry','journal_entry,journal_entry_type,country,active'):
         if owner!=s.player and ident not in involved:
             continue
-        visible=[button for button in definition(s,'common/journal_entries',entry,'scripted_button') if (entry,button) in shown]
+        visible=shown_buttons(s,entry)
         combos+=[{'journal_entry':ident,'button':index} for index,button in enumerate(visible)
                  if active and all(evaluate(parsed(text),country_scope(s,journal_entry=('journal_entry',ident))) is True
                                    for text in definition(s,'common/scripted_buttons',button,'possible'))]

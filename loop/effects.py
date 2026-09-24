@@ -1,6 +1,6 @@
 import collections
 from interface.actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, LEVELS, TOLL_LEVELS
-from interface.options.available import COUNTRY_OWNER, metric, overlords, subject_pairs, own_templates, latest_design, in_default, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, privatizable, privatization_requested, PRIVATIZATION_REQUESTED, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
+from interface.options.available import COUNTRY_OWNER, metric, overlords, subject_pairs, own_templates, latest_design, in_default, journal_button, shown_buttons, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, privatizable, privatization_requested, PRIVATIZATION_REQUESTED, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
 from interface.recording.spec import TABLE
 
 SLOT=0xFFFFFF
@@ -155,6 +155,12 @@ def held_goals(snapshot,play):
 
 def units(snapshot,formation,kind):
     return sum(1 for unit, in snapshot.rows('combat_unit','combat_unit_type',formation=formation) if unit==kind)
+
+
+def button_hidden(a,b,p):
+    pressed=journal_button(a,p['journal_entry'],p['button'])
+    return (pressed is not None and p['journal_entry'] in b.map('journal_entry','journal_entry,journal_entry_type')
+            and pressed[1] not in shown_buttons(b,pressed[0]))
 
 
 def country_state(snapshot):
@@ -450,7 +456,7 @@ EFFECTS={
                                or set(a.rows('player_relation','country,relations'))!=set(b.rows('player_relation','country,relations'))),
     'negotiate':(None,lambda a,b,p,n:not metric(a,'IsNegotiating') and bool(metric(b,'IsNegotiating'))),
     'take_decision':(None,lambda a,b,p,n:(p['decision'],) in a.rows('player_decision','decision') and (p['decision'],) not in b.rows('player_decision','decision')),
-    'press_journal_button':(None,lambda a,b,p,n:a.hours==b.hours and country_state(a)!=country_state(b)),
+    'press_journal_button':(None,lambda a,b,p,n:a.hours==b.hours and country_state(a)!=country_state(b) or button_hidden(a,b,p)),
     'declare_bankruptcy':(None,lambda a,b,p,n:in_default(a) and not in_default(b)),
     'design_ship_template':(None,more('ship_template',True)),
     'edit_ship_template':(None,lambda a,b,p,n:(template:=own_templates(a).get((p['ship_type'],p['index']))) is not None
