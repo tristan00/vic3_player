@@ -465,8 +465,7 @@ EFFECTS={
                         and p[n] not in {item for item, in b.rows('law_amendment','amendment')}),
     'pick_principle':(None,becomes(lambda s,p,n:p['power_bloc_principle'] in {kind for kind, in s.rows('power_bloc_adopted_principle','power_bloc_principle')},lambda p:True)),
     'upgrade_principle':(None,lambda a,b,p,n:bloc_principles(a)!=bloc_principles(b)),
-    'request_join_power_bloc':(None,lambda a,b,p,n:value(a,'country','power_bloc',a.player)!=value(b,'country','power_bloc',b.player)
-                               or set(a.rows('player_relation','country,relations'))!=set(b.rows('player_relation','country,relations'))),
+    'request_join_power_bloc':(None,lambda a,b,p,n:value(a,'country','power_bloc',a.player)!=p['power_bloc']==value(b,'country','power_bloc',b.player)),
     'negotiate':(None,lambda a,b,p,n:not metric(a,'IsNegotiating') and bool(metric(b,'IsNegotiating'))),
     'take_decision':(None,lambda a,b,p,n:(p['decision'],) in a.rows('player_decision','decision') and (p['decision'],) not in b.rows('player_decision','decision')),
     'press_journal_button':(None,lambda a,b,p,n:a.hours==b.hours and country_state(a)!=country_state(b) or button_hidden(a,b,p)),

@@ -63,7 +63,7 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
        'retrofit':('retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all','decommission_ship','disband_formation',
                    'build_ship','build_ship_for','cancel_ship','raise_ship_item','lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item',
                    'start_naval_mission','start_naval_mission_selected'),
-       'influence':('diplomatic_action','diplomatic_action_state','diplomatic_action_obligation'),
+       'influence':('diplomatic_action','diplomatic_action_state','diplomatic_action_obligation','request_join_power_bloc'),
        'research':('research','queue_research','dequeue_research'),
        'imposition':('impose_law',),
        'play':('start_play_country','start_play_state','start_play_confirmed','abandon_colony'),
