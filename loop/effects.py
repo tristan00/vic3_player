@@ -138,6 +138,11 @@ def held_goals(snapshot,play):
     return sum(1 for goal_play, in snapshot.rows('war_goal','diplomatic_play',holder=snapshot.player) if goal_play==play)
 
 
+def new_units(a,b,formation,kind):
+    existing={unit for unit, in a.rows('combat_unit','combat_unit')}
+    return {unit for unit,found in b.rows('combat_unit','combat_unit,combat_unit_type',formation=formation) if found==kind and unit not in existing}
+
+
 def units(snapshot,formation,kind):
     return sum(1 for unit, in snapshot.rows('combat_unit','combat_unit_type',formation=formation) if unit==kind)
 
@@ -414,7 +419,7 @@ EFFECTS={
     'stop_institution_change':('institution',lambda a,b,p,n:bool(value(a,'institution_private','growth',p[n])) and not value(b,'institution_private','growth',p[n])),
     'white_peace':('war',lambda a,b,p,n:pressed_in(a,p[n]) and not pressed_in(b,p[n])),
     'propose_peace':('war',lambda a,b,p,n:value(a,'war','peace_proposer',p[n])!=a.player and value(b,'war','peace_proposer',p[n])==b.player),
-    'recruit':('military_formation',lambda a,b,p,n:units(b,p[n],p['combat_unit_type'])>units(a,p[n],p['combat_unit_type'])),
+    'recruit':('military_formation',lambda a,b,p,n:bool(new_units(a,b,p[n],p['combat_unit_type']))),
     'disband_regulars':('military_formation',lambda a,b,p,n:units(b,p[n],p['combat_unit_type'])<units(a,p[n],p['combat_unit_type'])),
     'disband_conscripts':('military_formation',lambda a,b,p,n:units(b,p[n],p['combat_unit_type'])<units(a,p[n],p['combat_unit_type'])),
     'colonize':(None,lambda a,b,p,n:bool(set(colonies(b))-set(colonies(a)))),
