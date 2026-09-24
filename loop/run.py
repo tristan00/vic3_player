@@ -58,6 +58,7 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
        'pausing':('pause_all_construction','resume_all_construction','pause_ship_construction','resume_ship_construction'),
        'bureaucracy':('set_tax_level','set_institution_level'),
        'money':('nationalize','bulk_nationalize','bulk_nationalize_state'),
+       'companies':('create_company','remove_company'),
        'research':('research','queue_research','dequeue_research'),
        'imposition':('impose_law',),
        'play':('start_play_country','start_play_state','start_play_confirmed'),
@@ -162,7 +163,8 @@ class Loop:
         events=options.pop('choose_event_option',[])
         links={**{('building',ident):('building_type',kind) for ident,kind,_ in snapshot.buildings()},
                **{('character',ident):('military_formation',formation) for ident,formation in snapshot.rows('character','character,formation',country=snapshot.player) if formation},
-               **{('war',war):('diplomatic_play',play) for play,war in snapshot.rows('diplomatic_play','diplomatic_play,war') if war is not None}}
+               **{('war',war):('diplomatic_play',play) for play,war in snapshot.rows('diplomatic_play','diplomatic_play,war') if war is not None},
+               **{('ship',ship):('military_formation',fleet) for ship,fleet in snapshot.rows('ship','ship,fleet') if fleet is not None}}
         touched=set()
         batch=[]
         for event in sorted({combo['event'] for combo in events}):

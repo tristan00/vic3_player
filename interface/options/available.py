@@ -160,7 +160,8 @@ def truced(s):
 
 def reachable_state(s,state):
     owner=s.map('state','state,country').get(state)
-    return not busy(s) and not truce(s,owner) and owner not in opposed(s) and plays_permitted(s,owner,state_regions(s).get(state),state)
+    return (not busy(s) and not truce(s,owner) and owner not in opposed(s) and owner not in defensive_partners(s)
+            and plays_permitted(s,owner,state_regions(s).get(state),state))
 
 
 def reachable_country(s,country):
@@ -1260,6 +1261,23 @@ def war_goals(s):
             if s.player in sides.get(play,()) and holder==s.player and creator==s.player and status==1 and target is not None]
 
 
+def goal_targets(s,play,kind):
+    if definition(s,'common/war_goal_types',kind,'target_type')!=['country']:
+        return True
+    leaders=involved(s)[0].get(play,())
+    targets={leader for leader in leaders if leader!=s.player} if s.player in leaders else set()
+    settings=set(definition(s,'common/war_goal_types',kind,'settings'))
+    goals=[(target,holder) for other,goal_kind,target,holder in live_goals(s,'war_goal_type,target_country,holder') if other==play and goal_kind==kind]
+    if 'validate_conflicts_war_goals_all' in settings:
+        targets-={target for target,_ in goals}
+    if 'validate_conflicts_war_goals_holder' in settings:
+        targets-={target for target,holder in goals if holder==s.player}
+    if 'validate_revoke_claims' in settings:
+        regions={region for region, in s.rows('state','state_region',country=s.player)}
+        targets&={country for country,region in s.rows('country_claim','country,state_region') if region in regions}
+    return targets
+
+
 def live_goals(s,columns):
     plays=set(s.plays())
     return [row for row in s.rows('war_goal','diplomatic_play,'+columns) if row[0] in plays]
@@ -1719,7 +1737,7 @@ RULES={
                                       and (war:=war_of_play(s,goal['diplomatic_play'])) is not None
                                       and war_leader(s,war) and negotiable_war(s,war) and proposer(s,war) is None and peace_open(s,war)],
     'add_war_goal':lambda s:[{'diplomatic_play':play,'war_goal_type':kind,'index':0} for play in principal(s) if play not in at_war_plays(s) and escalation(s,play)<COUNTDOWN
-                             for kind in sorted({kind for kind, in s.rows('war_goal','war_goal_type')})],
+                             for kind in sorted({kind for kind, in s.rows('war_goal','war_goal_type')}) if goal_targets(s,play,kind)],
     'make_primary_demand':lambda s:[goal for goal in war_goals(s) if goal['diplomatic_play'] not in at_war_plays(s) and goal['diplomatic_play'] in principal(s)
                                     and sum(other['diplomatic_play']==goal['diplomatic_play'] for other in war_goals(s))>1],
     'withdraw_treaty':lambda s:product(treaty=[ident for ident,first,second,withdrawn in s.rows('treaty','treaty,first_country,second_country,withdrawn')
