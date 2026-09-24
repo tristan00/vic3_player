@@ -181,6 +181,7 @@ class Store:
         return world_id
 
     def begin_run(self,started_at,kind,advisors=(),**generated):
+        self.heartbeat_connection=psycopg.connect(self.dsn,autocommit=True)
         lost=self.connection.execute("update run set ended_at=heartbeat_at,end_reason='loop_lost' where ended_at is null returning run_id,heartbeat_at").fetchall()
         for run_id,heartbeat_at in lost:
             LOG.error('RUN %s WAS LOST: its loop last beat at %s UTC',run_id,heartbeat_at)
@@ -424,7 +425,7 @@ class Store:
         self.beater.start()
 
     def beat(self):
-        with psycopg.connect(self.dsn,autocommit=True) as connection:
+        with self.heartbeat_connection as connection:
             while True:
                 step,age=progress_age()
                 if age>self.longest:
