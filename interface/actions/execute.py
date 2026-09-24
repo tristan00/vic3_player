@@ -12,6 +12,7 @@ from .catalogue import BY_NAME, KEYS, TYPES
 from .gui import ABORT, VARIABLES, key_codes, key_table, split
 
 GAP=.05
+CYCLE=.3
 PRIME=.1
 TABLES={'military_formation':'formation'}
 IDENTITY_OFFSETS={'building':16,'country':24}
@@ -26,6 +27,7 @@ class Executor:
         self.indexes={}
         self.codes=key_codes(key_table(game.game_dir/'game',self.mods))
         self.last=0
+        self.started=0
         self.flips={}
 
     def index(self,kind,name):
@@ -85,8 +87,8 @@ class Executor:
         self.flips[key]=flip=self.flips.get(key,0)^1
         for variable,value in (*values.items(),('interface_seq',seq),('interface_mode',0),('interface_action',list(BY_NAME).index(name)+1)):
             writes.append((addresses[variable]+24,struct.pack('<q',value*SCALE)))
-        time.sleep(max(0,self.last+GAP-time.monotonic()))
-        started=time.monotonic()
+        time.sleep(max(0,self.last+GAP-time.monotonic(),self.started+CYCLE-time.monotonic()))
+        started=self.started=time.monotonic()
         reader.write(writes)
         time.sleep(PRIME)
         reader.write([(addresses[variable]+24,struct.pack('<q',value*SCALE)) for variable,value in (('interface_mode',2 if check else 1),('interface_flip',flip))])
