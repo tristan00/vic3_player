@@ -612,13 +612,12 @@ def bloc_advantage(s,bloc,country):
     return held[bloc]-max([metric(s,country,'GetUnclaimedLeverage')]+[amount for other,amount in held.items() if other!=bloc])
 
 
-def market_ticked(s):
-    return s.memo('market_ticked',lambda:s.hours>s.connection.execute('select min(game_date) from snapshot where run_id=%s',(s.run_id,)).fetchone()[0])
-
-
 def supplied(s,market,goods):
-    orders=s.rows('market_goods','sell_orders',market=market,goods=goods)
-    return market_ticked(s) and bool(orders) and bool(orders[0][0])
+    def compute():
+        areas={area for area,owner in s.rows('market_area','market_area,market') if owner==market}
+        states={state for area,state in s.rows('market_area_state','market_area,state') if area in areas}
+        return {kind for state,kind in s.rows('state_goods_supply','state,goods') if state in states}
+    return goods in s.memo(('market_supply',market),compute)
 
 
 def formation_fraction(operator,value,scope):
