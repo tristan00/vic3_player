@@ -386,6 +386,7 @@ class Store:
                 cursor.execute('update run set heartbeat_at=clock_timestamp(),progress_at=clock_timestamp() where run_id=%s',(self.run_id,))
         if opening:
             self.start_heartbeat()
+            self.analyze([entity for entity,idents in anchors.items() if idents]+[name for name,(rows,_) in staged.items() if rows])
         for entity,idents in anchors.items():
             self.anchored[entity].update(idents)
         for name,(_,current) in staged.items():
@@ -393,6 +394,12 @@ class Store:
                 self.previous[name]=current
         self.seq+=1
         return seq
+
+    @timed
+    def analyze(self,tables):
+        for table in tables:
+            progress(f'analyze {table}')
+            self.connection.execute(f'analyze {table}')
 
     @timed
     def validate(self,cursor,seq):
