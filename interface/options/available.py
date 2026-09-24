@@ -1649,7 +1649,8 @@ RULES={
     'edit_ship_template':lambda s:[{**combo,'index':index} for combo in ship_designs(s) for kind,index in sorted(custom_templates(s)) if kind==combo['ship_type']],
     'set_default_ship_template':lambda s:[{'ship_type':kind,'index':index} for kind,index in sorted(non_default_templates(s))],
     'set_fleet_ship_template':fleet_templates,
-    'delete_ship_template':lambda s:[{'ship_type':kind,'index':index} for kind,index in sorted(custom_templates(s))],
+    'delete_ship_template':lambda s:[{'ship_type':kind,'index':index} for kind,index in sorted(custom_templates(s))
+                                     if sum(1 for other,_ in own_templates(s) if other==kind)>1],
     'retrofit_fleet':lambda s:product(military_formation=retrofit_fleets(s,False)),
     'cancel_retrofit_fleet':lambda s:product(military_formation=retrofit_fleets(s,True)),
     'retrofit_all':lambda s:[{}] if retrofit_fleets(s,False) else [],
