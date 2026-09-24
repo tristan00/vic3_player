@@ -9,7 +9,7 @@ import time
 import psutil
 import psycopg
 
-from ..common import PROGRESS_AT, PROGRESS_STEP, STALL_LIMIT, progress, read_progress, timed
+from ..common import PROGRESS_AT, PROGRESS_STEP, PROGRESS_VERSION, STALL_LIMIT, progress, read_progress, timed
 from .spec import CLOSED,ENTITIES,TABLES,VOCABULARIES
 
 DSN='host=127.0.0.1 port=55433 dbname=vic3 user=postgres'
@@ -194,7 +194,7 @@ class Store:
         self.seq=0
         self.beating=multiprocessing.Event()
         self.beat_run=multiprocessing.Value('i',0,lock=False)
-        self.beater=multiprocessing.Process(target=heartbeat,args=(self.dsn,self.beat_run,PROGRESS_AT,PROGRESS_STEP,self.beating,os.getpid()),daemon=True,name='heartbeat')
+        self.beater=multiprocessing.Process(target=heartbeat,args=(self.dsn,self.beat_run,PROGRESS_VERSION,PROGRESS_AT,PROGRESS_STEP,self.beating,os.getpid()),daemon=True,name='heartbeat')
         self.beater.start()
         self.anchored={entity:set() for entity in ENTITIES}
         self.previous={}
@@ -324,6 +324,8 @@ class Store:
 
     @timed
     def write(self,built,phase,taken_at,read_ms):
+        if not self.beater.is_alive():
+            raise RuntimeError(f'The heartbeat process exited with code {self.beater.exitcode}')
         seq=self.seq
         live=self.live(built.rows)
         present={entity:set(slots.values()) for entity,slots in live.items()}
@@ -448,7 +450,7 @@ class Store:
                                 (reason,detail,game_exited_at,self.run_id))
 
 
-def heartbeat(dsn,run,at,step,stop,parent):
+def heartbeat(dsn,run,version,at,step,stop,parent):
     logging.basicConfig(level=logging.WARNING,format='%(asctime)s %(message)s')
     with psycopg.connect(dsn,autocommit=True) as connection:
         connection.execute('set synchronous_commit = off')
@@ -461,7 +463,10 @@ def heartbeat(dsn,run,at,step,stop,parent):
                 stop.wait(HEARTBEAT/10)
                 due=time.monotonic()
                 continue
-            name,age=read_progress(at,step)
+            read=read_progress(version,at,step)
+            if read is None:
+                continue
+            name,age=read
             started=time.monotonic()
             if age>longest:
                 longest=age
