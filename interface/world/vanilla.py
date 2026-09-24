@@ -100,7 +100,7 @@ def _economy(game,bands):
                         allowed.setdefault(bands[owner.split(':')[-1]],set()).add(name)
     for _,state,value in entries(game,'common/history/pops'):
         states.setdefault(state,{'buildings':collections.Counter(),'population':0})['population']+=sum(map(int,re.findall(r'\bsize\s*=\s*(\d+)',value)))
-    return states,allowed,{name:counts.most_common(1)[0][0] for name,counts in owners.items()}
+    return states,allowed,{name:sorted(counts.items()) for name,counts in owners.items()}
 
 
 def _cultures(game):

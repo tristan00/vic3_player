@@ -169,26 +169,26 @@ def _buildings(rng,tag,state,band,capital,overseas,population,center,military,al
     key=state['key']
     lines=[]
     produced=[]
-    _building=lambda tag,kind,levels,owner,state:_create(tag,kind,levels,owner,state) if buildable(kind) else ''
+    _building=lambda tag,kind,levels,state:_create(tag,kind,levels,rng.choices(*zip(*owners[kind]))[0],state) if buildable(kind) else ''
     if capital:
-        lines.append(_building(tag,'building_government_administration',1+(band<=1)+(population>1500000),owners['building_government_administration'],key))
+        lines.append(_building(tag,'building_government_administration',1+(band<=1)+(population>1500000),key))
         if band<=2:
-            lines.append(_building(tag,'building_construction_sector',max(1,3-band-rng.randint(0,1)),owners['building_construction_sector'],key))
+            lines.append(_building(tag,'building_construction_sector',max(1,3-band-rng.randint(0,1)),key))
     elif population>800000 and band<=2:
-        lines.append(_building(tag,'building_government_administration',1,owners['building_government_administration'],key))
+        lines.append(_building(tag,'building_government_administration',1,key))
     if center:
-        lines.append(_building(tag,'building_trade_center',center,owners['building_trade_center'],key))
+        lines.append(_building(tag,'building_trade_center',center,key))
     local=set(state['arable_resources'])
     levels={kind:level for kind,level in military.items() if level}
-    lines+=[_building(tag,kind,level,owners[kind],key) for kind,level in levels.items()]
+    lines+=[_building(tag,kind,level,key) for kind,level in levels.items()]
     for kind,amount in sorted(state['source']['buildings'].items()):
         if kind in SPECIAL or not amount or (kind in COASTAL and not state['coastal']) or kind not in local|allowed or not buildable(kind):
             continue
         levels[kind]=min(max(1,round(amount*_scale(state))),state['capped'].get(kind,amount*2))
-        lines.append(_building(tag,kind,levels[kind],owners[kind],key))
+        lines.append(_building(tag,kind,levels[kind],key))
         produced.append(kind)
     if overseas and state['coastal'] and 'building_port' not in levels:
-        lines.append(_building(tag,'building_port',1,owners['building_port'],key))
+        lines.append(_building(tag,'building_port',1,key))
     return lines,produced,levels
 
 
