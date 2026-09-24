@@ -689,6 +689,7 @@ HANDLERS={
         'turmoil':lambda o,v,sc:COMPARE[o](state_metric(sc,'CalcTurmoil'),amount(sc.s,v)),
         'has_decree':lambda o,v,sc:v in {kind for kind, in sc.s.rows('player_active_decree','decree_type',state=sc.ident)},
         'is_coastal':lambda o,v,sc:coastal(sc.s,sc.ident)==yes(v),
+        'has_claim_by':lambda o,v,sc:(sc.s.map('state','state,state_region').get(sc.ident),) in sc.s.rows('country_claim','state_region',country=resolve(sc,v)),
         'is_potential_treaty_port':lambda o,v,sc:bool(sc.s.map('state','state,treaty_port_potential').get(sc.ident)) if resolve(sc,v)==sc.s.player else None,
         'state_region':lambda o,v,sc:sc.s.map('state','state,state_region').get(sc.ident)==v.split(':',1)[-1],
         'is_homeland':lambda o,v,sc:homeland(sc.s,sc.ident,v.split(':',1)[-1]),
