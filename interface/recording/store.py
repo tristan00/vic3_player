@@ -412,7 +412,9 @@ class Store:
             raise RuntimeError(f'Snapshot {seq} breaks foreign keys: {broken[:5]}')
 
     def catalogue(self,names):
-        self.connection.execute('insert into catalogue_action (action) select unnest(%s::int4[]) on conflict do nothing',(self.names('action',list(names)),))
+        codes=self.names('action',list(names))
+        self.connection.execute('delete from catalogue_action where action <> all(%s::int4[])',(codes,))
+        self.connection.execute('insert into catalogue_action (action) select unnest(%s::int4[]) on conflict do nothing',(codes,))
 
     def log_action(self,entry,after):
         action=self.names('action',[entry['action']])[0]
