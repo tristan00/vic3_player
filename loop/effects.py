@@ -1,6 +1,6 @@
 import collections
 from interface.actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, LEVELS, TOLL_LEVELS
-from interface.options.available import COUNTRY_OWNER, subject_pairs, own_templates, latest_design, in_default, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, privatizable, privatization_requested, PRIVATIZATION_REQUESTED, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
+from interface.options.available import COUNTRY_OWNER, overlords, subject_pairs, own_templates, latest_design, in_default, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, privatizable, privatization_requested, PRIVATIZATION_REQUESTED, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
 from interface.recording.spec import TABLE
 
 SLOT=0xFFFFFF
@@ -232,6 +232,19 @@ def plays(snapshot):
     return set(snapshot.rows('diplomatic_play','diplomatic_play'))
 
 
+def new_plays(a,b,kind,target):
+    targets={target}|overlords(a,target)
+    started=lambda s:{play for play,initiator,other,found in s.rows('diplomatic_play','diplomatic_play,initiator,target,diplomatic_play_type')
+                      if initiator==s.player and other in targets and found==kind}
+    return started(b)-started(a)
+
+
+def released(a,b):
+    existing={country for country, in a.rows('country','country')}
+    mine=set(a.states())
+    return {owner for state,owner in b.rows('state','state,country') if state in mine and owner not in existing}
+
+
 def borrowed(snapshot,formation,index):
     return any(selected for position,selected in snapshot.rows('formation_borrow_setting','position,selected',formation=formation) if position==index)
 
@@ -365,8 +378,8 @@ EFFECTS={
                       !=set(b.rows('company','company,investment_charter,trade_charter',country=b.player))),
     'incorporate':('state',changed('state_status','incorporation')),
     'unincorporate':('state',equals('state_status','incorporation',0)),
-    'start_play_country':(None,more('diplomatic_play')),
-    'start_play_state':(None,more('diplomatic_play')),
+    'start_play_country':(None,lambda a,b,p,n:bool(new_plays(a,b,p['diplomatic_play_type'],p['country']))),
+    'start_play_state':(None,lambda a,b,p,n:bool(new_plays(a,b,p['diplomatic_play_type'],value(a,'state','country',p['state'])))),
     'hire_commander_for':('character',becomes(lambda s,p,n:value(s,'character','formation',p['character']),lambda p:p['military_formation'])),
     'nationalize':('building',lambda a,b,p,n:ownerships(a,p[n])!=ownerships(b,p[n])),
     'upgrade_regulars':('military_formation',lambda a,b,p,n:members(a,'formation_upgrade_unit_type',p[n],'combat_unit_type')
@@ -377,7 +390,7 @@ EFFECTS={
     'toggle_monopoly':(None,lambda a,b,p,n:((p['building_type'],) in a.rows('player_monopoly','building_type'))
                        !=((p['building_type'],) in b.rows('player_monopoly','building_type'))),
     'character_interaction':('character',lambda a,b,p,n:interaction_state(a,p[n])!=interaction_state(b,p[n]) or None),
-    'start_play_confirmed':(None,lambda a,b,p,n:plays(a)!=plays(b) or subject_pairs(a)!=subject_pairs(b)),
+    'start_play_confirmed':(None,lambda a,b,p,n:bool(new_plays(a,b,p['diplomatic_play_type'],p['country'])) or (b.player,p['country']) in subject_pairs(b)-subject_pairs(a)),
     'diplomatic_action_state':('country',lambda a,b,p,n:player_claims(a)!=player_claims(b) if p['diplomatic_action']=='da_stake_colonial_claim'
                                else value(a,'state','country',p['state'])!=value(b,'state','country',p['state'])),
     'diplomatic_action_obligation':('country',lambda a,b,p,n:obligations_with(a,p[n])!=obligations_with(b,p[n]) or pair_pacts(a,p[n])!=pair_pacts(b,p[n])
@@ -388,7 +401,7 @@ EFFECTS={
     'toggle_pause_colonization':('state',lambda a,b,p,n:((p[n],) in a.rows('player_colonization_paused','state'))!=((p[n],) in b.rows('player_colonization_paused','state'))),
     'set_default_unit_type':('military_formation',becomes(lambda s,p,n:p['combat_unit_type'] in members(s,'formation_selected_unit_type',p[n],'combat_unit_type'),lambda p:True)),
     'toggle_ignore_formable':(None,lambda a,b,p,n:ignoring(a,p['index'])!=ignoring(b,formable_ord(b,a,p['index']))),
-    'release_country':(None,lambda a,b,p,n:count(b,'country',False)>count(a,'country',False)),
+    'release_country':(None,lambda a,b,p,n:bool(released(a,b))),
     'form_country':(None,lambda a,b,p,n:value(a,'country','country_definition',a.player)!=value(b,'country','country_definition',b.player)),
     'toggle_ignore_decision':(None,lambda a,b,p,n:((p['decision'],) in a.rows('player_ignored_decision','decision'))
                               !=((p['decision'],) in b.rows('player_ignored_decision','decision'))),
@@ -422,7 +435,7 @@ EFFECTS={
     'recruit':('military_formation',lambda a,b,p,n:units(b,p[n],p['combat_unit_type'])>units(a,p[n],p['combat_unit_type'])),
     'disband_regulars':('military_formation',lambda a,b,p,n:units(b,p[n],p['combat_unit_type'])<units(a,p[n],p['combat_unit_type'])),
     'disband_conscripts':('military_formation',lambda a,b,p,n:units(b,p[n],p['combat_unit_type'])<units(a,p[n],p['combat_unit_type'])),
-    'colonize':(None,lambda a,b,p,n:colonies(b)!=colonies(a)),
+    'colonize':(None,lambda a,b,p,n:bool(set(colonies(b))-set(colonies(a)))),
     'impose_law':('law',lambda a,b,p,n:value(a,'law','imposer',p[n])!=a.player and value(b,'law','imposer',p[n])==b.player),
     'repeal_amendment':('amendment',lambda a,b,p,n:p[n] in {item for item, in a.rows('law_amendment','amendment')}
                         and p[n] not in {item for item, in b.rows('law_amendment','amendment')}),
