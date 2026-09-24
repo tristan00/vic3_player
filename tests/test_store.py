@@ -36,7 +36,7 @@ def empty():
 
 
 def country(ident,definition,capital):
-    return (ident,definition,'gov_test','faith',None,None,-1,capital,-1,-1,-1,-1,-1,None,None,False,True,False)
+    return (ident,definition,'gov_test','faith',None,None,-1,capital,-1,-1,-1,-1,-1,None,None,False,True,False,None,None)
 
 
 def built(step):
