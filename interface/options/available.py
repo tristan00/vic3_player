@@ -1310,7 +1310,8 @@ def war_goals(s):
             if s.player in sides.get(play,()) and holder==s.player and creator==s.player and status==1 and target is not None]
 
 
-UNMODELED_GOAL_SETTINGS={'validate_conflicts_annex_country','country_creation','validate_sole_formation_candidate','validate_take_treaty_port'}
+UNMODELED_GOAL_SETTINGS={'validate_conflicts_annex_country','country_creation','validate_sole_formation_candidate','validate_take_treaty_port',
+                         'targets_enemy_subject','has_other_stakeholder'}
 
 
 def goal_targets(s,play,kind):
