@@ -24,9 +24,11 @@ class EffectTests(unittest.TestCase):
                          'formation_history':[{'formation':5,'country':7}],'formation_report':[{'formation':5,'recalled':False}]})
         after=Memory(7,{'country_research_history':[{'country_research':3,'country':7,'researching':'tech_x'}],
                         'formation_history':[{'formation':5,'country':7}],'formation_report':[{'formation':5,'recalled':True}]})
-        self.assertTrue(verify('research',{'technology':'tech_x'},before,after,{},None))
-        self.assertFalse(verify('research',{'technology':'tech_y'},before,after,{},None))
-        self.assertTrue(verify('recall_fleet',{'military_formation':5},before,after,{},None))
+        self.assertTrue(verify('research',{'technology':'tech_x'},before,after))
+        self.assertFalse(verify('research',{'technology':'tech_y'},before,after))
+        self.assertTrue(verify('recall_fleet',{'military_formation':5},before,after))
+        self.assertFalse(verify('recall_fleet',{'military_formation':5},after,after))
+        self.assertIsNone(verify('upgrade_conscripts',{'military_formation':5},before,after))
 
 
 class AdvisorTests(unittest.TestCase):

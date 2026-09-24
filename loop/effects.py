@@ -86,7 +86,11 @@ def changed(table,column):
 
 
 def equals(table,column,expected):
-    return lambda a,b,p,name:value(b,table,column,p[name])==expected
+    return lambda a,b,p,name:value(a,table,column,p[name])!=expected and value(b,table,column,p[name])==expected
+
+
+def becomes(get,target):
+    return lambda a,b,p,n:get(a,p,n)!=target(p) and get(b,p,n)==target(p)
 
 
 def count(snapshot,table,mine):
@@ -102,11 +106,11 @@ def more(table,mine=False):
 
 
 def policy(column,expected):
-    return lambda a,b,p,name:b.rows('player_policy',column)[0][0]==expected(p)
+    return becomes(lambda s,p,n:s.rows('player_policy',column)[0][0],expected)
 
 
 def construction_paused(expected):
-    return lambda a,b,p,name:value(b,'country_construction_report','is_construction_paused',b.player)==expected
+    return becomes(lambda s,p,n:value(s,'country_construction_report','is_construction_paused',s.player),lambda p:expected)
 
 
 def roles(snapshot,play):
@@ -170,10 +174,10 @@ def flags(snapshot,table,column,key,buildings):
 def bulk_toggle(table,column,key='building',target=None,eligible=lambda s,ident:True):
     def check(a,b,p,n):
         subset=[ident for ident in bulk_subset(a,p['building_type'],None,'any') if eligible(a,ident)]
-        after=flags(b,table,column,key,subset)
+        before,after=flags(a,table,column,key,subset),flags(b,table,column,key,subset)
         if target is None:
-            return bool(subset) and len(set(after))==1 and after!=flags(a,table,column,key,subset)
-        return bool(subset) and all(value==target for value in after)
+            return bool(subset) and len(set(after))==1 and after!=before
+        return bool(subset) and after!=before and all(value==target for value in after)
     return check
 
 
@@ -184,8 +188,8 @@ def methods(snapshot,building):
 def bulk_method(a,b,p,n):
     subset=bulk_subset(a,p['building_type'],p.get('state'),p['ownership'])
     others=[ident for ident in bulk_subset(a,p['building_type'],None,'any') if ident not in subset]
-    return (bool(subset) and all(p['production_method'] in methods(b,ident) for ident in subset)
-            and all(methods(a,ident)==methods(b,ident) for ident in others))
+    return (bool(subset) and any(p['production_method'] not in methods(a,ident) for ident in subset)
+            and all(p['production_method'] in methods(b,ident) for ident in subset) and all(methods(a,ident)==methods(b,ident) for ident in others))
 
 
 def subset_setting(table,column,key,target):
@@ -193,8 +197,8 @@ def subset_setting(table,column,key,target):
         subset=bulk_subset(a,p['building_type'],p.get('state'),p['ownership'])
         known=ownership_classes(a)
         others=[ident for ident in bulk_subset(a,p['building_type'],None,'any') if ident not in subset and (p['ownership']=='any' or ident in known)]
-        return (bool(subset) and all(value==target for value in flags(b,table,column,key,subset))
-                and flags(a,table,column,key,others)==flags(b,table,column,key,others))
+        return (bool(subset) and flags(a,table,column,key,subset)!=flags(b,table,column,key,subset)
+                and all(value==target for value in flags(b,table,column,key,subset)) and flags(a,table,column,key,others)==flags(b,table,column,key,others))
     return check
 
 
@@ -273,21 +277,22 @@ EFFECTS={
     **{f'subset_{name}{suffix}':(None,subset_setting(*spec)) for name,spec in SUBSET_EFFECTS.items() for suffix in ('','_state')},
     'bulk_nationalize':(None,bulk_nationalized),'bulk_nationalize_state':(None,bulk_nationalized),
     'bulk_switch_production_method':(None,bulk_method),'bulk_switch_production_method_state':(None,bulk_method),
-    'switch_production_method':('building',lambda a,b,p,n:p['production_method'] in methods(b,p['building'])),
-    'downsize':('building',lambda a,b,p,n:value(b,'building','levels',p['building']) is None or value(b,'building','levels',p['building'])<value(a,'building','levels',p['building'])),
+    'switch_production_method':('building',lambda a,b,p,n:p['production_method'] not in methods(a,p['building']) and p['production_method'] in methods(b,p['building'])),
+    'downsize':('building',lambda a,b,p,n:value(a,'building','levels',p['building']) is not None
+                and (value(b,'building','levels',p['building']) is None or value(b,'building','levels',p['building'])<value(a,'building','levels',p['building']))),
     'cancel_construction':('building',lambda a,b,p,n:queue(b).count(site(a,p[n]))<queue(a).count(site(a,p[n]))),
-    'research':(None,lambda a,b,p,n:researching(b)==p['technology'] or p['technology'] in queued(b)),
-    'queue_research':(None,lambda a,b,p,n:p['technology'] in queued(b)),
-    'dequeue_research':(None,lambda a,b,p,n:p['technology'] not in queued(b)),
+    'research':(None,lambda a,b,p,n:researching(a)!=p['technology'] and p['technology'] not in queued(a) and (researching(b)==p['technology'] or p['technology'] in queued(b))),
+    'queue_research':(None,lambda a,b,p,n:p['technology'] not in queued(a) and p['technology'] in queued(b)),
+    'dequeue_research':(None,lambda a,b,p,n:p['technology'] in queued(a) and p['technology'] not in queued(b)),
     'build':(None,lambda a,b,p,n:queue(b).count((p['state'],p['building_type']))>queue(a).count((p['state'],p['building_type']))),
-    'enact_law':('law',lambda a,b,p,n:p['law'] in enacting_laws(b)),
-    'cancel_enactment':(None,lambda a,b,p,n:not enacting_laws(b)),
+    'enact_law':('law',lambda a,b,p,n:p['law'] not in enacting_laws(a) and p['law'] in enacting_laws(b)),
+    'cancel_enactment':(None,lambda a,b,p,n:bool(enacting_laws(a)) and not enacting_laws(b)),
     'set_institution_level':('institution',lambda a,b,p,n:(value(b,'institution_private','target_investment',p[n]),value(b,'institution','investment',p[n]))
                              !=(value(a,'institution_private','target_investment',p[n]),value(a,'institution','investment',p[n]))),
-    'issue_decree':(None,lambda a,b,p,n:(p['state'],p['decree']) in set(b.rows('player_active_decree','state,decree_type'))),
-    'remove_decree':(None,lambda a,b,p,n:(p['state'],p['decree']) not in set(b.rows('player_active_decree','state,decree_type'))),
+    'issue_decree':(None,becomes(lambda s,p,n:(p['state'],p['decree']) in set(s.rows('player_active_decree','state,decree_type')),lambda p:True)),
+    'remove_decree':(None,becomes(lambda s,p,n:(p['state'],p['decree']) in set(s.rows('player_active_decree','state,decree_type')),lambda p:False)),
     'toggle_consumption_tax':(None,lambda a,b,p,n:((p['goods'],) in a.rows('player_taxed_goods','goods'))!=((p['goods'],) in b.rows('player_taxed_goods','goods'))),
-    'set_supply_priority':('military_formation',lambda a,b,p,n:value(b,'formation','supply_priority',p[n])==('low','medium','high').index(p['level'])),
+    'set_supply_priority':('military_formation',becomes(lambda s,p,n:value(s,'formation','supply_priority',p[n]),lambda p:('low','medium','high').index(p['level']))),
     'toggle_mobilization_option':('military_formation',lambda a,b,p,n:members(a,'formation_mobilization_option',p[n],'mobilization_option')
                                   !=members(b,'formation_mobilization_option',p[n],'mobilization_option')),
     'raise_conscripts':('military_formation',equals('formation_status','raised_conscripts',True)),
@@ -302,24 +307,24 @@ EFFECTS={
     'create_army':(None,lambda a,b,p,n:len(b.rows('formation','formation',country=b.player,formation_type=0))>len(a.rows('formation','formation',country=a.player,formation_type=0))),
     'transfer_battalions':(None,lambda a,b,p,n:len(b.rows('combat_unit','combat_unit',formation=p['military_formation']))<len(a.rows('combat_unit','combat_unit',formation=p['military_formation']))
                            and len(b.rows('combat_unit','combat_unit',formation=p['target']))>len(a.rows('combat_unit','combat_unit',formation=p['target']))),
-    'deploy_to_front':('military_formation',lambda a,b,p,n:value(b,'formation_status','target_location',p[n])==p['front']),
+    'deploy_to_front':('military_formation',becomes(lambda s,p,n:value(s,'formation_status','target_location',p[n]),lambda p:p['front'])),
     'end_naval_mission':('military_formation',changed('formation_status','naval_mission')),
     'start_naval_mission_selected':('military_formation',changed('formation_status','naval_mission')),
     'end_naval_mission_selected':('military_formation',changed('formation_status','naval_mission')),
     'promote_commander':('character',changed('character','rank')),
     'commander_order':('character',changed('character','order_type')),
-    'assign_commander':('character',lambda a,b,p,n:value(b,'character','formation',p['character'])==p['military_formation']),
-    'unassign_commander':('character',changed('character','formation')),
-    'hire_commander':('character',lambda a,b,p,n:value(b,'character_private','recruitable',p[n]) is not True),
+    'assign_commander':('character',becomes(lambda s,p,n:value(s,'character','formation',p['character']),lambda p:p['military_formation'])),
+    'unassign_commander':('character',lambda a,b,p,n:value(a,'character','formation',p[n]) is not None and value(b,'character','formation',p[n]) is None),
+    'hire_commander':('character',lambda a,b,p,n:value(b,'character_private','recruitable',p[n]) is False and value(b,'character','country',p[n])==b.player),
     'toggle_bolster_movement':('political_movement',changed('political_movement','managed_status')),
     'toggle_suppress_movement':('political_movement',changed('political_movement','managed_status')),
     'withdraw_treaty':('treaty',equals('treaty','withdrawn',True)),
-    'disband_formation':('military_formation',lambda a,b,p,n:not b.rows('combat_unit','combat_unit',formation=p[n])),
+    'disband_formation':('military_formation',lambda a,b,p,n:value(a,'formation','dead',p[n]) is False and value(b,'formation','dead',p[n]) is not False),
     'build_ship':(None,lambda a,b,p,n:my_ships(b).count(p['ship_type'])>my_ships(a).count(p['ship_type'])),
     'cancel_ship':(None,lambda a,b,p,n:my_ships(b).count(p['ship_type'])<my_ships(a).count(p['ship_type'])),
     'decommission_ship':('ship',lambda a,b,p,n:value(b,'ship','fleet',p[n])!=value(a,'ship','fleet',p[n])),
-    'pause_ship_construction':(None,lambda a,b,p,n:ship_paused(b)),
-    'resume_ship_construction':(None,lambda a,b,p,n:not ship_paused(b)),
+    'pause_ship_construction':(None,lambda a,b,p,n:not ship_paused(a) and ship_paused(b)),
+    'resume_ship_construction':(None,lambda a,b,p,n:ship_paused(a) and not ship_paused(b)),
     'create_company':(None,more('company',True)),
     'remove_company':(None,fewer('company',True)),
     'toggle_charter':('company',lambda a,b,p,n:set(a.rows('company','company,investment_charter,trade_charter',country=a.player))
@@ -328,12 +333,13 @@ EFFECTS={
     'unincorporate':('state',equals('state_status','incorporation',0)),
     'start_play_country':(None,more('diplomatic_play')),
     'start_play_state':(None,more('diplomatic_play')),
-    'hire_commander_for':('character',lambda a,b,p,n:value(b,'character','formation',p['character'])==p['military_formation']),
+    'hire_commander_for':('character',becomes(lambda s,p,n:value(s,'character','formation',p['character']),lambda p:p['military_formation'])),
     'nationalize':('building',lambda a,b,p,n:ownerships(a,p[n])!=ownerships(b,p[n])),
     'upgrade_regulars':('military_formation',lambda a,b,p,n:members(a,'formation_upgrade_unit_type',p[n],'combat_unit_type')
                         !=members(b,'formation_upgrade_unit_type',p[n],'combat_unit_type')),
     'set_default_construction_fleet':('military_formation',equals('formation_report','default_fleet',True)),
-    'clear_default_construction_fleet':(None,lambda a,b,p,n:not any(flag for flag, in b.rows('formation_report','default_fleet'))),
+    'clear_default_construction_fleet':(None,lambda a,b,p,n:any(flag for flag, in a.rows('formation_report','default_fleet'))
+                                        and not any(flag for flag, in b.rows('formation_report','default_fleet'))),
     'toggle_monopoly':(None,lambda a,b,p,n:((p['building_type'],) in a.rows('player_monopoly','building_type'))
                        !=((p['building_type'],) in b.rows('player_monopoly','building_type'))),
     'character_interaction':('character',lambda a,b,p,n:interaction_state(a,p[n])!=interaction_state(b,p[n]) or None),
@@ -346,44 +352,46 @@ EFFECTS={
                          if p['diplomatic_action']=='expel_diplomats' else pacts(a)!=pacts(b) or relations(a)!=relations(b)),
     'make_primary_demand':(None,lambda a,b,p,n:maneuvers(b,p['diplomatic_play'])<maneuvers(a,p['diplomatic_play'])),
     'toggle_pause_colonization':('state',lambda a,b,p,n:((p[n],) in a.rows('player_colonization_paused','state'))!=((p[n],) in b.rows('player_colonization_paused','state'))),
-    'set_default_unit_type':('military_formation',lambda a,b,p,n:p['combat_unit_type'] in members(b,'formation_selected_unit_type',p[n],'combat_unit_type')),
+    'set_default_unit_type':('military_formation',becomes(lambda s,p,n:p['combat_unit_type'] in members(s,'formation_selected_unit_type',p[n],'combat_unit_type'),lambda p:True)),
     'toggle_ignore_formable':(None,lambda a,b,p,n:ignoring(a,p['index'])!=ignoring(b,formable_ord(b,a,p['index']))),
     'release_country':(None,lambda a,b,p,n:count(b,'country',False)>count(a,'country',False)),
     'form_country':(None,lambda a,b,p,n:value(a,'country','country_definition',a.player)!=value(b,'country','country_definition',b.player)),
     'toggle_ignore_decision':(None,lambda a,b,p,n:((p['decision'],) in a.rows('player_ignored_decision','decision'))
                               !=((p['decision'],) in b.rows('player_ignored_decision','decision'))),
-    'rehome_formation':('military_formation',lambda a,b,p,n:home_region(b,p[n])==p['strategic_region']),
+    'rehome_formation':('military_formation',becomes(lambda s,p,n:home_region(s,p[n]),lambda p:p['strategic_region'])),
     'cancel_queue_item':(None,lambda a,b,p,n:queue(b).count((p['state'],p['building_type']))<queue(a).count((p['state'],p['building_type']))),
     'raise_queue_item':(None,moved(lambda index,rest:index-1)),
     'lower_queue_item':(None,moved(lambda index,rest:index+1)),
     'first_queue_item':(None,moved(lambda index,rest:0)),
     'last_queue_item':(None,moved(lambda index,rest:rest)),
-    **{f'set_{direction}_{kind}':(None,lambda a,b,p,n,direction=direction,kind=kind:trade_level(b,direction,p['goods'])==TARIFF_CODES[kind][p['level']])
+    **{f'set_{direction}_{kind}':(None,becomes(lambda s,p,n,direction=direction:trade_level(s,direction,p['goods']),lambda p,kind=kind:TARIFF_CODES[kind][p['level']]))
        for direction in ('import','export') for kind in ('tariff','subvention')},
-    'pause':(None,lambda a,b,p,n:hours(b)==hours(a)),
+    'pause':(None,lambda a,b,p,n:hours(b)==hours(a) and b.meta['paused'] is True),
     'unpause':(None,lambda a,b,p,n:hours(b)>hours(a)),
-    'set_speed':(None,lambda a,b,p,n:None),
+    'set_speed':(None,lambda a,b,p,n:b.meta['speed']==int(p['speed'])),
     **{name:('diplomatic_play',lambda a,b,p,n:side(a,p[n])!=side(b,p[n])) for name in ('support_initiator','support_target')},
-    'stay_on_fence':('diplomatic_play',lambda a,b,p,n:not roles(b,p[n])&{'initiator_ally','target_ally'}),
-    'declare_neutrality':('diplomatic_play',lambda a,b,p,n:'interested' not in roles(b,p[n])),
-    **{f'lean_{side}':('diplomatic_play',lambda a,b,p,n,side=side:f'{side}_ally' in roles(b,p[n])) for side in ('initiator','target')},
+    'stay_on_fence':('diplomatic_play',lambda a,b,p,n:len(set(a.rows('player_proposal','country,kind')))>len(set(b.rows('player_proposal','country,kind')))
+                     and not roles(b,p[n])&{'initiator_ally','target_ally'}),
+    'declare_neutrality':('diplomatic_play',lambda a,b,p,n:'interested' in roles(a,p[n]) and 'interested' not in roles(b,p[n])),
+    **{f'lean_{side}':('diplomatic_play',lambda a,b,p,n,side=side:f'{side}_ally' not in roles(a,p[n]) and f'{side}_ally' in roles(b,p[n])) for side in ('initiator','target')},
     'back_down':('diplomatic_play',lambda a,b,p,n:value(a,'diplomatic_play','end_date',p[n])!=value(b,'diplomatic_play','end_date',p[n])),
     'add_war_goal':(None,lambda a,b,p,n:held_goals(b,p['diplomatic_play'])>held_goals(a,p['diplomatic_play'])),
     'toggle_press_war_goal':(None,lambda a,b,p,n:goal_status(a,p)!=goal_status(b,p)),
-    'mobilize':('military_formation',lambda a,b,p,n:mobilized(b).get(p[n]) is True),
-    'demobilize':('military_formation',lambda a,b,p,n:mobilized(b).get(p[n]) is False),
+    'mobilize':('military_formation',lambda a,b,p,n:mobilized(a).get(p[n]) is False and mobilized(b).get(p[n]) is True),
+    'demobilize':('military_formation',lambda a,b,p,n:mobilized(a).get(p[n]) is True and mobilized(b).get(p[n]) is False),
     'mobilize_all':(None,lambda a,b,p,n:sum(mobilized(b).values())>sum(mobilized(a).values())),
     'demobilize_all':(None,lambda a,b,p,n:sum(mobilized(b).values())<sum(mobilized(a).values())),
-    'stop_institution_change':('institution',lambda a,b,p,n:not value(b,'institution_private','growth',p[n])),
+    'stop_institution_change':('institution',lambda a,b,p,n:bool(value(a,'institution_private','growth',p[n])) and not value(b,'institution_private','growth',p[n])),
     'white_peace':('war',lambda a,b,p,n:pressed_in(a,p[n]) and not pressed_in(b,p[n])),
-    'propose_peace':('war',lambda a,b,p,n:value(b,'war','peace_proposer',p[n])==b.player),
+    'propose_peace':('war',lambda a,b,p,n:value(a,'war','peace_proposer',p[n])!=a.player and value(b,'war','peace_proposer',p[n])==b.player),
     'recruit':('military_formation',lambda a,b,p,n:units(b,p[n],p['combat_unit_type'])>units(a,p[n],p['combat_unit_type'])),
     'disband_regulars':('military_formation',lambda a,b,p,n:units(b,p[n],p['combat_unit_type'])<units(a,p[n],p['combat_unit_type'])),
     'disband_conscripts':('military_formation',lambda a,b,p,n:units(b,p[n],p['combat_unit_type'])<units(a,p[n],p['combat_unit_type'])),
     'colonize':(None,lambda a,b,p,n:colonies(b)!=colonies(a)),
-    'impose_law':('law',lambda a,b,p,n:value(b,'law','imposer',p[n])==b.player),
-    'repeal_amendment':('amendment',lambda a,b,p,n:p[n] not in {item for item, in b.rows('law_amendment','amendment')}),
-    'pick_principle':(None,lambda a,b,p,n:p['power_bloc_principle'] in {kind for kind, in b.rows('power_bloc_adopted_principle','power_bloc_principle')}),
+    'impose_law':('law',lambda a,b,p,n:value(a,'law','imposer',p[n])!=a.player and value(b,'law','imposer',p[n])==b.player),
+    'repeal_amendment':('amendment',lambda a,b,p,n:p[n] in {item for item, in a.rows('law_amendment','amendment')}
+                        and p[n] not in {item for item, in b.rows('law_amendment','amendment')}),
+    'pick_principle':(None,becomes(lambda s,p,n:p['power_bloc_principle'] in {kind for kind, in s.rows('power_bloc_adopted_principle','power_bloc_principle')},lambda p:True)),
     'upgrade_principle':(None,lambda a,b,p,n:set(a.rows('power_bloc_adopted_principle','power_bloc,power_bloc_principle'))
                          !=set(b.rows('power_bloc_adopted_principle','power_bloc,power_bloc_principle'))),
     'request_join_power_bloc':(None,lambda a,b,p,n:value(a,'country','power_bloc',a.player)!=value(b,'country','power_bloc',b.player)
@@ -394,22 +402,22 @@ EFFECTS={
     'press_journal_button':(None,lambda a,b,p,n:country_state(a)!=country_state(b)),
     'declare_bankruptcy':(None,lambda a,b,p,n:in_default(a) and not in_default(b)),
     'build_ship_for':(None,lambda a,b,p,n:my_ships(b).count(p['ship_type'])>my_ships(a).count(p['ship_type'])),
-    'capitulate':('war',lambda a,b,p,n:(b.player,) not in b.rows('war_participant','country',war=p[n])),
+    'capitulate':('war',lambda a,b,p,n:(a.player,) in a.rows('war_participant','country',war=p[n]) and (b.player,) not in b.rows('war_participant','country',war=p[n])),
     'kick_from_power_bloc':('country',changed('country','power_bloc')),
     'reform_government':('interest_group',changed('interest_group','in_government')),
-    'form_power_bloc':(None,lambda a,b,p,n:value(b,'country','power_bloc',b.player) is not None),
-    'leave_power_bloc':(None,lambda a,b,p,n:value(b,'country','power_bloc',b.player) is None),
+    'form_power_bloc':(None,lambda a,b,p,n:value(a,'country','power_bloc',a.player) is None and value(b,'country','power_bloc',b.player) is not None),
+    'leave_power_bloc':(None,lambda a,b,p,n:value(a,'country','power_bloc',a.player) is not None and value(b,'country','power_bloc',b.player) is None),
     'abandon_colony':('state',lambda a,b,p,n:value(b,'state_status','colony_progress',p[n])!=value(a,'state_status','colony_progress',p[n])
                       or value(b,'state','country',p[n])!=b.player),
-    **{f'{verb}_{kind}':('country',lambda a,b,p,n,kind=kind:not proposing(b,p[n],None if kind=='proposal' else kind))
+    **{f'{verb}_{kind}':('country',lambda a,b,p,n,kind=kind:proposing(a,p[n],None if kind=='proposal' else kind) and not proposing(b,p[n],None if kind=='proposal' else kind))
        for kind in ('treaty','demand','action_proposal','sway','proposal') for verb in ('accept','decline','reject','quick_decline')
        if f'{verb}_{kind}' in {'accept_treaty','decline_treaty','accept_demand','reject_demand','accept_action_proposal','decline_action_proposal','accept_sway',
                                'reject_sway','quick_decline_proposal'}},
-    'set_borrow_setting':('military_formation',lambda a,b,p,n:borrowed(b,p[n],p['index'])),
-    'cancel_strategic_objective_selected':('military_formation',lambda a,b,p,n:objective(b,p[n])!=p['state']&SLOT),
-    'set_strategic_objective':('military_formation',lambda a,b,p,n:objective(b,p[n])==p['state']&SLOT),
-    'station_formation':('military_formation',lambda a,b,p,n:value(b,'formation_status','target_location',p[n])==p['state']),
-    'choose_event_option':(None,lambda a,b,p,n:p['event'] not in {kind for kind, in b.rows('event','event_type')}),
+    'set_borrow_setting':('military_formation',lambda a,b,p,n:not borrowed(a,p[n],p['index']) and borrowed(b,p[n],p['index'])),
+    'cancel_strategic_objective_selected':('military_formation',lambda a,b,p,n:objective(a,p[n])==p['state']&SLOT and objective(b,p[n])!=p['state']&SLOT),
+    'set_strategic_objective':('military_formation',becomes(lambda s,p,n:objective(s,p[n]),lambda p:p['state']&SLOT)),
+    'station_formation':('military_formation',becomes(lambda s,p,n:value(s,'formation_status','target_location',p[n]),lambda p:p['state'])),
+    'choose_event_option':(None,lambda a,b,p,n:p['event'] in {kind for kind, in a.rows('event','event_type')} and p['event'] not in {kind for kind, in b.rows('event','event_type')}),
 }
 
 
@@ -431,21 +439,12 @@ EFFECTS.update({**{f'{name}_selected':EFFECTS[name] for name in ('mobilize','dem
                    (('raise',lambda i,last:i-1),('lower',lambda i,last:i+1),('first',lambda i,last:0),('last',lambda i,last:last),('cancel',None))},
                 'defend_invasion':EFFECTS['deploy_to_front'],
                 'recall_fleet':('military_formation',equals('formation_report','recalled',True)),
-                'set_formation_flag':('military_formation',lambda a,b,p,n:value(b,'formation','flag',p[n])==p['flag']),
+                'set_formation_flag':('military_formation',becomes(lambda s,p,n:value(s,'formation','flag',p[n]),lambda p:p['flag'])),
                 'station_selected':('military_formation',changed('formation_status','target_location'))})
 
 
-FLIPS={'upgrade_conscripts','toggle_accept_peace'}
-
-
-def verify(name,params,before,after,result,executor):
+def verify(name,params,before,after):
     if name in EFFECTS:
         owner,test=EFFECTS[name]
         return test(before,after,params,owner)
-    if name in FLIPS:
-        try:
-            again=executor.run(name,check=True,**params)
-        except LookupError:
-            return True
-        return not again['valid'] or again['desc']!=result['desc']
     return None

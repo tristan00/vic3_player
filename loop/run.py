@@ -178,7 +178,7 @@ class Loop:
             self.stuck(left)
         later=[]
         for entry,before,result in carried+batch:
-            verdict=verify(entry['action'],entry['params'],before,after,result,self.executor)
+            verdict=verify(entry['action'],entry['params'],before,after)
             if verdict is False:
                 later.append((entry,before,result))
             else:
@@ -311,7 +311,7 @@ class Loop:
             snapshot,later=self.turn_actions(snapshot,carried)
             snapshot,carried,pending=self.run_days(snapshot)
             for entry,before,result in later+pending:
-                verdict=verify(entry['action'],entry['params'],before,snapshot,result,self.executor)
+                verdict=verify(entry['action'],entry['params'],before,snapshot)
                 self.note({**entry,'status':'verified' if verdict else 'no_effect' if verdict is False else 'unverified'},snapshot)
 
 
