@@ -1199,13 +1199,9 @@ def journal(c):
         ids=idents(t)
         if set(t['scope_root_definition'])-{0}:
             raise RuntimeError('journal_entry.scope_root_definition is not always 0')
-        by_type={}
-        for i,country,kind,active in zip(t['id'],t['country'],t['journal_entry_type'],t['active']):
-            if flag(active) and (country==-1 or country&SLOT==c.player):
-                if c.label(kind) in by_type:
-                    raise RuntimeError(f'Two active journal entries of type {c.label(kind)} are visible to the player')
-                by_type[c.label(kind)]=i
-        progress={by_type[kind]:(p,g,pc) for kind,p,g,pc in c.rows('journal_progress','journal','progress','goal','percent')}
+        progress={entry:(p,g,pc) for entry,p,g,pc in c.rows('journal_progress','journal','progress','goal','percent')}
+        if set(progress)-set(t['id']):
+            raise RuntimeError(f'Journal progress names entries memory does not hold: {sorted(set(progress)-set(t["id"]))[:5]}')
         for index,i in enumerate(t['id']):
             p,g,pc=progress.get(i,(None,None,None))
             c.add('journal_entry_history',journal_entry=ids[i],country=t['country'][index],journal_entry_type=c.label(t['journal_entry_type'][index]),

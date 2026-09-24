@@ -361,10 +361,8 @@ def _scripted(tables,snapshot,held,tags,label,player,living,world,maps):
                sorted({(ident(item),interaction) for interaction,items in held.prefixed('cap_possible_interaction_').items() for item in items}))
     put(tables,'interaction_shown',[('character','int4'),('interaction','text')],
                sorted({(ident(item),interaction) for interaction,items in held.prefixed('cap_interaction_').items() for item in items}))
-    entries=snapshot['journal_entry']
-    entry_types=dict(zip((int(i)&0xffffff for i in entries['id'].tolist()),entries['journal_entry_type'].tolist()))
-    put(tables,'journal_progress',[('journal','text'),('progress','float8'),('goal','float8'),('percent','float8')],
-               sorted((label(entry_types[entry]),number(progress),number(goal),number(percent)) for entry,progress,goal,percent in
+    put(tables,'journal_progress',[('journal','int4'),('progress','float8'),('goal','float8'),('percent','float8')],
+               sorted((entry,number(progress),number(goal),number(percent)) for entry,progress,goal,percent in
                       held.fields('journal',held.listed('cap_obj_journal'),('progress','goal','percent'))))
     put(tables,'objective',[('objective','text')],sorted((key,) for key in set(held.flags('cap_objective'))))
     put(tables,'subgoal_completed',[('subgoal','text')],sorted((key,) for key in set(held.flags('cap_subgoal'))))
