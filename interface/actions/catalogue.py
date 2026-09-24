@@ -28,6 +28,7 @@ TYPES={
     'amendment':(105,'Amendment',None),
     'state':(76,'State',None),
     'state_region':(78,'StateRegion',None),
+    'strait':(80,'Strait',None),
     'strategic_region':(82,'StrategicRegion','common/strategic_regions'),
     'technology':(84,'Technology','common/technology/technologies'),
     'treaty':(101,'Treaty',None),
@@ -48,6 +49,9 @@ KEYS={
 
 
 LEVELS=('VeryLow','Low','Medium','High','VeryHigh')
+TOLL_LEVELS=('NoTolls','LowTolls','MediumTolls','HighTolls')
+ACCESS_STATUSES=('Open','NoMilitary','Closed')
+ACCESS_PERMISSIONS=('NoEnemies','OnlyAllies','OnlyController')
 
 
 def action_folders():
@@ -267,6 +271,9 @@ ACTIONS=(
     act('set_import_subvention','goods level:choice','GetPlayer.SetImportSubventions{level}({goods}.Self)',choices=('Low','High','Max')),
     act('set_export_subvention','goods level:choice','GetPlayer.SetExportSubventions{level}({goods}.Self)',choices=('Low','High','Max')),
     act('declare_bankruptcy','','GetPlayer.DeclareBankruptcy'),
+    act('set_strait_toll','strait level:choice','{strait}.SetControllerTollRate{level}(GetPlayer.Self)',choices=TOLL_LEVELS),
+    act('set_strait_access','strait state access:choice','{strait}.SetStateAccess{access}({state}.Self)',choices=ACCESS_STATUSES),
+    act('set_strait_allowed','strait state allowed:choice','{strait}.SetStateAllowedCountries{allowed}({state}.Self)',choices=ACCESS_PERMISSIONS),
     act('enact_law','law','{law}.StartEnacting'),
     act('cancel_enactment','','GetPlayer.GetLawBeingEnacted.StopEnacting'),
     act('impose_law','law','{law}.StartImposing'),
@@ -483,7 +490,7 @@ GROUPS={
                  *(f'bulk_{name}' for name,_ in BULK),*(f'subset_{name}{suffix}' for name,_ in SUBSET for suffix in ('','_state')),
                  'bulk_switch_production_method','bulk_switch_production_method_state','bulk_nationalize','bulk_nationalize_state'),
     'budget':('set_tax_level','set_government_wages','set_military_wages','toggle_consumption_tax','set_import_tariff','set_export_tariff',
-              'set_import_subvention','set_export_subvention','declare_bankruptcy'),
+              'set_import_subvention','set_export_subvention','declare_bankruptcy','set_strait_toll','set_strait_access','set_strait_allowed'),
     'politics':('enact_law','cancel_enactment','impose_law','repeal_amendment','toggle_bolster_movement','toggle_suppress_movement','negotiate','reform_government',
                 'set_institution_level','stop_institution_change','issue_decree','remove_decree'),
     'research':('research','queue_research','dequeue_research'),

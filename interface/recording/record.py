@@ -25,7 +25,8 @@ ENUM_SOURCES={'approval_state':'interest_group.approval_state','influence_type':
               'influence_type_reason':'interest_group.influence_type_reason','civil_war_side':'interest_group.civil_war',
               'law_checkpoint_result':'law.enactment_last_checkpoint_result','formation_type':'formation.type','supply_priority':'formation.supply_priority',
               'managed_status':'political_movement.managed_status','shipping_lane_type':'shipping_lane.shipping_lane_type','war_goal_demand_type':'war_goal.demand_type',
-              'war_goal_status':'war_goal.status','toll_rate':'strait.first_toll_rate','civil_war_type':'civil_war.type','battle_type':'battle.type',
+              'war_goal_status':'war_goal.status','toll_rate':'strait.first_toll_rate','strait_access_status':'strait.first_access_status',
+              'strait_access_permissions':'strait.first_access_permissions','civil_war_type':'civil_war.type','battle_type':'battle.type',
               'battle_status':'battle.status','play_side':'front_side.play_side','ai_attitude':'ai_country_goal.attitude','hq_type':'hq.type',
               'tax_level':'country.tax_level','supply_ship_construction_level':'country.supply_ship_construction_level'}
 BUDGET_LINES={('income',1):'income_taxes',('income',2):'poll_taxes',('income',7):'investment',('income',15):'market_fees',

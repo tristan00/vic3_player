@@ -12,6 +12,7 @@ COVERED={
     'B1':('set_tax_level',),'B2':('set_government_wages',),'B3':('set_military_wages',),'B4':('toggle_consumption_tax',),
     'B5':('set_import_tariff',),'B6':('set_import_subvention',),'B7':('set_export_tariff',),'B8':('set_export_subvention',),
     'B9':('declare_bankruptcy',),
+    'B10':('set_strait_toll',),'B11':('set_strait_access',),'B12':('set_strait_allowed',),
     'L1':('enact_law',),'L2':('cancel_enactment',),'L3':('impose_law',),'L4':('repeal_amendment',),
     'L5':('toggle_bolster_movement',),'L6':('toggle_suppress_movement',),'L7':('negotiate',),'L8':('reform_government',),
     'I1':('set_institution_level',),'I2':('stop_institution_change',),'I3':('issue_decree',),'I4':('remove_decree',),

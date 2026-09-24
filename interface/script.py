@@ -151,6 +151,7 @@ DEFINITION_FIELDS={
     'common/journal_entries':('scripted_button',),
     'common/diplomatic_plays':('war_goal','requires_interest_marker','allow_negotiated_peace'),
     'common/war_goal_types':('target_type','kind'),
+    'common/strait_definitions':('type','total_block_requires_full_control','military_block_requires_full_control','tolls_require_full_control'),
     'common/subject_types':('valid_overlord_country_types','valid_subject_country_types','valid_overlord_ranks','valid_subject_ranks','overlord_must_be_higher_rank',
                             'can_start_own_diplomatic_plays','can_have_subjects'),
     'common/ship_types':('unlocking_technologies','ship_group'),

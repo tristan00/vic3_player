@@ -36,7 +36,8 @@ VOCABULARIES={
 
 ENUMS=('ai_attitude','approval_state','battle_status','battle_type','building_owner_type','civil_war_side','civil_war_type','event_status','formation_flag',
        'formation_type','hq_type','influence_type','influence_type_reason','law_checkpoint_result','law_phase','managed_status','play_side','privatization_request',
-       'scope_type','shipping_lane_type','slave_basket','supply_priority','supply_ship_construction_level','tariff_level','tax_level','toll_rate','treaty_side',
+       'scope_type','shipping_lane_type','slave_basket','strait_access_permissions','strait_access_status','supply_priority','supply_ship_construction_level',
+       'tariff_level','tax_level','toll_rate','treaty_side',
        'wage_level','war_goal_demand_type','war_goal_pressed','war_goal_status')
 
 CHECKS={'budget_direction':('income','expense'),'tariff_direction':('import','export'),'goods_consumer':('pops','buildings','government','military'),
@@ -273,7 +274,10 @@ private('charter',[f('unlock',H)])
 entity('hq',[rr('country')])
 private('hq',[e('hq_type'),ov('hq_region','strategic_region')])
 entity('shipping_lane',[rr('country'),rr('begin_point','state'),rr('end_point','state'),f('convoy_cost',F),e('lane_type','shipping_lane_type')])
-entity('strait',[v('strait_definition'),d('first_last_access_change'),d('second_last_access_change'),e('first_toll_rate','toll_rate'),e('second_toll_rate','toll_rate')])
+entity('strait',[v('strait_definition'),e('first_access_status','strait_access_status'),e('first_access_permissions','strait_access_permissions'),
+                 e('second_access_status','strait_access_status'),e('second_access_permissions','strait_access_permissions'),
+                 d('first_last_access_change'),d('second_last_access_change'),d('first_last_toll_rate_change'),d('second_last_toll_rate_change'),
+                 e('first_toll_rate','toll_rate'),e('second_toll_rate','toll_rate')])
 child('strait_endpoint','strait',[],[rr('first_state','state'),rr('second_state','state'),x('strait_type','strait_type')],'player')
 entity('country_research',[rr('country'),ov('researching','technology')],'player')
 child('country_research_acquired','country_research',[v('technology')],(),'player')

@@ -1,7 +1,7 @@
 import re
 from functools import lru_cache
 
-from ..actions.catalogue import ACTIONS, LEVELS
+from ..actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, ACTIONS, LEVELS, TOLL_LEVELS
 from ..common import progress, timed
 from ..recording.spec import METRIC_COLUMNS
 from ..runner.memory import MONTH_STARTS
@@ -942,6 +942,58 @@ def money(s):
     return need(player_value(s,'player_treasury','money'),'player money')
 
 
+STRAIT_COOLDOWN_MONTHS=6
+STRAIT_SIDES=('first','second')
+
+
+def strait_sides(s):
+    mine=set(s.states())-{state for state,controller in s.rows('occupation','state,controller') if controller!=s.player}
+    sides=[]
+    for strait,first,second in s.rows('strait_endpoint','strait,first_state,second_state'):
+        held=[(side,state) for side,state in zip(STRAIT_SIDES,(first,second)) if state in mine]
+        sides+=[(strait,side,state) for side,state in held[:1 if len(held)==2 else 2]]
+    return sides
+
+
+def strait_value(s,strait,column):
+    return s.map('strait',f'strait,{column}').get(strait)
+
+
+def strait_settable(s,strait,column):
+    changed=strait_value(s,strait,column)
+    return changed is None or now(s)>=months_later(changed,STRAIT_COOLDOWN_MONTHS)
+
+
+def strait_requires(s,strait,field):
+    return definition(s,'common/strait_definitions',strait_value(s,strait,'strait_definition'),field)==['yes']
+
+
+def full_strait_control(s,strait):
+    mine=set(s.states())
+    return all(state in mine for first,second in s.rows('strait_endpoint','first_state,second_state',strait=strait) for state in (first,second))
+
+
+def strait_tolls(s):
+    if not player_value(s,'player_policy','can_toll_straits'):
+        return []
+    return [{'strait':strait,'level':level} for strait,side,_ in strait_sides(s)
+            if (full_strait_control(s,strait) or not strait_requires(s,strait,'tolls_require_full_control')) and strait_settable(s,strait,f'{side}_last_toll_rate_change')
+            for index,level in enumerate(TOLL_LEVELS) if strait_value(s,strait,f'{side}_toll_rate')!=index]
+
+
+def strait_accesses(s):
+    closing=player_value(s,'player_policy','can_close_straits')
+    blocks={'Closed':'total_block_requires_full_control','NoMilitary':'military_block_requires_full_control'}
+    return [{'strait':strait,'state':state,'access':status} for strait,side,state in strait_sides(s) if strait_settable(s,strait,f'{side}_last_access_change')
+            for index,status in enumerate(ACCESS_STATUSES) if strait_value(s,strait,f'{side}_access_status')!=index
+            and (status=='Open' or closing and (full_strait_control(s,strait) or not strait_requires(s,strait,blocks[status])))]
+
+
+def strait_permissions(s):
+    return [{'strait':strait,'state':state,'allowed':allowed} for strait,side,state in strait_sides(s) if strait_value(s,strait,f'{side}_access_status')
+            for index,allowed in enumerate(ACCESS_PERMISSIONS,1) if strait_value(s,strait,f'{side}_access_permissions')!=index]
+
+
 def player_value(s,table,column):
     rows=s.rows(table,column)
     return rows[0][0] if rows else None
@@ -1465,6 +1517,9 @@ RULES={
     'set_import_subvention':lambda s:trade_levels(s,'import','subvention'),
     'set_export_subvention':lambda s:trade_levels(s,'export','subvention'),
     'declare_bankruptcy':lambda s:[{}] if in_default(s) else [],
+    'set_strait_toll':strait_tolls,
+    'set_strait_access':strait_accesses,
+    'set_strait_allowed':strait_permissions,
     'enact_law':lambda s:product(law=enactable(s)),
     'cancel_enactment':lambda s:[{}] if enacting(s) else [],
     'impose_law':lambda s:product(law=imposable(s)),

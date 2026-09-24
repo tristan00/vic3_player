@@ -1,5 +1,5 @@
 import collections
-from interface.actions.catalogue import LEVELS
+from interface.actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, LEVELS, TOLL_LEVELS
 from interface.options.available import COUNTRY_OWNER, in_default, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, privatizable, privatization_requested, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
 from interface.recording.spec import TABLE
 
@@ -79,6 +79,10 @@ def formable_ord(after,before,index):
 def ignoring(snapshot,index):
     flags=[ignored for _,ignored in sorted(snapshot.rows('player_formable_country','position,ignored'))]
     return flags[index] if index is not None and index<len(flags) else None
+
+
+def strait_becomes(column,target):
+    return lambda a,b,p,n:any(value(a,'strait',f'{side}_{column}',p[n])!=value(b,'strait',f'{side}_{column}',p[n])==target(p) for side in ('first','second'))
 
 
 def changed(table,column):
@@ -403,6 +407,9 @@ EFFECTS={
     'take_decision':(None,lambda a,b,p,n:country_state(a)!=country_state(b)),
     'press_journal_button':(None,lambda a,b,p,n:country_state(a)!=country_state(b)),
     'declare_bankruptcy':(None,lambda a,b,p,n:in_default(a) and not in_default(b)),
+    'set_strait_toll':('strait',strait_becomes('toll_rate',lambda p:TOLL_LEVELS.index(p['level']))),
+    'set_strait_access':('strait',strait_becomes('access_status',lambda p:ACCESS_STATUSES.index(p['access']))),
+    'set_strait_allowed':('strait',strait_becomes('access_permissions',lambda p:ACCESS_PERMISSIONS.index(p['allowed'])+1)),
     'build_ship_for':(None,lambda a,b,p,n:my_ships(b).count(p['ship_type'])>my_ships(a).count(p['ship_type'])),
     'capitulate':('war',lambda a,b,p,n:(a.player,) in a.rows('war_participant','country',war=p[n]) and (b.player,) not in b.rows('war_participant','country',war=p[n])),
     'kick_from_power_bloc':('country',changed('country','power_bloc')),

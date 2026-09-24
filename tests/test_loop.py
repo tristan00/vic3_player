@@ -30,6 +30,19 @@ class EffectTests(unittest.TestCase):
         self.assertFalse(verify('recall_fleet',{'military_formation':5},after,after))
         self.assertIsNone(verify('upgrade_conscripts',{'military_formation':5},before,after))
 
+    def test_strait_verdicts_read_the_side_of_the_state(self):
+        rows=lambda **values:{'strait_endpoint':[{'strait':10,'first_state':1,'second_state':2}],
+                              'strait_history':[{'strait':10,'first_toll_rate':1,'second_toll_rate':1,'first_access_status':0,'second_access_status':0,'first_access_permissions':0,'second_access_permissions':0,**values}]}
+        before=Memory(7,rows())
+        self.assertTrue(verify('set_strait_toll',{'strait':10,'level':'HighTolls'},before,Memory(7,rows(second_toll_rate=3))))
+        self.assertFalse(verify('set_strait_toll',{'strait':10,'level':'HighTolls'},before,Memory(7,rows(second_toll_rate=2))))
+        self.assertFalse(verify('set_strait_toll',{'strait':10,'level':'LowTolls'},before,before))
+        self.assertTrue(verify('set_strait_access',{'strait':10,'state':2,'access':'Closed'},before,Memory(7,rows(second_access_status=2))))
+        self.assertTrue(verify('set_strait_access',{'strait':10,'state':2,'access':'Closed'},before,Memory(7,rows(first_access_status=2))))
+        self.assertFalse(verify('set_strait_access',{'strait':10,'state':2,'access':'Closed'},before,Memory(7,rows(first_access_status=1))))
+        self.assertTrue(verify('set_strait_allowed',{'strait':10,'state':1,'allowed':'OnlyController'},before,Memory(7,rows(first_access_permissions=3))))
+        self.assertFalse(verify('set_strait_allowed',{'strait':10,'state':1,'allowed':'OnlyAllies'},before,Memory(7,rows(first_access_permissions=3))))
+
 
 class AdvisorTests(unittest.TestCase):
     def test_random_advisor_picks_only_offered_combinations(self):

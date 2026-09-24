@@ -197,7 +197,7 @@ def player(c):
         p={column:private[column][0] for column in PRIVATE_COUNTRY}
         c.add('player_policy',heir=p['heir'],tax_level=p['tax_level'],government_wage_level=p['government_wage_level'],
               military_wage_level=p['military_wage_level'],supply_ship_construction_level=p['supply_ship_construction_level'],
-              can_toll_straits='can_toll' in straits(c),can_close_straits='can_close' in straits(c),has_bloc_mandates=mandates(c))
+              can_toll_straits='toll' in straits(c),can_close_straits='close' in straits(c),has_bloc_mandates=mandates(c))
         c.add('player_treasury',money=p['budget_money'],investment_pool=p['budget_investment_pool'],
               investment_pool_change_from_investment=p['budget_weekly_investment_pool_change_from_investment'],
               investment_pool_change_from_construction=p['budget_weekly_investment_pool_change_from_construction'],credit=p['budget_credit'],
@@ -773,10 +773,10 @@ def companies(c):
     t=c.table('strait')
     if t:
         ids=idents(t)
-        for ident,kind,first,second,first_rate,second_rate in zip(t['ident'],t['strait_definition'],t['first_last_access_change'],
-                                                                   t['second_last_access_change'],t['first_toll_rate'],t['second_toll_rate']):
-            c.add('strait_history',strait=ident,strait_definition=c.label(kind),first_last_access_change=first,second_last_access_change=second,
-                  first_toll_rate=first_rate,second_toll_rate=second_rate)
+        columns=('first_access_status','first_access_permissions','second_access_status','second_access_permissions','first_last_access_change',
+                 'second_last_access_change','first_last_toll_rate_change','second_last_toll_rate_change','first_toll_rate','second_toll_rate')
+        for ident,kind,*values in zip(t['ident'],t['strait_definition'],*(t[column] for column in columns)):
+            c.add('strait_history',strait=ident,strait_definition=c.label(kind),**dict(zip(columns,values)))
         for strait,first,second,kind in c.rows('strait_endpoint','strait','first_state','second_state','strait_type'):
             c.add('strait_endpoint',strait=ids[strait],first_state=c.ident('state',first),second_state=c.ident('state',second),strait_type=kind)
     t=c.table('technology')

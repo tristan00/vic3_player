@@ -136,12 +136,14 @@
     "strait.first_toll_rate": {
       "0": "no_tolls",
       "1": "low_tolls",
-      "2": "medium_tolls"
+      "2": "medium_tolls",
+      "3": "high_tolls"
     },
     "strait.second_toll_rate": {
       "0": "no_tolls",
       "1": "low_tolls",
-      "2": "medium_tolls"
+      "2": "medium_tolls",
+      "3": "high_tolls"
     },
     "interest_group.civil_war": {
       "0": "revolution",
@@ -322,6 +324,28 @@
     "ironman.storage": {
       "0": "local",
       "1": "cloud"
+    },
+    "strait.first_access_status": {
+      "0": "open",
+      "1": "no_military",
+      "2": "closed"
+    },
+    "strait.first_access_permissions": {
+      "0": "all",
+      "1": "no_enemies",
+      "2": "only_allies",
+      "3": "only_controller"
+    },
+    "strait.second_access_status": {
+      "0": "open",
+      "1": "no_military",
+      "2": "closed"
+    },
+    "strait.second_access_permissions": {
+      "0": "all",
+      "1": "no_enemies",
+      "2": "only_allies",
+      "3": "only_controller"
     }
   },
   "casualty_reasons": {
@@ -5589,6 +5613,30 @@
         "second_toll_rate": [
           "b",
           173
+        ],
+        "first_access_status": [
+          "b",
+          168
+        ],
+        "first_access_permissions": [
+          "b",
+          169
+        ],
+        "second_access_status": [
+          "b",
+          170
+        ],
+        "second_access_permissions": [
+          "b",
+          171
+        ],
+        "first_last_toll_rate_change": [
+          "i",
+          176
+        ],
+        "second_last_toll_rate_change": [
+          "i",
+          184
         ]
       },
       "keys": {

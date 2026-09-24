@@ -1295,9 +1295,15 @@
    "pollution"
   ],
   "strait": [
+   "first_access_permissions",
+   "first_access_status",
    "first_last_access_change",
+   "first_last_toll_rate_change",
    "first_toll_rate",
+   "second_access_permissions",
+   "second_access_status",
    "second_last_access_change",
+   "second_last_toll_rate_change",
    "second_toll_rate"
   ],
   "supply_ship": [

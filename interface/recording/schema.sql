@@ -475,6 +475,16 @@ create table slave_basket (
   name text unique
 );
 
+create table strait_access_permissions (
+  strait_access_permissions int2 primary key,
+  name text unique
+);
+
+create table strait_access_status (
+  strait_access_status int2 primary key,
+  name text unique
+);
+
 create table supply_priority (
   supply_priority int2 primary key,
   name text unique
@@ -3002,18 +3012,28 @@ create table strait_history (
   seq int4 not null,
   present bool not null,
   strait_definition int2,
+  first_access_status int2,
+  first_access_permissions int2,
+  second_access_status int2,
+  second_access_permissions int2,
   first_last_access_change game_hours,
   second_last_access_change game_hours,
+  first_last_toll_rate_change game_hours,
+  second_last_toll_rate_change game_hours,
   first_toll_rate int2,
   second_toll_rate int2,
   primary key (run_id, strait, seq),
   foreign key (run_id, strait) references strait,
   foreign key (run_id, seq) references snapshot,
   foreign key (strait_definition) references strait_definition,
+  foreign key (first_access_status) references strait_access_status,
+  foreign key (first_access_permissions) references strait_access_permissions,
+  foreign key (second_access_status) references strait_access_status,
+  foreign key (second_access_permissions) references strait_access_permissions,
   foreign key (first_toll_rate) references toll_rate,
   foreign key (second_toll_rate) references toll_rate,
-  check (present = (num_nulls(strait_definition, first_toll_rate, second_toll_rate) = 0)),
-  check (present or num_nonnulls(strait_definition, first_last_access_change, second_last_access_change, first_toll_rate, second_toll_rate) = 0)
+  check (present = (num_nulls(strait_definition, first_access_status, first_access_permissions, second_access_status, second_access_permissions, first_toll_rate, second_toll_rate) = 0)),
+  check (present or num_nonnulls(strait_definition, first_access_status, first_access_permissions, second_access_status, second_access_permissions, first_last_access_change, second_last_access_change, first_last_toll_rate_change, second_last_toll_rate_change, first_toll_rate, second_toll_rate) = 0)
 );
 
 create table strait_endpoint (
@@ -5348,8 +5368,8 @@ create function shipping_lane_at(run int4, at int4) returns table ("shipping_lan
   select l.shipping_lane, l.seq, l.country, l.begin_point, l.end_point, l.convoy_cost, l.lane_type from shipping_lane a, lateral (select shipping_lane, seq, country, begin_point, end_point, convoy_cost, lane_type, present from shipping_lane_history t where t.run_id = run and t.shipping_lane = a.shipping_lane and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
-create function strait_at(run int4, at int4) returns table ("strait" int4, "seq" int4, "strait_definition" int2, "first_last_access_change" game_hours, "second_last_access_change" game_hours, "first_toll_rate" int2, "second_toll_rate" int2) language sql stable as $$
-  select l.strait, l.seq, l.strait_definition, l.first_last_access_change, l.second_last_access_change, l.first_toll_rate, l.second_toll_rate from strait a, lateral (select strait, seq, strait_definition, first_last_access_change, second_last_access_change, first_toll_rate, second_toll_rate, present from strait_history t where t.run_id = run and t.strait = a.strait and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
+create function strait_at(run int4, at int4) returns table ("strait" int4, "seq" int4, "strait_definition" int2, "first_access_status" int2, "first_access_permissions" int2, "second_access_status" int2, "second_access_permissions" int2, "first_last_access_change" game_hours, "second_last_access_change" game_hours, "first_last_toll_rate_change" game_hours, "second_last_toll_rate_change" game_hours, "first_toll_rate" int2, "second_toll_rate" int2) language sql stable as $$
+  select l.strait, l.seq, l.strait_definition, l.first_access_status, l.first_access_permissions, l.second_access_status, l.second_access_permissions, l.first_last_access_change, l.second_last_access_change, l.first_last_toll_rate_change, l.second_last_toll_rate_change, l.first_toll_rate, l.second_toll_rate from strait a, lateral (select strait, seq, strait_definition, first_access_status, first_access_permissions, second_access_status, second_access_permissions, first_last_access_change, second_last_access_change, first_last_toll_rate_change, second_last_toll_rate_change, first_toll_rate, second_toll_rate, present from strait_history t where t.run_id = run and t.strait = a.strait and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function strait_endpoint_at(run int4, at int4) returns table ("strait" int4, "seq" int4, "first_state" int4, "second_state" int4, "strait_type" text) language sql stable as $$

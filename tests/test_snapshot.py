@@ -309,6 +309,33 @@ class RuleTests(unittest.TestCase):
                                       {'formation':6,'docked':True,'recalled':False,'hit_points_percent':.5}])
         self.assertEqual(RULES['recall_fleet'](s),[{'military_formation':5}])
 
+    def test_strait_settings_follow_the_owned_shore_and_the_cooldown(self):
+        straits=lambda **changes:snapshot(definitions={'common/strait_definitions':{'strait_gibraltar':{'tolls_require_full_control':['yes'],'total_block_requires_full_control':['yes']},'strait_bosporus':{}}},
+                                          player_policy=[{'can_toll_straits':True,'can_close_straits':True,**changes.pop('policy',{})}],
+                                          state_history=changes.pop('states',[{'state':1,'country':PLAYER},{'state':2,'country':OTHER},{'state':3,'country':PLAYER},{'state':4,'country':PLAYER}]),
+                                          strait_endpoint=[{'strait':10,'first_state':1,'second_state':2},{'strait':11,'first_state':3,'second_state':4}],
+                                          strait_history=[{'strait':10,'strait_definition':'strait_gibraltar','first_toll_rate':1,'second_toll_rate':1,'first_access_status':0,'first_access_permissions':0,
+                                                           'second_access_status':0,'second_access_permissions':0},
+                                                          {'strait':11,'strait_definition':'strait_bosporus','first_toll_rate':1,'second_toll_rate':0,'first_access_status':1,'first_access_permissions':1,
+                                                           'second_access_status':0,'second_access_permissions':0,**changes.pop('bosporus',{})}],**changes)
+        s=straits()
+        self.assertEqual(RULES['set_strait_toll'](s),[{'strait':11,'level':'NoTolls'},{'strait':11,'level':'MediumTolls'},{'strait':11,'level':'HighTolls'}])
+        self.assertEqual(RULES['set_strait_access'](s),[{'strait':10,'state':1,'access':'NoMilitary'},{'strait':11,'state':3,'access':'Open'},{'strait':11,'state':3,'access':'Closed'}])
+        self.assertEqual(RULES['set_strait_allowed'](s),[{'strait':11,'state':3,'allowed':'OnlyAllies'},{'strait':11,'state':3,'allowed':'OnlyController'}])
+        self.assertEqual(RULES['set_strait_access'](straits(policy={'can_close_straits':False})),[{'strait':11,'state':3,'access':'Open'}])
+        self.assertEqual(RULES['set_strait_toll'](straits(policy={'can_toll_straits':False})),[])
+        recent=straits(bosporus={'first_last_toll_rate_change':1000-24,'first_last_access_change':1000-24})
+        self.assertEqual(RULES['set_strait_toll'](recent),[])
+        self.assertEqual(RULES['set_strait_access'](recent),[{'strait':10,'state':1,'access':'NoMilitary'}])
+        self.assertEqual(len(RULES['set_strait_allowed'](recent)),2)
+        old=straits(bosporus={'first_last_toll_rate_change':1000-200*24,'first_last_access_change':1000-200*24})
+        self.assertEqual(len(RULES['set_strait_toll'](old)),3)
+        occupied=straits(occupation_history=[{'state':3,'controller':OTHER}])
+        self.assertEqual(RULES['set_strait_access'](occupied),[{'strait':10,'state':1,'access':'NoMilitary'},{'strait':11,'state':4,'access':'NoMilitary'},{'strait':11,'state':4,'access':'Closed'}])
+        shared=straits(states=[{'state':1,'country':PLAYER},{'state':2,'country':OTHER},{'state':3,'country':OTHER},{'state':4,'country':OTHER}])
+        self.assertEqual(RULES['set_strait_toll'](shared),[])
+        self.assertEqual(RULES['set_strait_access'](shared),[{'strait':10,'state':1,'access':'NoMilitary'}])
+
     def test_tariff_level_reads_the_player_tariff_by_direction(self):
         s=snapshot(player_tariff=[{'direction':'import','goods':'grain','level':5},{'direction':'export','goods':'grain','level':1}])
         self.assertEqual(trade_level(s,'import','grain'),5)
