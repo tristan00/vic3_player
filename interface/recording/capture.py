@@ -58,7 +58,7 @@ GROUPS={'public':VISIBILITY.metrics(list(METRICS['country']),'country'),
 FLOAT_STEP=0.01
 
 
-FLOAT_LIMITS={'Country.GetRankProgress':2}
+FLOAT_SEGMENTS={'Country.GetRankProgress':((2,FLOAT_STEP),(10,.1),(100,1))}
 
 
 INTEGER_PARTS={'int32':2,'int64':3}
@@ -205,8 +205,20 @@ def fixed(expression,kind):
     raise ValueError(f'No fixed-point conversion for {kind}')
 
 
+def segments(expression):
+    return FLOAT_SEGMENTS.get(expression,((1,FLOAT_STEP),))
+
+
 def limit(expression):
-    return FLOAT_LIMITS.get(expression,1)
+    return segments(expression)[-1][0]
+
+
+def thresholds(expression):
+    found=[];start=0
+    for upper,step in segments(expression):
+        found+=[(round(start+index*step,2),step) for index in range(1,round((upper-start)/step)+1)]
+        start=upper
+    return found
 
 
 def balanced(terms):
@@ -249,8 +261,8 @@ def scoped(expression,kind):
     if kind=='below':
         return f"MakeScopeValue(Select_CFixedPoint(LessThan_float({expression},'(float)0'),'(CFixedPoint)1','(CFixedPoint)0'))"
     if kind=='float':
-        return 'MakeScopeValue('+balanced([f"Select_CFixedPoint(GreaterThanOrEqualTo_float({expression},'(float){index*FLOAT_STEP:.2f}'),'(CFixedPoint){FLOAT_STEP}','(CFixedPoint)0')"
-                                           for index in range(1,round(limit(expression)/FLOAT_STEP)+1)])+')'
+        return 'MakeScopeValue('+balanced([f"Select_CFixedPoint(GreaterThanOrEqualTo_float({expression},'(float){threshold:.2f}'),'(CFixedPoint){step}','(CFixedPoint)0')"
+                                           for threshold,step in thresholds(expression)])+')'
     return f'MakeScopeValue({fixed(expression,kind)})'
 
 
