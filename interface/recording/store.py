@@ -49,7 +49,7 @@ class Layout:
 class Store:
     def __init__(self,dsn=DSN):
         self.dsn=dsn
-        self.connection=psycopg.connect(dsn,autocommit=True)
+        self.connection=psycopg.connect(dsn,autocommit=True,prepare_threshold=None)
         self.connection.execute('set synchronous_commit = off')
         stored=self.connection.execute('select digest from schema_digest').fetchone()
         if stored is None or bytes(stored[0])!=digest():

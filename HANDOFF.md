@@ -1,86 +1,47 @@
-# Handoff, 2026-09-23
+# Handoff, 2026-09-23 evening
 
-## Open problems, most important first
-
-1. **The database layout wastes most of its space.** It is 36 GB for 3,400 snapshots, about 10.7 MB each. Every snapshot stores a full copy of all 388 state tables (a vanilla snapshot is about 1.42M rows).
-   - Rows barely change between snapshots: in `interest_group_clout_trend`, 97.8% of a mini snapshot's rows and 89.7% of a vanilla one's are identical to the previous snapshot.
-   - History buffers are re-stored in full every time. `interest_group_clout_trend` alone is 6.3 GB, and the country/state trend tables and `state_pop_need` are next.
-   - Rows are narrow (about 20 bytes of data, 56 on disk).
-   - Ideas, all lossless:
-     - store rows with a first/last snapshot range, written only on change;
-     - store history as one row per sample;
-     - pack small child lists into array columns (not jsonb);
-     - use integer ids for metric names.
-   - The snapshot is training data: nothing may be removed. `tests/test_coverage.py` and `tests/coverage_baseline.json` guard that.
-2. **Vanilla snapshots have no province data.**
-   - `Store.world()` (`interface/recording/store.py:82`) stores the map (province image, provinces, adjacencies) only for mini worlds; vanilla sets `world_id=None` (`record.py:45`).
-   - `province_block()` (`capture.py:382`) returns '' without a mini world, so `province_state` has 0 rows across all 82 vanilla snapshots.
-   - Fix idea:
-     - generalise `geography.world_data()` to take the game's `map_data` (95 MB), with regions parsed from `map_data/state_regions`;
-     - build the vanilla province list from `province_terrains.txt` and `default.map` (about 40,875 provinces), and measure the capture time.
-3. **The Great Wave (ep2, `dlc018_ep2`) is now owned but its actions are unfinished.**
-   - Rows N7, N8, N11, N18 and N19 were moved back into scope on `master` (commit `045d33e`) and show as missing.
-   - Untested work is on branch **`great-wave-wip`** (commit `111ce81`, not merged):
-     - a `ship_setting` capture: a GUI widget over each fleet's ships recording template name, flagship, can-be-flagship, marked-for-retrofit and retrofit progress;
-     - actions `assign_flagship`/`unassign_flagship`, `retrofit_fleet`/`cancel_retrofit_fleet`, `retrofit_all`/`cancel_retrofit_all`, `set_default_template`/`set_fleet_template`/`delete_template`.
-   - The template offer rule (`templates()`) is still an empty stub.
-   - N19 (ship designer) isn't started. The relevant functions are `ShipDesignerPopup.SetShipType`, `ShipDesignerModSlot.OnSelectModificationForSlot`, `CreateTemplate`/`EditTemplate`, `ToggleRetrofit`, `PopupManager.ToggleShipDesignerPopupWithTemplate`.
-   - The live test (scratchpad `navy_test.py` on GBR) stopped with "The game did not acknowledge the live capture request" on the first capture. The new ship widget may be the cause, or it may be the intermittent startup timeout seen once before. **Test the branch's capture before merging.**
-4. **Catalogue rows still missing:**
-   - B10–B12: straits
-   - N3: mission sea regions
-   - N5: invasion planner
-   - N10: bulk ship actions
-   - W5: treaty war goals
-   - W13: sway offers
-   - T1: treaties
-   - PB8: bloc customization
-   - X8, X9: formation candidacy and unification plays
+## Blocked on the user
+Nothing. Four schema decisions are open (see the review section); until decided, the schema stays as it is.
 
 ## State right now
+- `master` at the latest commit. Unit suite: 181 tests in about 12 s (`.venv/Scripts/python -m unittest discover -s tests -q`). The suite reinstalls `vic3_test` itself.
+- The vanilla rotation round `vanilla_r21` was launched at 18:34 (third attempt; the first two were refused captures, both fixed). Its log is `D:\vic3_data\interface\vanilla_r21.log`; it ends with `ROUND EXITED code=N`.
+- **The working tree's `schema.sql` is newer than the schema installed in `vic3`.** The round runs on the installed schema. After the round ends, reinstall (`store.install`) before launching anything; `Store` refuses a digest mismatch. Reinstalling deletes the stored runs, which is allowed.
+- Rotation: `vanilla_r21` is the pending vanilla round. If it completed (exit code 0 and a counts line), the next five rounds are mini (`mini_r22` onward); if not, relaunch it as `vanilla_r21`.
+- Coverage: 95 of 176 actions verified (`.venv/Scripts/python -m loop.report`). Today's rounds: 782 verified of 819 action entries.
 
-- No round is running, and all game and loop processes are stopped. The hourly reminder cron was deleted.
-- `master` is at `045d33e`. The unit suite passes: 163 tests in about 7 s (`.venv/Scripts/python -m unittest discover -s tests -q`).
-- Coverage report (`.venv/Scripts/python -m loop.report`): 138 of 155 feasible rows implemented; **92 of 176 actions verified**, up from 47 at the start of the session.
-- **Rotation:** 5 minis, then 1 vanilla (see `loop/instruction.txt`). The last vanilla round was r14. Completed minis since then: r16, r17, r18, r19, r20 (r15 crashed and doesn't count). **The next round is vanilla, as `vanilla_r21`.** Consider fixing item 2 first so the vanilla data is complete.
-  - Launch detached via WMI:
-    `cmd.exe /c cd /d D:\vic3_agent && "C:\Program Files\Git\usr\bin\timeout.exe" 1500 .venv\Scripts\python.exe -m loop.run --minutes 20 [--vanilla] [--tag TAG] > D:\vic3_data\interface\<name>.log 2>&1`
-  - A round now starts a new session after an early defeat, until its time budget is used. Each session prints its own counts line.
+## Detection of dead runs (the user's rule: flagged within one second, or it is a critical bug)
+Everything is measured and stored, not promised. See DATABASE.md, section "Run liveness".
+- Game process gone: a watcher thread probes the process handle and one readable word of the executable every 50 ms. Measured: noticed 33 ms after the OS exit stamp, run row flagged 156 ms after it. The round then continues with a fresh session; three crashes in a row stop it.
+- Loop process killed: heartbeat every 100 ms; `run_lost` lists the run after 500 ms of silence with the last heartbeat as the stop time; the next loop start closes it as `loop_lost`. The launcher `loop/launch.cmd` appends `ROUND EXITED code=N` to the round log whatever happened.
+- Loop exception: the run ends as `loop_crashed` with `end_detail`, and a refused capture is dumped whole to `D:\vic3_data\interface\refusals\<time>.pkl` first.
+- Defeat: `dead()` confirms over three reads spaced 200 ms.
+- Still bounded by 5 s, not 1 s: a game that is alive but frozen (date stall, action timeout). Each `run_days` journal entry now records the longest tick gap so the stall limit can be set from data.
+- `run_late_flag` must stay empty; a `CRITICAL` or `LATE FLAG` log line is a critical bug.
 
-## What changed this session (all on `master`)
+## What changed today, in order
+1. Liveness: `GameCrashed`, `Process` handle with `exited`, `readable`, `exit_time`, `watch`; executor and session loops check it; `Loop.run` routes every exit through `end()`; heartbeat thread; `run_lost`, `run_late_flag`; launcher script; `loop` logger at INFO with one line per action.
+2. Dead flags stored for buildings, formations and wars. Script-side formation columns moved to `formation_report`; `formation_private` keeps the memory columns. Builders refuse a capture where script and memory disagree on the live set.
+3. Script captures name objects by slot; `Context.ident` converts every such slot to the memory identity, refusing slots memory lacks.
+4. Every memory handle is stored as the identity it names and anchored on first sight (`referenced_only` lists identities never captured). Provinces stay strict. The game holds stale handles (general to disbanded formation, cultural community to removed state, war goal to vanished play) and forward handles (front sides carry the identity of the war a play will start).
+5. One sample table per trend buffer; rings of the same object differ in capacity.
+6. Regional company headquarters buildings (`building_regional_<company type>`) added to the generated building names.
+7. Review-driven: `_at` functions walk the anchor table with one probe per identity; `run.end_reason` is a closed list with `end_detail`; `name_column` dropped (`Stored` reads vocabulary columns from the foreign keys); `tag`, `world_file`, `cli_seed` moved to `run_generated`.
 
-- **Executor:**
-  - Ship queue items are reached through our own non-virtualized list in the page-button area, with condition-driven page navigation (12 per page).
-  - Each multi-step stage sets an armed flag, and HUD timers turn it into the stage-done flag, so a widget that disappears no longer stalls the action. Abort clears all stage flags.
-  - Popups are closed by the deferred clean (0.1 s), and the auto-confirm fires at 0.02 s. Actions that ask for confirmation now work.
-  - The action time limit is 5 s (bulk production-method switches took up to 2 s).
-  - Log reads tolerate the gap while `debug.log` rotates.
-- **Capture:** per-target state picks for diplomatic actions are evaluated in script and stored on each target country, read via `Reader.holders()`, into the `diplomatic_action_state_pick` table.
-- **New or repaired actions:**
-  - `diplomatic_action_state`: the window's own state list.
-  - `reform_government`: groups taken from the reform panel's lists.
-  - `form_power_bloc`: identity plus primary principle, with a principles reset first.
-  - `pick_principle`: row PB6, not yet exercised.
-  - `transfer_battalions`: explicit left/right formations.
-  - `set_borrow_setting`: `OnClicked`, then execute.
-- **Offer-rule fixes:**
-  - capitulation while the overlord fights; war goals during the countdown; the colonize interest tier; treaty ports; bloc invites; privatizable buildings; reverse pacts;
-  - reform: marginalized groups, insurrectionary groups, the reform-block modifier, and keeping at least one governing group;
-  - raising conscripts only at home; resuming ship construction; DLC-visible principles.
-- **DLC:** `dlc_feature()` maps the seven named features (Sphere of Influence: `power_bloc_features`, `lobbies`, `foreign_investment`, `subject_and_bloc_actions`; Voice of the People: `voice_of_the_people_content`, `voice_of_the_people_preorder`, `agitators`) and raises on unknown names. Earlier in the session I wrongly claimed Sphere of Influence was missing; `ep1` is Sphere of Influence and is owned.
+## Schema review findings still open
+The review (adversarial, against the user's standard) found these; each alternative costs real work and is the user's call:
+1. `game_definition` is an entity-attribute-value table of script fields. Alternative: one typed table per definition folder (about forty) and a rewrite of `Stored.definitions` and the readers in `interface/options`.
+2. `loop_action_param` is name plus typed value. Alternative: typed parameter columns on `loop_action` (or a child table per action) with foreign keys to the anchors and vocabularies acted on.
+3. `world_asset` stores the map files as bytea (94 MB per vanilla world). Alternative: files on disk under the world digest, a digest per file in the table.
+4. Enum tables accept codes without labels (`Store.codes`). Alternative: labels required, unknown codes refused; needs label sources for the enums the memory layout does not name (building_owner_type, event_status, formation_flag, law_phase, privatization_request, slave_basket, treaty_side, war_goal_pressed, wage_level).
+5. Polymorphic references without foreign keys: `journal_entry_target` and `event_target` (scope_type + scope_target), `building_ownership_history` (owner_type + owner), `war_goal_history.target_other`, `formation_status.current_location` and `target_location`, `battle_history.invasion`. Alternative: one typed nullable column per target kind with a check that exactly one is set.
+6. Smaller: `player_message` and `player_construction_queue_item` keyed by position churn on every shift; `float8` for the game's fixed-point values; `state_pop_need.need` has no vocabulary; the four secondary indexes could be partial on `present`.
 
-## Smaller known issues
-
-- `demand_state` no_effect: the AI declining, and the decline isn't captured.
-- `create_company`: the re-establish cooldown and the company limit aren't captured.
-- `rehome_formation` while a rehome is already under way; `white_peace` while a peace deal is pending; authority raced within a pause.
-- `insurrectionary()` relies on `civil_war` plus `interest_group_movement_support`; `interest_group.civil_war` is never populated.
+## Catalogue rows still missing
+B10–B12 straits; N3 mission sea regions; N5 invasion planner; N7, N8, N11, N18, N19 (Great Wave navy work; untested code was on the old branch `great-wave-wip`, which is not in this repository's history); N10 bulk ship actions; W5 treaty war goals; W13 sway offers; T1 treaties; PB8 bloc customization; X8, X9 formation candidacy and unification plays.
 
 ## Useful scratchpad scripts
-
-Folder: `C:\Users\trist\AppData\Local\Temp\claude\D--vic3-agent\ce3a4ba2-d567-489c-aaa3-559f3178b4a3\scratchpad`
-
-- `trio_test.py TAG action...`: debug campaign, runs the offered combinations and prints before/after state.
-- `bloc_probe.py` / `flow_probe.py`: step-by-step probes built by truncating an action's stages with `dataclasses.replace`.
-- `debug_live.py`, `navy_test.py`.
-- Launch them detached with the same WMI pattern, using profile `development`.
+Folder: `C:\Users\trist\AppData\Local\Temp\claude\D--vic3-agent\3b26cb9e-043f-4cdf-bad5-5886126b3e4e\scratchpad`
+- `inspect_refusal.py [dump]`: for a refused capture, whether the named slot exists in memory, which columns and script lists hold it.
+- `inspect_samples.py`, `inspect_ring.py`: trend buffer contents and ring-order check.
+- `formation_probe.py`, `formation_probe2.py`, `formation_probe3.py`, `war_probe.py`: live probes on the `development` profile (mini world generated on the spot, or vanilla GBR) that run one action and print memory versus script state; launch detached via WMI, they delete their run afterwards.

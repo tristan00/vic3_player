@@ -161,6 +161,18 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(c.execute('select end_reason,ended_at=heartbeat_at from run where run_id=%s',(lost,)).fetchone(),('loop_lost',True))
         self.assertEqual(c.execute('select count(*) from run_lost').fetchone(),(0,))
 
+    def test_verification_is_computed_by_the_database_from_logged_actions(self):
+        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+        c=self.store.connection
+        self.store.names('action',['build','research'])
+        for n,(name,status) in enumerate((('build','verified'),('build','verified'),('build','verified'),('research','invalid')),1):
+            self.store.log_action({'seq':n,'turn':1,'advisor':'random','action':name,'params':{'state':1},'snapshot':0,'status':status,'detail':'x','ms':1},None)
+        rows=dict((a,(r,v,f,w,ok)) for a,r,v,f,w,ok in c.execute('select action,runs,verified,failed,worlds,verified_by_standard from action_verification').fetchall())
+        self.assertEqual(rows['build'],(1,3,0,1,False))
+        self.assertEqual(rows['research'],(1,0,1,0,False))
+        self.assertEqual(c.execute('select verified_actions,catalogue_actions,never_attempted from verification_summary').fetchone(),(0,2,0))
+        self.assertEqual(c.execute('select world from action_run_outcome').fetchone(),('attached',))
+
     def test_samples_are_immutable(self):
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
         changed=built({**STEPS[1],'samples':[(1,0.9),(2,0.6)]})
