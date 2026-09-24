@@ -535,8 +535,8 @@ ENACTMENT_COOLDOWN_HOURS=730*24
 
 
 def enacting_laws(s):
-    mine=set(s.mine('law'))
-    return [ident for ident,started in s.rows('law_private','law,enactment_start_date') if ident in mine and started is not None and started!=NO_DATE]
+    phases=s.map('law','law,phase',country=s.player)
+    return [ident for ident,started in s.rows('law_private','law,enactment_start_date') if phases.get(ident) and started is not None and started!=NO_DATE]
 
 
 def enacting(s):
@@ -594,7 +594,7 @@ def negotiable(s):
     ideologies=group_ideologies(s)
     current=current_law(s,enacting_law)
     willing={ident for ident,amenability,negotiated in s.rows('interest_group_private','interest_group,amenability,negotiated')
-             if amenability is not None and amenability>=MIN_AMENABILITY and not negotiated}
+             if amenability is not None and amenability>MIN_AMENABILITY and not negotiated}
     return [ident for ident,government,influence in s.rows('interest_group','interest_group,in_government,influence_type',country=s.player)
             if ident in willing and influence!=MARGINALIZED and (stance(s,ideologies.get(ident,[]),enacting_law)<stance(s,ideologies.get(ident,[]),current)
                                      or government and not endorses(s,ideologies.get(ident,[]),enacting_law))]
@@ -1575,7 +1575,7 @@ RULES={
     'reform_government':lambda s:[{'interest_group':group,'mode':'Staged' if governs else 'Potential'}
                                   for group,governs,influence in s.rows('interest_group','interest_group,in_government,influence_type',country=s.player)
                                   if not law_flag(s,'country_block_government_reform_bool')
-                                  and ((governs and governing_count(s)>1) or (not governs and influence!=MARGINALIZED and group not in insurrectionary(s)))],
+                                  and group not in insurrectionary(s) and ((governs and governing_count(s)>1) or (not governs and influence!=MARGINALIZED))],
     'form_power_bloc':lambda s:[{'power_bloc_identity':identity,'power_bloc_principle':levels[0]} for identity in s.keys('power_bloc_identity') if may_found_bloc(s)
                                 and passes(s,'common/power_bloc_identities',identity,('visible','possible'),country_scope(s))
                                 for group in s.definitions('common/power_bloc_principle_groups')

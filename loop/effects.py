@@ -229,7 +229,8 @@ def objective(snapshot,formation):
 
 
 def interaction_state(snapshot,character):
-    return snapshot.rows('character','country,interest_group',character=character),snapshot.characters_roles(character)
+    return (snapshot.rows('character','country,interest_group,noble,prominence,rank',character=character),snapshot.characters_roles(character),
+            set(snapshot.rows('character_timed_modifier','modifier,instances',character=character)),snapshot.rows('character_status','popularity',character=character))
 
 
 def relations(snapshot):

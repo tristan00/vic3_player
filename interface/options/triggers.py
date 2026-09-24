@@ -677,6 +677,7 @@ HANDLERS={
         'leverage_advantage':leverage_advantage,
     },
     'country':{
+        'aggressive_diplomatic_plays_permitted':lambda o,v,sc:(not modifier_flag(sc.s,sc.ident,'country_disallow_aggressive_plays_bool'))==yes(v),
         'is_diplomatic_play_participant_with':lambda o,v,sc:resolve(sc,v) is not None and play_participants(sc.s,sc.ident,resolve(sc,v)),
         'is_indirect_subject_of':lambda o,v,sc:resolve(sc,v) in indirect_overlords(sc.s,sc.ident),
         'has_strategic_region_interest_tier':region_tier,
