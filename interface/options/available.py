@@ -535,8 +535,8 @@ ENACTMENT_COOLDOWN_HOURS=730*24
 
 
 def enacting_laws(s):
-    phases=s.map('law','law,phase',country=s.player)
-    return [ident for ident,started in s.rows('law_private','law,enactment_start_date') if phases.get(ident) and started is not None and started!=NO_DATE]
+    mine=set(s.mine('law'))
+    return [ident for ident,started in s.rows('law_private','law,enactment_start_date') if ident in mine and started is not None and started!=NO_DATE]
 
 
 def enacting(s):
