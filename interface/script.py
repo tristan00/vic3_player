@@ -188,7 +188,7 @@ BLOCK_FIELDS={
     'common/combat_unit_types':('upkeep_modifier',),
     'common/decrees':('state_trigger','country_trigger'),
     'common/war_goal_types':('possible','valid'),
-    'common/amendments':('can_repeal',),
+    'common/amendments':('can_repeal','modifier'),
     'common/scripted_buttons':('possible',),
     'common/law_groups':('change_allowed_trigger',),
     'common/power_bloc_principles':('power_bloc_modifier','visible','possible'),

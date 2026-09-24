@@ -192,8 +192,14 @@ def dlc_feature(s,feature):
     return token in set(s.dlc)
 
 
+def amendments(s,country):
+    mine={law for law, in s.rows('law','law',country=country)}
+    return [kind for law,kind in s.rows('amendment','law,amendment_type') if law in mine]
+
+
 def modifier_texts(s,country):
-    sources=[('common/laws',law) for law in laws(s,country)]+[('common/technology/technologies',tech) for tech in technologies(s,country)]
+    sources=([('common/laws',law) for law in laws(s,country)]+[('common/technology/technologies',tech) for tech in technologies(s,country)]
+             +[('common/amendments',kind) for kind in amendments(s,country)])
     return [text for folder,key in sources for text in s.definitions(folder).get(key,{}).get('modifier',())]
 
 
