@@ -60,7 +60,7 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
        'money':('nationalize','bulk_nationalize','bulk_nationalize_state','declare_bankruptcy'),
        'companies':('create_company','remove_company'),
        'decisions':('take_decision',),
-       'retrofit':('retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all'),
+       'retrofit':('retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all','decommission_ship'),
        'influence':('diplomatic_action','diplomatic_action_state','diplomatic_action_obligation'),
        'research':('research','queue_research','dequeue_research'),
        'imposition':('impose_law',),
@@ -70,7 +70,7 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
        'commanders':('hire_commander','hire_commander_for','unassign_commander'),
        'army_state':('mobilize','mobilize_all','mobilize_selected','demobilize','demobilize_all','demobilize_selected','station_formation','rehome_formation','back_down','capitulate','disband_formation','disband_regulars'),
        'shipbuilding':('build_ship','build_ship_for','cancel_ship','pause_ship_construction','resume_ship_construction','raise_ship_item',
-                       'lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item','declare_bankruptcy'),
+                       'lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item','declare_bankruptcy','decommission_ship'),
        'templates':('design_ship_template','edit_ship_template','set_default_ship_template','set_fleet_ship_template','delete_ship_template')}
 
 
@@ -163,18 +163,22 @@ class Loop:
 
     @timed
     def turn_actions(self,snapshot,carried):
-        options={name:combos for name,combos in available(snapshot).items() if name not in PARKED}
-        events=options.pop('choose_event_option',[])
-        links={**{('building',ident):('building_type',kind) for ident,kind,_ in snapshot.buildings()},
-               **{('character',ident):('military_formation',formation) for ident,formation in snapshot.rows('character','character,formation',country=snapshot.player) if formation},
-               **{('war',war):('diplomatic_play',play) for play,war in snapshot.rows('diplomatic_play','diplomatic_play,war') if war is not None},
-               **{('ship',ship):('military_formation',fleet) for ship,fleet in snapshot.rows('ship','ship,fleet') if fleet is not None}}
-        touched=set()
         batch=[]
+        touched=set()
+        options=available(snapshot)
+        events=options['choose_event_option']
         for event in sorted({combo['event'] for combo in events}):
             name,params=self.advisors[0].choose({'choose_event_option':[combo for combo in events if combo['event']==event]},snapshot)
             touched|=targets(name,params)
             self.perform(self.advisors[0].name,name,params,snapshot,batch)
+        if batch:
+            snapshot=self.snapshot('post_action')
+            options=available(snapshot)
+        options={name:combos for name,combos in options.items() if name not in PARKED and name!='choose_event_option'}
+        links={**{('building',ident):('building_type',kind) for ident,kind,_ in snapshot.buildings()},
+               **{('character',ident):('military_formation',formation) for ident,formation in snapshot.rows('character','character,formation',country=snapshot.player) if formation},
+               **{('war',war):('diplomatic_play',play) for play,war in snapshot.rows('diplomatic_play','diplomatic_play,war') if war is not None},
+               **{('ship',ship):('military_formation',fleet) for ship,fleet in snapshot.rows('ship','ship,fleet') if fleet is not None}}
         answers={name:options.pop(name,[]) for pair in PROPOSAL_ANSWERS for name in pair}
         quick=options.pop('quick_decline_proposal',[])
         for pair in PROPOSAL_ANSWERS:

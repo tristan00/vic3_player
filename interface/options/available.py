@@ -1082,24 +1082,14 @@ FASTEST_SPEED='4'
 DEFAULT_TAX_COST=100
 
 
-def pop_demand(s):
-    def compute():
-        market=s.map('country','country,market').get(s.player)
-        areas={area for area, in s.rows('market_area','market_area',market=market)}
-        states={state for area,state in s.rows('market_area_state','market_area,state') if area in areas}
-        mine={ident for ident,state in s.rows('building','building,state') if state in states}
-        demand=dict(s.rows('market_goods','goods,buy_orders',market=market))
-        for ident,goods,value in s.rows('building_goods','building,goods,input'):
-            if ident in mine and value is not None:
-                demand[goods]=demand.get(goods,0)-value
-        return demand
-    return s.memo('pop_demand',compute)
+def pop_needed(s):
+    states=set(s.states())
+    return s.memo('pop_needed',lambda:{goods for state,goods,weight in s.rows('state_pop_need','state,goods,weight') if state in states and weight})
 
 
 def taxable(s):
     taxed={goods for goods, in s.rows('player_taxed_goods','goods')}
-    consumed={goods for fields in s.definitions('common/pop_needs').values() for goods in fields.get('goods',[])}
-    return [goods for goods in s.keys('goods') if goods in taxed or (goods in consumed and pop_demand(s).get(goods,0)>0
+    return [goods for goods in s.keys('goods') if goods in taxed or (goods in pop_needed(s)
             and authority(s)>=float(next(iter(definition(s,'common/goods',goods,'consumption_tax_cost')),DEFAULT_TAX_COST)))]
 
 
@@ -1608,6 +1598,7 @@ DIPLOMATIC={'da_knowledge_sharing':lambda s,c:len(technologies(s)[0])>len(tech_o
             'join_power_bloc':lambda s,c:not overlords(s,s.player) and any(bloc_advantage(s,bloc,s.player)>=JOIN_LEVERAGE and below_leader(s,bloc)
                                                                             for bloc in power_bloc_of(s,c)),
             'invite_to_power_bloc':lambda s,c:not power_bloc_of(s,c),
+            'fund_lobbies':lambda s,c:rank_value(s,s.player)>=rank_value(s,c) and not in_default(s),
             'da_support_regime':lambda s,c:country_metric(s,c,'GetGovernmentLegitimacy') is not None and country_metric(s,c,'GetGovernmentLegitimacy')<75}
 
 
