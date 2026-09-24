@@ -1612,7 +1612,7 @@ RULES={
     'recruit_from_formation':lambda s:[{'military_formation':combo['military_formation'],'combat_unit_type':combo['combat_unit_type'],'state':s.map('building','building,state')[combo['building']]}
                                        for combo in recruit(s)],
     'activate_conscription_center':lambda s:[{'military_formation':formation,'combat_unit_type':kind,'state':state} for state in conscription_states(s)
-                                             for kind in unit_types_unlocked(s) for formation in s.formations('army')],
+                                             for kind in unit_types_unlocked(s) for formation in s.formations('army')] if 'law_peasant_levies' not in active_laws(s) else [],
     'disembark':lambda s:product(military_formation=[f for armies_ in [set(s.formations('army'))] for f, in s.rows('formation_report','formation',embarked=True) if f in armies_]),
     'cancel_invasion':lambda s:product(military_formation=[f for manned in [set(s.formations())] for f, in s.rows('formation_report','formation',invading=True) if f in manned]),
     'mobilize':lambda s:product(military_formation=[f for f in armies(s,False) if not demobilizing(s,f)] if principal(s) else []),
