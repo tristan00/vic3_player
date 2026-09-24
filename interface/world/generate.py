@@ -675,13 +675,6 @@ def generate(seed,countries,states,tech,pop,*,game_dir=DEFAULT_GAME,data_dir=DEF
     strait_lines=[]
     eligible=[s for s in straits if len(s['seas'])>=2]
     chokepoints=[s for s in eligible if rng.random()<min(1,data['straits_per_crossing']*len(straits)/len(eligible))]
-    if eligible and not chokepoints:
-        chokepoints=[rng.choice(eligible)]
-    owner_of={p:s['country'] for s in regions for p in s['provinces']}
-    for strait in chokepoints:
-        for country in world['countries']:
-            if country['tag'] in {owner_of[strait['from']],owner_of[strait['to']]}:
-                country['situations']+=1
     for i,strait in enumerate(straits,1):
         (x0,y0),(x1,y1)=strait['start'],strait['stop']
         adjacency_lines.append(f'{codes[strait["from"]]};{codes[strait["to"]]};sea;-1;{x0};{height-y0};{x1};{height-y1};;strait_{i}')
