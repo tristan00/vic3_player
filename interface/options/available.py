@@ -1886,7 +1886,7 @@ RULES={
                         product(state=colonizable(s)),
     'toggle_pause_colonization':lambda s:product(state=colonies(s)),
     'abandon_colony':lambda s:product(state=abandonable(s)),
-    'incorporate':lambda s:product(state=[i for i in s.states() if incorporation(s).get(i)==0 and i not in colonies(s)]),
+    'incorporate':lambda s:product(state=[i for i in s.states() if incorporation(s).get(i)==0 and i not in colonies(s) and not s.map('state_economy','state,treaty_port').get(i)]),
     'unincorporate':lambda s:product(state=[i for i in s.states() if 0<need(incorporation(s).get(i),f'incorporation of state {i}')<1]),
     'press_journal_button':journal_buttons,
     'choose_event_option':event_options,
