@@ -876,7 +876,13 @@ def unit_group(s,kind):
 def upgradable(s,military_formation,combat_unit_type):
     selected=selected_units(s,military_formation).get(unit_group(s,combat_unit_type))
     pending={kind for kind, in s.rows('formation_upgrade_unit_type','combat_unit_type',formation=military_formation)}
-    return selected is not None and combat_unit_type not in pending and selected in definition(s,'common/combat_unit_types',combat_unit_type,'upgrades')
+    if selected is None or combat_unit_type in pending or selected not in definition(s,'common/combat_unit_types',combat_unit_type,'upgrades'):
+        return False
+    needed=unit_goods(s,'common/combat_unit_types',selected)
+    supplies=state_supply(s)
+    located=s.map('building','building,state')
+    return all(needed<=supplies.get(located.get(building),set())
+               for building,kind in s.rows('combat_unit','building,combat_unit_type',formation=military_formation) if kind==combat_unit_type)
 
 
 def changing(s):
