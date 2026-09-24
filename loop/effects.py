@@ -1,6 +1,6 @@
 import collections
 from interface.actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, LEVELS, TOLL_LEVELS
-from interface.options.available import COUNTRY_OWNER, own_templates, in_default, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, privatizable, privatization_requested, PRIVATIZATION_REQUESTED, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
+from interface.options.available import COUNTRY_OWNER, subject_pairs, own_templates, in_default, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, privatizable, privatization_requested, PRIVATIZATION_REQUESTED, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
 from interface.recording.spec import TABLE
 
 SLOT=0xFFFFFF
@@ -362,7 +362,7 @@ EFFECTS={
     'toggle_monopoly':(None,lambda a,b,p,n:((p['building_type'],) in a.rows('player_monopoly','building_type'))
                        !=((p['building_type'],) in b.rows('player_monopoly','building_type'))),
     'character_interaction':('character',lambda a,b,p,n:interaction_state(a,p[n])!=interaction_state(b,p[n]) or None),
-    'start_play_confirmed':(None,lambda a,b,p,n:plays(a)!=plays(b) or None),
+    'start_play_confirmed':(None,lambda a,b,p,n:plays(a)!=plays(b) or subject_pairs(a)!=subject_pairs(b)),
     'diplomatic_action_state':('country',lambda a,b,p,n:value(a,'state','country',p['state'])!=value(b,'state','country',p['state'])
                                or plays(a)!=plays(b) or pacts(a)!=pacts(b)),
     'diplomatic_action_obligation':('country',lambda a,b,p,n:set(a.rows('player_obligation','country,direction'))!=set(b.rows('player_obligation','country,direction'))
