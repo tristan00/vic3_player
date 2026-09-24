@@ -55,7 +55,8 @@ SHARED={**{name:'queue' for name in ('raise_queue_item','lower_queue_item','firs
         **{name:'enactment' for name in ('enact_law','cancel_enactment','negotiate')},
         **{name:'commanders' for name in ('hire_commander','hire_commander_for','unassign_commander')},
         **{name:'army_state' for name in ('mobilize','mobilize_all','demobilize','demobilize_all','station_formation','rehome_formation','back_down','capitulate')},
-        **{name:'shipbuilding' for name in ('build_ship','build_ship_for','cancel_ship','pause_ship_construction','resume_ship_construction')}}
+        **{name:'shipbuilding' for name in ('build_ship','build_ship_for','cancel_ship','pause_ship_construction','resume_ship_construction','raise_ship_item',
+                                            'lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item')}}
 
 
 def targets(name,params,links={}):
