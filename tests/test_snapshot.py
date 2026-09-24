@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
-from interface.options.available import RULES, trade_level
+from interface.options.available import RULES, barred_regions, capital_frontier, months_later, repealable, trade_level
 from tests.memory_stored import Memory
 from interface.runner.memory import Reader, HEAP_LOW, visible_columns
 from interface.script import event_options
@@ -373,6 +373,35 @@ class RuleTests(unittest.TestCase):
         self.assertEqual(trade_level(s,'import','grain'),5)
         self.assertEqual(trade_level(s,'export','grain'),1)
         self.assertEqual(trade_level(s,'import','wood'),3)
+
+    def test_colonization_skips_regions_whose_traits_need_an_unresearched_technology(self):
+        traits=lambda *acquired:snapshot(definitions={'common/state_traits':{'state_trait_severe_malaria':{'required_techs_for_colonization':['quinine']},'state_trait_malaria':{}}},
+                                         country_research_history=[{'country_research':1,'country':PLAYER}],
+                                         country_research_acquired=[{'country_research':1,'technology':name} for name in acquired],
+                                         state_region_trait=[{'state_region':'STATE_A','state_trait':'state_trait_severe_malaria'},{'state_region':'STATE_B','state_trait':'state_trait_malaria'}])
+        self.assertEqual(barred_regions(traits()),{'STATE_A'})
+        self.assertEqual(barred_regions(traits('quinine')),set())
+
+    def test_frontier_colonization_borders_only_the_player_own_states_around_the_capital(self):
+        s=snapshot(definitions={'common/diplomatic_actions':{'vassal':{'subject_pact':['yes']}},'adjacency':[(1,2),(2,3),(5,4),(5,6)]},
+                   country_history=[{'country':PLAYER,'capital':10},{'country':OTHER,'capital':20}],
+                   pact_history=[{'pact':1,'first_country':PLAYER,'second_country':OTHER,'pact_type':'vassal'}],
+                   state_history=[{'state':10,'country':PLAYER},{'state':20,'country':OTHER},{'state':30,'country':99},{'state':40,'country':99}],
+                   province_history=[{'province':1,'state':10,'controller':PLAYER},{'province':5,'state':10,'controller':PLAYER},{'province':2,'state':20,'controller':OTHER},
+                                     {'province':3,'state':30,'controller':99},{'province':4,'state':40,'controller':99},{'province':6,'state':None,'controller':None}])
+        self.assertEqual(capital_frontier(s),{20,40})
+
+    def test_sponsored_amendments_repeal_ten_years_after_activation(self):
+        activated=1000*365*24
+        amendments=lambda hours:snapshot(law_history=[{'law':1,'country':PLAYER,'active':True}],law_amendment=[{'law':1,'amendment':5},{'law':1,'amendment':6}],
+                                         amendment_history=[{'amendment':5,'law':1,'timeout':600,'timeout_date':months_later(activated,600)},
+                                                            {'amendment':6,'law':1,'timeout':0,'timeout_date':None}])
+        early=amendments(activated)
+        early.hours=months_later(activated,119)
+        self.assertEqual(repealable(early),{6})
+        late=amendments(activated)
+        late.hours=months_later(activated,120)
+        self.assertEqual(repealable(late),{5,6})
 
 
 if __name__=='__main__':

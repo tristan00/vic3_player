@@ -144,6 +144,7 @@ DEFINITION_FIELDS={
     'common/building_groups':('parent_group','is_government_funded','should_auto_expand','default_building'),
     'common/technology/technologies':('unlocking_technologies','can_research'),
     'common/laws':('group','unlocking_technologies','unlocking_laws','disallowing_laws'),
+    'common/state_traits':('required_techs_for_colonization',),
     'common/decrees':('unlocking_technologies','unlocking_laws','cost'),
     'common/goods':('cost','consumption_tax_cost','local','tradeable'),
     'common/combat_unit_types':('group','unlocking_technologies','upgrades'),

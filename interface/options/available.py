@@ -626,6 +626,14 @@ def attached_amendments(s):
     return s.memo('attached_amendments',compute)
 
 
+REPEAL_COOLDOWN_MONTHS=120
+
+
+def repealable(s):
+    return {ident for ident,timeout,expiry in s.rows('amendment','amendment,timeout,timeout_date') if ident in attached_amendments(s)
+            and (expiry is None or now(s)>=months_later(expiry,REPEAL_COOLDOWN_MONTHS-timeout))}
+
+
 def negotiable(s):
     laws=s.map('law','law,law_type',country=s.player)
     enacting_law=next((laws[ident] for ident in enacting_laws(s)),None)
@@ -1292,19 +1300,27 @@ def colonizable(s):
     colonized={located.get(state) for state,province in s.rows('state_status','state,next_colony_province') if province is not None}
     blocked={region for state,region,country in rows if in_play(s,country)}
     frontier='law_frontier_colonization' in active_laws(s)
+    barred=barred_regions(s)
     return sorted({region:state for state,region,country in rows if country in decentralized(s) and state_regions(s).get(state) in engaged(s)
-                   and region not in colonized and region not in blocked and not truce(s,country)
+                   and region not in colonized and region not in blocked and region not in barred and not truce(s,country)
                    and (not frontier or state in capital_frontier(s))}.values())
+
+
+def barred_regions(s):
+    acquired,*_=technologies(s)
+    required={trait:set(fields.get('required_techs_for_colonization',())) for trait,fields in s.definitions('common/state_traits').items()}
+    return {region for region,trait in s.rows('state_region_trait','state_region,state_trait') if required.get(trait,set())-acquired}
 
 
 def capital_frontier(s):
     def compute():
         components=march_components(s)
         home=components.get(s.map('country','country,capital').get(s.player),set())
+        owned=set(s.states())
         colors=s.province_colors()
         rows=s.rows('province','province,state')
-        mine={colors[province] for province,state in rows if components.get(state,set())&home}
-        state_of={colors[province]:state for province,state in rows}
+        mine={colors[province] for province,state in rows if state in owned and components.get(state,set())&home}
+        state_of={colors[province]:state for province,state in rows if state is not None}
         return {state_of[other] for first,second in s.adjacency() for near,other in ((first,second),(second,first))
                 if near in mine and other not in mine and other in state_of}
     return s.memo('capital_frontier',compute)
@@ -1752,7 +1768,7 @@ RULES={
     'cancel_enactment':lambda s:[{}] if enacting(s) else [],
     'impose_law':lambda s:product(law=imposable(s)),
     'repeal_amendment':lambda s:product(amendment=[ident for ident,law,kind in s.rows('amendment','amendment,law,amendment_type')
-                                                   if ident in attached_amendments(s)
+                                                   if ident in repealable(s)
                                                    and opposed_in_government(s,next(iter(definition(s,'common/amendments',kind,'parent')),None))
                                                    and passes(s,'common/amendments',kind,('can_repeal',),country_scope(s))]),
     'toggle_bolster_movement':lambda s:product(political_movement=movements(s,PROMOTED)),
