@@ -1,13 +1,15 @@
 from collections import defaultdict
 import hashlib
 import logging
+import multiprocessing
+import os
 from pathlib import Path
-import threading
 import time
 
+import psutil
 import psycopg
 
-from ..common import STALL_LIMIT, progress, progress_age, timed
+from ..common import PROGRESS_AT, PROGRESS_STEP, STALL_LIMIT, progress, read_progress, timed
 from .spec import CLOSED,ENTITIES,TABLES,VOCABULARIES
 
 DSN='host=127.0.0.1 port=55433 dbname=vic3 user=postgres'
@@ -183,8 +185,6 @@ class Store:
         return world_id
 
     def begin_run(self,started_at,kind,advisors=(),**generated):
-        self.heartbeat_connection=psycopg.connect(self.dsn,autocommit=True)
-        self.heartbeat_connection.execute('set synchronous_commit = off')
         lost=self.connection.execute("update run set ended_at=heartbeat_at,end_reason='loop_lost' where ended_at is null returning run_id,heartbeat_at").fetchall()
         for run_id,heartbeat_at in lost:
             LOG.error('RUN %s WAS LOST: its loop last beat at %s UTC',run_id,heartbeat_at)
@@ -192,7 +192,10 @@ class Store:
         self.run_id=None
         self.constants=None
         self.seq=0
-        self.beater=None
+        self.beating=multiprocessing.Event()
+        self.beat_run=multiprocessing.Value('i',0,lock=False)
+        self.beater=multiprocessing.Process(target=heartbeat,args=(self.dsn,self.beat_run,PROGRESS_AT,PROGRESS_STEP,self.beating,os.getpid()),daemon=True,name='heartbeat')
+        self.beater.start()
         self.anchored={entity:set() for entity in ENTITIES}
         self.previous={}
         self.samples={}
@@ -422,28 +425,7 @@ class Store:
                        for name,value in entry['params'].items()])
 
     def start_heartbeat(self):
-        self.beating=threading.Event()
-        self.longest=0
-        self.beater=threading.Thread(target=self.beat,daemon=True,name='heartbeat')
-        self.beater.start()
-
-    def beat(self):
-        with self.heartbeat_connection as connection:
-            due=time.monotonic()
-            while True:
-                step,age=progress_age()
-                started=time.monotonic()
-                if age>self.longest:
-                    self.longest=age
-                    connection.execute('update run set longest_step=%s,longest_step_ms=%s where run_id=%s',(step,round(age*1000),self.run_id))
-                connection.execute("update run set heartbeat_at=now(),progress_at=now()-%s*interval '1 second',progress_step=%s where run_id=%s",
-                                   (age,step,self.run_id))
-                done=time.monotonic()
-                if done-due>SLOW_BEAT:
-                    LOG.warning('SLOW BEAT in %s: woke %.3f s late, update took %.3f s',step,started-due,done-started)
-                due=time.monotonic()+HEARTBEAT
-                if self.beating.wait(HEARTBEAT):
-                    return
+        self.beat_run.value=self.run_id
 
     def flag_stalled(self,step,age):
         with psycopg.connect(self.dsn,autocommit=True) as connection:
@@ -464,6 +446,33 @@ class Store:
             self.beater=None
         self.connection.execute('update run set ended_at=now(),end_reason=%s,end_detail=%s,game_exited_at=%s where run_id=%s and ended_at is null',
                                 (reason,detail,game_exited_at,self.run_id))
+
+
+def heartbeat(dsn,run,at,step,stop,parent):
+    logging.basicConfig(level=logging.WARNING,format='%(asctime)s %(message)s')
+    with psycopg.connect(dsn,autocommit=True) as connection:
+        connection.execute('set synchronous_commit = off')
+        longest=0
+        due=time.monotonic()
+        while not stop.is_set():
+            if not psutil.pid_exists(parent):
+                return
+            if not run.value:
+                stop.wait(HEARTBEAT/10)
+                due=time.monotonic()
+                continue
+            name,age=read_progress(at,step)
+            started=time.monotonic()
+            if age>longest:
+                longest=age
+                connection.execute('update run set longest_step=%s,longest_step_ms=%s where run_id=%s',(name,round(age*1000),run.value))
+            connection.execute("update run set heartbeat_at=now(),progress_at=now()-%s*interval '1 second',progress_step=%s where run_id=%s",
+                               (age,name,run.value))
+            done=time.monotonic()
+            if done-due>SLOW_BEAT:
+                LOG.warning('SLOW BEAT in %s: woke %.3f s late, update took %.3f s',name,started-due,done-started)
+            due=time.monotonic()+HEARTBEAT
+            stop.wait(HEARTBEAT)
 
 
 def enumerate_rows(run_id,values):

@@ -1,6 +1,7 @@
 from functools import wraps
 import json
 import logging
+import multiprocessing
 from pathlib import Path
 import time
 
@@ -17,15 +18,22 @@ def slot(value):
 
 
 STALL_LIMIT=5
-PROGRESS={'step':'start','at':time.monotonic()}
+STEP_BYTES=200
+PROGRESS_AT=multiprocessing.Value('d',time.monotonic(),lock=False)
+PROGRESS_STEP=multiprocessing.Array('c',STEP_BYTES,lock=False)
 
 
 def progress(step):
-    PROGRESS.update(step=step,at=time.monotonic())
+    PROGRESS_STEP.value=step.encode('utf-8','replace')[:STEP_BYTES-1]
+    PROGRESS_AT.value=time.monotonic()
+
+
+def read_progress(at,step):
+    return step.value.decode('utf-8','replace'),time.monotonic()-at.value
 
 
 def progress_age():
-    return PROGRESS['step'],time.monotonic()-PROGRESS['at']
+    return read_progress(PROGRESS_AT,PROGRESS_STEP)
 
 
 def timed(method):
