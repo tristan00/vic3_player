@@ -1,10 +1,13 @@
 from collections import defaultdict
+import logging
 from dataclasses import dataclass
 
 from ..common import progress, slot, timed
 from .spec import DROPPED_COUNTRY_METRICS,DROPPED_STATE_METRICS,METRIC_COLUMNS,METRICS_KINDS,TABLE,TABLES
 
 SLOT=0xffffff
+
+LOG=logging.getLogger('interface')
 
 
 @dataclass
@@ -934,8 +937,12 @@ def politics(c):
             for group, in items:
                 c.add('civil_war_interest_group',civil_war=ids[i],interest_group=group)
         for i,items in c.children('civil_war_seceded_state','id','state_region','incorporated').items():
+            empty=[incorporated for region,incorporated in items if not region]
+            if empty:
+                LOG.warning('Civil war %s lists %d seceded entries without a state region',ids[i],len(empty))
             for region,incorporated in items:
-                c.add('civil_war_seceded_state',civil_war=ids[i],state_region=c.label(region),incorporated=flag(incorporated))
+                if region:
+                    c.add('civil_war_seceded_state',civil_war=ids[i],state_region=c.label(region),incorporated=flag(incorporated))
 
 
 CHARACTER_KEYS=('religion','first_name','last_name','ideology','order_type','rank')
