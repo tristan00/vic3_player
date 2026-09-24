@@ -871,10 +871,6 @@ def armies(s,mobilized):
     return [ident for ident,value in s.rows('formation_status','formation,mobilized') if ident in manned and value==mobilized]
 
 
-def unit_types(s,military_formation):
-    return sorted({kind for kind, in s.rows('combat_unit','combat_unit_type',formation=military_formation)})
-
-
 def selected_units(s,formation):
     return dict(s.rows('formation_selected_unit_type','combat_unit_group,combat_unit_type',formation=formation))
 
@@ -969,8 +965,14 @@ def conscript_types(s,formation):
                    if kinds.get(building)=='building_conscription_center'})
 
 
+def regular_types(s,formation):
+    kinds={ident:kind for ident,(kind,_) in located_buildings(s).items()}
+    return sorted({unit for unit,building in s.rows('combat_unit','combat_unit_type,building',formation=formation)
+                   if kinds.get(building)!='building_conscription_center'})
+
+
 def formation_units(s,formations):
-    return [{'military_formation':formation,'combat_unit_type':kind} for formation in formations for kind in unit_types(s,formation)]
+    return [{'military_formation':formation,'combat_unit_type':kind} for formation in formations for kind in regular_types(s,formation)]
 
 
 def country_metric(s,country,name):
