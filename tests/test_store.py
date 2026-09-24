@@ -153,6 +153,17 @@ class StoreTests(unittest.TestCase):
         self.assertIsNone(self.store.beater)
         self.assertEqual(c.execute('select end_reason,ended_at is not null from run where run_id=%s',(run,)).fetchone(),('time',True))
 
+    def test_a_run_whose_loop_vanished_is_closed_by_the_next_loop_with_its_last_heartbeat(self):
+        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+        c=self.store.connection
+        lost=self.store.run_id
+        c.execute("update run set heartbeat_at=now()-interval '9 seconds' where run_id=%s",(lost,))
+        other=Store(DSN)
+        other.begin_run(started_at=datetime(2026,9,23,tzinfo=timezone.utc),kind='attached')
+        other.connection.close()
+        self.assertEqual(c.execute('select end_reason,ended_at=heartbeat_at from run where run_id=%s',(lost,)).fetchone(),('loop_lost',True))
+        self.assertEqual(c.execute('select count(*) from run_lost').fetchone(),(0,))
+
     def test_samples_are_immutable(self):
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
         changed=built({**STEPS[1],'samples':[(1,0.9),(2,0.6)]})
