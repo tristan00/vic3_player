@@ -3,6 +3,7 @@ import hashlib
 import logging
 from pathlib import Path
 import threading
+import time
 
 import psycopg
 
@@ -16,6 +17,7 @@ SLOT=0xffffff
 FIXED={'pact_history':('first_country','second_country'),'treaty_history':('first_country','second_country'),
        'diplomatic_action_history':('first_country','second_country')}
 HEARTBEAT=.1
+SLOW_BEAT=.25
 
 
 def digest():
@@ -427,13 +429,19 @@ class Store:
 
     def beat(self):
         with self.heartbeat_connection as connection:
+            due=time.monotonic()
             while True:
                 step,age=progress_age()
+                started=time.monotonic()
                 if age>self.longest:
                     self.longest=age
                     connection.execute('update run set longest_step=%s,longest_step_ms=%s where run_id=%s',(step,round(age*1000),self.run_id))
                 connection.execute("update run set heartbeat_at=now(),progress_at=now()-%s*interval '1 second',progress_step=%s where run_id=%s",
                                    (age,step,self.run_id))
+                done=time.monotonic()
+                if done-due>SLOW_BEAT:
+                    LOG.warning('SLOW BEAT in %s: woke %.3f s late, update took %.3f s',step,started-due,done-started)
+                due=time.monotonic()+HEARTBEAT
                 if self.beating.wait(HEARTBEAT):
                     return
 
