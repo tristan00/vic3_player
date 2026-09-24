@@ -449,7 +449,7 @@ EFFECTS={
     'request_join_power_bloc':(None,lambda a,b,p,n:value(a,'country','power_bloc',a.player)!=value(b,'country','power_bloc',b.player)
                                or set(a.rows('player_relation','country,relations'))!=set(b.rows('player_relation','country,relations'))),
     'negotiate':(None,lambda a,b,p,n:not metric(a,'IsNegotiating') and bool(metric(b,'IsNegotiating'))),
-    'take_decision':(None,lambda a,b,p,n:a.hours==b.hours and country_state(a)!=country_state(b)),
+    'take_decision':(None,lambda a,b,p,n:(p['decision'],) in a.rows('player_decision','decision') and (p['decision'],) not in b.rows('player_decision','decision')),
     'press_journal_button':(None,lambda a,b,p,n:a.hours==b.hours and country_state(a)!=country_state(b)),
     'declare_bankruptcy':(None,lambda a,b,p,n:in_default(a) and not in_default(b)),
     'design_ship_template':(None,more('ship_template',True)),

@@ -59,6 +59,7 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
        'bureaucracy':('set_tax_level','set_institution_level'),
        'money':('nationalize','bulk_nationalize','bulk_nationalize_state','declare_bankruptcy'),
        'companies':('create_company','remove_company'),
+       'decisions':('take_decision',),
        'retrofit':('retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all'),
        'influence':('diplomatic_action','diplomatic_action_state','diplomatic_action_obligation'),
        'research':('research','queue_research','dequeue_research'),
