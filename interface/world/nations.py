@@ -312,7 +312,7 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
         garrison=_allot(trade['barracks'] if buildable('building_barrack') else 0,weights,data['barracks_cap'][army_law])
         troops_by_state=_allot(trade['units'],weights,data['barracks_cap'][army_law])
         naval_home=max(coastal,key=lambda s:(s is capital,s['arable_land'])) if coastal else None
-        navy=trade['ships'] if naval_home else 0
+        navy=trade['ships'] if naval_home and trade['naval'] and buildable('building_naval_administration') else 0
         for state,(size,pops,homelands),troops,regiments in zip(states,populations,garrison,troops_by_state):
             state['country']=tag
             state_type='incorporated' if state['id'] in reachable else 'unincorporated'

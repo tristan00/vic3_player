@@ -1289,10 +1289,25 @@ def ship_designs(s):
     return combos
 
 
+def own_templates(s):
+    mine=sorted((kind,ordinal,template) for template,owner,kind,ordinal in s.rows('ship_template','ship_template,country,ship_type,ordinal_number') if owner==s.player)
+    return {(kind,index):template for kind in {kind for kind,_,_ in mine} for index,(_,_,template) in enumerate(item for item in mine if item[0]==kind)}
+
+
 def custom_templates(s):
     base=s.map('ship_template_private','ship_template,base')
-    mine=sorted((kind,ordinal,template) for template,owner,kind,ordinal in s.rows('ship_template','ship_template,country,ship_type,ordinal_number') if owner==s.player)
-    return {(kind,index) for kind in {kind for kind,_,_ in mine} for index,(_,_,template) in enumerate(item for item in mine if item[0]==kind) if base.get(template) is False}
+    return {key for key,template in own_templates(s).items() if base.get(template) is False}
+
+
+def non_default_templates(s):
+    flags=s.map('ship_template_private','ship_template,flags')
+    return {key for key,template in own_templates(s).items() if not flags.get(template,0)&1}
+
+
+def fleet_templates(s):
+    assigned=set(s.rows('ship_template_fleet','ship_template,fleet'))
+    return [{'ship_type':kind,'index':index,'military_formation':fleet} for (kind,index),template in sorted(own_templates(s).items())
+            for fleet in s.formations('fleet') if (template,fleet) not in assigned]
 
 
 def retrofit_fleets(s,retrofitting):
@@ -1632,6 +1647,9 @@ RULES={
     'set_supply_ship_construction':lambda s:product(level=other_levels(s,'supply_ship_construction_level')),
     'design_ship_template':ship_designs,
     'edit_ship_template':lambda s:[{**combo,'index':index} for combo in ship_designs(s) for kind,index in sorted(custom_templates(s)) if kind==combo['ship_type']],
+    'set_default_ship_template':lambda s:[{'ship_type':kind,'index':index} for kind,index in sorted(non_default_templates(s))],
+    'set_fleet_ship_template':fleet_templates,
+    'delete_ship_template':lambda s:[{'ship_type':kind,'index':index} for kind,index in sorted(custom_templates(s))],
     'retrofit_fleet':lambda s:product(military_formation=retrofit_fleets(s,False)),
     'cancel_retrofit_fleet':lambda s:product(military_formation=retrofit_fleets(s,True)),
     'retrofit_all':lambda s:[{}] if retrofit_fleets(s,False) else [],

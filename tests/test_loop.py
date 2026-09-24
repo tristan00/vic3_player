@@ -43,6 +43,18 @@ class EffectTests(unittest.TestCase):
         self.assertTrue(verify('edit_ship_template',{'ship_type':'x','ship_modification':'y'},idle,Memory(7,rows(False,2))))
         self.assertFalse(verify('edit_ship_template',{'ship_type':'x','ship_modification':'y'},idle,idle))
 
+    def test_template_management_verdicts(self):
+        rows=lambda templates,flags,fleets:{'ship_template_history':[{'ship_template':t,'country':7,'ship_type':'x','ordinal_number':i+1} for i,t in enumerate(templates)],
+                                            'ship_template_private':[{'ship_template':t,'base':i==0,'flags':flags.get(t,0)} for i,t in enumerate(templates)],
+                                            'ship_template_fleet':[{'ship_template':t,'fleet':f} for t,f in fleets]}
+        before=Memory(7,rows([9,10],{9:3},[]))
+        self.assertTrue(verify('set_default_ship_template',{'ship_type':'x','index':1},before,Memory(7,rows([9,10],{9:2,10:1},[]))))
+        self.assertFalse(verify('set_default_ship_template',{'ship_type':'x','index':1},before,before))
+        self.assertTrue(verify('set_fleet_ship_template',{'ship_type':'x','index':1,'military_formation':5},before,Memory(7,rows([9,10],{9:3},[(10,5)]))))
+        self.assertFalse(verify('set_fleet_ship_template',{'ship_type':'x','index':0,'military_formation':5},before,Memory(7,rows([9,10],{9:3},[(10,5)]))))
+        self.assertTrue(verify('delete_ship_template',{'ship_type':'x','index':1},before,Memory(7,rows([9],{9:3},[]))))
+        self.assertFalse(verify('delete_ship_template',{'ship_type':'x','index':1},before,before))
+
     def test_strait_verdicts_read_the_side_of_the_state(self):
         rows=lambda **values:{'strait_endpoint':[{'strait':10,'first_state':1,'second_state':2}],
                               'strait_history':[{'strait':10,'first_toll_rate':1,'second_toll_rate':1,'first_access_status':0,'second_access_status':0,'first_access_permissions':0,'second_access_permissions':0,**values}]}

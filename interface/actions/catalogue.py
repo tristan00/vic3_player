@@ -203,6 +203,7 @@ POLITICS=('gui/politics_panel.gui','name = "politics_panel"')
 REFORM=('@PoliticsPanel.AccessReformGovernment','')
 PLAY_CONFIRMATION=('gui/popups.gui','name = "diplomatic_play_confirmation"')
 DESIGNER=('gui/ship_designer_popup.gui','name = ship_designer_popup')
+TEMPLATE_ITEM=(('ShipTemplateList.GetTemplatesOfType({ship_type}.Self)','EqualTo_int32(PdxGuiWidget.AccessParent.GetIndexInDataModel, {index})'),)
 
 
 PROPOSAL_KINDS=(('treaty','GetTreaty','Proposal.GetTreaty.IsValid',(('accept','AcceptTreatyProposal'),('decline','DeclineTreatyProposal'))),
@@ -364,6 +365,9 @@ ACTIONS=(
     act('retrofit_fleet','military_formation','MilitaryFormation.RetrofitShips',alternatives=FORMATION[1:]),
     act('cancel_retrofit_fleet','military_formation','MilitaryFormation.CancelRetrofitShips',alternatives=FORMATION[1:]),
     act('retrofit_all','','RetrofitShips'),
+    act('set_default_ship_template','ship_type index:int','ShipTemplate.SetAsDefaultForCountry',datamodels=TEMPLATE_ITEM),
+    act('set_fleet_ship_template','ship_type index:int military_formation','ShipTemplate.SetAsDefaultForFleet({military_formation}.Self)',datamodels=TEMPLATE_ITEM),
+    act('delete_ship_template','ship_type index:int','ShipTemplate.DeleteTemplate',datamodels=TEMPLATE_ITEM),
     act('cancel_retrofit_all','','CancelRetrofitShips'),
     act('set_borrow_setting','military_formation index:int','MilitaryFormationBorrowSetting.OnClicked',valid='IsValid(MilitaryFormationBorrowSetting.GetBorrowingCommand)',
         cleanup=('Execute(MilitaryFormationBorrowSetting.GetBorrowingCommand)',),
@@ -394,8 +398,7 @@ ACTIONS=(
     Action('edit_ship_template',('ship_type','index:int','ship_modification'),'PopupManager.AccessShipDesignerPopup.EditTemplate',
            window=DESIGNER,start=(('PopupManager.HideShipDesignerPopup','PopupManager.ToggleShipDesignerPopup'),((),)),cleanup=('PopupManager.HideShipDesignerPopup',),
            stages=((DESIGNER,(),lambda values:['PopupManager.AccessShipDesignerPopup.SetShipType({ship_type}.Self)']),
-                   (DESIGNER,(('ShipTemplateList.GetTemplatesOfType({ship_type}.Self)','EqualTo_int32(PdxGuiWidget.AccessParent.GetIndexInDataModel, {index})'),),
-                    lambda values:['PopupManager.AccessShipDesignerPopup.SetShipTemplate(ShipTemplate.Self)']),
+                   (DESIGNER,TEMPLATE_ITEM,lambda values:['PopupManager.AccessShipDesignerPopup.SetShipTemplate(ShipTemplate.Self)']),
                    (DESIGNER,(('PopupManager.AccessShipDesignerPopup.GetModificationSlots',''),
                               ('ShipDesignerModSlot.GetModifications','EqualTo_string(ShipModificationType.GetNameNoFormatting, GetShipModificationType({ship_modification}).GetNameNoFormatting)')),
                     lambda values:['ShipDesignerModSlot.OnSelectModificationForSlot(ShipModificationType.Self)']))),
@@ -516,7 +519,8 @@ GROUPS={
     'research':('research','queue_research','dequeue_research'),
     'army':('defend_invasion','set_formation_flag','station_selected','deploy_selected_to_front','mobilize_selected','demobilize_selected','raise_conscripts_selected','cancel_strategic_objective_selected','set_borrow_setting','transfer_battalions','upgrade_all_units','create_army','recruit_from_formation','activate_conscription_center','disembark','deploy_to_front','station_formation','rehome_formation','set_strategic_objective','cancel_invasion','recruit','mobilize','demobilize','raise_conscripts','disband_formation','mobilize_all','demobilize_all','toggle_mobilization_option',
             'set_supply_priority','disband_regulars','disband_conscripts','upgrade_regulars','upgrade_conscripts','set_default_unit_type'),
-    'navy':('recall_fleet','raise_ship_item','lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item','set_default_construction_fleet','clear_default_construction_fleet','decommission_ship','build_ship','build_ship_for','cancel_ship','start_naval_mission','end_naval_mission','start_naval_mission_selected','end_naval_mission_selected','pause_ship_construction','resume_ship_construction','set_supply_ship_construction','design_ship_template','edit_ship_template','retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all'),
+    'navy':('recall_fleet','raise_ship_item','lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item','set_default_construction_fleet','clear_default_construction_fleet','decommission_ship','build_ship','build_ship_for','cancel_ship','start_naval_mission','end_naval_mission','start_naval_mission_selected','end_naval_mission_selected','pause_ship_construction','resume_ship_construction','set_supply_ship_construction','design_ship_template','edit_ship_template','retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all',
+            'set_default_ship_template','set_fleet_ship_template','delete_ship_template'),
     'characters':('commander_order','hire_commander','hire_commander_for','promote_commander','assign_commander','unassign_commander','character_interaction'),
     'diplomacy':('diplomatic_action','diplomatic_action_obligation','diplomatic_action_state','start_play_confirmed','withdraw_treaty','accept_treaty','decline_treaty','accept_demand','reject_demand','accept_action_proposal',
                  'decline_action_proposal','quick_decline_proposal','request_join_power_bloc','form_power_bloc','kick_from_power_bloc','leave_power_bloc','upgrade_principle','pick_principle'),

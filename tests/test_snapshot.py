@@ -361,6 +361,19 @@ class RuleTests(unittest.TestCase):
         self.assertEqual(RULES['retrofit_all'](idle),[])
         self.assertEqual(RULES['cancel_retrofit_all'](idle),[])
 
+    def test_template_management_offers_custom_templates_by_ordinal_index(self):
+        s=snapshot(ship_template_history=[{'ship_template':9,'country':PLAYER,'ship_type':'ship_type_frigate','ordinal_number':1},
+                                          {'ship_template':11,'country':PLAYER,'ship_type':'ship_type_frigate','ordinal_number':3},
+                                          {'ship_template':10,'country':PLAYER,'ship_type':'ship_type_frigate','ordinal_number':2},
+                                          {'ship_template':12,'country':OTHER,'ship_type':'ship_type_frigate','ordinal_number':1}],
+                   ship_template_private=[{'ship_template':9,'base':True,'flags':3},{'ship_template':10,'base':False,'flags':0},{'ship_template':11,'base':False,'flags':0}],
+                   formation_history=[{'formation':5,'country':PLAYER,'formation_type':1}],ship_history=[{'ship':1,'fleet':5}],
+                   ship_template_fleet=[{'ship_template':10,'fleet':5}])
+        self.assertEqual(RULES['delete_ship_template'](s),[{'ship_type':'ship_type_frigate','index':1},{'ship_type':'ship_type_frigate','index':2}])
+        self.assertEqual(RULES['set_default_ship_template'](s),RULES['delete_ship_template'](s))
+        self.assertEqual(RULES['set_default_ship_template'](snapshot(**{**s.given,'ship_template_private':[{'ship_template':9,'base':True,'flags':2},{'ship_template':10,'base':False,'flags':1},{'ship_template':11,'base':False,'flags':0}]})),[{'ship_type':'ship_type_frigate','index':0},{'ship_type':'ship_type_frigate','index':2}])
+        self.assertEqual(RULES['set_fleet_ship_template'](s),[{'ship_type':'ship_type_frigate','index':0,'military_formation':5},{'ship_type':'ship_type_frigate','index':2,'military_formation':5}])
+
     def test_tariff_level_reads_the_player_tariff_by_direction(self):
         s=snapshot(player_tariff=[{'direction':'import','goods':'grain','level':5},{'direction':'export','goods':'grain','level':1}])
         self.assertEqual(trade_level(s,'import','grain'),5)

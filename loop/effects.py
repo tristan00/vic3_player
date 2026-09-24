@@ -1,6 +1,6 @@
 import collections
 from interface.actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, LEVELS, TOLL_LEVELS
-from interface.options.available import COUNTRY_OWNER, in_default, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, privatizable, privatization_requested, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
+from interface.options.available import COUNTRY_OWNER, own_templates, in_default, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, privatizable, privatization_requested, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
 from interface.recording.spec import TABLE
 
 SLOT=0xFFFFFF
@@ -84,6 +84,11 @@ def ignoring(snapshot,index):
 def own_versions(snapshot):
     mine={template for template, in snapshot.rows('ship_template','ship_template',country=snapshot.player)}
     return [row for row in snapshot.rows('ship_template_version_list','ship_template,ship_template_version') if row[0] in mine]
+
+
+def template_flags(snapshot,p):
+    template=own_templates(snapshot).get((p['ship_type'],p['index']))
+    return snapshot.map('ship_template_private','ship_template,flags').get(template,0)
 
 
 def retrofitting_fleets(snapshot):
@@ -418,6 +423,10 @@ EFFECTS={
     'declare_bankruptcy':(None,lambda a,b,p,n:in_default(a) and not in_default(b)),
     'design_ship_template':(None,more('ship_template',True)),
     'edit_ship_template':(None,lambda a,b,p,n:len(own_versions(b))>len(own_versions(a))),
+    'set_default_ship_template':(None,lambda a,b,p,n:not template_flags(a,p)&1 and template_flags(b,p)&1),
+    'set_fleet_ship_template':(None,lambda a,b,p,n:(own_templates(a).get((p['ship_type'],p['index'])),p['military_formation']) not in set(a.rows('ship_template_fleet','ship_template,fleet'))
+                               and (own_templates(b).get((p['ship_type'],p['index'])),p['military_formation']) in set(b.rows('ship_template_fleet','ship_template,fleet'))),
+    'delete_ship_template':(None,lambda a,b,p,n:own_templates(a).get((p['ship_type'],p['index'])) is not None and own_templates(a)[p['ship_type'],p['index']] not in own_templates(b).values()),
     'retrofit_fleet':('military_formation',equals('formation_report','retrofitting',True)),
     'cancel_retrofit_fleet':('military_formation',equals('formation_report','retrofitting',False)),
     'retrofit_all':(None,lambda a,b,p,n:retrofitting_fleets(a)<retrofitting_fleets(b)),
