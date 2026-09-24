@@ -61,7 +61,7 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
        'companies':('create_company','remove_company'),
        'research':('research','queue_research','dequeue_research'),
        'imposition':('impose_law',),
-       'play':('start_play_country','start_play_state','start_play_confirmed'),
+       'play':('start_play_country','start_play_state','start_play_confirmed','abandon_colony'),
        'bloc':('form_power_bloc','leave_power_bloc','request_join_power_bloc','kick_from_power_bloc','pick_principle','upgrade_principle'),
        'enactment':('enact_law','cancel_enactment','negotiate'),
        'commanders':('hire_commander','hire_commander_for','unassign_commander'),

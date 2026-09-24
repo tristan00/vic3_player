@@ -1224,7 +1224,8 @@ def abandonable(s):
 
 def colonizable(s):
     rows=s.rows('state','state,state_region,country')
-    colonized={s.map('state','state,state_region').get(state) for state in colonies(s)}
+    located=s.map('state','state,state_region')
+    colonized={located.get(state) for state,province in s.rows('state_status','state,next_colony_province') if province is not None}
     blocked={region for state,region,country in rows if in_play(s,country)}
     return sorted({region:state for state,region,country in rows if country in decentralized(s) and state_regions(s).get(state) in interests(s)
                    and region not in colonized and region not in blocked and not truce(s,country)}.values())
