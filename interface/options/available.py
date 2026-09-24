@@ -1276,8 +1276,24 @@ def colonizable(s):
     located=s.map('state','state,state_region')
     colonized={located.get(state) for state,province in s.rows('state_status','state,next_colony_province') if province is not None}
     blocked={region for state,region,country in rows if in_play(s,country)}
-    return sorted({region:state for state,region,country in rows if country in decentralized(s) and state_regions(s).get(state) in interests(s)
-                   and region not in colonized and region not in blocked and not truce(s,country)}.values())
+    frontier='law_frontier_colonization' in active_laws(s)
+    return sorted({region:state for state,region,country in rows if country in decentralized(s) and state_regions(s).get(state) in engaged(s)
+                   and region not in colonized and region not in blocked and not truce(s,country)
+                   and (not frontier or state in capital_frontier(s))}.values())
+
+
+def capital_frontier(s):
+    def compute():
+        components=march_components(s)
+        home=components.get(s.map('country','country,capital').get(s.player),set())
+        colors=s.province_colors()
+        rows=s.rows('province','province,state')
+        mine={colors[province] for province,state in rows if components.get(state,set())&home}
+        state_of={colors[province]:state for province,state in rows}
+        return {state_of[other] for first,second in s.adjacency() for near,other in ((first,second),(second,first))
+                if near in mine and other not in mine and other in state_of}
+    return s.memo('capital_frontier',compute)
+
 
 
 def charter_toggles(s):
