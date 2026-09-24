@@ -1,6 +1,6 @@
 import collections
 from interface.actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, LEVELS, TOLL_LEVELS
-from interface.options.available import COUNTRY_OWNER, own_templates, in_default, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, privatizable, privatization_requested, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
+from interface.options.available import COUNTRY_OWNER, own_templates, in_default, ownership_classes, TARIFF_CODES, bulk_subset, private_levels, privatizable, privatization_requested, PRIVATIZATION_REQUESTED, enacting_laws, hq_regions, live_goals, my_ships, pressed_in, ship_paused, trade_level
 from interface.recording.spec import TABLE
 
 SLOT=0xFFFFFF
@@ -184,15 +184,15 @@ def goal_status(snapshot,p):
             if play==p['diplomatic_play'] and kind==p['war_goal_type'] and target==p['country']}
 
 
-def flags(snapshot,table,column,key,buildings):
+def flags(snapshot,table,column,key,buildings,mask=-1):
     values=snapshot.map(table,f'{key},{column}')
-    return [bool(values.get(ident)) for ident in buildings]
+    return [bool((values.get(ident) or 0)&mask) for ident in buildings]
 
 
-def bulk_toggle(table,column,key='building',target=None,eligible=lambda s,ident:True):
+def bulk_toggle(table,column,key='building',target=None,eligible=lambda s,ident:True,mask=-1):
     def check(a,b,p,n):
         subset=[ident for ident in bulk_subset(a,p['building_type'],None,'any') if eligible(a,ident)]
-        before,after=flags(a,table,column,key,subset),flags(b,table,column,key,subset)
+        before,after=flags(a,table,column,key,subset,mask),flags(b,table,column,key,subset,mask)
         if target is None:
             return bool(subset) and len(set(after))==1 and after!=before
         return bool(subset) and after!=before and all(value==target for value in after)
@@ -272,8 +272,8 @@ def bulk_nationalized(a,b,p,n):
 
 
 BULK_EFFECTS={'subsidies':('building','subsidized'),'auto_expand':('building_private','auto_expand'),
-              'privatization':('building','privatization_requested','building',None,lambda s,i:privatizable(s,i) or privatization_requested(s,i)),
-              'remove_privatization':('building','privatization_requested','building',False)}
+              'privatization':('building','privatization_requested','building',None,lambda s,i:privatizable(s,i) or privatization_requested(s,i),PRIVATIZATION_REQUESTED),
+              'remove_privatization':('building','privatization_requested','building',False,lambda s,i:True,PRIVATIZATION_REQUESTED)}
 
 
 EFFECTS={

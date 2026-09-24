@@ -527,8 +527,11 @@ def revolution_brewing(s):
     return bool(s.rows('civil_war','civil_war',origin_country=s.player))
 
 
+PRIVATIZATION_REQUESTED=1
+
+
 def privatization_requested(s,ident):
-    return bool(s.map('building','building,privatization_requested').get(ident))
+    return bool((s.map('building','building,privatization_requested').get(ident) or 0)&PRIVATIZATION_REQUESTED)
 
 
 def active_laws(s):
