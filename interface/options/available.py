@@ -254,6 +254,12 @@ def subject_permits(s,field):
     return kind is None or definition(s,'common/subject_types',kind,field)!=['no']
 
 
+def diplomatically_autonomous(s,country):
+    kinds=[next(iter(definition(s,'common/diplomatic_actions',action,'subject_type')),None) for first,second,action in s.rows('pact','first_country,second_country,pact_type')
+           if second==country and definition(s,'common/diplomatic_actions',action,'subject_pact')]
+    return all(definition(s,'common/subject_types',kind,'can_start_own_diplomatic_plays')!=['no'] for kind in kinds)
+
+
 def play_allowed(s,play,**saved):
     scope=country_scope(s,**saved)
     target=saved.get('target_country',(None,None))[1]
@@ -1454,7 +1460,7 @@ def shared_interest(s,country):
 
 
 def rivalry_allowed(s,country):
-    if not shared_interest(s,country):
+    if not shared_interest(s,country) or not diplomatically_autonomous(s,s.player) or not diplomatically_autonomous(s,country):
         return False
     mine,theirs=rank_ladder(s,s.player),rank_ladder(s,country)
     return (relations(s,country)<CORDIAL and (type_of(s,s.player)=='recognized')==(type_of(s,country)=='recognized')
