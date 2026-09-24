@@ -250,6 +250,26 @@ def relations(snapshot):
     return set(snapshot.rows('player_relation','country,relations,improve_relations'))
 
 
+def relation_with(snapshot,country):
+    return {row for row in relations(snapshot) if row[0]==country}
+
+
+def relation_changed(a,b,country):
+    return a.hours==b.hours and relation_with(a,country)!=relation_with(b,country)
+
+
+def pair_pacts(snapshot,country):
+    return {row for row in pacts(snapshot) if {row[0],row[1]}=={snapshot.player,country}}
+
+
+def obligations_with(snapshot,country):
+    return {row for row in snapshot.rows('player_obligation','country,direction') if row[0]==country}
+
+
+def player_claims(snapshot):
+    return set(snapshot.rows('country_claim','state_region',country=snapshot.player))
+
+
 def colonies(snapshot):
     mine=set(snapshot.states())
     return {state:progress for state,progress in snapshot.rows('state_status','state,colony_progress') if state in mine}
@@ -358,12 +378,12 @@ EFFECTS={
                        !=((p['building_type'],) in b.rows('player_monopoly','building_type'))),
     'character_interaction':('character',lambda a,b,p,n:interaction_state(a,p[n])!=interaction_state(b,p[n]) or None),
     'start_play_confirmed':(None,lambda a,b,p,n:plays(a)!=plays(b) or subject_pairs(a)!=subject_pairs(b)),
-    'diplomatic_action_state':('country',lambda a,b,p,n:value(a,'state','country',p['state'])!=value(b,'state','country',p['state'])
-                               or plays(a)!=plays(b) or pacts(a)!=pacts(b)),
-    'diplomatic_action_obligation':('country',lambda a,b,p,n:set(a.rows('player_obligation','country,direction'))!=set(b.rows('player_obligation','country,direction'))
-                                    or pacts(a)!=pacts(b)),
+    'diplomatic_action_state':('country',lambda a,b,p,n:player_claims(a)!=player_claims(b) if p['diplomatic_action']=='da_stake_colonial_claim'
+                               else value(a,'state','country',p['state'])!=value(b,'state','country',p['state'])),
+    'diplomatic_action_obligation':('country',lambda a,b,p,n:obligations_with(a,p[n])!=obligations_with(b,p[n]) or pair_pacts(a,p[n])!=pair_pacts(b,p[n])
+                                    or relation_changed(a,b,p[n])),
     'diplomatic_action':('country',lambda a,b,p,n:(p[n],'of_player') in set(b.rows('player_diplomat_expulsion','country,direction'))
-                         if p['diplomatic_action']=='expel_diplomats' else pacts(a)!=pacts(b) or relations(a)!=relations(b)),
+                         if p['diplomatic_action']=='expel_diplomats' else pair_pacts(a,p[n])!=pair_pacts(b,p[n]) or relation_changed(a,b,p[n])),
     'make_primary_demand':(None,lambda a,b,p,n:maneuvers(b,p['diplomatic_play'])<maneuvers(a,p['diplomatic_play'])),
     'toggle_pause_colonization':('state',lambda a,b,p,n:((p[n],) in a.rows('player_colonization_paused','state'))!=((p[n],) in b.rows('player_colonization_paused','state'))),
     'set_default_unit_type':('military_formation',becomes(lambda s,p,n:p['combat_unit_type'] in members(s,'formation_selected_unit_type',p[n],'combat_unit_type'),lambda p:True)),
