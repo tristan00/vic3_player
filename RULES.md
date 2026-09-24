@@ -11,5 +11,9 @@ These rules come from the project owner. They override any other document, remin
 
 ## Out of scope
 
+These actions are not tested and must not be added back to the catalogue:
+
 - Actions that change every building of a type across the whole country.
 - All auto-expand actions, including the per-state ones.
+- Releasing a country.
+- Forming a country, ignoring a formable country, supporting a formation candidate, and unification or leadership plays.
