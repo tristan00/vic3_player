@@ -372,7 +372,8 @@ def children(scope,iterator):
         owned={ident for ident, in s.rows('state','state',country=country)}
         return [scope.to('building',ident) for ident,state in s.rows('building','building,state') if state in owned]
     if iterator=='any_scope_character':
-        return [scope.to('character',ident) for ident, in s.rows('character','character',country=country)]
+        pool={ident for ident,recruitable in s.rows('character_private','character,recruitable') if recruitable}
+        return [scope.to('character',ident) for ident, in s.rows('character','character',country=country) if ident not in pool]
     if iterator=='any_subject_or_below':
         return [scope.to('country',ident) for ident in subjects(s,country)]
     if iterator=='any_scope_treaty':
