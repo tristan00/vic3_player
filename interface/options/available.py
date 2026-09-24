@@ -1081,8 +1081,13 @@ DEFAULT_TAX_COST=100
 
 
 def pop_needed(s):
-    states=set(s.states())
-    return s.memo('pop_needed',lambda:{goods for state,goods,weight in s.rows('state_pop_need','state,goods,weight') if state in states and weight})
+    def compute():
+        states=set(s.states())
+        market=s.map('country','country,market').get(s.player)
+        bought={goods for goods,orders in s.rows('market_goods','goods,buy_orders',market=market) if orders}
+        institutional={goods for goods, in s.rows('player_consumed_goods','goods')}
+        return {goods for state,goods,weight in s.rows('state_pop_need','state,goods,weight') if state in states and weight} & bought - institutional
+    return s.memo('pop_needed',compute)
 
 
 def taxable(s):
