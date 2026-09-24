@@ -27,6 +27,11 @@ class TriggerTests(unittest.TestCase):
         self.assertTrue(evaluate(parse('liberty_desire >= 20'),scope))
         self.assertTrue(evaluate(parse('liberty_desire <= 10'),country_scope(Memory(9,{'country_history':[{'country':9}]}))))
 
+    def test_government_type_reads_the_country_government(self):
+        s=Memory(7,{'country_history':[{'country':7,'government':'gov_monarchy'},{'country':9,'government':'gov_chartered_company'}]})
+        self.assertFalse(evaluate(parse('has_government_type = gov_chartered_company'),country_scope(s)))
+        self.assertTrue(evaluate(parse('has_government_type = gov_chartered_company'),country_scope(s,9)))
+
     def test_every_captured_trigger_uses_supported_keys(self):
         for folder,wanted in BLOCK_FIELDS.items():
             for name,text in read(DEFAULT_GAME/'game',folder):
