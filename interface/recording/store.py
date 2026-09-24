@@ -376,7 +376,7 @@ class Store:
                     self.copy(cursor,name,layout.names,[(self.run_id,*row[:width],seq,*row[width:]) for row in stored])
             self.validate(cursor,seq)
             if opening:
-                cursor.execute('update run set heartbeat_at=now(),progress_at=now() where run_id=%s',(self.run_id,))
+                cursor.execute('update run set heartbeat_at=clock_timestamp(),progress_at=clock_timestamp() where run_id=%s',(self.run_id,))
         if opening:
             self.start_heartbeat()
         for entity,idents in anchors.items():
