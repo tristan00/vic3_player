@@ -51,7 +51,7 @@ class Stuck(Exception):
     pass
 
 
-SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_queue_item','cancel_construction','cancel_queue_item','declare_bankruptcy'),
+SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_queue_item','cancel_construction','cancel_queue_item','declare_bankruptcy','disband_formation','disband_regulars','disband_conscripts'),
        'authority':('toggle_bolster_movement','toggle_suppress_movement','issue_decree','toggle_monopoly','toggle_charter','toggle_consumption_tax',
                     'set_government_wages','character_interaction'),
        'pausing':('pause_all_construction','resume_all_construction','pause_ship_construction','resume_ship_construction','declare_bankruptcy'),
