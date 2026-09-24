@@ -1423,6 +1423,10 @@ def pressed_in(s,war):
     return any(flag for owner,holder,flag in live_goals(s,'holder,pressed') if owner==play and holder==s.player)
 
 
+def revolution_against_player(s,war):
+    return any(kind=='dp_revolution' and target==s.player for kind,target in s.rows('diplomatic_play','diplomatic_play_type,target',war=war))
+
+
 def peace_open(s,war):
     date=s.map('war','war,peace_date').get(war)
     return date is None or now(s)>=date
@@ -1732,7 +1736,7 @@ RULES={
     'propose_peace':lambda s:product(war=[w for w in s.wars() if war_leader(s,w) and negotiable_war(s,w) and proposer(s,w) is None and peace_open(s,w)]),
     'white_peace':lambda s:product(war=[w for w in s.wars() if war_leader(s,w) and negotiable_war(s,w) and proposer(s,w) is None and pressed_in(s,w) and peace_open(s,w)]),
     'toggle_accept_peace':lambda s:product(war=[w for w in s.wars() if proposer(s,w) not in (None,s.player) and has_say(s,w) and negotiable_war(s,w)]),
-    'capitulate':lambda s:product(war=[w for w in s.wars() if not overlords(s,s.player)&war_countries(s,w)]),
+    'capitulate':lambda s:product(war=[w for w in s.wars() if not overlords(s,s.player)&war_countries(s,w) and not revolution_against_player(s,w)]),
     'toggle_press_war_goal':lambda s:[goal for goal in war_goals(s) if goal['diplomatic_play'] in at_war_plays(s)
                                       and (war:=war_of_play(s,goal['diplomatic_play'])) is not None
                                       and war_leader(s,war) and negotiable_war(s,war) and proposer(s,war) is None and peace_open(s,war)],
