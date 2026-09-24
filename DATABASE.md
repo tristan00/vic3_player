@@ -14,7 +14,7 @@
 | Capture wiring | `record.py` |
 | Reader used by the rules | `../options/stored.py` |
 
-`store.install(connection)` drops schema `public` and recreates it from `schema.sql`. `Store` refuses to open a database whose `schema_digest` differs from `schema.sql`, so regenerate the SQL and reinstall after any change to `spec.py` or the fixed SQL.
+`store.install(connection)` drops schema `public` and recreates it from `schema.sql`. `Store` refuses to open a database whose `schema_digest` differs from `schema.sql`, so regenerate the SQL and reinstall after any change to `spec.py` or the fixed SQL. Reinstalling deletes every run.
 
 ## Model
 Each run records a sequence of snapshots, numbered `seq` from 0. Every run-scoped table starts with `run_id`.
@@ -26,7 +26,7 @@ Each run records a sequence of snapshots, numbered `seq` from 0. Every run-scope
 | history | `<entity>_history(run_id, <entity>, seq, present, ...)`: the entity's own attributes | `pop_history` |
 | subject | `<entity>_<topic>(run_id, <entity>, seq, ...)`: a 1:1 attribute group, valid while the entity is present | `pop_status`, `country_economy` |
 | private subject | `<entity>_private`: memory columns the game shows only to the owner, with rows for the player's objects only | `law_private`, `formation_private` |
-| child | `<owner>_<thing>(run_id, <owner>, <key...>, seq, present, ...)`: sets and lists an entity holds | `country_culture`, `state_goods` |
+| child | `<owner>_<thing>(run_id, <owner>, <key...>, seq, present, ...)`: sets and lists an entity holds | `country_culture`, `ship_template_version_list` |
 | listing | `<name>(run_id, <key...>, seq, present, ...)`: sets with no owning entity, mostly the player's view | `player_alert`, `relation` |
 | singleton | `player_<topic>(run_id, seq, ...)`: one row per version, the player country's private data | `player_treasury` |
 | sample | `<owner>_<trend>_sample(run_id, [<owner>,] [<key>,] n, seq, date, <value>)`: one trend buffer, keyed by the game's sample counter `n` | `interest_group_clout_sample` |
@@ -38,7 +38,7 @@ Every table except samples is insert-only.
 - Subject rows have no `present`. They count only while the owner's history row is present.
 
 ### Samples
-Every trend buffer of the game is its own sample table with one value column. The buffers of one object are rings of different capacities, so two trends of the same object do not hold the same sample numbers; for example an interest group's clout ring is longer than its radicals ring.
+Every trend buffer of the game is its own sample table with one value column. The buffers of one object are rings of different capacities, so two trends of the same object do not hold the same sample numbers; an interest group's clout ring is longer than its radicals ring.
 - `n` is the game's sample counter. Position `p` of a ring of size `s` whose counter is `n` holds sample `n - ((n - 1 - p) mod s)`.
 - Samples are written once and never change; the writer raises if a stored sample changes.
 - `seq` is the snapshot that first saw the sample.
@@ -48,8 +48,8 @@ Every trend buffer of the game is its own sample table with one value column. Th
 - Entities are keyed by the game's full identity, `slot | generation << 24`. Generation 0 is common, so a bare slot number and a generation-0 identity look alike.
 - Memory fields hold full identities. Script and GUI captures name objects by slot; the builders turn every such slot into the identity the memory capture holds in that slot (`Context.ident`) and refuse a capture where the script names a slot memory does not hold.
 - Every reference to an entity has a foreign key to that entity's anchor. A reference to nothing is NULL.
-- A strict reference must name an identity captured in the same snapshot, generation included. A stale handle to a reused slot is refused rather than linked to the new occupant.
-- A loose reference keeps whatever identity the game holds and gives it an anchor row on first sight, so the history of that identity may start later or have ended earlier. The game holds such handles in `character.formation` (a general keeps the handle of a disbanded formation), `party_private.leader`, `front_side.war` (a play's fronts carry the identity of the war that will start), `war_goal.diplomatic_play` and `war_participant.diplomatic_play` (plays vanish before their wars).
+- A reference is stored as exactly the identity the game holds. The game keeps handles to objects that are gone (a general to a disbanded formation, a cultural community to a removed state, a war goal to a vanished play) and to objects that do not exist yet (a play's fronts carry the identity of the war that will start). Such an identity gets an anchor row on first sight, so its history may start later or have ended earlier. `referenced_only` lists identities with an anchor but no history row; a war reserved by a play is expected there, anything else is a capture gap.
+- Provinces are the exception: a province reference must name a captured province, because provinces never change.
 - Game sentinels (−1, and 65535 for some province fields) are declared per column in `spec.py` and stored as NULL.
 - Relations, pacts, treaties and diplomatic actions are keyed by their ordered country pair, which never changes within a run.
 - Provinces carry `(province, color)` per run, with a foreign key to `world_province`.
@@ -58,9 +58,9 @@ Every trend buffer of the game is its own sample table with one value column. Th
 Buildings, formations and wars stay in game memory for a while after they end, with the game's own `dead` flag set. Their history tables carry `dead`. Script-side captures skip dead objects, so a player table filled from script covers exactly the live objects: `formation_report` and `building_private` have rows for the player's live objects only, and the builders refuse a capture where the two sides disagree.
 
 ### Names and codes
-- Every name column references a typed vocabulary table `(<name> identity, name unique)`, for example `goods`, `law_type` or `building_type`. `name_column` lists which column uses which vocabulary.
+- Every name column references a typed vocabulary table `(<name> identity, name unique)`, for example `goods`, `law_type` or `building_type`. Which columns are names is read from the foreign keys (`Stored` does this from `pg_constraint`).
   - Closed vocabularies are filled from the game's definition folders when a ruleset is registered.
-  - Building types also include the runtime-generated `building_<company_type>` names.
+  - Building types also include the runtime-generated `building_<company_type>` and `building_regional_<company_type>` names.
   - The writer refuses a name that isn't defined in the run's ruleset.
   - Free text (localization keys, scope names, UI windows, advisors, actions) goes in open vocabularies that the writer fills as it meets new values.
 - Every game code references its enum table `(<enum> int2, name)`. A code met for the first time is added with a NULL name.
@@ -79,8 +79,19 @@ Dropped duplicate metrics are listed in `spec.DROPPED_COUNTRY_METRICS` and `spec
 ### Fixed tables
 - **World:** `world`, `world_province`, `world_adjacency` and `world_asset`. Vanilla and generated worlds are registered the same way, from the game's or the mod's `map_data`.
 - **Ruleset:** `ruleset`, `ruleset_definition` (the load order of each definition folder) and `game_definition` (a verbatim key/value mirror of script fields, read by the rules). Also `event_definition_option`, `building_production_method`, `dlc` and `capture_gap`.
-- **Run:** `run`, `run_generated` (generated worlds only), `run_advisor`, `run_game_rule`, `snapshot` and `ui_open_window`.
-- **Loop:** `loop_action`, `loop_action_param`, and `action_parameter` (the declared parameters of each action).
+- **Run:** `run`, `run_generated` (generated worlds only: `tag`, `world_file`, `cli_seed`, `run_seed`, budget and profile), `run_advisor`, `run_game_rule`, `snapshot` and `ui_open_window`.
+- **Loop:** `catalogue_action` (the actions of the catalogue, registered when a loop starts), `loop_action`, `loop_action_param`, and `action_parameter` (the declared parameters of each action).
+
+## Verification
+Whether an action attempt worked is decided at runtime by `verify()` in `loop/effects.py`, which compares the snapshot before the attempt with the snapshot after it. Its result is the `status` of the attempt's `loop_action` row: `verified`, `unverified` (no verifier or no evidence), `invalid`, `no_object`, `no_effect`, `raced` or `ui_leftover`. Nothing else decides it, and no count is made outside the database.
+
+| View | Content |
+|---|---|
+| `action_run_outcome` | per run and action: verified, unverified, failed and raced attempts, and the run's world (`vanilla_<tag>`, the generated world's name, or `attached`) |
+| `action_verification` | per catalogue action, over the last 3 runs that attempted it: attempts, distinct worlds with a verified attempt, and `verified_by_standard` |
+| `verification_summary` | verified actions, catalogue actions, actions never attempted |
+
+The standard: at least 3 verified attempts, on at least 2 distinct worlds, and verified attempts at least 95 percent of verified plus failed attempts, over the last 3 runs containing the action. `python -m loop.report` prints these views and the static catalogue rows.
 
 ## Run liveness
 Every run row says whether its loop is alive and how it ended, with the timestamps needed to measure detection.
@@ -90,7 +101,8 @@ Every run row says whether its loop is alive and how it ended, with the timestam
 | `started_at` | the loop began the run |
 | `heartbeat_at` | the loop's last sign of life, refreshed every 100 ms by a thread with its own connection |
 | `ended_at` | the run was flagged as over |
-| `end_reason` | `time`, `years`, `defeated`, `ui_stuck`, `game_crashed`, `loop_crashed: <error>` or `loop_lost` |
+| `end_reason` | `time`, `years`, `defeated`, `ui_stuck`, `game_crashed`, `loop_crashed` or `loop_lost` |
+| `end_detail` | the error text for `loop_crashed` and `game_crashed` |
 | `game_exited_at` | the process exit time reported by the OS, for `game_crashed` |
 
 - **Game exit.** A watcher thread checks the game's process handle every 50 ms: whether the process object is signaled and whether one word of the executable is still readable. Memory becomes unreadable at the start of teardown, hundreds of milliseconds before a large process is signaled, so the watcher flags at teardown start: it writes `ended_at` and `end_reason = 'game_crashed'` at once through its own connection, then waits for the OS exit time and records it in `game_exited_at`. The loop itself also stops at its next game access and logs when it did.
@@ -102,7 +114,7 @@ Every run row says whether its loop is alive and how it ended, with the timestam
 ```sql
 select * from run_lost;
 select * from run_late_flag;
-select run_id, end_reason, ended_at - game_exited_at from run where end_reason = 'game_crashed';
+select run_id, end_reason, end_detail, ended_at - game_exited_at from run where end_reason = 'game_crashed';
 ```
 
 ## Querying
@@ -114,14 +126,9 @@ select p.pop, s.wealth from pop_at(1, 50) p join pop_status_at(1, 50) s using (p
 select * from player_treasury_at(1, 50);
 ```
 
-- **Predicates on a key column** push down to the primary key.
+- Functions of tables with an owner walk the owner's anchor table and take the latest row of each identity through one primary-key probe, so their cost grows with the number of identities, not with the run's length. A predicate on the owner column pushes into that probe. Child tables keyed below their owner take the latest row per key within the owner's rows.
+- Functions of tables without an owner take the latest row per key with a backward primary-key scan.
 - **Predicates on another column** must first find candidate keys through a secondary index. There are four: `pop_history (run_id, location, seq)`, `building_history (run_id, state, seq)`, `state_history (run_id, country, seq)` and `character_history (run_id, country, seq)`.
-
-  ```sql
-  select p.* from pop_at(1, 50) p
-  where p.pop in (select pop from pop_history where run_id = 1 and location = 3) and p.location = 3;
-  ```
-
 - **What changed at a snapshot:** `where run_id = R and seq = S` on any table.
 - **Names:** join the vocabulary table, for example `join law_type using (law_type)`.
 - **A trend:** `select n, date, clout from interest_group_clout_sample where run_id = R and interest_group = G order by n`.
@@ -133,17 +140,17 @@ The writer (`Store.write`) handles each snapshot in one transaction:
 1. It resolves references, sentinels and names, and diffs every table against the previous snapshot.
 2. It inserts the snapshot row.
 3. It suspends foreign-key triggers for the transaction (`set local session_replication_role = replica`).
-4. It inserts new anchors (identities present or loosely referenced for the first time) and changed rows, then runs one generated check per foreign key over this snapshot's rows.
+4. It inserts new anchors (identities present or referenced for the first time) and changed rows, then runs one generated check per foreign key over this snapshot's rows.
 5. Any violation raises and rolls back.
 
-Primary keys, NOT NULL and check constraints are never suspended. Any other writer gets row-by-row foreign-key checks as usual.
+Primary keys, NOT NULL and check constraints are never suspended. Any other writer gets row-by-row foreign-key checks as usual. The connection uses no server-side prepared statements, so every check is planned with its actual run and snapshot values and uses the indexes.
 
 The checks read only the latest block ranges through the `brin (run_id, seq)` index on every timed table.
 
 `select delete_run(run_id)` removes a run. The open vocabularies are kept.
 
 ## Tests
-- `tests/test_store.py` round-trips the writer on `vic3_test`, reinstalls that schema first, and checks strict and loose references, the heartbeat, `run_lost` and the closing of lost runs.
+- `tests/test_store.py` round-trips the writer on `vic3_test`, reinstalls that schema first, and checks references and anchors, the heartbeat, `run_lost`, the closing of lost runs and the verification views.
 - `tests/test_liveness.py` kills a child process and checks that the process handle reports the exit, its readability, its OS exit time and the watcher alert within a second.
 - `tests/test_coverage.py` pushes a complete synthetic capture through every builder, and fails if a captured table has no stored table.
 - `tests/memory_stored.py` is an in-memory `Stored` for rule tests: rows are dicts keyed by the schema's column names.
