@@ -110,7 +110,7 @@ class CoverageTests(unittest.TestCase):
 
     def test_rows_are_either_covered_infeasible_or_known(self):
         from loop.coverage import COVERED, INFEASIBLE, ROWS
-        self.assertEqual(len(ROWS),159)
+        self.assertEqual(len(ROWS),154)
         self.assertEqual((set(COVERED)|set(INFEASIBLE))-set(ROWS),set())
         self.assertEqual(set(COVERED)&set(INFEASIBLE),set())
 

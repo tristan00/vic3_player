@@ -1662,10 +1662,6 @@ def event_options(s):
             if visible is not None and enabled]
 
 
-def listed(s,table,column):
-    return [value for _,value in sorted(s.rows(table,'position,'+column))]
-
-
 def remove_companies(s):
     owning={company for company, in s.rows('company_owned_country','company')}
     return [kind for ident,kind,established in s.rows('company','company,company_type,established',country=s.player)
@@ -1913,9 +1909,6 @@ RULES={
     'set_speed':lambda s:product(speed=(FASTEST_SPEED,)),
     'take_decision':lambda s:product(decision=[name for name, in s.rows('player_decision','decision') if decidable(s,name)]),
     'toggle_ignore_decision':lambda s:product(decision=[name for name, in s.rows('player_decision','decision')]),
-    'release_country':lambda s:product(index=[index for index,possible in enumerate(listed(s,'player_releasable_country','possible')) if possible]),
-    'toggle_ignore_formable':lambda s:product(index=list(range(len(listed(s,'player_formable_country','name'))))),
-    'form_country':lambda s:product(index=[index for index,formable in enumerate(listed(s,'player_formable_country','formable')) if formable]),
 }
 
 

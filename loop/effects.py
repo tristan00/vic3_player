@@ -66,21 +66,6 @@ def hours(snapshot):
     return snapshot.hours
 
 
-def formables(snapshot):
-    return [name for _,name in sorted(snapshot.rows('player_formable_country','position,name'))]
-
-
-def formable_ord(after,before,index):
-    names=formables(before)
-    name=names[index] if index<len(names) else None
-    return next((ord for ord,found in enumerate(formables(after)) if found==name),None)
-
-
-def ignoring(snapshot,index):
-    flags=[ignored for _,ignored in sorted(snapshot.rows('player_formable_country','position,ignored'))]
-    return flags[index] if index is not None and index<len(flags) else None
-
-
 def template_flags(snapshot,p):
     template=own_templates(snapshot).get((p['ship_type'],p['index']))
     return snapshot.map('ship_template_private','ship_template,flags').get(template,0)
@@ -238,12 +223,6 @@ def new_plays(a,b,kind,target):
     started=lambda s:{play for play,initiator,other,found in s.rows('diplomatic_play','diplomatic_play,initiator,target,diplomatic_play_type')
                       if initiator==s.player and other in targets and found==kind}
     return started(b)-started(a)
-
-
-def released(a,b):
-    existing={country for country, in a.rows('country','country')}
-    mine=set(a.states())
-    return {owner for state,owner in b.rows('state','state,country') if state in mine and owner not in existing}
 
 
 def borrowed(snapshot,formation,index):
@@ -406,9 +385,6 @@ EFFECTS={
     'make_primary_demand':(None,lambda a,b,p,n:maneuvers(b,p['diplomatic_play'])<maneuvers(a,p['diplomatic_play'])),
     'toggle_pause_colonization':('state',lambda a,b,p,n:((p[n],) in a.rows('player_colonization_paused','state'))!=((p[n],) in b.rows('player_colonization_paused','state'))),
     'set_default_unit_type':('military_formation',becomes(lambda s,p,n:p['combat_unit_type'] in members(s,'formation_selected_unit_type',p[n],'combat_unit_type'),lambda p:True)),
-    'toggle_ignore_formable':(None,lambda a,b,p,n:ignoring(a,p['index'])!=ignoring(b,formable_ord(b,a,p['index']))),
-    'release_country':(None,lambda a,b,p,n:bool(released(a,b))),
-    'form_country':(None,lambda a,b,p,n:value(a,'country','country_definition',a.player)!=value(b,'country','country_definition',b.player)),
     'toggle_ignore_decision':(None,lambda a,b,p,n:((p['decision'],) in a.rows('player_ignored_decision','decision'))
                               !=((p['decision'],) in b.rows('player_ignored_decision','decision'))),
     'rehome_formation':('military_formation',lambda a,b,p,n:(home_region(a,p[n])!=p['strategic_region'] and home_region(b,p[n])==p['strategic_region'])

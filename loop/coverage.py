@@ -34,7 +34,7 @@ COVERED={
     'PB1':('request_join_power_bloc',),'PB5':('form_power_bloc',),'PB3':('kick_from_power_bloc',),'PB4':('leave_power_bloc',),'PB7':('upgrade_principle',),'PB6':('pick_principle',),
     'CO1':('create_company',),'CO2':('remove_company',),'CO3':('toggle_charter',),
     'X1':('colonize',),'X2':('toggle_pause_colonization',),'X3':('abandon_colony',),'X4':('incorporate',),'X5':('unincorporate',),
-    'J1':('take_decision',),'J2':('toggle_ignore_decision',),'X7':('form_country',),'X10':('toggle_ignore_formable',),'X11':('release_country',),'J3':('press_journal_button',),'J4':('choose_event_option',),
+    'J1':('take_decision',),'J2':('toggle_ignore_decision',),'J3':('press_journal_button',),'J4':('choose_event_option',),
     'U1':('pause','unpause'),'U2':('set_speed',),
 }
 
@@ -199,11 +199,6 @@ ROWS={
     'X4':'Incorporate a state',
     'X5':'Unincorporate a state',
     'X6':'Rename a state',
-    'X7':'Form a country',
-    'X8':'Support a candidate for a major formation',
-    'X9':'Start a unification or leadership play',
-    'X10':'Ignore a formable country',
-    'X11':'Release a country (independent or as a subject; optionally play as it)',
     'X12':'Move the capital, or move the market capital',
     'J1':'Take a decision',
     'J2':'Ignore a decision',

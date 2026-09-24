@@ -186,7 +186,6 @@ BLOC_FORMATION=('gui/power_bloc_formation_panel.gui','name = "power_bloc_formati
 PRINCIPLE_WINDOW=('gui/principle_selection_window.gui','name = "principle_selection_window"')
 BLOC_PANEL=('gui/power_bloc_panel.gui','name = "power_bloc_panel"')
 DIPLOMATIC_WINDOW=('gui/popups.gui','name = "diplomatic_action_window"')
-RELEASE_WINDOW=('gui/popups.gui','name = "release_country_window"')
 POLITICS=('gui/politics_panel.gui','name = "politics_panel"')
 REFORM=('@PoliticsPanel.AccessReformGovernment','')
 PLAY_CONFIRMATION=('gui/popups.gui','name = "diplomatic_play_confirmation"')
@@ -473,13 +472,6 @@ ACTIONS=(
     act('set_speed','speed:choice',"TimeKeeper.SetGameSpeed('(int32){speed}')",valid='TimeKeeper.CanSetGameSpeed',choices=('0','1','2','3','4')),
     act('take_decision','decision','Decision.TakeDecision(GetPlayer)',
         datamodels=(('AccessPlayer.GetDecisions','EqualTo_string(Decision.GetName, Localize({decision}))'),)),
-    act('toggle_ignore_formable','index:int','GetPlayer.ToggleIgnoreCountryFormation(CountryFormation.Self)',
-        datamodels=(('AccessPlayer.AccessFormableCountries','EqualTo_int32(PdxGuiWidget.GetIndexInDataModel, {index})'),)),
-    act('form_country','index:int','CountryFormation.FormCountry(GetPlayer)',
-        datamodels=(('AccessPlayer.AccessFormableCountries','EqualTo_int32(PdxGuiWidget.GetIndexInDataModel, {index})'),)),
-    Action('release_country',('index:int',),'ReleaseCountryWindow.ReleaseCountry',window=RELEASE_WINDOW,cleanup=('PopupManager.HideReleaseCountryConfirmation',),
-           start=(('PopupManager.ShowReleaseCountryConfirmation(CountryCreation.Self)',),
-                  ((('AccessPlayer.AccessReleasableCountries','EqualTo_int32(PdxGuiWidget.GetIndexInDataModel, {index})'),),))),
     act('toggle_ignore_decision','decision','GetPlayer.ToggleIgnoreDecision(Decision.Self)',
         datamodels=(('AccessPlayer.GetDecisions','EqualTo_string(Decision.GetName, Localize({decision}))'),)),
 )
@@ -511,7 +503,7 @@ GROUPS={
     'war':('propose_peace','white_peace','capitulate','toggle_accept_peace'),
     'companies':('create_company','remove_company','toggle_charter'),
     'expansion':('colonize','toggle_pause_colonization','abandon_colony','incorporate','unincorporate'),
-    'journal':('press_journal_button','choose_event_option','take_decision','toggle_ignore_decision','toggle_ignore_formable','form_country','release_country'),
+    'journal':('press_journal_button','choose_event_option','take_decision','toggle_ignore_decision'),
     'time':('pause','unpause','set_speed'),
 }
 

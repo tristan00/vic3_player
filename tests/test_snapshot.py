@@ -294,14 +294,6 @@ class RuleTests(unittest.TestCase):
                                  {'event':9,'option':2,'enabled':False,'visible_position':1},{'event':9,'option':3,'enabled':True,'visible_position':2}])
         self.assertEqual(RULES['choose_event_option'](s),[{'event':'sample.1','option':0},{'event':'sample.1','option':2}])
 
-    def test_formable_and_releasable_indexes_follow_list_positions(self):
-        s=snapshot(player_formable_country=[{'name':'Italy','position':1,'formable':True,'ignored':False},
-                                            {'name':'Germany','position':0,'formable':False,'ignored':False}],
-                   player_releasable_country=[{'name':'Flanders','position':0,'possible':True}])
-        self.assertEqual(RULES['form_country'](s),[{'index':1}])
-        self.assertEqual(RULES['toggle_ignore_formable'](s),[{'index':0},{'index':1}])
-        self.assertEqual(RULES['release_country'](s),[{'index':0}])
-
     def test_fleet_recall_needs_a_damaged_fleet_at_sea(self):
         s=snapshot(formation_history=[{'formation':5,'country':PLAYER,'formation_type':1},{'formation':6,'country':PLAYER,'formation_type':1}],
                    ship_history=[{'ship':1,'fleet':5},{'ship':2,'fleet':6}],
