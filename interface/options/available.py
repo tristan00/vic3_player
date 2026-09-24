@@ -161,7 +161,7 @@ def truced(s):
 def reachable_state(s,state):
     owner=s.map('state','state,country').get(state)
     return (not busy(s) and not truce(s,owner) and owner not in opposed(s) and owner not in defensive_partners(s)
-            and plays_permitted(s,owner,state_regions(s).get(state),state))
+            and not s.map('country','country,in_civil_war').get(owner) and plays_permitted(s,owner,state_regions(s).get(state),state))
 
 
 def reachable_country(s,country):
