@@ -407,6 +407,7 @@ EFFECTS={
     'take_decision':(None,lambda a,b,p,n:country_state(a)!=country_state(b)),
     'press_journal_button':(None,lambda a,b,p,n:country_state(a)!=country_state(b)),
     'declare_bankruptcy':(None,lambda a,b,p,n:in_default(a) and not in_default(b)),
+    'design_ship_template':(None,more('ship_template',True)),
     'set_strait_toll':('strait',strait_becomes('toll_rate',lambda p:TOLL_LEVELS.index(p['level']))),
     'set_strait_access':('strait',strait_becomes('access_status',lambda p:ACCESS_STATUSES.index(p['access']))),
     'set_strait_allowed':('strait',strait_becomes('access_permissions',lambda p:ACCESS_PERMISSIONS.index(p['allowed'])+1)),

@@ -336,6 +336,19 @@ class RuleTests(unittest.TestCase):
         self.assertEqual(RULES['set_strait_toll'](shared),[])
         self.assertEqual(RULES['set_strait_access'](shared),[{'strait':10,'state':1,'access':'NoMilitary'}])
 
+    def test_ship_designs_offer_unlocked_modifications_absent_from_own_templates(self):
+        definitions={'common/ship_types':{'ship_type_frigate':{'unlocking_technologies':[],'ship_group':['ship_group_light_ships'],
+                                                              'modifications':['ship_mod_slot_armor = { mod_a mod_b } ship_mod_slot_utility_1 = { util_a } ship_mod_slot_guns = { mod_c mod_d }']}},
+                     'common/ship_modifications':{'mod_a':{},'mod_b':{'unlocking_technologies':['tech_x']},'mod_c':{},'mod_d':{'unlocking_technologies':['tech_y','tech_z']},'util_a':{}},
+                     'common/ship_modification_slots':{'ship_mod_slot_armor':{},'ship_mod_slot_guns':{},'ship_mod_slot_utility_1':{'utility':['yes']}},
+                     'common/technology/technologies':{'tech_x':{},'tech_y':{},'tech_z':{}}}
+        s=snapshot(definitions=definitions,country_research_history=[{'country_research':3,'country':PLAYER,'researching':None}],
+                   country_research_acquired=[{'country_research':3,'technology':'tech_z'}],
+                   ship_template_history=[{'ship_template':9,'country':PLAYER,'ship_type':'ship_type_frigate'}],
+                   ship_template_version_list=[{'ship_template':9,'position':0,'ship_template_version':21},{'ship_template':9,'position':1,'ship_template_version':22}],
+                   ship_template_version_modification=[{'ship_template_version':21,'position':0,'ship_modification':'mod_c'},{'ship_template_version':22,'position':0,'ship_modification':'mod_a'}])
+        self.assertEqual(RULES['design_ship_template'](s),[{'ship_type':'ship_type_frigate','ship_modification':'mod_c'},{'ship_type':'ship_type_frigate','ship_modification':'mod_d'}])
+
     def test_tariff_level_reads_the_player_tariff_by_direction(self):
         s=snapshot(player_tariff=[{'direction':'import','goods':'grain','level':5},{'direction':'export','goods':'grain','level':1}])
         self.assertEqual(trade_level(s,'import','grain'),5)

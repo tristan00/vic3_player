@@ -45,6 +45,7 @@ KEYS={
     'decision':'common/decisions',
     'charter':'common/company_charter_types',
     'power_bloc_identity':'common/power_bloc_identities',
+    'ship_modification':'common/ship_modifications',
 }
 
 
@@ -201,6 +202,7 @@ RELEASE_WINDOW=('gui/popups.gui','name = "release_country_window"')
 POLITICS=('gui/politics_panel.gui','name = "politics_panel"')
 REFORM=('@PoliticsPanel.AccessReformGovernment','')
 PLAY_CONFIRMATION=('gui/popups.gui','name = "diplomatic_play_confirmation"')
+DESIGNER=('gui/ship_designer_popup.gui','name = ship_designer_popup')
 
 
 PROPOSAL_KINDS=(('treaty','GetTreaty','Proposal.GetTreaty.IsValid',(('accept','AcceptTreatyProposal'),('decline','DeclineTreatyProposal'))),
@@ -379,6 +381,12 @@ ACTIONS=(
     act('pause_ship_construction','','GetPlayer.PauseShipConstruction'),
     act('resume_ship_construction','','GetPlayer.ResumeShipConstruction'),
     act('set_supply_ship_construction','level:choice','GetPlayer.SetSupplyShipConstructionLevel{level}',choices=LEVELS),
+    Action('design_ship_template',('ship_type','ship_modification'),'PopupManager.AccessShipDesignerPopup.CreateTemplate',
+           window=DESIGNER,start=(('PopupManager.HideShipDesignerPopup','PopupManager.ToggleShipDesignerPopup'),((),)),cleanup=('PopupManager.HideShipDesignerPopup',),
+           stages=((DESIGNER,(),lambda values:['PopupManager.AccessShipDesignerPopup.SetShipType({ship_type}.Self)']),
+                   (DESIGNER,(('PopupManager.AccessShipDesignerPopup.GetModificationSlots',''),
+                              ('ShipDesignerModSlot.GetModifications','EqualTo_string(ShipModificationType.GetNameNoFormatting, GetShipModificationType({ship_modification}).GetNameNoFormatting)')),
+                    lambda values:['ShipDesignerModSlot.OnSelectModificationForSlot(ShipModificationType.Self)']))),
     act('character_interaction','character interaction','Character.GetInteraction({interaction}).ExecuteCommand(Character.Self)',
         valid='Character.GetInteraction({interaction}).IsCommandValid(Character.Self)',alternatives=CHARACTER_SOURCES),
     act('diplomatic_action','country diplomatic_action','GetCountryDiplomaticAction({diplomatic_action}, GetPlayer.Self, {country}.Self).ExecuteAction'),
@@ -414,7 +422,7 @@ ACTIONS=(
       for name,command in (('toggle_press_war_goal','ToggleIsPressedInPotentialPeaceDeal'),('make_primary_demand','MakeWarGoalPrimaryDemand'))),
     Action('add_war_goal',('diplomatic_play','war_goal_type','index:int'),'AddWarGoalPanel.AccessDiplomaticPlay.AddWarGoal(WarGoalDraft.Self)',
            datamodels=(('','EqualTo_int32(PdxGuiWidget.AccessParent.GetIndexInDataModel, {index})'),),
-           valid='IsValid(AddWarGoalPanel.AccessDiplomaticPlay.AddWarGoal(WarGoalDraft.Self))',why='AddWarGoalPanel.GetDiplomaticPlay.GetCanAddWarGoalDesc(WarGoalDraft.Self)',
+           why='AddWarGoalPanel.GetDiplomaticPlay.GetCanAddWarGoalDesc(WarGoalDraft.Self)',
            window=ADD_WAR_GOAL,cleanup=('InformationPanelBar.ClosePanel',),
            start=(('InformationPanelBar.OpenAddWarGoalPanel(DiplomaticPlay.Self, GetPlayer.Self)',),
                   ((('AccessPlayer.AccessActiveDiplomaticPlays','ObjectsEqual(DiplomaticPlay.Self, {diplomatic_play}.Self)'),),)),
@@ -460,7 +468,7 @@ ACTIONS=(
     *(act(f'{verb}_{kind}','country',f'Proposal.{getter}.{command}',window=PROPOSALS,
           datamodels=((PROPOSALS[1],f'And(ObjectsEqual(Proposal.GetActor.Self, {{country}}.Self), {condition})'),))
       for kind,getter,condition,pairs in PROPOSAL_KINDS for verb,command in pairs),
-    act('quick_decline_proposal','country','PopupManager.DeclineProposal(Proposal.AccessSelf)',window=PROPOSALS,
+    act('quick_decline_proposal','country','PopupManager.DeclineProposal(Proposal.AccessSelf)',valid='Proposal.GetActor.IsValid',window=PROPOSALS,
         datamodels=((PROPOSALS[1],'ObjectsEqual(Proposal.GetActor.Self, {country}.Self)'),)),
     act('pause','','TimeKeeper.TogglePause',valid='And(TimeKeeper.CanTogglePause, Not(TimeKeeper.IsPaused))',why=TIME_WHY),
     act('unpause','','TimeKeeper.TogglePause',valid='And(TimeKeeper.CanTogglePause, TimeKeeper.IsPaused)',why=TIME_WHY),
@@ -496,7 +504,7 @@ GROUPS={
     'research':('research','queue_research','dequeue_research'),
     'army':('defend_invasion','set_formation_flag','station_selected','deploy_selected_to_front','mobilize_selected','demobilize_selected','raise_conscripts_selected','cancel_strategic_objective_selected','set_borrow_setting','transfer_battalions','upgrade_all_units','create_army','recruit_from_formation','activate_conscription_center','disembark','deploy_to_front','station_formation','rehome_formation','set_strategic_objective','cancel_invasion','recruit','mobilize','demobilize','raise_conscripts','disband_formation','mobilize_all','demobilize_all','toggle_mobilization_option',
             'set_supply_priority','disband_regulars','disband_conscripts','upgrade_regulars','upgrade_conscripts','set_default_unit_type'),
-    'navy':('recall_fleet','raise_ship_item','lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item','set_default_construction_fleet','clear_default_construction_fleet','decommission_ship','build_ship','build_ship_for','cancel_ship','start_naval_mission','end_naval_mission','start_naval_mission_selected','end_naval_mission_selected','pause_ship_construction','resume_ship_construction','set_supply_ship_construction'),
+    'navy':('recall_fleet','raise_ship_item','lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item','set_default_construction_fleet','clear_default_construction_fleet','decommission_ship','build_ship','build_ship_for','cancel_ship','start_naval_mission','end_naval_mission','start_naval_mission_selected','end_naval_mission_selected','pause_ship_construction','resume_ship_construction','set_supply_ship_construction','design_ship_template'),
     'characters':('commander_order','hire_commander','hire_commander_for','promote_commander','assign_commander','unassign_commander','character_interaction'),
     'diplomacy':('diplomatic_action','diplomatic_action_obligation','diplomatic_action_state','start_play_confirmed','withdraw_treaty','accept_treaty','decline_treaty','accept_demand','reject_demand','accept_action_proposal',
                  'decline_action_proposal','quick_decline_proposal','request_join_power_bloc','form_power_bloc','kick_from_power_bloc','leave_power_bloc','upgrade_principle','pick_principle'),

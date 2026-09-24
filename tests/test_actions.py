@@ -71,6 +71,26 @@ class DataTypeTests(unittest.TestCase):
         text='\n'.join(f.read_text(encoding='utf-8',errors='replace') for f in dump.glob('data_types_*.txt'))
         cls.types={m[1] for m in re.finditer(r'^([A-Z]\w*)\nDefinition type: Type',text,re.M)}
         cls.functions={m[1].split('(')[0].strip() for m in re.finditer(r'^([A-Z][\w.]*(?:\( [^)]*\))?)\nDefinition type: (?:Function|Promote)',text,re.M)}
+        cls.returns={}
+        for m in re.finditer(r'^([A-Z][\w.]*(?:\( [^)]*\))?)\nDefinition type: [\w ]+\nReturn type: (\S+)',text,re.M):
+            if m[2]!='[unregistered]':
+                cls.returns.setdefault(m[1].split('(')[0].strip(),m[2])
+
+    def resolve(self,text):
+        while '(' in text:
+            text=re.sub(r'\([^()]*\)','',text)
+        parts=text.split('.')
+        current=parts[0] if parts[0] in self.types else self.returns.get(parts[0])
+        for part in parts[1:]:
+            current=self.returns.get(f'{current}.{part}')
+        return current
+
+    def test_command_objects_are_executed_and_void_callbacks_declare_validity(self):
+        for action in ACTIONS:
+            _,values=gui.variants(action)[0]
+            kind=self.resolve(gui.fill(action.command,values))
+            self.assertIn(kind,('Command','void'),action.name)
+            self.assertEqual(bool(action.valid),kind=='void',f'{action.name}: a Command runs only without a validity expression, a void callback needs one')
 
     def test_every_cleanup_call_is_a_void_callback(self):
         text='\n'.join(f.read_text(encoding='utf-8',errors='replace') for f in (DEFAULT_DATA/'profiles'/'mini'/'logs'/'data_types').glob('data_types_*.txt'))

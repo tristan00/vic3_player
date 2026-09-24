@@ -1266,6 +1266,29 @@ def ship_types(s):
             and definition(s,'common/ship_types',name,'ship_group')!=['ship_group_supply_ships']]
 
 
+def ship_slots(s,kind):
+    slots=[(slot,mods.split()) for block in definition(s,'common/ship_types',kind,'modifications') for slot,mods in re.findall(r'(\w+) = \{([^}]*)\}',block)]
+    return [(slot,mods) for slot,mods in slots if definition(s,'common/ship_modification_slots',slot,'utility')!=['yes']]
+
+
+def designed(s,kind):
+    versions=s.grouped('ship_template_version_list','ship_template,ship_template_version')
+    latest=[versions[template][-1] for template,owner,ship_type in s.rows('ship_template','ship_template,country,ship_type') if owner==s.player and ship_type==kind and versions.get(template)]
+    return {tuple(mod for _,mod in sorted(s.rows('ship_template_version_modification','position,ship_modification',ship_template_version=version))) for version in latest}
+
+
+def ship_designs(s):
+    acquired,_,_,_=technologies(s)
+    combos=[]
+    for kind in ship_types(s):
+        for _,mods in ship_slots(s,kind):
+            for mod in mods:
+                techs=definition(s,'common/ship_modifications',mod,'unlocking_technologies')
+                if (not techs or set(techs)&acquired) and not any(mod in design for design in designed(s,kind)):
+                    combos.append({'ship_type':kind,'ship_modification':mod})
+    return combos
+
+
 JOIN_LEVERAGE=200
 
 
@@ -1597,6 +1620,7 @@ RULES={
     'pause_ship_construction':lambda s:[{}] if not ship_paused(s) and not construction_paused(s) and metric(s,'GetShipConstruction')>0 else [],
     'resume_ship_construction':lambda s:[{}] if ship_paused(s) and not construction_paused(s) and not in_default(s) else [],
     'set_supply_ship_construction':lambda s:product(level=other_levels(s,'supply_ship_construction_level')),
+    'design_ship_template':ship_designs,
     'character_interaction':lambda s:[{'character':character,'interaction':interaction}
                                       for chosen in [set(s.characters('character_role_ruler','character_role_heir','character_role_general','character_role_admiral',
                                                                       'character_role_ig_leader'))]
