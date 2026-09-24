@@ -15,12 +15,24 @@ def sleeper():
     return subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)'],creationflags=subprocess.CREATE_NO_WINDOW)
 
 
+def attach(child):
+    deadline=time.monotonic()+5
+    while True:
+        try:
+            return Process(child.pid)
+        except OSError:
+            if time.monotonic()>deadline:
+                raise
+            time.sleep(.02)
+
+
 class ProcessTests(unittest.TestCase):
     def test_a_killed_process_is_flagged_within_a_second_with_its_exit_time(self):
         child=sleeper()
         try:
-            process=Process(child.pid)
+            process=attach(child)
             self.assertFalse(process.exited())
+            self.assertTrue(process.readable())
             process.check()
             before=datetime.now(timezone.utc)
             child.kill()
@@ -39,7 +51,7 @@ class ProcessTests(unittest.TestCase):
         child=sleeper()
         alerted=threading.Event()
         try:
-            process=Process(child.pid)
+            process=attach(child)
             stopped=process.watch(alerted.set)
             child.kill()
             child.wait()
@@ -50,7 +62,7 @@ class ProcessTests(unittest.TestCase):
         child=sleeper()
         alerted=threading.Event()
         try:
-            stopped=Process(child.pid).watch(alerted.set)
+            stopped=attach(child).watch(alerted.set)
             stopped.set()
             time.sleep(.1)
             child.kill()

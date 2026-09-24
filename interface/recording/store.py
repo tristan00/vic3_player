@@ -404,8 +404,10 @@ class Store:
 
     def flag_game_exit(self,exited_at):
         with psycopg.connect(self.dsn,autocommit=True) as connection:
-            connection.execute("update run set ended_at=now(),end_reason='game_crashed',game_exited_at=%s where run_id=%s and ended_at is null",
-                               (exited_at,self.run_id))
+            if exited_at is None:
+                connection.execute("update run set ended_at=now(),end_reason='game_crashed' where run_id=%s and ended_at is null",(self.run_id,))
+            else:
+                connection.execute("update run set game_exited_at=%s where run_id=%s and end_reason='game_crashed' and game_exited_at is null",(exited_at,self.run_id))
 
     def end_run(self,reason,game_exited_at=None):
         if self.beater is not None:

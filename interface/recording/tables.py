@@ -37,6 +37,7 @@ class Context:
         self.goods=capture.goods
         self.orders=orders
         self.out=defaultdict(list)
+        self.identities={}
 
     def label(self,code):
         name=self.name(code) if code else None
@@ -76,6 +77,14 @@ class Context:
 
     def add(self,table,**values):
         self.out[table].append(values)
+
+    def ident(self,entity,value):
+        if entity not in self.identities:
+            found=self.table(entity)
+            self.identities[entity]=dict(zip(found['id'],found['ident'])) if found else {}
+        if value&SLOT not in self.identities[entity]:
+            raise RuntimeError(f'The script names {entity} {value} but the memory capture holds no such object')
+        return self.identities[entity][value&SLOT]
 
     def player_rows(self,table,*columns,sparse=False):
         items=self.children(table,'id',*columns,sparse=sparse)
@@ -249,13 +258,13 @@ def player(c):
             c.add('player_construction_queue_item',private=private,position=position,state=row['state'],building_type=c.label(row['building_type']),
                   owner_building_type=c.label(row.get('owner_building_type')),speed=row['speed'],construction_left=row['construction_left'])
     for country,kind in sorted(set(c.rows('proposal_shown','country','kind'))):
-        c.add('player_proposal',country=country,kind=kind)
+        c.add('player_proposal',country=c.ident('country',country),kind=kind)
     for country, in sorted(set(c.rows('country_adjacent','country'))):
-        c.add('player_adjacent_country',country=country)
+        c.add('player_adjacent_country',country=c.ident('country',country))
     for country,direction in sorted(set(c.rows('diplomats_expelled','country','direction'))):
-        c.add('player_diplomat_expulsion',country=country,direction={'by':'by_player','of':'of_player'}[direction])
+        c.add('player_diplomat_expulsion',country=c.ident('country',country),direction={'by':'by_player','of':'of_player'}[direction])
     for country,direction in sorted(set(c.rows('obligation','country','direction'))):
-        c.add('player_obligation',country=country,direction=direction)
+        c.add('player_obligation',country=c.ident('country',country),direction=direction)
     for position,name,formable,ignored in sorted(c.rows('formable_country','ord','name','formable','ignored')):
         c.add('player_formable_country',name=name,position=position,formable=flag(formable),ignored=flag(ignored))
     for position,name,possible in sorted(c.rows('releasable_country','ord','name','possible')):
@@ -264,7 +273,7 @@ def player(c):
         if state==-1:
             c.add('player_alert',alert_type=alert,instances=instances)
         else:
-            c.add('player_state_alert',alert_type=alert,state=state)
+            c.add('player_state_alert',alert_type=alert,state=c.ident('state',state))
     for decision,takeable in sorted(set(c.rows('decision','decision','takeable'))):
         c.add('player_decision',decision=decision,takeable=None if takeable is None else flag(takeable))
     for position,date,kind,title,description in c.rows('message_feed','ord','date','type','name','description'):
@@ -272,26 +281,27 @@ def player(c):
     for entry,button in sorted(set(c.rows('journal_button_shown','journal_entry','button'))):
         c.add('player_journal_button',journal_entry_type=entry,scripted_button=button)
     for first,second in sorted(set(c.rows('treaty_enforced_on_player','first_country','second_country'))):
-        c.add('player_treaty_enforced',first_country=first,second_country=second)
+        c.add('player_treaty_enforced',first_country=c.ident('country',first),second_country=c.ident('country',second))
     shown=set(c.rows('diplomatic_action_shown','country','action'))
     possible=set(c.rows('diplomatic_action_possible','country','action'))
     if possible-shown:
         raise RuntimeError(f'Diplomatic actions possible but not shown: {sorted(possible-shown)[:5]}')
     for country,action in sorted(shown):
-        c.add('player_diplomatic_option',target_country=country,action_type=action,possible=(country,action) in possible)
+        c.add('player_diplomatic_option',target_country=c.ident('country',country),action_type=action,possible=(country,action) in possible)
     for country,action,side,state in sorted(set(c.rows('diplomatic_action_state_pick','country','action','side','state'))):
-        c.add('player_diplomatic_option_state',target_country=country,action_type=action,side={'first':'source','second':'target'}[side],state=state)
+        c.add('player_diplomatic_option_state',target_country=c.ident('country',country),action_type=action,side={'first':'source','second':'target'}[side],
+              state=c.ident('state',state))
     shown=set(c.rows('interaction_shown','character','interaction'))
     possible=set(c.rows('interaction_possible','character','interaction'))
     if possible-shown:
         raise RuntimeError(f'Character interactions possible but not shown: {sorted(possible-shown)[:5]}')
     for character,interaction in sorted(shown):
-        c.add('player_character_interaction',character=character,character_interaction=interaction,possible=(character,interaction) in possible)
+        c.add('player_character_interaction',character=c.ident('character',character),character_interaction=interaction,possible=(character,interaction) in possible)
     for state,paused in c.rows('state_setting','state','colonization_paused'):
         if flag(paused):
-            c.add('player_colonization_paused',state=state)
+            c.add('player_colonization_paused',state=c.ident('state',state))
     for state,kind in sorted(set(c.rows('decree_active','state','decree_type'))):
-        c.add('player_active_decree',state=state,decree_type=kind)
+        c.add('player_active_decree',state=c.ident('state',state),decree_type=kind)
     ids=idents(c.table('country')) if c.table('country') else {}
     weekly=samples(c,'country',('prestige','literacy'),ids)
     for (owner,n),(date,prestige,literacy) in weekly.items():
@@ -531,9 +541,9 @@ def states(c):
     for i,group,need,code,weight in c.rows('state_pop_need','id','need_group','need','goods_type','weight'):
         c.add('state_pop_need',state=ids[i],culture_type=c.label(group),need=need,goods=c.label(code),weight=weight)
     for state,name in sorted(set(c.rows('state_goods_supply','state','goods'))):
-        c.add('state_goods_supply',state=state,goods=name)
+        c.add('state_goods_supply',state=c.ident('state',state),goods=name)
     for state,kind in sorted(set(c.rows('decree_state_valid','state','decree_type'))):
-        c.add('state_decree_valid',state=state,decree_type=kind)
+        c.add('state_decree_valid',state=c.ident('state',state),decree_type=kind)
     t=c.table('decree')
     if t:
         for ident,owner,state,kind in zip(t['ident'],t['owner'],t['state'],t['decree_type']):
@@ -642,7 +652,7 @@ def buildings(c):
         if set(settings)!=live:
             raise RuntimeError(f'Building GUI captures cover {sorted(set(settings)-live)[:5]} beyond the live player buildings and miss {sorted(live-set(settings))[:5]}')
         for building,values in settings.items():
-            c.add('building_private',building=building,**dict(zip(('auto_expand','output_paused','monopoly','privatizable'),map(flag,values))))
+            c.add('building_private',building=c.ident('building',building),**dict(zip(('auto_expand','output_paused','monopoly','privatizable'),map(flag,values))))
         for i,items in c.children('building_pm','id','production_method').items():
             for method, in items:
                 c.add('building_production_method_active',building=ids[i],production_method=c.label(method))
@@ -753,7 +763,7 @@ def companies(c):
                 raise RuntimeError(f'Country {country} holds two companies of type {c.label(kind)}')
             by_owner[c.label(kind),country&SLOT]=i
         for kind,country,owned in sorted(set(c.rows('company_owns_country','company_type','country','owned_country'))):
-            c.add('company_owned_country',company=ids[by_owner[kind,country]],country=owned)
+            c.add('company_owned_country',company=ids[by_owner[kind,country]],country=c.ident('country',owned))
     t=c.table('charter')
     if t:
         ids=idents(t)
@@ -780,7 +790,7 @@ def companies(c):
             c.add('strait_history',strait=ident,strait_definition=c.label(kind),first_last_access_change=first,second_last_access_change=second,
                   first_toll_rate=first_rate,second_toll_rate=second_rate)
         for strait,first,second,kind in c.rows('strait_endpoint','strait','first_state','second_state','strait_type'):
-            c.add('strait_endpoint',strait=ids[strait],first_state=first,second_state=second,strait_type=kind)
+            c.add('strait_endpoint',strait=ids[strait],first_state=c.ident('state',first),second_state=c.ident('state',second),strait_type=kind)
     t=c.table('technology')
     if t:
         ids=idents(t)
@@ -1031,7 +1041,7 @@ def military(c):
             for _,group,kind in items:
                 c.add('formation_selected_unit_type',formation=ids[i],combat_unit_group=c.label(group),combat_unit_type=c.label(kind))
         for formation,position,name,selected in c.rows('formation_borrow_setting','formation','ord','name','selected'):
-            c.add('formation_borrow_setting',formation=formation,name=name,position=position,selected=flag(selected))
+            c.add('formation_borrow_setting',formation=c.ident('formation',formation),name=name,position=position,selected=flag(selected))
     t=c.table('ship')
     if t:
         ids=idents(t)
@@ -1114,12 +1124,12 @@ def wars(c):
         for ident,x,y in zip(t['ident'],t['x'],t['y']):
             c.add('front_history',front=ident,x=x,y=y)
         for front,advantage in c.rows('front_advantage','front','advantage'):
-            c.add('front_advantage',front=front,advantage=advantage)
+            c.add('front_advantage',front=c.ident('front',front),advantage=advantage)
         for i,items in c.children('front_sides','id','value').items():
             for side, in items:
                 c.add('front_listed_side',front=ids[i],front_side=side)
     for front,invader,invaded,state,ended in sorted(set(c.rows('invasion','front','invader','invaded','state','ended'))):
-        c.add('invasion',front=front,invader=invader,invaded=invaded,state=state,ended=flag(ended))
+        c.add('invasion',front=c.ident('front',front),invader=c.ident('country',invader),invaded=c.ident('country',invaded),state=c.ident('state',state),ended=flag(ended))
     t=c.table('front_side')
     if t:
         for ident,front,war,side in zip(t['ident'],t['front'],t['war'],t['play_side']):

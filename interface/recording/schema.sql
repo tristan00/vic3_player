@@ -6063,7 +6063,7 @@ create view run_lost as
 
 create view run_late_flag as
   select run_id, kind, end_reason, game_exited_at, ended_at, ended_at - game_exited_at as flag_delay
-  from run where game_exited_at is not null and ended_at - game_exited_at > interval '1 second';
+  from run where end_reason = 'game_crashed' and (game_exited_at is null or ended_at - game_exited_at > interval '1 second');
 
 create index pop_history_location on pop_history (run_id, location, seq);
 create index building_history_state on building_history (run_id, state, seq);

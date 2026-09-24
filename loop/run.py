@@ -241,15 +241,27 @@ class Loop:
         return after,[(entry,after,result) for entry,_,result in paused],pending
 
     def crashed(self):
-        exited_at=self.process.exit_time()
-        latency=latency_ms(exited_at)
-        LOG.error('GAME CRASHED: process %s exited at %s UTC, flagged %d ms later',self.process.pid,exited_at.strftime('%H:%M:%S.%f'),latency)
+        noticed=datetime.now(timezone.utc)
+        LOG.error('GAME CRASHED: process %s is gone, noticed at %s UTC by the watcher',self.process.pid,noticed.strftime('%H:%M:%S.%f'))
+        try:
+            self.store.flag_game_exit(None)
+        except Exception:
+            LOG.exception('The game exit could not be written to the run row')
+        exited_at=self.exit_time()
+        if exited_at is None:
+            LOG.critical('GAME UNREADABLE: process %s stopped answering memory reads but has not exited within %d ms',self.process.pid,EXIT_GRACE_MS)
+            return
+        latency=round((noticed-exited_at).total_seconds()*1000)
+        LOG.error('GAME CRASHED: process %s exited at %s UTC per the OS, noticed %d ms after that',self.process.pid,exited_at.strftime('%H:%M:%S.%f'),latency)
         if latency>LATE_FLAG_MS:
             LOG.critical('LATE FLAG: %d ms between the game exit and the flag; the limit is %d ms',latency,LATE_FLAG_MS)
         try:
             self.store.flag_game_exit(exited_at)
         except Exception:
-            LOG.exception('The game exit could not be written to the run row')
+            LOG.exception('The game exit time could not be written to the run row')
+
+    def exit_time(self):
+        return self.process.exit_time() if self.process.exits_within(EXIT_GRACE_MS) else None
 
     def end(self,reason,game_exited_at=None):
         self.watching.set()
@@ -266,16 +278,17 @@ class Loop:
         except Stuck:
             return self.end('ui_stuck')
         except BaseException as error:
-            if not isinstance(error,GameCrashed) and not self.process.exits_within(EXIT_GRACE_MS):
+            if not isinstance(error,GameCrashed) and not self.process.gone() and not self.process.exits_within(EXIT_GRACE_MS):
                 LOG.error('LOOP CRASHED: %s: %s',type(error).__name__,error)
                 self.end(f'loop_crashed: {type(error).__name__}: {error}'[:200])
                 raise
-            exited_at=self.process.exit_time()
-            LOG.error('GAME CRASHED: %s; the loop reacted %d ms after the exit',error,latency_ms(exited_at))
+            exited_at=self.exit_time()
+            LOG.error('GAME CRASHED: %s; the loop reacted at %s UTC, %s ms after the exit the OS reports',error,datetime.now(timezone.utc).strftime('%H:%M:%S.%f'),
+                      None if exited_at is None else latency_ms(exited_at))
             self.end('game_crashed',exited_at)
             if isinstance(error,GameCrashed):
                 raise
-            raise GameCrashed(f'The game process {self.process.pid} exited while the loop hit {type(error).__name__}: {error}') from error
+            raise GameCrashed(f'The game process {self.process.pid} died while the loop hit {type(error).__name__}: {error}') from error
 
     def play(self,years,seconds):
         deadline=time.monotonic()+seconds
@@ -458,6 +471,7 @@ def main():
     levels=(arguments.tech,arguments.pop)
     logging.basicConfig(level=logging.WARNING,format='%(asctime)s %(message)s')
     logging.getLogger('interface').setLevel(logging.INFO)
+    logging.getLogger('loop').setLevel(logging.INFO)
     game=GameInterface(arguments.profile)
     rng=random.Random(arguments.seed)
     weights={**WEIGHTS,**{name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}}

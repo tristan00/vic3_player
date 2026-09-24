@@ -48,9 +48,22 @@ class Process:
         if not self.handle:
             raise ctypes.WinError(ctypes.get_last_error())
         self._close=weakref.finalize(self,kernel.CloseHandle,self.handle)
+        modules=(wintypes.HMODULE*1)();needed=wintypes.DWORD()
+        if not psapi.EnumProcessModules(self.handle,modules,ctypes.sizeof(modules),ctypes.byref(needed)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        if not modules[0]:
+            raise OSError(f'process {pid} has not loaded its executable yet')
+        self.base=modules[0]
 
     def exited(self):
         return kernel.WaitForSingleObject(self.handle,0)==WAIT_OBJECT_0
+
+    def readable(self):
+        data=ctypes.create_string_buffer(8);count=ctypes.c_size_t()
+        return bool(kernel.ReadProcessMemory(self.handle,self.base,data,8,ctypes.byref(count)))
+
+    def gone(self):
+        return self.exited() or not self.readable()
 
     def exits_within(self,milliseconds):
         return kernel.WaitForSingleObject(self.handle,milliseconds)==WAIT_OBJECT_0
@@ -63,14 +76,14 @@ class Process:
         return datetime.fromtimestamp(exit_/10**7-FILETIME_EPOCH_SECONDS,timezone.utc)
 
     def check(self):
-        if self.exited():
-            raise GameCrashed(f'The game process {self.pid} exited at {self.exit_time():%H:%M:%S.%f} UTC')
+        if self.gone():
+            raise GameCrashed(f'The game process {self.pid} is '+('exited' if self.exited() else 'shutting down, its memory is unreadable'))
 
     def watch(self,alert):
         stopped=threading.Event()
         def wait():
             while not stopped.wait(WATCH_INTERVAL):
-                if self.exited():
+                if self.gone():
                     alert()
                     return
         threading.Thread(target=wait,daemon=True,name='game-watch').start()
@@ -110,12 +123,7 @@ class Reader:
         self.pid=pid
         self.process=Process(pid)
         self.handle=self.process.handle
-        modules=(wintypes.HMODULE*1)();needed=wintypes.DWORD()
-        if not psapi.EnumProcessModules(self.handle,modules,ctypes.sizeof(modules),ctypes.byref(needed)):
-            raise ctypes.WinError(ctypes.get_last_error())
-        if not modules[0]:
-            raise OSError(f'process {pid} has not loaded its executable yet')
-        self.base=modules[0]
+        self.base=self.process.base
         self.tables=LAYOUT['tables']
         self.keys={}
         self.names=[]

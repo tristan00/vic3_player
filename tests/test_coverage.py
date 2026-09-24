@@ -80,7 +80,7 @@ def synthetic(body,world):
         maps[name]={('flag','0'):('flag','Germany') if name=='cap_formable_name' else ('value',1.0)}
     for name in capture.MESSAGE_MAPS+capture.PROPOSAL_MAPS:
         maps[name]={('value',1.0):PLAYER if name=='cap_proposal_actor' else ('flag','x')}
-    picks={5:{'variables':{},'lists':{name:[STATE] for name in set(re.findall(r'name = (capd_\w+)',body))},'maps':{}}}
+    picks={1:{'variables':{},'lists':{name:[STATE] for name in set(re.findall(r'name = (capd_\w+)',body))},'maps':{}}}
     return record.Held({'variables':variables,'lists':lists,'maps':maps},7,picks)
 
 
