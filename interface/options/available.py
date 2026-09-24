@@ -1618,13 +1618,17 @@ INFAMY_PACT_COST=((100,1.0),(50,.5),(25,.25))
 LOBBY_PACT_COST_MAX=.5
 
 
-def pact_cost_multiplier(s,country):
+def pact_cost_multiplier(s,country,action):
     infamy=s.map('country_diplomacy','country,infamy').get(s.player) or 0
     clout=s.map('interest_group_stats','interest_group,clout')
     members=s.grouped('political_lobby_member','political_lobby,interest_group')
-    lobbied=sum(clout.get(group,0) for lobby,owner,target in s.rows('political_lobby','political_lobby,country,target_country')
+    hostile=definition(s,'common/diplomatic_actions',action,'pact_hostile')==['yes']
+    lobbied=sum(clout.get(group,0)*(1 if kind.startswith('lobby_pro')==hostile else -1)
+                for lobby,owner,target,kind in s.rows('political_lobby','political_lobby,country,target_country,political_lobby_type')
                 if owner==s.player and target==country for group in members.get(lobby,[]))
-    return 1+next((extra for threshold,extra in INFAMY_PACT_COST if infamy>=threshold),0)+min(LOBBY_PACT_COST_MAX,lobbied)
+    rank=float(next(iter(definition(s,'common/country_ranks',rank_of(s,country),'diplo_pact_cost')),1))-1
+    return (1+next((extra for threshold,extra in INFAMY_PACT_COST if infamy>=threshold),0)+rank
+            +max(-LOBBY_PACT_COST_MAX,min(LOBBY_PACT_COST_MAX,lobbied)))
 
 
 def diplomatic_allowed(s,country,action):
@@ -1632,7 +1636,7 @@ def diplomatic_allowed(s,country,action):
             and (country,action) in diplomatic_possible(s)
             and passes(s,'common/diplomatic_actions',action,('maintain',),country_scope(s,target_country=('country',country),actor=('country',s.player)))
             and action_group_allows(s,action,country) and not pact_between(s,action,country)
-            and metric(s,"GetPowerDelta('influence')")>=float(next(iter(definition(s,'common/diplomatic_actions',action,'pact_cost')),0))*pact_cost_multiplier(s,country)
+            and metric(s,"GetPowerDelta('influence')")>=float(next(iter(definition(s,'common/diplomatic_actions',action,'pact_cost')),0))*pact_cost_multiplier(s,country,action)
             and DIPLOMATIC.get(action,lambda s,c:True)(s,country))
 
 

@@ -159,7 +159,7 @@ DEFINITION_FIELDS={
     'common/ship_modification_slots':('utility',),
     'common/strategic_regions':('states',),
     'common/geographic_regions':('strategic_regions','state_regions'),
-    'common/country_ranks':('rank_value',),
+    'common/country_ranks':('rank_value','diplo_pact_cost'),
     'common/commander_ranks':('rank_value',),
     'map_data/state_regions':('arable_resources','naval_exit_id'),
     'common/mobilization_options':('unlocking_technologies','unlocking_principles'),
@@ -215,6 +215,9 @@ def definitions(game,mods=()):
             +[(folder,name,'body',' '.join(body(text).split())) for folder in ('common/scripted_triggers','common/scripted_rules') for name,text in read(game,folder,mods)]
             +[('common/diplomatic_actions',name,'pact_cost',cost) for name,text in read(game,'common/diplomatic_actions',mods)
               for cost in re.findall(r'\bpact\s*=\s*\{\s*cost\s*=\s*([\d.]+)',text)[:1]]
+            +[('common/diplomatic_actions',name,'pact_hostile',value) for name,text in read(game,'common/diplomatic_actions',mods)
+              for field,values in fields(body(text)) if field=='pact'
+              for inner,found in fields(' '.join(values)) if inner=='is_hostile' for value in found]
             +[('common/diplomatic_actions',name,'maintain',' '.join(trigger)) for name,text in read(game,'common/diplomatic_actions',mods)
               for field,values in fields(body(text)) if field=='pact'
               for inner,requirement in fields(' '.join(values)) if inner=='requirement_to_maintain'
