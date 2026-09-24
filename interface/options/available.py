@@ -293,6 +293,8 @@ def play_allowed(s,play,**saved):
 def companies(s):
     if metric(s,'GetNumCompanies')>=metric(s,'GetMaxNumCompanies'):
         return []
+    if any(second==s.player and kind=='chartered_company' for _,second,kind in s.rows('pact','first_country,second_country,pact_type')):
+        return []
     acquired,_,_,_=technologies(s)
     held={kind for kind, in s.rows('company','company_type')}
     potential={combo['building_type'] for combo in buildable(s)}|{kind for _,kind,_ in s.buildings()}
