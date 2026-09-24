@@ -319,9 +319,7 @@ def warleaders(s,war):
 
 
 def play_participants(s,first,second):
-    plays={play for play,_ in play_sides(s)}
-    return first!=second and any(first in play_sides(s).get((play,0),set())|play_sides(s).get((play,1),set())
-               and second in play_sides(s).get((play,0),set())|play_sides(s).get((play,1),set()) for play in plays)
+    return any(first in members and second in members for members in play_sides(s).values())
 
 
 def interest_tier(s,country,region):

@@ -32,6 +32,16 @@ class TriggerTests(unittest.TestCase):
         self.assertFalse(evaluate(parse('has_government_type = gov_chartered_company'),country_scope(s)))
         self.assertTrue(evaluate(parse('has_government_type = gov_chartered_company'),country_scope(s,9)))
 
+    def test_play_participation_alongside_counts_the_same_side_including_oneself(self):
+        s=Memory(7,{'country_history':[{'country':7},{'country':9},{'country':4},{'country':5}],
+                    'diplomatic_play_history':[{'diplomatic_play':1,'initiator':7,'target':9}],
+                    'pact_history':[{'first_country':7,'second_country':4,'pact_type':'puppet'},{'first_country':9,'second_country':5,'pact_type':'puppet'}]},
+                 {'common/diplomatic_actions':{'puppet':{'subject_pact':['yes']}}})
+        rule=parse('NOT = { scope:target_country.top_overlord ?= { is_diplomatic_play_participant_with = root } }')
+        self.assertFalse(evaluate(rule,country_scope(s,target_country=('country',4))))
+        self.assertTrue(evaluate(rule,country_scope(s,target_country=('country',5))))
+        self.assertTrue(evaluate(rule,country_scope(Memory(7,{'country_history':[{'country':7},{'country':4}]}),target_country=('country',4))))
+
     def test_every_captured_trigger_uses_supported_keys(self):
         for folder,wanted in BLOCK_FIELDS.items():
             for name,text in read(DEFAULT_GAME/'game',folder):
