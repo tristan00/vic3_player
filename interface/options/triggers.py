@@ -783,6 +783,8 @@ def country_test(key,operator,value,scope):
         return bool(found) and pact_exists(s,country,found.country(),fields.get('type'))
     if key=='aggressive_diplomatic_plays_permitted':
         return (autonomous(s,country) and not modifier_flag(s,country,'country_disallow_aggressive_plays_bool'))==yes(value)
+    if key=='country_has_state_religion':
+        return s.map('country','country,religion').get(country)==value.split(':',1)[-1]
     if key=='country_has_primary_culture':
         return value.split(':',1)[-1] in primary_cultures(s,country)
     if key=='has_interest_marker_in_region':
@@ -898,7 +900,7 @@ HANDLED={'AND','OR','NOT','NOR','NAND','any_scope_war','calc_true_if','amount','
          'is_in_power_bloc','is_direct_subject_of','ruler_can_have_command','can_form_nation','exists','is_power_bloc_leader','is_in_same_power_bloc',
          'has_diplomatic_relevance','is_adjacent_to_country','has_diplomats_expelled',
          'aggressive_diplomatic_plays_permitted','has_interest_marker_in_region',
-         'country_has_primary_culture','strategic_region','law','owns_entire_state_region','country_or_subject_owns_entire_state_region'}|set(METRIC_KEYS)|SCOPES|{key for table in HANDLERS.values() for key in table}
+         'country_has_primary_culture','country_has_state_religion','strategic_region','law','owns_entire_state_region','country_or_subject_owns_entire_state_region'}|set(METRIC_KEYS)|SCOPES|{key for table in HANDLERS.values() for key in table}
 
 
 def unsupported(nodes):

@@ -647,7 +647,8 @@ def law_possible(s,country,law):
 
 def imposable(s):
     pending={owner for owner,imposer in s.rows('law','country,imposer') if imposer is not None}
-    targets=subjects(s)-pending
+    cooling={owner for owner, in s.rows('country_timed_modifier','country',modifier='impose_law_cooldown')}
+    targets=subjects(s)-pending-cooling
     return [ident for ident,kind,owner,active in s.rows('law','law,law_type,country,active') if owner in targets and not active
             and law_possible(s,owner,kind) and all(evaluate(parsed(text),country_scope(s,target_country=('country',owner))) is not False
                                                    for text in definition(s,'common/laws',kind,'can_impose') or ['can_impose_law_default = yes'])]
