@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
+import pickle
 import random
 import re
 import time
@@ -10,7 +11,7 @@ import time
 import numpy as np
 
 from ..actions.catalogue import action_folders
-from ..common import slot, timed
+from ..common import DEFAULT_DATA, slot, timed
 from ..runner.memory import LAYOUT, MONTH_STARTS
 from ..script import alerts, blocks, body, building_methods, decisions, definitions, event_options, keys, production_methods, read, scalar
 from .capture import (ALERT_SCOPES, BORROW_MAPS, RELEASE_MAPS, FORMABLE_MAPS, GROUPS, MESSAGE_MAPS, METRICS, PART, PROPOSAL_MAPS, UI_CHECKS, evaluable, method_block, metric_map,
@@ -80,12 +81,20 @@ def record(game,store,phase):
         snapshot[table]={column:values[~answered] for column,values in snapshot[table].items()}
     tables={name:{column:values.tolist() for column,values in columns.items()} for name,columns in snapshot.items()}
     manifest=json.loads(world.read_text(encoding='utf-8')) if world else None
-    colors=_scripted(tables,snapshot,held,tags,label,player,living,manifest,map_data(game.game_dir,manifest))
-    _options(tables,snapshot,windows,label)
-    constants,meta,open_windows=snapshot_meta(tables,label)
-    rows=build(Capture(tables,label,player,reader.goods_codes.tolist(),open_windows),store.orders,colors)
-    read_ms=(time.perf_counter()-started)*1000
-    seq=store.write(Built(rows,constants,meta,colors),phase,datetime.now(timezone.utc),read_ms)
+    try:
+        colors=_scripted(tables,snapshot,held,tags,label,player,living,manifest,map_data(game.game_dir,manifest))
+        _options(tables,snapshot,windows,label)
+        constants,meta,open_windows=snapshot_meta(tables,label)
+        rows=build(Capture(tables,label,player,reader.goods_codes.tolist(),open_windows),store.orders,colors)
+        read_ms=(time.perf_counter()-started)*1000
+        seq=store.write(Built(rows,constants,meta,colors),phase,datetime.now(timezone.utc),read_ms)
+    except RuntimeError as error:
+        path=DEFAULT_DATA/'refusals'/f'{time.strftime("%Y%m%dT%H%M%S")}.pkl'
+        path.parent.mkdir(parents=True,exist_ok=True)
+        with open(path,'wb') as handle:
+            pickle.dump({'error':str(error),'phase':phase,'player':player,'tables':tables,'held':own,'picks':held.picks,'windows':windows},handle)
+        LOG.error('CAPTURE REFUSED: %s; the capture is dumped to %s',error,path)
+        raise
     return store.run_id,seq
 
 

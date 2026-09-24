@@ -118,6 +118,7 @@ class Loop:
     @timed
     def perform(self,source,name,params,snapshot,pending,raced=None):
         entry=self.entry(source,name,params,snapshot)
+        LOG.info('action %s %s %s',entry['seq'],name,params)
         try:
             result=self.executor.run(name,**params)
         except LookupError as error:
