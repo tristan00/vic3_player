@@ -596,6 +596,9 @@ class Reader:
             if kind=='u':
                 result[column]=halves[:,offset//4].astype(np.int64)&0xffffffff
                 continue
+            if kind=='h':
+                result[column]=octets[:,offset:offset+2].copy().view('<u2')[:,0].astype(np.int32)
+                continue
             result[column]=(words[:,offset//8]/100000 if kind=='q' else words[:,offset//8].copy() if kind=='w' else halves[:,offset//4].copy() if kind in 'id'
                             else (octets[:,offset].astype(np.int32)>>bit[0])&1 if bit else octets[:,offset].astype(np.int32))
         for column,(offset,kind,inner,*present) in spec.get('keys',{}).items():
