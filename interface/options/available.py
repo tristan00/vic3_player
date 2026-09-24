@@ -1704,10 +1704,11 @@ RULES={
     'capitulate':lambda s:product(war=[w for w in s.wars() if not overlords(s,s.player)&war_countries(s,w)]),
     'toggle_press_war_goal':lambda s:[goal for goal in war_goals(s) if goal['diplomatic_play'] in at_war_plays(s)
                                       and (war:=war_of_play(s,goal['diplomatic_play'])) is not None
-                                      and war_leader(s,war) and negotiable_war(s,war) and proposer(s,war) is None],
+                                      and war_leader(s,war) and negotiable_war(s,war) and proposer(s,war) is None and s.map('war','war,peace_date').get(war) is None],
     'add_war_goal':lambda s:[{'diplomatic_play':play,'war_goal_type':kind,'index':0} for play in principal(s) if play not in at_war_plays(s) and escalation(s,play)<COUNTDOWN
                              for kind in sorted({kind for kind, in s.rows('war_goal','war_goal_type')})],
-    'make_primary_demand':lambda s:[goal for goal in war_goals(s) if goal['diplomatic_play'] not in at_war_plays(s) and goal['diplomatic_play'] in principal(s)],
+    'make_primary_demand':lambda s:[goal for goal in war_goals(s) if goal['diplomatic_play'] not in at_war_plays(s) and goal['diplomatic_play'] in principal(s)
+                                    and sum(other['diplomatic_play']==goal['diplomatic_play'] for other in war_goals(s))>1],
     'withdraw_treaty':lambda s:product(treaty=[ident for ident,first,second,withdrawn in s.rows('treaty','treaty,first_country,second_country,withdrawn')
                                               if s.player in (first,second) and not withdrawn and (first,second) not in enforced_on_player(s)]),
     'request_join_power_bloc':lambda s:product(power_bloc=[] if player_blocs(s) or overlords(s,s.player) else
