@@ -231,6 +231,12 @@ def autonomous(s,country):
                if second==country and actions.get(action,{}).get('subject_pact'))
 
 
+def subject_type_of(s,country):
+    actions=s.definitions('common/diplomatic_actions')
+    return next((next(iter(actions.get(action,{}).get('subject_type',[])),None) for first,second,action in s.rows('pact','first_country,second_country,pact_type')
+                 if second==country and actions.get(action,{}).get('subject_pact')),None)
+
+
 def overlords(s,country):
     return {first for first,second in subject_pairs(s) if second==country}
 
@@ -390,6 +396,8 @@ def children(scope,iterator):
                 if owner==country and s.player in (owner,other)]
     if iterator=='any_interest_group':
         return [scope.to('interest_group',ident) for ident, in s.rows('interest_group','interest_group',country=country)]
+    if iterator=='any_primary_culture':
+        return [scope.to('culture',ident) for ident, in s.rows('country_culture','culture',country=country)]
     if iterator=='any_scope_war':
         return [scope.to('war',ident) for ident in sorted({war for war, in s.rows('war_participant','war',country=country)})]
     return None
@@ -618,7 +626,15 @@ def formation_fraction(operator,value,scope):
     return COMPARE[fields['value'][0]](share,amount(s,fields['value'][1]))
 
 
+def discrimination_traits(scope):
+    fields=scope.s.definitions('common/cultures').get(scope.s.map('culture','culture,culture_type').get(scope.ident),{})
+    return {trait for field in ('heritage','language','traditions') for trait in fields.get(field,())}
+
+
 HANDLERS={
+    'culture':{
+        'has_discrimination_trait':lambda o,v,sc:v in discrimination_traits(sc),
+    },
     'character':{
         'has_role':lambda o,v,sc:'character_role_'+v in roles(sc.s,sc.ident),
         'has_role_of_type':lambda o,v,sc:'character_role_'+v in roles(sc.s,sc.ident),
@@ -783,6 +799,9 @@ def country_test(key,operator,value,scope):
         return bool(found) and pact_exists(s,country,found.country(),fields.get('type'))
     if key=='aggressive_diplomatic_plays_permitted':
         return (autonomous(s,country) and not modifier_flag(s,country,'country_disallow_aggressive_plays_bool'))==yes(value)
+    if key=='can_increase_autonomy':
+        kind=subject_type_of(s,country)
+        return (kind is not None and bool(s.definitions('common/subject_types').get(kind,{}).get('higher_autonomy_subject_type_alternatives')))==yes(value)
     if key=='country_has_state_religion':
         return s.map('country','country,religion').get(country)==value.split(':',1)[-1]
     if key=='country_has_primary_culture':
@@ -893,14 +912,14 @@ def modifiers(s,kind,ident):
 
 
 HANDLED={'AND','OR','NOT','NOR','NAND','any_scope_war','calc_true_if','amount','custom_tooltip','hidden_trigger','custom_description','has_dlc_feature','always','has_variable',
-         'any_scope_state','any_scope_building','any_scope_character','any_subject_or_below','any_interest_group','count','limit',
+         'any_scope_state','any_scope_building','any_scope_character','any_primary_culture','any_subject_or_below','any_interest_group','count','limit',
          'trigger_if','trigger_else_if','trigger_else','text','target','value','has_technology_researched','has_law','has_law_or_variant',
          'is_subject','is_subject_of','is_at_war','has_journal_entry','is_diplomatic_play_enemy_of','this','has_modifier','is_country_type','game_date','liberty_desire',
          'any_scope_treaty','any_scope_article','country_rank','is_revolutionary','is_insurrectionary','has_war_with','has_diplomatic_pact',
          'is_in_power_bloc','is_direct_subject_of','ruler_can_have_command','can_form_nation','exists','is_power_bloc_leader','is_in_same_power_bloc',
          'has_diplomatic_relevance','is_adjacent_to_country','has_diplomats_expelled',
          'aggressive_diplomatic_plays_permitted','has_interest_marker_in_region',
-         'country_has_primary_culture','country_has_state_religion','strategic_region','law','owns_entire_state_region','country_or_subject_owns_entire_state_region'}|set(METRIC_KEYS)|SCOPES|{key for table in HANDLERS.values() for key in table}
+         'country_has_primary_culture','country_has_state_religion','can_increase_autonomy','strategic_region','law','owns_entire_state_region','country_or_subject_owns_entire_state_region'}|set(METRIC_KEYS)|SCOPES|{key for table in HANDLERS.values() for key in table}
 
 
 def unsupported(nodes):

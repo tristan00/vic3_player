@@ -153,7 +153,7 @@ DEFINITION_FIELDS={
     'common/war_goal_types':('target_type','kind'),
     'common/strait_definitions':('type','total_block_requires_full_control','military_block_requires_full_control','tolls_require_full_control'),
     'common/subject_types':('valid_overlord_country_types','valid_subject_country_types','valid_overlord_ranks','valid_subject_ranks','overlord_must_be_higher_rank',
-                            'can_start_own_diplomatic_plays','can_have_subjects'),
+                            'can_start_own_diplomatic_plays','can_have_subjects','higher_autonomy_subject_type_alternatives'),
     'common/ship_types':('unlocking_technologies','ship_group'),
     'common/ship_modifications':('type','unlocking_technologies'),
     'common/ship_modification_slots':('utility',),
@@ -167,6 +167,7 @@ DEFINITION_FIELDS={
     'common/diplomatic_actions':('unlocking_technologies','groups','can_use_obligations','first_state_list','second_state_list','reverse_pact'),
     'common/interest_tier_types':('rank','min_involvement'),
     'common/power_bloc_principle_groups':('primary_for_identity','levels','unlocking_identity','blocking_identity'),
+    'common/cultures':('heritage','language','traditions'),
 }
 
 

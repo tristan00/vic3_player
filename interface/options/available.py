@@ -6,7 +6,7 @@ from ..common import progress, timed
 from ..recording.spec import METRIC_COLUMNS
 from ..runner.memory import MONTH_STARTS
 
-from .triggers import ENGAGED, Scope, bloc_advantage, modifier_flag, character_scope, country_scope, evaluate, overlords, parse, subject_pairs
+from .triggers import ENGAGED, Scope, autonomous, bloc_advantage, modifier_flag, character_scope, country_scope, evaluate, overlords, parse, subject_pairs
 from .triggers import play_sides, stance, coastal as trigger_coastal, laws as trigger_laws, technologies as trigger_technologies
 
 SLOT=0xFFFFFF
@@ -165,7 +165,7 @@ def reachable_state(s,state):
 
 def reachable_country(s,country):
     capital=s.map('country','country,capital').get(country)
-    return (not busy(s) and not truce(s,country) and country not in decentralized(s) and country not in guaranteed(s)
+    return (not busy(s) and not truce(s,country) and country not in decentralized(s) and country not in guaranteed(s) and country not in defensive_partners(s)
             and not in_play(s,country) and not s.map('country','country,in_civil_war').get(country) and capital is not None and plays_permitted(s,country,state_regions(s).get(capital)))
 
 
@@ -193,6 +193,14 @@ def plays_permitted(s,country,region,state=None):
 def guaranteed(s):
     return s.memo('guaranteed',lambda:{target for kind,target in s.rows('treaty_article','treaty_article_type,target_country',source_country=s.player)
                                       if kind=='guarantee_independence'})
+
+
+def defensive_partners(s):
+    def compute():
+        sides={treaty:(first,second) for treaty,first,second in s.rows('treaty','treaty,first_country,second_country')}
+        pairs=[sides.get(treaty,()) for treaty,kind in s.rows('treaty_article','treaty,treaty_article_type') if kind=='defensive_pact']
+        return {other for pair in pairs if s.player in pair for other in pair if other!=s.player}
+    return s.memo('defensive_partners',compute)
 
 
 def decentralized(s):
@@ -252,12 +260,6 @@ def own_subject_type(s):
 def subject_permits(s,field):
     kind=own_subject_type(s)
     return kind is None or definition(s,'common/subject_types',kind,field)!=['no']
-
-
-def diplomatically_autonomous(s,country):
-    kinds=[next(iter(definition(s,'common/diplomatic_actions',action,'subject_type')),None) for first,second,action in s.rows('pact','first_country,second_country,pact_type')
-           if second==country and definition(s,'common/diplomatic_actions',action,'subject_pact')]
-    return all(definition(s,'common/subject_types',kind,'can_start_own_diplomatic_plays')!=['no'] for kind in kinds)
 
 
 def play_allowed(s,play,**saved):
@@ -1298,6 +1300,11 @@ def ship_designs(s):
             if not any(mod in design for design in designed(s,kind))]
 
 
+def templates_in_construction(s):
+    building={version for version, in s.rows('ship_construction','version')}
+    return {template for template,version in s.rows('ship_template_version_list','ship_template,ship_template_version') if version in building}
+
+
 TEMPLATE_DELETING=4
 
 
@@ -1398,6 +1405,11 @@ def pressed_in(s,war):
     return any(flag for owner,holder,flag in live_goals(s,'holder,pressed') if owner==play and holder==s.player)
 
 
+def peace_open(s,war):
+    date=s.map('war','war,peace_date').get(war)
+    return date is None or now(s)>=date
+
+
 def proposer(s,war):
     return s.map('war','war,peace_proposer').get(war)
 
@@ -1460,7 +1472,7 @@ def shared_interest(s,country):
 
 
 def rivalry_allowed(s,country):
-    if not shared_interest(s,country) or not diplomatically_autonomous(s,s.player) or not diplomatically_autonomous(s,country):
+    if not shared_interest(s,country) or not autonomous(s,s.player) or not autonomous(s,country):
         return False
     mine,theirs=rank_ladder(s,s.player),rank_ladder(s,country)
     return (relations(s,country)<CORDIAL and (type_of(s,s.player)=='recognized')==(type_of(s,country)=='recognized')
@@ -1610,7 +1622,8 @@ RULES={
                                    if (name:=formation_report(s,f,'display_name')) is not None and len(name)<=NAME_CHARACTERS
                                    for flag in range(ARMY_FLAGS) if flag!=s.map('formation','formation,flag').get(f)],
     'station_selected':lambda s:[{'military_formation':f,'strategic_region':region} for f in settled(s,s.formations('army')) if not demobilizing(s,f)
-                                 for region in sorted({region for kind,region in hq_regions(s).values() if kind==0}) if region!=home_region(s,f)],
+                                 for region in sorted({region for kind,region in hq_regions(s).values() if kind==0})
+                                 if region not in (home_region(s,f),state_regions(s).get(s.map('formation_status','formation,target_location').get(f)))],
     'transfer_battalions':lambda s:[{'military_formation':source,'target':target} for source in s.formations('army') for target in s.formations('army')
                                     if source!=target and located(s,source)==located(s,target) and len(s.rows('combat_unit','combat_unit',formation=source))>=2],
     'upgrade_all_units':lambda s:[{}] if RULES['upgrade_regulars'](s) else [],
@@ -1661,8 +1674,8 @@ RULES={
                                    for mod in unlocked_modifications(s,kind) if mod not in latest_design(s,template)],
     'set_default_ship_template':lambda s:[{'ship_type':kind,'index':index} for kind,index in sorted(non_default_templates(s))],
     'set_fleet_ship_template':fleet_templates,
-    'delete_ship_template':lambda s:[{'ship_type':kind,'index':index} for kind,index in sorted(own_templates(s))
-                                     if sum(1 for other,_ in own_templates(s) if other==kind)>1],
+    'delete_ship_template':lambda s:[{'ship_type':kind,'index':index} for (kind,index),template in sorted(own_templates(s).items())
+                                     if sum(1 for other,_ in own_templates(s) if other==kind)>1 and template not in templates_in_construction(s)],
     'retrofit_fleet':lambda s:product(military_formation=retrofit_fleets(s,False)),
     'cancel_retrofit_fleet':lambda s:product(military_formation=retrofit_fleets(s,True)),
     'retrofit_all':lambda s:[{}] if retrofit_fleets(s,False) else [],
@@ -1698,13 +1711,13 @@ RULES={
                                                       and not overlords(s,s.player)&set(involved(s)[0].get(p,()))]),
     'declare_neutrality':lambda s:product(diplomatic_play=[p for p in third_party(s) if not committed(s,p)]),
     'back_down':lambda s:product(diplomatic_play=backable(s)),
-    'propose_peace':lambda s:product(war=[w for w in s.wars() if war_leader(s,w) and negotiable_war(s,w) and proposer(s,w) is None and (s.map('war','war,peace_date').get(w) is None or now(s)>=s.map('war','war,peace_date').get(w))]),
-    'white_peace':lambda s:product(war=[w for w in s.wars() if war_leader(s,w) and negotiable_war(s,w) and proposer(s,w) is None and pressed_in(s,w)]),
+    'propose_peace':lambda s:product(war=[w for w in s.wars() if war_leader(s,w) and negotiable_war(s,w) and proposer(s,w) is None and peace_open(s,w)]),
+    'white_peace':lambda s:product(war=[w for w in s.wars() if war_leader(s,w) and negotiable_war(s,w) and proposer(s,w) is None and pressed_in(s,w) and peace_open(s,w)]),
     'toggle_accept_peace':lambda s:product(war=[w for w in s.wars() if proposer(s,w) not in (None,s.player) and has_say(s,w) and negotiable_war(s,w)]),
     'capitulate':lambda s:product(war=[w for w in s.wars() if not overlords(s,s.player)&war_countries(s,w)]),
     'toggle_press_war_goal':lambda s:[goal for goal in war_goals(s) if goal['diplomatic_play'] in at_war_plays(s)
                                       and (war:=war_of_play(s,goal['diplomatic_play'])) is not None
-                                      and war_leader(s,war) and negotiable_war(s,war) and proposer(s,war) is None and s.map('war','war,peace_date').get(war) is None],
+                                      and war_leader(s,war) and negotiable_war(s,war) and proposer(s,war) is None and peace_open(s,war)],
     'add_war_goal':lambda s:[{'diplomatic_play':play,'war_goal_type':kind,'index':0} for play in principal(s) if play not in at_war_plays(s) and escalation(s,play)<COUNTDOWN
                              for kind in sorted({kind for kind, in s.rows('war_goal','war_goal_type')})],
     'make_primary_demand':lambda s:[goal for goal in war_goals(s) if goal['diplomatic_play'] not in at_war_plays(s) and goal['diplomatic_play'] in principal(s)
