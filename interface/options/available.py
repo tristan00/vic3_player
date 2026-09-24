@@ -924,6 +924,9 @@ def march_components(s):
     return s.memo('march_components',compute)
 
 
+TRANSFER_MINIMUM=4
+
+
 def reaches(s,formation,region):
     components=march_components(s)
     here=components.get(located(s,formation),set())
@@ -1711,7 +1714,7 @@ RULES={
                                  for region in sorted({region for kind,region in hq_regions(s).values() if kind==0})
                                  if region not in (home_region(s,f),state_regions(s).get(s.map('formation_status','formation,target_location').get(f))) and reaches(s,f,region)],
     'transfer_battalions':lambda s:[{'military_formation':source,'target':target} for source in s.formations('army') for target in s.formations('army')
-                                    if source!=target and located(s,source)==located(s,target) and len(s.rows('combat_unit','combat_unit',formation=source))>=2
+                                    if source!=target and located(s,source)==located(s,target) and len(s.rows('combat_unit','combat_unit',formation=source))>=TRANSFER_MINIMUM
                                     and not formation_report(s,target,'invading')],
     'upgrade_all_units':lambda s:[{}] if RULES['upgrade_regulars'](s) else [],
     'create_army':lambda s:product(option=range(len({region for kind,region in hq_regions(s).values() if kind==0}))),
