@@ -363,7 +363,7 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
         history['ai'].append(f'c:{tag} ?= {{ {" ".join("set_strategy = "+s for s in strategies)} }}')
         countries.append({'tag':tag,'name':name,'states':[s['key'] for s in states],'capital':capital['key'],'culture':culture['key'],
                           'religion':culture['religion'],'color':[int(c) for c in color.split()],'band':band,'technology_tier':technology,
-                          'country_type':country_type,'tier':tier,'politics':politics,'laws':laws,'ruling':ruling,'produced':produced,'trade':trade,'holdings':holdings,'armed':bool(units),'army':sum(count for _,count in units),'monarchs':monarchs,
+                          'country_type':country_type,'tier':tier,'politics':politics,'laws':laws,'ruling':ruling,'produced':produced,'trade':trade,'holdings':holdings,'armed':bool(units),'army':sum(count for _,count in units),'navy':navy,'monarchs':monarchs,
                           'provinces':[p for s in states for p in s['province_codes']]})
     _diplomacy(rng,data,countries,neighbours,history,localization)
     _claims(rng,data,regions,state_neighbours,history)

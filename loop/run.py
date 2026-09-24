@@ -38,6 +38,7 @@ PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_de
 WEIGHTS={'cancel_enactment':.1,'nationalize':.1,'bulk_nationalize':.1,'bulk_nationalize_state':.1,'build':3,'research':3,'enact_law':2,'switch_production_method':3,'bulk_switch_production_method':3,'bulk_switch_production_method_state':3,'deploy_to_front':5,'set_strategic_objective':3,'start_play_country':.1,'start_play_state':.1,'mobilize':5,'mobilize_all':5,'raise_conscripts':3,'demobilize':.2,'demobilize_all':.2,'cancel_construction':.1,'cancel_queue_item':.1,'downsize':.1,'pause_construction':.1,'dequeue_research':.1,'pause_all_construction':.05,**{name:.1 for name in ('auto_expand_on','auto_expand_off','bulk_auto_expand','subset_auto_expand_on',
                                                                                 'subset_auto_expand_on_state','subset_auto_expand_off','subset_auto_expand_off_state')}}
 UNVERIFIED_WEIGHT=10
+NAVY_WEIGHT=3
 HOURS_PER_DAY=24
 MAX_TECH=1.5
 HOURS_PER_YEAR=365*HOURS_PER_DAY
@@ -477,8 +478,9 @@ def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds):
     recent=recent_tags()
     if chosen in recent:
         raise ValueError(f'{chosen} was played in one of the last {RECENT_ROUNDS} rounds: {recent}')
-    tag=chosen or rng.choice([country['tag'] for country in json.loads(world.read_text(encoding='utf-8'))['countries']] if world else
-                                    [tag for tag in TOP_PRESTIGE if tag not in recent])
+    countries=json.loads(world.read_text(encoding='utf-8'))['countries'] if world else []
+    tag=chosen or (rng.choices([country['tag'] for country in countries],weights=[NAVY_WEIGHT if country['navy'] else 1 for country in countries])[0] if world else
+                   rng.choice([tag for tag in TOP_PRESTIGE if tag not in recent]))
     game.close()
     game.campaign(tag,world=str(world) if world else None,debug=False)
     seed=rng.randrange(10**9)
