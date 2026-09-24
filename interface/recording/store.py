@@ -182,6 +182,7 @@ class Store:
 
     def begin_run(self,started_at,kind,advisors=(),**generated):
         self.heartbeat_connection=psycopg.connect(self.dsn,autocommit=True)
+        self.heartbeat_connection.execute('set synchronous_commit = off')
         lost=self.connection.execute("update run set ended_at=heartbeat_at,end_reason='loop_lost' where ended_at is null returning run_id,heartbeat_at").fetchall()
         for run_id,heartbeat_at in lost:
             LOG.error('RUN %s WAS LOST: its loop last beat at %s UTC',run_id,heartbeat_at)
