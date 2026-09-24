@@ -132,7 +132,7 @@ def singleton(name,columns):
 entity('country',[v('country_definition'),ov('government','government_type'),v('religion'),ov('country_rank'),ov('country_type'),r('ruler','character'),
                   r('capital','state'),r('market'),r('market_capital','state'),r('power_bloc'),r('founding_company','company'),o('map_color_override',I4,-1),
                   ov('dynamic_name_key','localization_key'),ov('dynamic_adjective_key','localization_key'),f('in_civil_war',B),f('trends_initialized',B),
-                  f('bloc_leader',B)])
+                  f('bloc_leader',B),d('power_bloc_join_date'),d('power_bloc_leave_date')])
 child('country_culture','country',[rr('culture')])
 child('country_claim','country',[v('state_region')])
 child('country_religion','country',[v('religion')])

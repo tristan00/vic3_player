@@ -178,6 +178,11 @@ def regions_in_play(s):
     return s.memo('regions_in_play',lambda:{region for region,war in s.rows('diplomatic_play','strategic_region,war') if war is None})
 
 
+def country_regions(s,country):
+    regions=state_regions(s)
+    return {regions.get(state) for state, in s.rows('state','state',country=country)}
+
+
 def plays_permitted(s,country,region,state=None):
     saved={'target_country':('country',country),'region':('strategic_region',region)}
     if state is not None:
@@ -1220,10 +1225,15 @@ def below_leader(s,bloc):
         leader is not None and rank_value(s,s.player)<rank_value(s,leader))
 
 
+BLOC_MEMBERSHIP_MONTHS=6
+
+
 def may_leave(s):
     bloc=next(iter(power_bloc_of(s,s.player)))
     identity=s.map('power_bloc','power_bloc,power_bloc_identity').get(bloc)
-    return passes(s,'common/power_bloc_identities',identity,('can_leave',),country_scope(s))
+    joined=s.map('country','country,power_bloc_join_date').get(s.player)
+    return (joined is not None and now(s)>=months_later(joined,BLOC_MEMBERSHIP_MONTHS)
+            and passes(s,'common/power_bloc_identities',identity,('can_leave',),country_scope(s)))
 
 
 def bloc_leader(s):
@@ -1547,7 +1557,7 @@ RULES={
     'start_play_confirmed':lambda s:[{**option,'mode':mode} for option in RULES['start_play_country'](s) for mode in ('AsDemand','ForcePlay')],
     'start_play_country':lambda s:[{'country':country,'diplomatic_play_type':play} for country in s.countries() if reachable_country(s,country)
                                    for play in play_types(s,'country') if play_allowed(s,play,target_country=('country',country))
-                                   and state_regions(s).get(s.map('country','country,capital').get(country)) not in regions_in_play(s)
+                                   and not country_regions(s,country)&regions_in_play(s)
                                    and (not marker_required(s,play) or state_regions(s).get(s.map('country','country,capital').get(country)) in engaged(s))],
     'start_play_state':lambda s:[{'state':state,'diplomatic_play_type':play} for state,country in s.rows('state','state,country') if country!=s.player and reachable_state(s,state)
                                  for play in play_types(s,'state') if play_allowed(s,play,target_country=('country',country),target_state=('state',state))

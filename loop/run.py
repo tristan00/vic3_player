@@ -51,7 +51,7 @@ SHARED={**{name:'queue' for name in ('raise_queue_item','lower_queue_item','firs
         **{name:'authority' for name in ('toggle_bolster_movement','toggle_suppress_movement','issue_decree','toggle_monopoly','toggle_charter','toggle_consumption_tax')},
         **{name:'money' for name in ('nationalize','bulk_nationalize','bulk_nationalize_state')},
         **{name:'research' for name in ('research','queue_research','dequeue_research')},
-        'impose_law':'imposition','start_play_country':'play','start_play_state':'play',
+        'impose_law':'imposition','start_play_country':'play','start_play_state':'play','start_play_confirmed':'play',
         **{name:'bloc' for name in ('form_power_bloc','leave_power_bloc','request_join_power_bloc','kick_from_power_bloc','pick_principle','upgrade_principle')},
         **{name:'enactment' for name in ('enact_law','cancel_enactment','negotiate')},
         **{name:'commanders' for name in ('hire_commander','hire_commander_for','unassign_commander')},

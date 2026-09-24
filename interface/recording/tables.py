@@ -117,7 +117,8 @@ def countries(c):
               market=t['market'][index],market_capital=t['market_capital'][index],power_bloc=t['power_bloc_as_core'][index],
               founding_company=t['founding_company'][index],map_color_override=t['map_color_override'][index],
               dynamic_name_key=c.label(t['dynamic_country_name'][index]),dynamic_adjective_key=c.label(t['dynamic_country_adjective'][index]),
-              in_civil_war=flag(t['civil_war'][index]),trends_initialized=flag(t['trends_initialized'][index]),bloc_leader=i in leaders)
+              in_civil_war=flag(t['civil_war'][index]),trends_initialized=flag(t['trends_initialized'][index]),bloc_leader=i in leaders,
+              power_bloc_join_date=t['power_bloc_join_date'][index],power_bloc_leave_date=t['power_bloc_leave_date'][index])
         c.add('country_population',country=ids[i],loyalists_increase=t['pop_radicals_and_loyalists_statistics_loyalists_increase'][index],
               loyalists_decrease=t['pop_radicals_and_loyalists_statistics_loyalists_decrease'][index],
               radicals_increase=t['pop_radicals_and_loyalists_statistics_radicals_increase'][index],

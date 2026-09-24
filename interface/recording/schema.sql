@@ -1200,6 +1200,8 @@ create table country_history (
   in_civil_war bool,
   trends_initialized bool,
   bloc_leader bool,
+  power_bloc_join_date game_hours,
+  power_bloc_leave_date game_hours,
   primary key (run_id, country, seq),
   foreign key (run_id, country) references country,
   foreign key (run_id, seq) references snapshot,
@@ -1217,7 +1219,7 @@ create table country_history (
   foreign key (dynamic_name_key) references localization_key,
   foreign key (dynamic_adjective_key) references localization_key,
   check (present = (num_nulls(country_definition, religion, in_civil_war, trends_initialized, bloc_leader) = 0)),
-  check (present or num_nonnulls(country_definition, government, religion, country_rank, country_type, ruler, capital, market, market_capital, power_bloc, founding_company, map_color_override, dynamic_name_key, dynamic_adjective_key, in_civil_war, trends_initialized, bloc_leader) = 0)
+  check (present or num_nonnulls(country_definition, government, religion, country_rank, country_type, ruler, capital, market, market_capital, power_bloc, founding_company, map_color_override, dynamic_name_key, dynamic_adjective_key, in_civil_war, trends_initialized, bloc_leader, power_bloc_join_date, power_bloc_leave_date) = 0)
 );
 
 create table country_culture (
@@ -4933,8 +4935,8 @@ create table state_status_report (
   check (present or num_nonnulls(colony_progress_as_days, daily_colony_progress, num_colonizers, is_colony_progress_blocked_by_inactive_interest, is_company_colony, is_incorporated, is_incorporating, years_to_incorporate, blockade_level, current_blockade_strength, required_blockade_strength, devastation_daily_change, daily_devastation_increase_from_bombardment, has_famine_reported, is_split_state) = 0)
 );
 
-create function country_at(run int4, at int4) returns table ("country" int4, "seq" int4, "country_definition" int2, "government" int2, "religion" int2, "country_rank" int2, "country_type" int2, "ruler" int4, "capital" int4, "market" int4, "market_capital" int4, "power_bloc" int4, "founding_company" int4, "map_color_override" int4, "dynamic_name_key" int4, "dynamic_adjective_key" int4, "in_civil_war" bool, "trends_initialized" bool, "bloc_leader" bool) language sql stable as $$
-  select l.country, l.seq, l.country_definition, l.government, l.religion, l.country_rank, l.country_type, l.ruler, l.capital, l.market, l.market_capital, l.power_bloc, l.founding_company, l.map_color_override, l.dynamic_name_key, l.dynamic_adjective_key, l.in_civil_war, l.trends_initialized, l.bloc_leader from country a, lateral (select country, seq, country_definition, government, religion, country_rank, country_type, ruler, capital, market, market_capital, power_bloc, founding_company, map_color_override, dynamic_name_key, dynamic_adjective_key, in_civil_war, trends_initialized, bloc_leader, present from country_history t where t.run_id = run and t.country = a.country and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
+create function country_at(run int4, at int4) returns table ("country" int4, "seq" int4, "country_definition" int2, "government" int2, "religion" int2, "country_rank" int2, "country_type" int2, "ruler" int4, "capital" int4, "market" int4, "market_capital" int4, "power_bloc" int4, "founding_company" int4, "map_color_override" int4, "dynamic_name_key" int4, "dynamic_adjective_key" int4, "in_civil_war" bool, "trends_initialized" bool, "bloc_leader" bool, "power_bloc_join_date" game_hours, "power_bloc_leave_date" game_hours) language sql stable as $$
+  select l.country, l.seq, l.country_definition, l.government, l.religion, l.country_rank, l.country_type, l.ruler, l.capital, l.market, l.market_capital, l.power_bloc, l.founding_company, l.map_color_override, l.dynamic_name_key, l.dynamic_adjective_key, l.in_civil_war, l.trends_initialized, l.bloc_leader, l.power_bloc_join_date, l.power_bloc_leave_date from country a, lateral (select country, seq, country_definition, government, religion, country_rank, country_type, ruler, capital, market, market_capital, power_bloc, founding_company, map_color_override, dynamic_name_key, dynamic_adjective_key, in_civil_war, trends_initialized, bloc_leader, power_bloc_join_date, power_bloc_leave_date, present from country_history t where t.run_id = run and t.country = a.country and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function country_culture_at(run int4, at int4) returns table ("country" int4, "culture" int4, "seq" int4) language sql stable as $$
