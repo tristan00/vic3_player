@@ -323,7 +323,7 @@ def build(seed,countries,states,tech,pop):
 def world_size(rng,levels):
     states=rng.randint(10,150)
     tech,pop=levels
-    return (rng.randrange(10**9),rng.randint(1,max(1,states//3)),states,
+    return (rng.randrange(10**9),rng.randint(2,max(2,states//3)),states,
             round(rng.uniform(0,MAX_TECH),2) if tech is None else tech,round(rng.uniform(0,1),2) if pop is None else pop)
 
 
