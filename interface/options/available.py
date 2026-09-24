@@ -1602,6 +1602,7 @@ def rivalry_allowed(s,country):
 
 
 DIPLOMATIC={'da_knowledge_sharing':lambda s,c:len(technologies(s)[0])>len(tech_of(s,c)),
+            'da_request_knowledge_sharing':lambda s,c:len(tech_of(s,c))>len(technologies(s)[0]),
             'increase_relations':lambda s,c:relations(s,c)<AMICABLE and not pact_between(s,'damage_relations',c),
             'damage_relations':lambda s,c:relations(s,c)>COLD and not pact_between(s,'increase_relations',c),
             'rivalry':lambda s,c:rivalry_allowed(s,c) and not pact_between(s,'rivalry',c),
