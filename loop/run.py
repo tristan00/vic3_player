@@ -59,7 +59,7 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
        'bureaucracy':('set_tax_level','set_institution_level'),
        'money':('nationalize','bulk_nationalize_state','declare_bankruptcy'),
        'companies':('create_company','remove_company'),
-       'decisions':('take_decision',),
+       'decisions':('take_decision','toggle_ignore_decision'),
        'retrofit':('retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all','decommission_ship','disband_formation',
                    'build_ship','build_ship_for','cancel_ship','raise_ship_item','lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item',
                    'start_naval_mission','start_naval_mission_selected'),
