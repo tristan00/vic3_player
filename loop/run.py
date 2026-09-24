@@ -69,9 +69,9 @@ SHARED={**{name:'queue' for name in ('raise_queue_item','lower_queue_item','firs
 
 
 def targets(name,params,links={}):
-    objects={(key,value) for key,value in params.items() if key in BY_NAME[name].params}|({('shared',SHARED[name])} if name in SHARED else set())
+    objects={(key,value) for key,value in params.items() if key in BY_NAME[name].params}
     objects|={links[item] for item in objects if item in links}
-    return objects or {('group',GROUP[name])}
+    return (objects or {('group',GROUP[name])})|({('shared',SHARED[name])} if name in SHARED else set())
 
 
 @timed
