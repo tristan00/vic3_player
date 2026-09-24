@@ -1370,6 +1370,9 @@ def goal_targets(s,play,kind):
     targets=set(opponents)
     if 'validate_conflicts_war_goals_all' in settings:
         targets-={target for _,target,_,_ in goals}
+    if 'validate_conflicts_make_subject' in settings:
+        subjecting={name for name in s.keys('war_goal_type') if next(iter(definition(s,'common/war_goal_types',name,'kind')),'').startswith('make_')}
+        targets-={target for owner,other,target in live_goals(s,'war_goal_type,target_country') if owner==play and other in subjecting}
     if 'validate_conflicts_war_goals_holder' in settings:
         targets-={target for _,target,_,holder in goals if holder==s.player}
     if 'validate_independence' in settings:
