@@ -1275,7 +1275,8 @@ def journal_buttons(s):
             continue
         visible=[button for button in definition(s,'common/journal_entries',entry,'scripted_button') if (entry,button) in shown]
         combos+=[{'journal_entry':ident,'button':index} for index,button in enumerate(visible)
-                 if active and passes(s,'common/scripted_buttons',button,('possible',),country_scope(s,journal_entry=('journal_entry',ident)))]
+                 if active and all(evaluate(parsed(text),country_scope(s,journal_entry=('journal_entry',ident))) is True
+                                   for text in definition(s,'common/scripted_buttons',button,'possible'))]
     return combos
 
 
