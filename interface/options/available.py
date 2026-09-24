@@ -268,6 +268,8 @@ def subject_permits(s,field):
 def play_allowed(s,play,**saved):
     scope=country_scope(s,**saved)
     target=saved.get('target_country',(None,None))[1]
+    if (target,'player_owes') in obligations(s):
+        return False
     kinds={next(iter(definition(s,'common/war_goal_types',goal,'kind')),'') for goal in definition(s,'common/diplomatic_plays',play,'war_goal')}
     if kinds&AUTONOMY_GOALS:
         if (target,s.player) not in subject_pairs(s):
@@ -637,7 +639,7 @@ ILLEGITIMATE=25
 
 
 def enactable(s):
-    if enacting(s) or metric(s,'GetGovernmentLegitimacy')<ILLEGITIMATE:
+    if enacting(s) or metric(s,'GetGovernmentLegitimacy')<=ILLEGITIMATE:
         return []
     acquired,_,_,_=technologies(s)
     active=active_laws(s)
