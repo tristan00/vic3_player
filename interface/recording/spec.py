@@ -353,8 +353,8 @@ entity('ship_template_version',[rr('ship_template'),f('position',I2),v('ship_typ
 child('ship_template_version_modification','ship_template_version',[f('position',I2)],[v('ship_modification')])
 entity('naval_mission',[v('naval_mission_type')])
 entity('war',[r('diplomatic_play'),f('days_since_exhaustion',I4),d('peace_date'),r('peace_proposer','country'),d('peace_proposal_date'),f('dead',B)])
-child('war_participant','war',[rr('country')],[rr('diplomatic_play'),f('war_support',F)])
-entity('war_goal',[rr('holder','country'),rr('creator','country'),rr('diplomatic_play'),v('war_goal_type'),r('target_state','state'),r('target_country','country'),
+child('war_participant','war',[rr('country')],[rr('diplomatic_play',loose=True),f('war_support',F)])
+entity('war_goal',[rr('holder','country'),rr('creator','country'),rr('diplomatic_play',loose=True),v('war_goal_type'),r('target_state','state'),r('target_country','country'),
                    o('target_other',I4,-1),e('demand_type','war_goal_demand_type'),e('status','war_goal_status'),e('pressed','war_goal_pressed')])
 entity('front',[f('x',F),f('y',F)])
 subject('front_advantage','front',[f('advantage',F)],'player')
