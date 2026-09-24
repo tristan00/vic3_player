@@ -8,6 +8,10 @@ DEFAULT_GAME=Path('D:/SteamLibrary/steamapps/common/Victoria 3')
 DEFAULT_DATA=Path('D:/vic3_data/interface')
 
 
+class GameCrashed(Exception):
+    pass
+
+
 def slot(value):
     return int(value)&0xffffff if int(value)!=-1 else -1
 

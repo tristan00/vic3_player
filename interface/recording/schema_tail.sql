@@ -1,5 +1,13 @@
 alter table run add foreign key (run_id, player_country) references country deferrable initially deferred;
 
+create view run_lost as
+  select run_id, kind, started_at, heartbeat_at, now() - heartbeat_at as silent_for
+  from run where ended_at is null and heartbeat_at < now() - interval '1 second';
+
+create view run_late_flag as
+  select run_id, kind, end_reason, game_exited_at, ended_at, ended_at - game_exited_at as flag_delay
+  from run where game_exited_at is not null and ended_at - game_exited_at > interval '1 second';
+
 create index pop_history_location on pop_history (run_id, location, seq);
 create index building_history_state on building_history (run_id, state, seq);
 create index state_history_country on state_history (run_id, country, seq);

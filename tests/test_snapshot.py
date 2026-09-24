@@ -305,7 +305,7 @@ class RuleTests(unittest.TestCase):
     def test_fleet_recall_needs_a_damaged_fleet_at_sea(self):
         s=snapshot(formation_history=[{'formation':5,'country':PLAYER,'formation_type':1},{'formation':6,'country':PLAYER,'formation_type':1}],
                    ship_history=[{'ship':1,'fleet':5},{'ship':2,'fleet':6}],
-                   formation_private=[{'formation':5,'docked':False,'recalled':False,'hit_points_percent':.5},
+                   formation_report=[{'formation':5,'docked':False,'recalled':False,'hit_points_percent':.5},
                                       {'formation':6,'docked':True,'recalled':False,'hit_points_percent':.5}])
         self.assertEqual(RULES['recall_fleet'](s),[{'military_formation':5}])
 

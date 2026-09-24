@@ -242,7 +242,8 @@ child('harvest_condition_area','harvest_condition',[f('position',I2)],[f('intens
 entity('famine',[rr('state'),f('start_date',H),f('num_births',I4),f('num_deaths',I4)])
 entity('province',[r('state'),r('controller','country')])
 
-entity('building',[v('building_type'),r('state'),f('levels',I4),e('slave_basket'),f('active',B),f('subsidized',B),e('privatization_requested','privatization_request')])
+entity('building',[v('building_type'),r('state'),f('levels',I4),e('slave_basket'),f('active',B),f('subsidized',B),e('privatization_requested','privatization_request'),
+                   f('dead',B)])
 private('building',[f('auto_expand',B),f('output_paused',B),f('monopoly',B),f('privatizable',B)])
 subject('building_flow','building',[f('balance_subsidies',F),f('trade_revenue',F),f('input_goods_shortage',F),f('tariffs',F),f('tolls',F),f('subventions',F),
                                     f('supply_ship_construction',F),f('military_ship_construction',F),f('produced_supply',F),f('income_taxes',F),f('cash_reserves',F),
@@ -322,12 +323,13 @@ entity('combat_unit',[r('country'),r('formation'),r('building'),r('battle'),v('c
 entity('casualties',[r('unit','combat_unit'),r('building')])
 child('casualties_event','casualties',[f('position',I2)],[r('battle')])
 entity('formation',[rr('country'),e('formation_type'),ov('name_key','localization_key'),e('flag','formation_flag'),f('color_red',I2),f('color_green',I2),
-                    f('color_blue',I2),r('supply_hub','state'),e('supply_priority'),r('attached_to_fleet','formation')])
+                    f('color_blue',I2),r('supply_hub','state'),e('supply_priority'),r('attached_to_fleet','formation'),f('dead',B)])
 subject('formation_status','formation',[r('province',sentinel=65535),o('current_location',I4,-1),o('target_location',I4,-1),r('naval_mission'),f('x',F),f('y',F),
                                          f('organization',F),f('sea_presence',F),f('supply',F),f('delivered_supply',F),f('supply_ships',I4),f('mobilized',B),
                                          f('raised_conscripts',B)])
-private('formation',[rr('home_hq','hq'),r('strategic_objective','state'),f('travel_distance',F),f('default_fleet',B),f('demobilizing',B),f('invading',B),
-                     f('embarked',B),f('docked',B),f('recalled',B),f('hit_points_percent',F),f('deployable',B),f('display_name',T)])
+private('formation',[rr('home_hq','hq'),r('strategic_objective','state'),f('travel_distance',F)])
+child('formation_report','formation',[],[f('default_fleet',B),f('demobilizing',B),f('invading',B),f('embarked',B),f('docked',B),f('recalled',B),
+                                          f('hit_points_percent',F),f('deployable',B),f('display_name',T)],'player')
 child('formation_mobilization_option','formation',[v('mobilization_option')])
 child('formation_upgrade_unit_type','formation',[v('combat_unit_type')])
 child('formation_selected_unit_type','formation',[v('combat_unit_group')],[v('combat_unit_type')])
@@ -342,7 +344,7 @@ child('ship_template_fleet','ship_template',[rr('fleet','formation')],(),'player
 entity('ship_template_version',[rr('ship_template'),f('position',I2),v('ship_type')])
 child('ship_template_version_modification','ship_template_version',[f('position',I2)],[v('ship_modification')])
 entity('naval_mission',[v('naval_mission_type')])
-entity('war',[r('diplomatic_play'),f('days_since_exhaustion',I4),d('peace_date'),r('peace_proposer','country'),d('peace_proposal_date')])
+entity('war',[r('diplomatic_play'),f('days_since_exhaustion',I4),d('peace_date'),r('peace_proposer','country'),d('peace_proposal_date'),f('dead',B)])
 child('war_participant','war',[rr('country')],[rr('diplomatic_play'),f('war_support',F)])
 entity('war_goal',[rr('holder','country'),rr('creator','country'),rr('diplomatic_play'),v('war_goal_type'),r('target_state','state'),r('target_country','country'),
                    o('target_other',I4,-1),e('demand_type','war_goal_demand_type'),e('status','war_goal_status'),e('pressed','war_goal_pressed')])

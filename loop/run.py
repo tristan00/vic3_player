@@ -11,7 +11,7 @@ from advisors import ADVISORS
 from interface import GameInterface, generate, record
 from interface.actions import Executor
 from interface.actions.catalogue import BY_NAME, GROUP
-from interface.common import DEFAULT_DATA, timed
+from interface.common import DEFAULT_DATA, GameCrashed, timed
 from interface.recording.store import Store
 from interface.runner.screen import shot
 from interface.options import available
@@ -76,6 +76,8 @@ class Loop:
         self.rng=rng
         self.store=Store()
         self.executor=Executor(game)
+        self.process=game.reader().process
+        self.watching=self.process.watch(self.crashed)
         self.journal=journal or DEFAULT_DATA/'loop'/f'{time.strftime("%Y%m%dT%H%M%S")}.jsonl'
         self.journal.parent.mkdir(parents=True,exist_ok=True)
         self.attached=run['kind']=='attached'
@@ -207,14 +209,17 @@ class Loop:
         self.perform('loop','unpause',{},snapshot,pending,raced='running')
         hours=reader.date()[0]
         moved=time.monotonic()
+        longest_gap=0
         while reader.date()[0]<target:
             if dead(reader):
                 raise Defeated()
             if reader.date()[0]!=hours:
+                longest_gap=max(longest_gap,time.monotonic()-moved)
                 hours,moved=reader.date()[0],time.monotonic()
             elif time.monotonic()-moved>STALL_LIMIT:
-                self.game._running()
-                raise RuntimeError(f'The game date stopped at {reader.date()[1]} for {STALL_LIMIT} s after unpausing')
+                reader.check()
+                raise RuntimeError(f'The game date stopped at {reader.date()[1]} for {STALL_LIMIT} s after unpausing; '
+                                   f'the longest earlier gap between ticks was {longest_gap*1000:.0f} ms')
             time.sleep(.02)
         paused=[]
         if running(reader):
@@ -231,19 +236,49 @@ class Loop:
             return after,[],[]
         reached=game_hours(after)
         self.note({**entry,'ms':round((time.monotonic()-started)*1000),'status':'verified' if reached>=target else 'no_effect',
-                   'detail':f'{(reached-target)/HOURS_PER_DAY:+.1f} days past the target'},after)
+                   'detail':f'{(reached-target)/HOURS_PER_DAY:+.1f} days past the target, longest tick gap {longest_gap*1000:.0f} ms'},after)
         return after,[(entry,after,result) for entry,_,result in paused],pending
 
-    def end(self,reason):
+    def crashed(self):
+        exited_at=self.process.exit_time()
+        latency=latency_ms(exited_at)
+        LOG.error('GAME CRASHED: process %s exited at %s UTC, flagged %d ms later',self.process.pid,exited_at.strftime('%H:%M:%S.%f'),latency)
+        if latency>LATE_FLAG_MS:
+            LOG.critical('LATE FLAG: %d ms between the game exit and the flag; the limit is %d ms',latency,LATE_FLAG_MS)
+        try:
+            self.store.flag_game_exit(exited_at)
+        except Exception:
+            LOG.exception('The game exit could not be written to the run row')
+
+    def end(self,reason,game_exited_at=None):
+        self.watching.set()
         self.counts['end']=reason
-        self.store.end_run(reason)
+        self.store.end_run(reason,game_exited_at)
         return self.counts
 
     @timed
     def run(self,years,seconds):
+        try:
+            return self.play(years,seconds)
+        except Defeated:
+            return self.end('defeated')
+        except Stuck:
+            return self.end('ui_stuck')
+        except GameCrashed as error:
+            exited_at=self.process.exit_time()
+            LOG.error('GAME CRASHED: %s; the loop reacted %d ms after the exit',error,latency_ms(exited_at))
+            self.end('game_crashed',exited_at)
+            raise
+        except BaseException as error:
+            LOG.error('LOOP CRASHED: %s: %s',type(error).__name__,error)
+            self.end(f'loop_crashed: {type(error).__name__}: {error}'[:200])
+            raise
+
+    def play(self,years,seconds):
         deadline=time.monotonic()+seconds
         self.executor.run('pause')
         snapshot=self.snapshot('start')
+        self.store.start_heartbeat()
         left=self.open_ui(snapshot)
         if left:
             raise RuntimeError(f'The round starts with {"+".join(left)} open')
@@ -255,13 +290,8 @@ class Loop:
             if game_hours(snapshot)-start>=years*HOURS_PER_YEAR:
                 return self.end('years')
             self.turn+=1
-            try:
-                snapshot,later=self.turn_actions(snapshot,carried)
-                snapshot,carried,pending=self.run_days(snapshot)
-            except Defeated:
-                return self.end('defeated')
-            except Stuck:
-                return self.end('ui_stuck')
+            snapshot,later=self.turn_actions(snapshot,carried)
+            snapshot,carried,pending=self.run_days(snapshot)
             for entry,before,result in later+pending:
                 verdict=verify(entry['action'],entry['params'],before,snapshot,result,self.executor)
                 self.note({**entry,'status':'verified' if verdict else 'no_effect' if verdict is False else 'unverified'},snapshot)
@@ -298,13 +328,22 @@ class WorldPool:
 
 RUNNING_PROBE=1
 DEATH_READS=3
+DEATH_READ_GAP=.2
+LATE_FLAG_MS=1000
+CRASHES_IN_A_ROW=3
+
+
+def latency_ms(exited_at):
+    return round((datetime.now(timezone.utc)-exited_at).total_seconds()*1000)
 
 
 def dead(reader):
+    started=time.monotonic()
     for _ in range(DEATH_READS):
         if reader.alive():
             return False
-        time.sleep(.2)
+        time.sleep(DEATH_READ_GAP)
+    LOG.error('DEFEATED: the played country owned no state in %d reads over %.0f ms',DEATH_READS,(time.monotonic()-started)*1000)
     return True
 
 
@@ -427,13 +466,23 @@ def main():
     worlds=Vanilla(rng) if arguments.vanilla else WorldPool(rng,arguments.pool,levels) if arguments.pool else Fresh(rng,levels)
     deadline=time.monotonic()+arguments.minutes*60
     chosen=arguments.tag
+    crashes=0
     while (remaining:=deadline-time.monotonic())>=MIN_SESSION_SECONDS:
         try:
             counts,journal=session(game,rng,worlds,advisors,arguments,chosen,remaining)
+        except GameCrashed as error:
+            crashes+=1
+            LOG.error('GAME CRASHED (%d in a row): %s',crashes,error)
+            game.close()
+            if crashes>=CRASHES_IN_A_ROW:
+                raise
+            print(json.dumps({'end':'game_crashed','crashes_in_a_row':crashes}),flush=True)
+            continue
         except BaseException:
             game.close()
             raise
         chosen=None
+        crashes=0
         print(json.dumps(counts),journal,flush=True)
 
 

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import time
 import unittest
 
 import psycopg
@@ -120,6 +121,20 @@ class StoreTests(unittest.TestCase):
         bad.rows['law_history'][0]=(LAW,PLAYER,'law_unknown',0.1,1,None,True,-1)
         with self.assertRaisesRegex(RuntimeError,'not a law_type'):
             self.store.write(bad,'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+
+    def test_heartbeat_marks_a_live_run_and_ending_stops_it(self):
+        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+        c=self.store.connection
+        run=self.store.run_id
+        c.execute("update run set heartbeat_at=now()-interval '5 seconds' where run_id=%s",(run,))
+        self.assertEqual([r for r, in c.execute('select run_id from run_lost')],[run])
+        self.store.start_heartbeat()
+        time.sleep(.6)
+        self.assertEqual(c.execute('select count(*) from run_lost').fetchone(),(0,))
+        self.assertLess(c.execute('select now()-heartbeat_at from run where run_id=%s',(run,)).fetchone()[0].total_seconds(),1)
+        self.store.end_run('time')
+        self.assertIsNone(self.store.beater)
+        self.assertEqual(c.execute('select end_reason,ended_at is not null from run where run_id=%s',(run,)).fetchone(),('time',True))
 
     def test_samples_are_immutable(self):
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)

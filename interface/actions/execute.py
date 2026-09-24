@@ -92,6 +92,7 @@ class Executor:
         reader.write([(addresses[variable]+24,struct.pack('<q',value*SCALE)) for variable,value in (('interface_mode',2 if check else 1),('interface_flip',flip))])
         done=f'INTERFACE|action|{seq}|'
         while time.monotonic()-started<LIMIT:
+            reader.check()
             text=self.game.log()
             if done in text:
                 self.last=time.monotonic()
@@ -104,6 +105,7 @@ class Executor:
         reader.write([(addresses['interface_mode']+24,struct.pack('<q',ABORT*SCALE))])
         aborted=time.monotonic()
         while done not in self.game.log() and time.monotonic()-aborted<ABORT_LIMIT:
+            reader.check()
             time.sleep(.005)
         reader.write([(addresses['interface_action']+24,struct.pack('<q',0))])
         self.last=time.monotonic()

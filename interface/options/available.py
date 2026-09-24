@@ -801,7 +801,7 @@ def war_fronts(s):
 
 
 def deployable(s):
-    return {formation for formation, in s.rows('formation_private','formation',deployable=True)}
+    return {formation for formation, in s.rows('formation_report','formation',deployable=True)}
 
 
 def idle_armies(s):
@@ -823,9 +823,13 @@ def formation_setting(s,formation,column):
     return s.map('formation_private','formation,'+column).get(formation)
 
 
+def formation_report(s,formation,column):
+    return s.map('formation_report','formation,'+column).get(formation)
+
+
 def demobilizing(s,formation):
     return (any(owner==formation and progress for owner,progress in s.rows('combat_unit','formation,mobilization'))
-            or bool(formation_setting(s,formation,'demobilizing')))
+            or bool(formation_report(s,formation,'demobilizing')))
 
 
 def armies(s,mobilized):
@@ -1464,12 +1468,12 @@ RULES={
     'deploy_selected_to_front':lambda s:RULES['deploy_to_front'](s),
     'defend_invasion':lambda s:[{'military_formation':f,'front':front} for front,ended in invasions(s) if not ended for f in armies(s,True)],
     'recall_fleet':lambda s:product(military_formation=[f for fleets in [set(s.formations('fleet'))] for f,docked,recalled,health in
-                                                        s.rows('formation_private','formation,docked,recalled,hit_points_percent')
+                                                        s.rows('formation_report','formation,docked,recalled,hit_points_percent')
                                                         if f in fleets and not docked and not recalled and health<1]),
     **{f'{verb}_ship_item':(lambda s,skip=skip:product(index=ship_items(s)[skip[0]:len(ship_items(s))-skip[1]]))
        for verb,skip in (('raise',(1,0)),('first',(1,0)),('lower',(0,1)),('last',(0,1)),('cancel',(0,0)))},
     'set_formation_flag':lambda s:[{'military_formation':f,'flag':flag} for f in s.formations('army')
-                                   if (name:=formation_setting(s,f,'display_name')) is not None and len(name)<=NAME_CHARACTERS
+                                   if (name:=formation_report(s,f,'display_name')) is not None and len(name)<=NAME_CHARACTERS
                                    for flag in range(ARMY_FLAGS) if flag!=s.map('formation','formation,flag').get(f)],
     'station_selected':lambda s:[{'military_formation':f,'strategic_region':region} for f in settled(s,s.formations('army')) if not demobilizing(s,f)
                                  for region in sorted({region for kind,region in hq_regions(s).values() if kind==0}) if region!=home_region(s,f)],
@@ -1481,8 +1485,8 @@ RULES={
                                        for combo in recruit(s)],
     'activate_conscription_center':lambda s:[{'military_formation':formation,'combat_unit_type':kind,'state':state} for state in conscription_states(s)
                                              for kind in unit_types_unlocked(s) for formation in s.formations('army')],
-    'disembark':lambda s:product(military_formation=[f for armies_ in [set(s.formations('army'))] for f, in s.rows('formation_private','formation',embarked=True) if f in armies_]),
-    'cancel_invasion':lambda s:product(military_formation=[f for manned in [set(s.formations())] for f, in s.rows('formation_private','formation',invading=True) if f in manned]),
+    'disembark':lambda s:product(military_formation=[f for armies_ in [set(s.formations('army'))] for f, in s.rows('formation_report','formation',embarked=True) if f in armies_]),
+    'cancel_invasion':lambda s:product(military_formation=[f for manned in [set(s.formations())] for f, in s.rows('formation_report','formation',invading=True) if f in manned]),
     'mobilize':lambda s:product(military_formation=[f for f in armies(s,False) if not demobilizing(s,f)] if principal(s) else []),
     'demobilize':lambda s:product(military_formation=armies(s,True)),
     'raise_conscripts':lambda s:product(military_formation=[i for i,r in s.rows('formation_status','formation,raised_conscripts') if i in armies(s,True) and not r and at_home(s,i)]),
@@ -1587,8 +1591,8 @@ RULES={
                                                                     'accept_action_proposal','decline_action_proposal','accept_sway','reject_sway')},
     'pause_all_construction':lambda s:[{}] if not construction_paused(s) else [],
     'resume_all_construction':lambda s:[{}] if construction_paused(s) and not in_default(s) else [],
-    'set_default_construction_fleet':lambda s:product(military_formation=[f for f in s.formations('fleet') if not formation_setting(s,f,'default_fleet')]),
-    'clear_default_construction_fleet':lambda s:[{}] if s.rows('formation_private','formation',default_fleet=True) else [],
+    'set_default_construction_fleet':lambda s:product(military_formation=[f for f in s.formations('fleet') if not formation_report(s,f,'default_fleet')]),
+    'clear_default_construction_fleet':lambda s:[{}] if s.rows('formation_report','formation',default_fleet=True) else [],
     'decommission_ship':lambda s:[] if revolution_brewing(s) else product(ship=[ident for fleets in [set(s.formations('fleet'))] for ident,fleet in s.rows('ship','ship,fleet') if fleet in fleets]),
     'build_ship':lambda s:product(ship_type=ship_types(s) if metric(s,'GetShipConstruction')>0 else []),
     'build_ship_for':lambda s:product(ship_type=ship_types(s) if metric(s,'GetShipConstruction')>0 else [],military_formation=s.formations('fleet')),

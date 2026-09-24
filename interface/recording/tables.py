@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 
-from ..common import timed
+from ..common import slot, timed
 from .spec import DROPPED_COUNTRY_METRICS,DROPPED_STATE_METRICS,METRIC_COLUMNS,METRICS_KINDS,TABLE,TABLES
 
 SLOT=0xffffff
@@ -633,9 +633,15 @@ def buildings(c):
         for index,i in enumerate(t['id']):
             c.add('building_history',building=ids[i],building_type=c.label(t['building'][index]),state=t['state'][index],levels=t['levels'][index],
                   slave_basket=t['slave_basket'][index],active=flag(t['active'][index]),subsidized=flag(t['subsidized'][index]),
-                  privatization_requested=t['privatization_requested'][index])
+                  privatization_requested=t['privatization_requested'][index],dead=flag(t['dead'][index]))
             c.add('building_flow',building=ids[i],**{name:t[name][index] for name in BUILDING_FLOW})
-        for building,*values in c.rows('building_setting','building','auto_expand','output_paused','monopoly','privatizable'):
+        settings={building:values for building,*values in c.rows('building_setting','building','auto_expand','output_paused','monopoly','privatizable')}
+        states=c.table('state')
+        mine={int(i) for i,owner in zip(states['id'],states['country']) if slot(owner)==c.player}
+        live={i for i,state,dead in zip(t['id'],t['state'],t['dead']) if not flag(dead) and slot(state) in mine}
+        if set(settings)!=live:
+            raise RuntimeError(f'Building GUI captures cover {sorted(set(settings)-live)[:5]} beyond the live player buildings and miss {sorted(live-set(settings))[:5]}')
+        for building,values in settings.items():
             c.add('building_private',building=building,**dict(zip(('auto_expand','output_paused','monopoly','privatizable'),map(flag,values))))
         for i,items in c.children('building_pm','id','production_method').items():
             for method, in items:
@@ -993,7 +999,8 @@ def military(c):
                 raise RuntimeError(f'Formation {i} has {len(xy)} position values')
             c.add('formation_history',formation=ids[i],country=t['country'][index],formation_type=t['type'][index],name_key=c.label(t['localizable_name'][index]),
                   flag=t['flag'][index],color_red=t['color_red'][index],color_green=t['color_green'][index],color_blue=t['color_blue'][index],
-                  supply_hub=t['supply_hub'][index],supply_priority=t['supply_priority'][index],attached_to_fleet=t['attached_to_fleet'][index])
+                  supply_hub=t['supply_hub'][index],supply_priority=t['supply_priority'][index],attached_to_fleet=t['attached_to_fleet'][index],
+                  dead=flag(t['dead'][index]))
             c.add('formation_status',formation=ids[i],province=t['province'][index],current_location=t['current_location_identity'][index],
                   target_location=t['target_location_identity'][index],naval_mission=t['naval_mission'][index],x=xy[0],y=xy[1],
                   organization=t['organization'][index],sea_presence=t['sea_presence'][index],supply=t['supply'][index],
@@ -1003,13 +1010,18 @@ def military(c):
         deployable={f for f, in c.rows('formation_deployable','formation')}
         display=dict(c.rows('formation_name','formation','name'))
         private={i:values for i,*values in c.rows('formation_private','id','home_hq','strategic_objective','travel_progress_path_distance')}
-        if set(settings)!=set(display) or deployable-set(settings) or set(private)!=set(settings):
-            raise RuntimeError('Formation private data and GUI captures cover different formations')
+        dead=dict(zip(t['id'],t['dead']))
+        live={i for i in private if not flag(dead[i])}
+        if set(settings)!=set(display) or deployable-set(settings):
+            raise RuntimeError(f'Formation GUI captures cover different formations: settings {sorted(settings)[:5]}, names {sorted(display)[:5]}, '
+                               f'deployable {sorted(deployable)[:5]}')
+        if set(settings)!=live:
+            raise RuntimeError(f'Formation GUI captures cover {sorted(set(settings)-live)[:5]} beyond the live player formations and miss {sorted(live-set(settings))[:5]}')
         for i,(home,objective,distance) in private.items():
-            values=settings[i]
-            c.add('formation_private',formation=ids[i],home_hq=home,strategic_objective=objective,travel_distance=distance,
-                  **{name:flag(value) for name,value in zip(FORMATION_PRIVATE,values[:6])},hit_points_percent=values[6],deployable=i in deployable,
-                  display_name=display[i])
+            c.add('formation_private',formation=ids[i],home_hq=home,strategic_objective=objective,travel_distance=distance)
+        for i,values in settings.items():
+            c.add('formation_report',formation=ids[i],**{name:flag(value) for name,value in zip(FORMATION_PRIVATE,values[:6])},hit_points_percent=values[6],
+                  deployable=i in deployable,display_name=display[i])
         for name,table,column in (('formation_mobilization_option','active_mobilization_options','mobilization_option'),
                                   ('formation_upgrade_unit_type','regular_unit_types_to_upgrade','combat_unit_type')):
             for i,items in c.children('formation_'+table,'id','value').items():
@@ -1083,9 +1095,10 @@ def wars(c):
     t=c.table('war')
     if t:
         ids=idents(t)
-        for ident,play,days,peace,proposer,proposal in zip(t['ident'],t['diplomatic_play'],t['days_since_exhaustion'],t['peace_date'],t['peace_proposer'],
-                                                           t['peace_proposal_date']):
-            c.add('war_history',war=ident,diplomatic_play=play,days_since_exhaustion=days,peace_date=peace,peace_proposer=proposer,peace_proposal_date=proposal)
+        for ident,play,days,peace,proposer,proposal,dead in zip(t['ident'],t['diplomatic_play'],t['days_since_exhaustion'],t['peace_date'],t['peace_proposer'],
+                                                                t['peace_proposal_date'],t['dead']):
+            c.add('war_history',war=ident,diplomatic_play=play,days_since_exhaustion=days,peace_date=peace,peace_proposer=proposer,peace_proposal_date=proposal,
+                  dead=flag(dead))
         for i,items in c.children('war_participant','id','diplomatic_play','country','war_support').items():
             for play,country,support in items:
                 c.add('war_participant',war=ids[i],country=country,diplomatic_play=play,war_support=support)

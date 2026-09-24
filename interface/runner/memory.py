@@ -1,14 +1,16 @@
 import ctypes
 from ctypes import wintypes
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import struct
+import threading
 import time
 import weakref
 
 import numpy as np
 
-from ..common import DEFAULT_GAME, timed
+from ..common import DEFAULT_GAME, GameCrashed, timed
 from ..script import read, scalar
 from ..visibility import Visibility
 
@@ -29,7 +31,51 @@ kernel.OpenProcess.argtypes=[wintypes.DWORD,wintypes.BOOL,wintypes.DWORD]
 kernel.ReadProcessMemory.argtypes=[wintypes.HANDLE,ctypes.c_void_p,ctypes.c_void_p,ctypes.c_size_t,ctypes.POINTER(ctypes.c_size_t)]
 kernel.WriteProcessMemory.argtypes=kernel.ReadProcessMemory.argtypes
 kernel.CloseHandle.argtypes=[wintypes.HANDLE]
+kernel.WaitForSingleObject.restype=wintypes.DWORD
+kernel.WaitForSingleObject.argtypes=[wintypes.HANDLE,wintypes.DWORD]
+kernel.GetProcessTimes.argtypes=[wintypes.HANDLE]+[ctypes.POINTER(wintypes.FILETIME)]*4
 psapi.EnumProcessModules.argtypes=[wintypes.HANDLE,ctypes.POINTER(wintypes.HMODULE),wintypes.DWORD,ctypes.POINTER(wintypes.DWORD)]
+PROCESS_ACCESS=0x100410
+WAIT_OBJECT_0=0
+FILETIME_EPOCH_SECONDS=11644473600
+WATCH_INTERVAL=.05
+
+
+class Process:
+    def __init__(self,pid):
+        self.pid=pid
+        self.handle=kernel.OpenProcess(PROCESS_ACCESS,False,pid)
+        if not self.handle:
+            raise ctypes.WinError(ctypes.get_last_error())
+        self._close=weakref.finalize(self,kernel.CloseHandle,self.handle)
+
+    def exited(self):
+        return kernel.WaitForSingleObject(self.handle,0)==WAIT_OBJECT_0
+
+    def exit_time(self):
+        times=[wintypes.FILETIME() for _ in range(4)]
+        if not kernel.GetProcessTimes(self.handle,*(ctypes.byref(t) for t in times)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        exit_=(times[1].dwHighDateTime<<32)|times[1].dwLowDateTime
+        return datetime.fromtimestamp(exit_/10**7-FILETIME_EPOCH_SECONDS,timezone.utc)
+
+    def check(self):
+        if self.exited():
+            raise GameCrashed(f'The game process {self.pid} exited at {self.exit_time():%H:%M:%S.%f} UTC')
+
+    def watch(self,alert):
+        stopped=threading.Event()
+        def wait():
+            while not stopped.wait(WATCH_INTERVAL):
+                if self.exited():
+                    alert()
+                    return
+        threading.Thread(target=wait,daemon=True,name='game-watch').start()
+        return stopped
+
+    def close(self):
+        self._close()
+        self.handle=None
 
 
 def outputs(name,spec):
@@ -59,10 +105,8 @@ def visible_columns():
 class Reader:
     def __init__(self,pid,game_dir=DEFAULT_GAME,mods=()):
         self.pid=pid
-        self.handle=kernel.OpenProcess(0x410,False,pid)
-        if not self.handle:
-            raise ctypes.WinError(ctypes.get_last_error())
-        self._close=weakref.finalize(self,kernel.CloseHandle,self.handle)
+        self.process=Process(pid)
+        self.handle=self.process.handle
         modules=(wintypes.HMODULE*1)();needed=wintypes.DWORD()
         if not psapi.EnumProcessModules(self.handle,modules,ctypes.sizeof(modules),ctypes.byref(needed)):
             raise ctypes.WinError(ctypes.get_last_error())
@@ -93,18 +137,23 @@ class Reader:
                 raise RuntimeError(f'Unsupported game build: {table} database signature differs from layout {LAYOUT["version"]}')
 
     def close(self):
-        self._close()
+        self.process.close()
         self.handle=None
+
+    def check(self):
+        self.process.check()
 
     def read(self,address,size):
         data=ctypes.create_string_buffer(size);count=ctypes.c_size_t()
         if not kernel.ReadProcessMemory(self.handle,address,data,size,ctypes.byref(count)) or count.value!=size:
+            self.check()
             raise OSError(f'Cannot read {size} bytes at {address:#x}')
         return data.raw
 
     def array(self,address,size):
         data=np.empty(size//8,dtype='<i8');count=ctypes.c_size_t()
         if not kernel.ReadProcessMemory(self.handle,address,data.ctypes.data,size,ctypes.byref(count)) or count.value!=size:
+            self.check()
             raise OSError(f'Cannot read {size} bytes at {address:#x}')
         return data
 
@@ -248,11 +297,13 @@ class Reader:
     def write(self,writes):
         handle=kernel.OpenProcess(0x28,False,self.pid)
         if not handle:
+            self.check()
             raise ctypes.WinError(ctypes.get_last_error())
         try:
             for address,data in writes:
                 written=ctypes.c_size_t()
                 if not kernel.WriteProcessMemory(handle,address,data,len(data),ctypes.byref(written)) or written.value!=len(data):
+                    self.check()
                     raise ctypes.WinError(ctypes.get_last_error())
         finally:
             kernel.CloseHandle(handle)

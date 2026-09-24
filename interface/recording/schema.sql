@@ -629,8 +629,10 @@ create table run (
   kind text not null check (kind in ('mini', 'vanilla', 'attached')),
   source_session text not null,
   started_at timestamptz not null,
+  heartbeat_at timestamptz not null,
   ended_at timestamptz,
   end_reason text,
+  game_exited_at timestamptz,
   world_id int4 not null references world,
   ruleset_id int4 not null references ruleset,
   player_country int4 not null,
@@ -2580,6 +2582,7 @@ create table building_history (
   active bool,
   subsidized bool,
   privatization_requested int2,
+  dead bool,
   primary key (run_id, building, seq),
   foreign key (run_id, building) references building,
   foreign key (run_id, seq) references snapshot,
@@ -2587,8 +2590,8 @@ create table building_history (
   foreign key (run_id, state) references state,
   foreign key (slave_basket) references slave_basket,
   foreign key (privatization_requested) references privatization_request,
-  check (present = (num_nulls(building_type, levels, slave_basket, active, subsidized, privatization_requested) = 0)),
-  check (present or num_nonnulls(building_type, state, levels, slave_basket, active, subsidized, privatization_requested) = 0)
+  check (present = (num_nulls(building_type, levels, slave_basket, active, subsidized, privatization_requested, dead) = 0)),
+  check (present or num_nonnulls(building_type, state, levels, slave_basket, active, subsidized, privatization_requested, dead) = 0)
 );
 
 create table building_private (
@@ -3690,6 +3693,7 @@ create table formation_history (
   supply_hub int4,
   supply_priority int2,
   attached_to_fleet int4,
+  dead bool,
   primary key (run_id, formation, seq),
   foreign key (run_id, formation) references formation,
   foreign key (run_id, seq) references snapshot,
@@ -3700,8 +3704,8 @@ create table formation_history (
   foreign key (run_id, supply_hub) references state,
   foreign key (supply_priority) references supply_priority,
   foreign key (run_id, attached_to_fleet) references formation,
-  check (present = (num_nulls(country, formation_type, flag, color_red, color_green, color_blue, supply_priority) = 0)),
-  check (present or num_nonnulls(country, formation_type, name_key, flag, color_red, color_green, color_blue, supply_hub, supply_priority, attached_to_fleet) = 0)
+  check (present = (num_nulls(country, formation_type, flag, color_red, color_green, color_blue, supply_priority, dead) = 0)),
+  check (present or num_nonnulls(country, formation_type, name_key, flag, color_red, color_green, color_blue, supply_hub, supply_priority, attached_to_fleet, dead) = 0)
 );
 
 create table formation_status (
@@ -3736,6 +3740,20 @@ create table formation_private (
   home_hq int4,
   strategic_objective int4,
   travel_distance float8,
+  primary key (run_id, formation, seq),
+  foreign key (run_id, formation) references formation,
+  foreign key (run_id, seq) references snapshot,
+  foreign key (run_id, home_hq) references hq,
+  foreign key (run_id, strategic_objective) references state,
+  check (present = (num_nulls(home_hq, travel_distance) = 0)),
+  check (present or num_nonnulls(home_hq, strategic_objective, travel_distance) = 0)
+);
+
+create table formation_report (
+  run_id int4 not null,
+  formation int4 not null,
+  seq int4 not null,
+  present bool not null,
   default_fleet bool,
   demobilizing bool,
   invading bool,
@@ -3748,10 +3766,8 @@ create table formation_private (
   primary key (run_id, formation, seq),
   foreign key (run_id, formation) references formation,
   foreign key (run_id, seq) references snapshot,
-  foreign key (run_id, home_hq) references hq,
-  foreign key (run_id, strategic_objective) references state,
-  check (present = (num_nulls(home_hq, travel_distance, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name) = 0)),
-  check (present or num_nonnulls(home_hq, strategic_objective, travel_distance, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name) = 0)
+  check (present = (num_nulls(default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name) = 0)),
+  check (present or num_nonnulls(default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name) = 0)
 );
 
 create table formation_mobilization_option (
@@ -3973,13 +3989,14 @@ create table war_history (
   peace_date game_hours,
   peace_proposer int4,
   peace_proposal_date game_hours,
+  dead bool,
   primary key (run_id, war, seq),
   foreign key (run_id, war) references war,
   foreign key (run_id, seq) references snapshot,
   foreign key (run_id, diplomatic_play) references diplomatic_play,
   foreign key (run_id, peace_proposer) references country,
-  check (present = (num_nulls(days_since_exhaustion) = 0)),
-  check (present or num_nonnulls(diplomatic_play, days_since_exhaustion, peace_date, peace_proposer, peace_proposal_date) = 0)
+  check (present = (num_nulls(days_since_exhaustion, dead) = 0)),
+  check (present or num_nonnulls(diplomatic_play, days_since_exhaustion, peace_date, peace_proposer, peace_proposal_date, dead) = 0)
 );
 
 create table war_participant (
@@ -5137,8 +5154,8 @@ create function province_at(run int4, at int4) returns table ("province" int4, "
   select province, seq, state, controller from (select distinct on (province) province, seq, state, controller, present from province_history where run_id = run and seq <= at order by province, seq desc) latest where present
 $$;
 
-create function building_at(run int4, at int4) returns table ("building" int4, "seq" int4, "building_type" int2, "state" int4, "levels" int4, "slave_basket" int2, "active" bool, "subsidized" bool, "privatization_requested" int2) language sql stable as $$
-  select building, seq, building_type, state, levels, slave_basket, active, subsidized, privatization_requested from (select distinct on (building) building, seq, building_type, state, levels, slave_basket, active, subsidized, privatization_requested, present from building_history where run_id = run and seq <= at order by building, seq desc) latest where present
+create function building_at(run int4, at int4) returns table ("building" int4, "seq" int4, "building_type" int2, "state" int4, "levels" int4, "slave_basket" int2, "active" bool, "subsidized" bool, "privatization_requested" int2, "dead" bool) language sql stable as $$
+  select building, seq, building_type, state, levels, slave_basket, active, subsidized, privatization_requested, dead from (select distinct on (building) building, seq, building_type, state, levels, slave_basket, active, subsidized, privatization_requested, dead, present from building_history where run_id = run and seq <= at order by building, seq desc) latest where present
 $$;
 
 create function building_private_at(run int4, at int4) returns table ("building" int4, "seq" int4, "auto_expand" bool, "output_paused" bool, "monopoly" bool, "privatizable" bool) language sql stable as $$
@@ -5393,12 +5410,16 @@ create function casualties_event_at(run int4, at int4) returns table ("casualtie
   select casualties, position, seq, battle from (select distinct on (casualties, position) casualties, position, seq, battle, present from casualties_event where run_id = run and seq <= at order by casualties, position, seq desc) latest where present
 $$;
 
-create function formation_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "country" int4, "formation_type" int2, "name_key" int4, "flag" int2, "color_red" int2, "color_green" int2, "color_blue" int2, "supply_hub" int4, "supply_priority" int2, "attached_to_fleet" int4) language sql stable as $$
-  select formation, seq, country, formation_type, name_key, flag, color_red, color_green, color_blue, supply_hub, supply_priority, attached_to_fleet from (select distinct on (formation) formation, seq, country, formation_type, name_key, flag, color_red, color_green, color_blue, supply_hub, supply_priority, attached_to_fleet, present from formation_history where run_id = run and seq <= at order by formation, seq desc) latest where present
+create function formation_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "country" int4, "formation_type" int2, "name_key" int4, "flag" int2, "color_red" int2, "color_green" int2, "color_blue" int2, "supply_hub" int4, "supply_priority" int2, "attached_to_fleet" int4, "dead" bool) language sql stable as $$
+  select formation, seq, country, formation_type, name_key, flag, color_red, color_green, color_blue, supply_hub, supply_priority, attached_to_fleet, dead from (select distinct on (formation) formation, seq, country, formation_type, name_key, flag, color_red, color_green, color_blue, supply_hub, supply_priority, attached_to_fleet, dead, present from formation_history where run_id = run and seq <= at order by formation, seq desc) latest where present
 $$;
 
-create function formation_private_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "home_hq" int4, "strategic_objective" int4, "travel_distance" float8, "default_fleet" bool, "demobilizing" bool, "invading" bool, "embarked" bool, "docked" bool, "recalled" bool, "hit_points_percent" float8, "deployable" bool, "display_name" text) language sql stable as $$
-  select formation, seq, home_hq, strategic_objective, travel_distance, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name from (select distinct on (formation) formation, seq, home_hq, strategic_objective, travel_distance, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name, present from formation_private where run_id = run and seq <= at order by formation, seq desc) latest where present
+create function formation_private_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "home_hq" int4, "strategic_objective" int4, "travel_distance" float8) language sql stable as $$
+  select formation, seq, home_hq, strategic_objective, travel_distance from (select distinct on (formation) formation, seq, home_hq, strategic_objective, travel_distance, present from formation_private where run_id = run and seq <= at order by formation, seq desc) latest where present
+$$;
+
+create function formation_report_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "default_fleet" bool, "demobilizing" bool, "invading" bool, "embarked" bool, "docked" bool, "recalled" bool, "hit_points_percent" float8, "deployable" bool, "display_name" text) language sql stable as $$
+  select formation, seq, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name from (select distinct on (formation) formation, seq, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name, present from formation_report where run_id = run and seq <= at order by formation, seq desc) latest where present
 $$;
 
 create function formation_mobilization_option_at(run int4, at int4) returns table ("formation" int4, "mobilization_option" int2, "seq" int4) language sql stable as $$
@@ -5457,8 +5478,8 @@ create function naval_mission_at(run int4, at int4) returns table ("naval_missio
   select naval_mission, seq, naval_mission_type from (select distinct on (naval_mission) naval_mission, seq, naval_mission_type, present from naval_mission_history where run_id = run and seq <= at order by naval_mission, seq desc) latest where present
 $$;
 
-create function war_at(run int4, at int4) returns table ("war" int4, "seq" int4, "diplomatic_play" int4, "days_since_exhaustion" int4, "peace_date" game_hours, "peace_proposer" int4, "peace_proposal_date" game_hours) language sql stable as $$
-  select war, seq, diplomatic_play, days_since_exhaustion, peace_date, peace_proposer, peace_proposal_date from (select distinct on (war) war, seq, diplomatic_play, days_since_exhaustion, peace_date, peace_proposer, peace_proposal_date, present from war_history where run_id = run and seq <= at order by war, seq desc) latest where present
+create function war_at(run int4, at int4) returns table ("war" int4, "seq" int4, "diplomatic_play" int4, "days_since_exhaustion" int4, "peace_date" game_hours, "peace_proposer" int4, "peace_proposal_date" game_hours, "dead" bool) language sql stable as $$
+  select war, seq, diplomatic_play, days_since_exhaustion, peace_date, peace_proposer, peace_proposal_date, dead from (select distinct on (war) war, seq, diplomatic_play, days_since_exhaustion, peace_date, peace_proposer, peace_proposal_date, dead, present from war_history where run_id = run and seq <= at order by war, seq desc) latest where present
 $$;
 
 create function war_participant_at(run int4, at int4) returns table ("war" int4, "country" int4, "seq" int4, "diplomatic_play" int4, "war_support" float8) language sql stable as $$
@@ -5828,6 +5849,7 @@ create index casualties_event_seq on casualties_event using brin (run_id, seq) w
 create index formation_history_seq on formation_history using brin (run_id, seq) with (autosummarize = on);
 create index formation_status_seq on formation_status using brin (run_id, seq) with (autosummarize = on);
 create index formation_private_seq on formation_private using brin (run_id, seq) with (autosummarize = on);
+create index formation_report_seq on formation_report using brin (run_id, seq) with (autosummarize = on);
 create index formation_mobilization_option_seq on formation_mobilization_option using brin (run_id, seq) with (autosummarize = on);
 create index formation_upgrade_unit_type_seq on formation_upgrade_unit_type using brin (run_id, seq) with (autosummarize = on);
 create index formation_selected_unit_type_seq on formation_selected_unit_type using brin (run_id, seq) with (autosummarize = on);
@@ -6034,6 +6056,14 @@ insert into name_column values
   ('event_target', 'name_key', 'scope_name');
 
 alter table run add foreign key (run_id, player_country) references country deferrable initially deferred;
+
+create view run_lost as
+  select run_id, kind, started_at, heartbeat_at, now() - heartbeat_at as silent_for
+  from run where ended_at is null and heartbeat_at < now() - interval '1 second';
+
+create view run_late_flag as
+  select run_id, kind, end_reason, game_exited_at, ended_at, ended_at - game_exited_at as flag_delay
+  from run where game_exited_at is not null and ended_at - game_exited_at > interval '1 second';
 
 create index pop_history_location on pop_history (run_id, location, seq);
 create index building_history_state on building_history (run_id, state, seq);

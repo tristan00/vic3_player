@@ -682,7 +682,6 @@
       "drop": [
         "auto_downsize_start_date",
         "construction_province",
-        "dead",
         "establishment_date",
         "government_dividends",
         "government_reinvestment",
@@ -1644,7 +1643,6 @@
         "ai_tag",
         "basecamp",
         "creation_date",
-        "dead",
         "flags",
         "full_supply_path_path_cost",
         "full_supply_path_path_distance",
@@ -2873,7 +2871,6 @@
     "war": {
       "disposition": "public",
       "drop": [
-        "dead",
         "start_date"
       ]
     },

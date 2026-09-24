@@ -10,7 +10,7 @@ import uuid
 
 import psutil
 
-from ..common import DEFAULT_DATA, DEFAULT_GAME, timed, write_json, write_script
+from ..common import DEFAULT_DATA, DEFAULT_GAME, GameCrashed, timed, write_json, write_script
 from .tail import LogTail
 
 STARTUP_QUIET=30
@@ -101,9 +101,11 @@ class GameInterface:
             return None
 
     def _running(self):
+        if not self.session_file.exists():
+            raise RuntimeError('This profile was never launched')
         process=self.process()
         if process is None:
-            raise RuntimeError('This profile is not running')
+            raise GameCrashed(f'The game process {self.session()["pid"]} is gone')
         return process
 
     def settings(self,changes=None):
@@ -231,6 +233,7 @@ class GameInterface:
             if hasattr(self,'_reader'):
                 self._reader.close()
             self._reader,self._reader_identity=reader,identity
+        self._reader.check()
         return self._reader
 
     @timed

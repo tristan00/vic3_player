@@ -1,6 +1,7 @@
 import hashlib
 import logging
 from pathlib import Path
+import threading
 
 import psycopg
 
@@ -13,6 +14,7 @@ LOG=logging.getLogger('interface')
 SLOT=0xffffff
 FIXED={'pact_history':('first_country','second_country'),'treaty_history':('first_country','second_country'),
        'diplomatic_action_history':('first_country','second_country')}
+HEARTBEAT=.25
 
 
 def digest():
@@ -45,6 +47,7 @@ class Layout:
 
 class Store:
     def __init__(self,dsn=DSN):
+        self.dsn=dsn
         self.connection=psycopg.connect(dsn,autocommit=True)
         self.connection.execute('set synchronous_commit = off')
         stored=self.connection.execute('select digest from schema_digest').fetchone()
@@ -175,10 +178,14 @@ class Store:
         return world_id
 
     def begin_run(self,started_at,kind,advisors=(),**generated):
+        lost=self.connection.execute("update run set ended_at=heartbeat_at,end_reason='loop_lost' where ended_at is null returning run_id,heartbeat_at").fetchall()
+        for run_id,heartbeat_at in lost:
+            LOG.error('RUN %s WAS LOST: its loop last beat at %s UTC',run_id,heartbeat_at)
         self.pending={'started_at':started_at,'kind':kind,'advisors':list(advisors),**generated}
         self.run_id=None
         self.constants=None
         self.seq=0
+        self.beater=None
         self.anchored={entity:set() for entity in ENTITIES}
         self.previous={}
         self.samples={}
@@ -187,8 +194,8 @@ class Store:
     def open_run(self,cursor,constants):
         pending=self.pending
         tag=self.names('country_definition',[pending.get('tag')])[0]
-        run_id=cursor.execute('insert into run (kind,source_session,started_at,world_id,ruleset_id,player_country,game_speed,first_start,custom_rng_seed,tag,'
-                              'world_file,cli_seed) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
+        run_id=cursor.execute('insert into run (kind,source_session,started_at,heartbeat_at,world_id,ruleset_id,player_country,game_speed,first_start,'
+                              'custom_rng_seed,tag,world_file,cli_seed) values (%s,%s,%s,now(),%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
                               (pending['kind'],self.session,pending['started_at'],self.world_id,self.ruleset_id,constants['player_country'],
                                constants['game_speed'],constants['first_start'],constants['custom_rng_seed'],tag,pending.get('world'),pending.get('cli_seed'))).fetchone()[0]
         if pending['kind']!='attached':
@@ -385,8 +392,28 @@ class Store:
                       [(self.run_id,entry['seq'],action,name,value if kinds[name]=='integer' else None,None if kinds[name]=='integer' else str(value))
                        for name,value in entry['params'].items()])
 
-    def end_run(self,reason):
-        self.connection.execute('update run set ended_at=now(),end_reason=%s where run_id=%s',(reason,self.run_id))
+    def start_heartbeat(self):
+        self.beating=threading.Event()
+        self.beater=threading.Thread(target=self.beat,daemon=True,name='heartbeat')
+        self.beater.start()
+
+    def beat(self):
+        with psycopg.connect(self.dsn,autocommit=True) as connection:
+            while not self.beating.wait(HEARTBEAT):
+                connection.execute('update run set heartbeat_at=now() where run_id=%s',(self.run_id,))
+
+    def flag_game_exit(self,exited_at):
+        with psycopg.connect(self.dsn,autocommit=True) as connection:
+            connection.execute("update run set ended_at=now(),end_reason='game_crashed',game_exited_at=%s where run_id=%s and ended_at is null",
+                               (exited_at,self.run_id))
+
+    def end_run(self,reason,game_exited_at=None):
+        if self.beater is not None:
+            self.beating.set()
+            self.beater.join()
+            self.beater=None
+        self.connection.execute('update run set ended_at=now(),end_reason=%s,game_exited_at=%s where run_id=%s and ended_at is null',
+                                (reason,game_exited_at,self.run_id))
 
 
 def enumerate_rows(run_id,values):

@@ -295,8 +295,8 @@ EFFECTS={
     'recruit_from_formation':(None,lambda a,b,p,n:units(b,p['military_formation'],p['combat_unit_type'])>units(a,p['military_formation'],p['combat_unit_type'])
                               or len(queue(b))>len(queue(a))),
     'activate_conscription_center':(None,lambda a,b,p,n:conscripts(b,p)!=conscripts(a,p) or None),
-    'disembark':('military_formation',equals('formation_private','embarked',False)),
-    'cancel_invasion':('military_formation',equals('formation_private','invading',False)),
+    'disembark':('military_formation',equals('formation_report','embarked',False)),
+    'cancel_invasion':('military_formation',equals('formation_report','invading',False)),
     'upgrade_all_units':(None,lambda a,b,p,n:set(a.rows('formation_upgrade_unit_type','formation,combat_unit_type'))
                          !=set(b.rows('formation_upgrade_unit_type','formation,combat_unit_type'))),
     'create_army':(None,lambda a,b,p,n:len(b.rows('formation','formation',country=b.player,formation_type=0))>len(a.rows('formation','formation',country=a.player,formation_type=0))),
@@ -332,8 +332,8 @@ EFFECTS={
     'nationalize':('building',lambda a,b,p,n:ownerships(a,p[n])!=ownerships(b,p[n])),
     'upgrade_regulars':('military_formation',lambda a,b,p,n:members(a,'formation_upgrade_unit_type',p[n],'combat_unit_type')
                         !=members(b,'formation_upgrade_unit_type',p[n],'combat_unit_type')),
-    'set_default_construction_fleet':('military_formation',equals('formation_private','default_fleet',True)),
-    'clear_default_construction_fleet':(None,lambda a,b,p,n:not any(flag for flag, in b.rows('formation_private','default_fleet'))),
+    'set_default_construction_fleet':('military_formation',equals('formation_report','default_fleet',True)),
+    'clear_default_construction_fleet':(None,lambda a,b,p,n:not any(flag for flag, in b.rows('formation_report','default_fleet'))),
     'toggle_monopoly':(None,lambda a,b,p,n:((p['building_type'],) in a.rows('player_monopoly','building_type'))
                        !=((p['building_type'],) in b.rows('player_monopoly','building_type'))),
     'character_interaction':('character',lambda a,b,p,n:interaction_state(a,p[n])!=interaction_state(b,p[n]) or None),
@@ -430,7 +430,7 @@ EFFECTS.update({**{f'{name}_selected':EFFECTS[name] for name in ('mobilize','dem
                 **{f'{verb}_ship_item':(None,lambda a,b,p,n,goal=goal:ship_moved(a,b,p['index'],goal)) for verb,goal in
                    (('raise',lambda i,last:i-1),('lower',lambda i,last:i+1),('first',lambda i,last:0),('last',lambda i,last:last),('cancel',None))},
                 'defend_invasion':EFFECTS['deploy_to_front'],
-                'recall_fleet':('military_formation',equals('formation_private','recalled',True)),
+                'recall_fleet':('military_formation',equals('formation_report','recalled',True)),
                 'set_formation_flag':('military_formation',lambda a,b,p,n:value(b,'formation','flag',p[n])==p['flag']),
                 'station_selected':('military_formation',changed('formation_status','target_location'))})
 

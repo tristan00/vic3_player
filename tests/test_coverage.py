@@ -110,8 +110,8 @@ def entities():
     three=lambda **columns:Filled(3,id=[1,2,3],ident=[1,2,3],**columns)
     one=lambda **columns:Filled(1,id=[3],ident=[3],**columns)
     lines=lambda:Filled(22,id=[1]*22,ord=list(range(22)),value=[1.0]*22)
-    return {**{name:three(country=[1,1,1]) for name in ('country','state','front','character','formation','interest_group','power_bloc')},
-            'building':three(state=[2,2,2]),'strait':three(),'law':three(country=[1,1,1],law=[1,1,2]),'company':one(country=[1],company_type=[2]),
+    return {**{name:three(country=[1,1,1]) for name in ('country','state','front','character','interest_group','power_bloc')},
+            'formation':three(country=[1,1,1],dead=[1,1,0]),'building':three(state=[2,2,2],dead=[1,1,0]),'strait':three(),'law':three(country=[1,1,1],law=[1,1,2]),'company':one(country=[1],company_type=[2]),
             'journal_entry':one(country=[1],journal_entry_type=[2],scope_root_definition=[0]),'state_region':Filled(1,id=[1]),
             'world_market_price_trend_channel':Filled(1,id=[0],ord=[0],channel=[0],date=[1],index=[1]),
             'world_market_price_trend':Filled(1,id=[0],channel=[0],ord=[0],value=[1.0]),'country_private':Filled(1,id=[1]),
