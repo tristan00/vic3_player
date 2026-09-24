@@ -266,7 +266,7 @@ def player(c):
     for decision,takeable in sorted(set(c.rows('decision','decision','takeable'))):
         c.add('player_decision',decision=decision,takeable=None if takeable is None else flag(takeable))
     for position,date,kind,title,description in c.rows('message_feed','ord','date','type','name','description'):
-        c.add('player_message',position=position,date_text=date,message_group=kind,title=title,description=description)
+        c.add('player_message',position=position,date_text=date,message_group=kind or None,title=title,description=description)
     for entry,button in sorted(set(c.rows('journal_button_shown','journal_entry','button'))):
         c.add('player_journal_button',journal_entry_type=entry,scripted_button=button)
     for first,second in sorted(set(c.rows('treaty_enforced_on_player','first_country','second_country'))):

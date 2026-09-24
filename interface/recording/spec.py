@@ -185,7 +185,7 @@ listing('player_releasable_country',[f('name',T)],[f('position',I2),f('possible'
 listing('player_alert',[v('alert_type')],[f('instances',I4)],'player')
 listing('player_state_alert',[v('alert_type'),rr('state')],(),'player')
 listing('player_decision',[v('decision')],[o('takeable',B)],'player')
-listing('player_message',[f('position',I2)],[f('date_text',T),v('message_group'),f('title',T),f('description',T)],'player')
+listing('player_message',[f('position',I2)],[f('date_text',T),ov('message_group'),f('title',T),f('description',T)],'player')
 listing('player_journal_button',[v('journal_entry_type'),v('scripted_button')],(),'player')
 listing('player_treaty_enforced',[rr('first_country','country'),rr('second_country','country')],(),'player')
 listing('player_diplomatic_option',[rr('target_country','country'),v('action_type','diplomatic_action_type')],[f('possible',B)],'player')

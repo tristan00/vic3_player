@@ -1854,7 +1854,7 @@ create table player_message (
   primary key (run_id, position, seq),
   foreign key (run_id, seq) references snapshot,
   foreign key (message_group) references message_group,
-  check (present = (num_nulls(date_text, message_group, title, description) = 0)),
+  check (present = (num_nulls(date_text, title, description) = 0)),
   check (present or num_nonnulls(date_text, message_group, title, description) = 0)
 );
 
