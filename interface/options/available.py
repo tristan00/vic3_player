@@ -1437,13 +1437,6 @@ def proposer(s,war):
     return s.map('war','war,peace_proposer').get(war)
 
 
-def enemy_states(s):
-    wars=set(s.wars())
-    plays={play for ident,play in s.rows('war','war,diplomatic_play') if ident in wars}
-    enemies={country for country,play in s.rows('war_participant','country,diplomatic_play') if play in plays}-{s.player}
-    return [ident for ident,country in s.rows('state','state,country') if country in enemies]
-
-
 def proposers(s,kind):
     return sorted({country for country, in s.rows('player_proposal','country',kind=kind)})
 
@@ -1792,7 +1785,7 @@ RULES={
     'cancel_strategic_objective_selected':lambda s:[{'military_formation':f,'state':objective&SLOT} for idle in [set(settled(s,s.formations('army')))]
                                                     for f,objective in s.rows('formation_private','formation,strategic_objective')
                                                     if f in idle and objective is not None],
-    'set_strategic_objective':lambda s:[{'military_formation':f,'state':st} for f in settled(s,s.formations('army')) for st in enemy_states(s)
+    'set_strategic_objective':lambda s:[{'military_formation':f,'state':st} for f in settled(s,s.formations('army')) for st in s.states()
                                         if st!=formation_setting(s,f,'strategic_objective')],
     'pick_principle':lambda s:[{'slot':len(held),'power_bloc_principle':levels[0]} for held in [bloc_principles(s)] if bloc_leader(s) and mandates(s) and len(held)<PRINCIPLE_SLOTS
                                for identity in [bloc_identity(s)]
