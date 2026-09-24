@@ -210,7 +210,8 @@ def methods(snapshot,building):
 
 def bulk_method(a,b,p,n):
     subset=bulk_subset(a,p['building_type'],p.get('state'),p['ownership'])
-    others=[ident for ident in bulk_subset(a,p['building_type'],None,'any') if ident not in subset]
+    kept=set(bulk_subset(b,p['building_type'],None,'any'))
+    others=[ident for ident in bulk_subset(a,p['building_type'],None,'any') if ident not in subset and ident in kept]
     return (bool(subset) and any(p['production_method'] not in methods(a,ident) for ident in subset)
             and all(p['production_method'] in methods(b,ident) for ident in subset) and all(methods(a,ident)==methods(b,ident) for ident in others))
 
