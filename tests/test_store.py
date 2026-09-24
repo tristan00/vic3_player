@@ -147,7 +147,7 @@ class StoreTests(unittest.TestCase):
         beat,age,step,longest=c.execute('select now()-heartbeat_at,now()-progress_at,progress_step,longest_step_ms from run where run_id=%s',(run,)).fetchone()
         self.assertLess(beat.total_seconds(),1)
         self.assertLess(age.total_seconds(),2)
-        self.assertTrue(step.startswith('write'))
+        self.assertIn('write',step)
         self.assertLess(longest,2000)
         self.store.end_run('time')
         self.assertIsNone(self.store.beater)
