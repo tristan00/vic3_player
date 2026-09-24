@@ -64,7 +64,7 @@ def tariffs(s,direction,column):
 
 def tariff_open(s,direction,goods):
     changed=tariffs(s,direction,'last_change').get(goods)
-    return changed is None or now(s)-changed<GRACE_HOURS or now(s)>=months_later(changed,COOLDOWN_MONTHS)
+    return changed is None or now(s)-changed<GRACE_HOURS or now(s)>months_later(changed,COOLDOWN_MONTHS)
 
 
 def law_modifier(s,key):
