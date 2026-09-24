@@ -1376,7 +1376,8 @@ def goal_targets(s,play,kind):
             targets={state for state in targets if regions.get(state) in claims(s)}
         if 'validate_conflicts_conquer_state' in settings:
             targets-={state for _,_,state,_ in goals}
-        return targets
+        owners=s.map('state','state,country')
+        return {state for state in targets if goal_valid(s,kind,target_state=('state',state),target_country=('country',owners.get(state)))}
     targets=set(opponents)
     if 'validate_conflicts_war_goals_all' in settings:
         targets-={target for _,target,_,_ in goals}
@@ -1397,7 +1398,11 @@ def goal_targets(s,play,kind):
     if 'validate_revoke_claims' in settings:
         regions={region for region, in s.rows('state','state_region',country=s.player)}
         targets&={country for country,region in s.rows('country_claim','country,state_region') if region in regions}
-    return targets
+    return {target for target in targets if goal_valid(s,kind,target_country=('country',target))}
+
+
+def goal_valid(s,kind,**saved):
+    return passes(s,'common/war_goal_types',kind,('valid',),country_scope(s,**saved))
 
 
 def live_goals(s,columns):
