@@ -661,10 +661,14 @@ def buildings(c):
     if t:
         owners={value&SLOT:(building,value) for building,_,value in c.rows('building_owners','id','ord','value')}
         assets={value&SLOT:(owner,value) for owner,_,value in c.rows('building_assets','id','ord','value')}
+        captured=set(c.table('building')['ident']) if c.table('building') else set()
         for i,ident,building,owner_type,owner,levels,privatization in zip(t['id'],t['ident'],t['building'],t['identity_type'],t['identity_building'],
                                                                            t['levels'],t['privatization']):
             listed=owners.pop(i,None)
-            if listed is None or listed[0]!=building&SLOT or listed[1]!=ident:
+            if building not in captured:
+                if listed is not None:
+                    raise RuntimeError(f'Ownership {ident} of vanished building {building} is still listed among the owners of building {listed[0]}')
+            elif listed is None or listed[0]!=building&SLOT or listed[1]!=ident:
                 raise RuntimeError(f'Ownership {ident} is not listed among the owners of building {building}')
             asset=assets.pop(i,None)
             if asset is not None and (asset[0]!=owner&SLOT or asset[1]!=ident):
