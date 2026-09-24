@@ -14,6 +14,7 @@ POLL=.25
 STATUS_EVERY=300
 NO_RUN_LIMIT=420
 GONE_GRACE=3
+START_LIMIT=60
 EVENT=re.compile(r'Traceback|CRITICAL|LATE FLAG|STALLED|CRASHED|REFUSED|WAS LOST|ROUND EXITED|^\{')
 EXITED=re.compile(r'ROUND EXITED code=(\d+)')
 FAILURE=re.compile(r'Traceback|CRITICAL|LATE FLAG|STALLED|CRASHED|REFUSED')
@@ -58,6 +59,7 @@ class Watch:
         self.flagged=set()
         self.failed=False
         self.gone_at=None
+        self.seen=False
         self.status_at=time.monotonic()
 
     def log_events(self):
@@ -115,7 +117,13 @@ class Watch:
                 return self.finish(int(exited.group(1)))
             self.failed|=bool(FAILURE.search(line))
         self.run_events()
-        if not any(name=='python.exe' for name,_ in loop_processes()):
+        alive=any(name=='python.exe' for name,_ in loop_processes())
+        self.seen|=alive
+        if not self.seen and (datetime.now(timezone.utc)-self.since).total_seconds()>START_LIMIT:
+            say(f'LOOP PROCESS NEVER STARTED within {START_LIMIT} s')
+            self.failed=True
+            return self.finish(-1)
+        if self.seen and not alive:
             self.gone_at=self.gone_at or time.monotonic()
             if time.monotonic()-self.gone_at>GONE_GRACE:
                 say('LOOP PROCESS GONE without a ROUND EXITED line')
