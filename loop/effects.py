@@ -479,6 +479,8 @@ EFFECTS={
     'set_strait_allowed':('strait',strait_becomes('access_permissions',lambda p:ACCESS_PERMISSIONS.index(p['allowed'])+1)),
     'build_ship_for':(None,lambda a,b,p,n:my_ships(b).count(p['ship_type'])>my_ships(a).count(p['ship_type'])),
     'capitulate':('war',lambda a,b,p,n:(a.player,) in a.rows('war_participant','country',war=p[n]) and (b.player,) not in b.rows('war_participant','country',war=p[n])),
+    'toggle_accept_peace':('war',lambda a,b,p,n:value(a,'war','peace_proposer',p[n]) not in (None,a.player)
+                           and (a.player,) in a.rows('war_participant','country',war=p[n]) and (b.player,) not in b.rows('war_participant','country',war=p[n])),
     'kick_from_power_bloc':('country',changed('country','power_bloc')),
     'reform_government':('interest_group',changed('interest_group','in_government')),
     'form_power_bloc':(None,lambda a,b,p,n:value(a,'country','power_bloc',a.player) is None and value(b,'country','power_bloc',b.player) is not None),
