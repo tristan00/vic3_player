@@ -360,9 +360,17 @@ def sectors(s):
     return [ident for ident,kind,_ in s.buildings() if kind in CONSTRUCTION]
 
 
+def crew_max(s,version):
+    kind=s.map('ship_template_version','ship_template_version,ship_type').get(version)
+    parts=[('common/ship_types',kind)]+[('common/ship_modifications',mod) for _,mod in s.rows('ship_template_version_modification','position,ship_modification',ship_template_version=version)]
+    return sum(float(found) for folder,name in parts for text in definition(s,folder,name,'modifier')
+               for found in re.findall(r'ship_crew_max_add\s*=\s*(-?[\d.]+)',text))
+
+
 def uncrewed_fleets(s):
     crew=s.grouped('ship_crew','ship,crew')
-    return {fleet for ship,fleet in s.rows('ship','ship,fleet') if not sum(crew.get(ship,[]))}
+    minimum=float(definition(s,'common/defines','NMilitary|MINIMUM_SHIP_CREW_PERCENTAGE_TO_DEPLOY','value')[0])
+    return {fleet for ship,fleet,version in s.rows('ship','ship,fleet,version') if sum(crew.get(ship,[]))<=minimum*crew_max(s,version)}
 
 
 def mission_types(s,fleet):
