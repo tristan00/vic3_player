@@ -10,7 +10,7 @@ import weakref
 
 import numpy as np
 
-from ..common import DEFAULT_GAME, GameCrashed, timed
+from ..common import DEFAULT_GAME, GameCrashed, progress, timed
 from ..script import read, scalar
 from ..visibility import Visibility
 
@@ -256,7 +256,11 @@ class Reader:
     @timed
     def holders(self,countries):
         _,slots,addresses=self.objects(self.tables['country']['rva'])
-        return {country:self.held_at(int(addresses[np.nonzero(slots==country)[0][0]])) for country in countries}
+        held={}
+        for country in countries:
+            progress('holders')
+            held[country]=self.held_at(int(addresses[np.nonzero(slots==country)[0][0]]))
+        return held
 
     def held_at(self,address):
         spec=self.tables['country']
@@ -329,6 +333,7 @@ class Reader:
                     (('interface_capture_seq',nonce*SCALE),('interface_capture_done',0),('interface_capture',200000 if save else 100000))])
         deadline=time.monotonic()+timeout
         while self.word(targets['interface_capture_done'])!=200000 or self.word(targets['interface_capture'])!=0:
+            progress('request_capture')
             if time.monotonic()>deadline:
                 raise TimeoutError('The game did not acknowledge the live capture request')
             time.sleep(.002)

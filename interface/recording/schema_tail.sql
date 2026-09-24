@@ -6,7 +6,7 @@ create view run_lost as
 
 create view run_stalled as
   select run_id, kind, started_at, progress_step, now() - progress_at as stalled_for
-  from run where ended_at is null and progress_at < now() - interval '30 seconds';
+  from run where ended_at is null and progress_at < now() - interval '5 seconds';
 
 create view action_run_outcome as
   select l.run_id, l.action, r.started_at,

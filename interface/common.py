@@ -16,7 +16,7 @@ def slot(value):
     return int(value)&0xffffff if int(value)!=-1 else -1
 
 
-STALL_LIMIT=30
+STALL_LIMIT=5
 PROGRESS={'step':'start','at':time.monotonic()}
 
 

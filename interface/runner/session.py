@@ -37,9 +37,19 @@ def _spawn(arguments,directory):
     script=("$ErrorActionPreference='Stop'; (Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments "
             f"@{{CommandLine='{command}';CurrentDirectory='{directory}'}}).ProcessId")
     encoded=base64.b64encode(script.encode('utf-16-le')).decode('ascii')
-    result=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-EncodedCommand',encoded],
-                          capture_output=True,text=True,timeout=30,creationflags=subprocess.CREATE_NO_WINDOW,check=True)
-    return psutil.Process(int(result.stdout))
+    shell=subprocess.Popen(['powershell.exe','-NoProfile','-NonInteractive','-EncodedCommand',encoded],
+                           stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,creationflags=subprocess.CREATE_NO_WINDOW)
+    deadline=time.monotonic()+30
+    while shell.poll() is None:
+        progress('_spawn')
+        if time.monotonic()>deadline:
+            shell.kill()
+            raise TimeoutError('PowerShell did not spawn the process within 30 s')
+        time.sleep(.05)
+    out,err=shell.communicate()
+    if shell.returncode:
+        raise RuntimeError(f'PowerShell failed to spawn the process: {err.strip()}')
+    return psutil.Process(int(out))
 
 
 def _patch_harvest(pid):

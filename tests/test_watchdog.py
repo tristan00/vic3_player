@@ -33,7 +33,7 @@ class WatchdogTests(unittest.TestCase):
         step,age=progress_age()
         self.assertEqual(step,'slow done')
         self.assertLess(age,1)
-        self.assertGreater(STALL_LIMIT,10)
+        self.assertLessEqual(STALL_LIMIT,5)
 
     def test_tripping_flags_the_run_and_closes_the_game(self):
         game,store=Game(),Store()

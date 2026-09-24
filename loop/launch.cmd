@@ -10,5 +10,5 @@ goto next
 :run
 cd /d D:\vic3_agent
 echo ROUND STARTED args=!ARGS! at !DATE! !TIME! > "!LOG!"
-"C:\Program Files\Git\usr\bin\timeout.exe" 1500 .venv\Scripts\python.exe -m loop.run !ARGS! >> "!LOG!" 2>&1
+.venv\Scripts\python.exe -m loop.run !ARGS! >> "!LOG!" 2>&1
 echo ROUND EXITED code=!ERRORLEVEL! at !DATE! !TIME! >> "!LOG!"

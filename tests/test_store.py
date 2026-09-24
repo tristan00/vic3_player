@@ -159,11 +159,11 @@ class StoreTests(unittest.TestCase):
         run=self.store.run_id
         self.store.beating.set()
         self.store.beater.join()
-        c.execute("update run set progress_at=now()-interval '31 seconds',progress_step='validate x' where run_id=%s",(run,))
+        c.execute("update run set progress_at=now()-interval '6 seconds',progress_step='validate x' where run_id=%s",(run,))
         self.assertEqual([(r,s) for r,s,_ in c.execute('select run_id,progress_step,stalled_for from run_stalled')],[(run,'validate x')])
         self.store.flag_stalled('validate x',31.2)
         self.assertEqual(c.execute('select end_reason,end_detail from run where run_id=%s',(run,)).fetchone(),
-                         ('loop_stalled','validate x made no progress for 31.2 s; the limit is 30 s'))
+                         ('loop_stalled','validate x made no progress for 31.2 s; the limit is 5 s'))
         self.assertEqual(c.execute('select count(*) from run_stalled').fetchone(),(0,))
         self.store.end_run('time')
         self.assertEqual(c.execute('select end_reason from run where run_id=%s',(run,)).fetchone(),('loop_stalled',))

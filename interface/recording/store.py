@@ -93,6 +93,7 @@ class Store:
         return checks
 
     def copy(self,cursor,name,columns,rows):
+        progress(f'copy {name}')
         if rows:
             with cursor.copy(f'copy {name} ({",".join(columns)}) from stdin') as copy:
                 for row in rows:
@@ -170,7 +171,8 @@ class Store:
         terrains=self.names('terrain',[p['terrain'] for p in provinces])
         with self.connection.transaction(),self.connection.cursor() as cursor:
             world_id=cursor.execute('insert into world (digest) values (%s) returning world_id',(digest_bytes,)).fetchone()[0]
-            self.copy(cursor,'world_asset',('world_id','name','data'),[(world_id,name,content) for name,content in assets.items()])
+            for name,content in assets.items():
+                self.copy(cursor,'world_asset',('world_id','name','data'),[(world_id,name,content)])
             self.copy(cursor,'world_province',('world_id','color','state_region','terrain','area_pixels','x','y'),
                       [(world_id,int(p['color'][1:],16),region,terrain,p['area_pixels'],p['x'],p['y']) for p,region,terrain in zip(provinces,regions,terrains)])
             self.copy(cursor,'world_adjacency',('world_id','first_color','second_color','shared_border_pixels'),
@@ -324,6 +326,7 @@ class Store:
         resolved={}
         referenced=defaultdict(set)
         for name,rows in built.rows.items():
+            progress(f'resolve {name}')
             layout=self.layouts[name]
             resolved[name]=self.resolve(layout,rows,live,referenced)
             self.check_fixed(layout,resolved[name])
@@ -332,6 +335,7 @@ class Store:
             raise RuntimeError(f'The capture built no rows for {sorted(missing)}')
         staged={}
         for name,rows in resolved.items():
+            progress(f'stage {name}')
             layout=self.layouts[name]
             if layout.kind=='sample':
                 fresh=self.fresh_samples(layout,rows)
@@ -360,6 +364,7 @@ class Store:
                 else:
                     self.copy(cursor,entity,('run_id',entity,'first_seq'),[(self.run_id,ident,seq) for ident in idents])
             for name,(rows,_) in staged.items():
+                progress(f'copy {name}')
                 layout=self.layouts[name]
                 stored=self.stored(layout,rows)
                 if layout.kind=='sample':
@@ -368,6 +373,8 @@ class Store:
                     width=len(layout.keys)
                     self.copy(cursor,name,layout.names,[(self.run_id,*row[:width],seq,*row[width:]) for row in stored])
             self.validate(cursor,seq)
+            if opening:
+                cursor.execute('update run set heartbeat_at=now(),progress_at=now() where run_id=%s',(self.run_id,))
         if opening:
             self.start_heartbeat()
         for entity,idents in anchors.items():
@@ -418,13 +425,15 @@ class Store:
 
     def beat(self):
         with psycopg.connect(self.dsn,autocommit=True) as connection:
-            while not self.beating.wait(HEARTBEAT):
+            while True:
                 step,age=progress_age()
                 if age>self.longest:
                     self.longest=age
                     connection.execute('update run set longest_step=%s,longest_step_ms=%s where run_id=%s',(step,round(age*1000),self.run_id))
                 connection.execute("update run set heartbeat_at=now(),progress_at=now()-%s*interval '1 second',progress_step=%s where run_id=%s",
                                    (age,step,self.run_id))
+                if self.beating.wait(HEARTBEAT):
+                    return
 
     def flag_stalled(self,step,age):
         with psycopg.connect(self.dsn,autocommit=True) as connection:

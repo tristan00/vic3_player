@@ -4,7 +4,7 @@ import re
 import struct
 import time
 
-from ..common import slot, timed
+from ..common import progress, slot, timed
 from ..recording.capture import plain
 from ..runner.memory import SCALE
 from ..script import keys
@@ -92,6 +92,7 @@ class Executor:
         reader.write([(addresses[variable]+24,struct.pack('<q',value*SCALE)) for variable,value in (('interface_mode',2 if check else 1),('interface_flip',flip))])
         done=f'INTERFACE|action|{seq}|'
         while time.monotonic()-started<LIMIT:
+            progress('executor')
             reader.check()
             text=self.game.log()
             if done in text:
@@ -105,6 +106,7 @@ class Executor:
         reader.write([(addresses['interface_mode']+24,struct.pack('<q',ABORT*SCALE))])
         aborted=time.monotonic()
         while done not in self.game.log() and time.monotonic()-aborted<ABORT_LIMIT:
+            progress('executor abort')
             reader.check()
             time.sleep(.005)
         reader.write([(addresses['interface_action']+24,struct.pack('<q',0))])

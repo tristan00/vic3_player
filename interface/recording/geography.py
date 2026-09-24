@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from ..common import timed
+from ..common import progress, timed
 from ..script import read
 
 
@@ -54,15 +54,19 @@ def geometry(files,regions):
     with Image.open(io.BytesIO(files['provinces.png'])) as image:
         rgb=np.asarray(image.convert('RGB'),dtype=np.int32)
     pixels=(rgb[:,:,0]<<16)|(rgb[:,:,1]<<8)|rgb[:,:,2]
+    progress('geometry colors')
     colors,inverse,area=np.unique(pixels,return_inverse=True,return_counts=True)
+    progress('geometry centres')
     yy,xx=np.indices(pixels.shape)
     x=np.bincount(inverse.ravel(),weights=xx.ravel())/area
     y=np.bincount(inverse.ravel(),weights=yy.ravel())/area
     borders=[]
     for first,second in ((pixels[:,:-1],pixels[:,1:]),(pixels[:-1],pixels[1:])):
+        progress('geometry borders')
         unequal=first!=second
         first,second=first[unequal],second[unequal]
         borders.append((np.minimum(first,second).astype(np.int64)<<24)|np.maximum(first,second))
+    progress('geometry edges')
     edges,count=np.unique(np.concatenate(borders),return_counts=True)
     adjacencies=[{'first':label(edge>>24),'second':label(edge&0xffffff),'shared_border_pixels':int(n)} for edge,n in zip(edges,count)]
     provinces=[{'color':label(color),'region':regions.get(label(color)),'terrain':types.get(label(color)),'area_pixels':int(size),'x':float(cx),'y':float(cy)}

@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 
-from ..common import slot, timed
+from ..common import progress, slot, timed
 from .spec import DROPPED_COUNTRY_METRICS,DROPPED_STATE_METRICS,METRIC_COLUMNS,METRICS_KINDS,TABLE,TABLES
 
 SLOT=0xffffff
@@ -1275,6 +1275,7 @@ def build(capture,orders,colors):
     context.construction_paused=None
     context.ship_queue_paused={}
     for builder in BUILDERS:
+        progress(f'build {builder.__name__}')
         builder(context)
     provinces(context,colors)
     windows=capture.windows

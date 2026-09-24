@@ -2,7 +2,7 @@ import re
 from functools import lru_cache
 
 from ..actions.catalogue import ACTIONS, LEVELS
-from ..common import timed
+from ..common import progress, timed
 from ..recording.spec import METRIC_COLUMNS
 from ..runner.memory import MONTH_STARTS
 
@@ -1651,4 +1651,8 @@ RULES={
 
 @timed
 def available(snapshot):
-    return {action.name:RULES[action.name](snapshot) for action in ACTIONS}
+    offered={}
+    for action in ACTIONS:
+        progress(f'available {action.name}')
+        offered[action.name]=RULES[action.name](snapshot)
+    return offered
