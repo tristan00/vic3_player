@@ -2,7 +2,7 @@ alter table run add foreign key (run_id, player_country) references country defe
 
 create view run_lost as
   select run_id, kind, started_at, heartbeat_at, now() - heartbeat_at as silent_for
-  from run where ended_at is null and heartbeat_at < now() - interval '1 second';
+  from run where ended_at is null and heartbeat_at < now() - interval '0.5 second';
 
 create view run_late_flag as
   select run_id, kind, end_reason, game_exited_at, ended_at, ended_at - game_exited_at as flag_delay

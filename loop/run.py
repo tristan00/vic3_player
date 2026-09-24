@@ -278,13 +278,14 @@ class Loop:
         except Stuck:
             return self.end('ui_stuck')
         except BaseException as error:
+            reacted=datetime.now(timezone.utc)
             if not isinstance(error,GameCrashed) and not self.process.gone() and not self.process.exits_within(EXIT_GRACE_MS):
                 LOG.error('LOOP CRASHED: %s: %s',type(error).__name__,error)
                 self.end(f'loop_crashed: {type(error).__name__}: {error}'[:200])
                 raise
             exited_at=self.exit_time()
-            LOG.error('GAME CRASHED: %s; the loop reacted at %s UTC, %s ms after the exit the OS reports',error,datetime.now(timezone.utc).strftime('%H:%M:%S.%f'),
-                      None if exited_at is None else latency_ms(exited_at))
+            LOG.error('GAME CRASHED: %s; the loop stopped at %s UTC, %s ms after the exit the OS reports',error,reacted.strftime('%H:%M:%S.%f'),
+                      None if exited_at is None else round((reacted-exited_at).total_seconds()*1000))
             self.end('game_crashed',exited_at)
             if isinstance(error,GameCrashed):
                 raise
@@ -348,10 +349,6 @@ DEATH_READ_GAP=.2
 LATE_FLAG_MS=1000
 EXIT_GRACE_MS=1000
 CRASHES_IN_A_ROW=3
-
-
-def latency_ms(exited_at):
-    return round((datetime.now(timezone.utc)-exited_at).total_seconds()*1000)
 
 
 def dead(reader):

@@ -15,7 +15,7 @@ LOG=logging.getLogger('interface')
 SLOT=0xffffff
 FIXED={'pact_history':('first_country','second_country'),'treaty_history':('first_country','second_country'),
        'diplomatic_action_history':('first_country','second_country')}
-HEARTBEAT=.25
+HEARTBEAT=.1
 
 
 def digest():
