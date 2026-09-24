@@ -24,6 +24,12 @@ class Memory(Stored):
         names=layout.keys+['seq']+layout.data
         return names,[tuple(row.get(name) for name in names) for row in self.given.get(stored,[])]
 
+    def adjacency(self):
+        return self.given_definitions.get('adjacency',[])
+
+    def province_colors(self):
+        return {row['province']:row['province'] for row in self.given.get('province_history',[])}
+
     def first_seen(self,table):
         stored=table+'_history' if table+'_history' in self.tables else table
         return {row[table]:position for position,row in enumerate(self.given.get(stored,[]))}

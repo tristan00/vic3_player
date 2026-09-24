@@ -20,6 +20,16 @@ def date_text(hours):
     return f'{year-YEAR_OFFSET}.{month+1}.{day-MONTH_STARTS[month]+1}.{hour}'
 
 
+ADJACENCY={}
+
+
+@timed
+def world_adjacency(connection,world_id):
+    if world_id not in ADJACENCY:
+        ADJACENCY[world_id]=connection.execute('select first_color,second_color from world_adjacency where world_id=%s',(world_id,)).fetchall()
+    return ADJACENCY[world_id]
+
+
 class Stored:
     @timed
     def __init__(self,connection,run_id,seq):
@@ -86,6 +96,15 @@ class Stored:
                 result.setdefault(key,[]).append(values[0] if len(values)==1 else tuple(values))
             self.cache[signature]=result
         return self.cache[signature]
+
+    def adjacency(self):
+        def compute():
+            world_id,=self.connection.execute('select world_id from run where run_id=%s',(self.run_id,)).fetchone()
+            return world_adjacency(self.connection,world_id)
+        return self.memo('adjacency',compute)
+
+    def province_colors(self):
+        return self.memo('province_colors',lambda:dict(self.connection.execute('select province,color from province where run_id=%s',(self.run_id,)).fetchall()))
 
     def first_seen(self,table):
         return self.memo(('first_seen',table),lambda:dict(self.connection.execute(f'select {table},first_seq from {table} where run_id=%s',(self.run_id,)).fetchall()))

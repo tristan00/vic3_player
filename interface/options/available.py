@@ -897,6 +897,33 @@ def at_home(s,formation):
     return state_regions(s).get(located(s,formation))==hq_regions(s).get(home_of(s,formation),(None,None))[1]
 
 
+def march_components(s):
+    def compute():
+        allowed={s.player}|subjects(s)|overlords(s,s.player)
+        colors=s.province_colors()
+        state_of={colors[province]:state for province,state,controller in s.rows('province','province,state,controller') if controller in allowed and state is not None}
+        parent={color:color for color in state_of}
+        def root(color):
+            while parent[color]!=color:
+                parent[color]=parent[parent[color]]
+                color=parent[color]
+            return color
+        for first,second in s.adjacency():
+            if first in parent and second in parent:
+                parent[root(first)]=root(second)
+        found={}
+        for color,state in state_of.items():
+            found.setdefault(state,set()).add(root(color))
+        return found
+    return s.memo('march_components',compute)
+
+
+def reaches(s,formation,region):
+    components=march_components(s)
+    here=components.get(located(s,formation),set())
+    return any(components[state]&here for state,strategic in state_regions(s).items() if strategic==region and state in components)
+
+
 def located(s,formation):
     return s.map('formation_status','formation,current_location').get(formation)
 
@@ -913,7 +940,8 @@ def rehome(s):
     regions=hq_regions(s)
     kinds=s.map('formation','formation,formation_type',country=s.player)
     return [{'military_formation':formation,'strategic_region':region} for formation in idle_armies(s) if not travelling(s,formation)
-            for kind,region in sorted(set(regions.values())) if kind==kinds[formation] and region!=regions.get(home_of(s,formation),(None,None))[1]]
+            for kind,region in sorted(set(regions.values())) if kind==kinds[formation] and region!=regions.get(home_of(s,formation),(None,None))[1]
+            and (kind!=0 or reaches(s,formation,region))]
 
 
 def conscript_types(s,formation):
@@ -1273,6 +1301,8 @@ def goal_targets(s,play,kind):
         targets-={target for target,_ in goals}
     if 'validate_conflicts_war_goals_holder' in settings:
         targets-={target for target,holder in goals if holder==s.player}
+    if 'validate_independence' in settings:
+        targets&=overlords(s,s.player)
     if 'validate_revoke_claims' in settings:
         regions={region for region, in s.rows('state','state_region',country=s.player)}
         targets&={country for country,region in s.rows('country_claim','country,state_region') if region in regions}
@@ -1639,9 +1669,10 @@ RULES={
                                    for flag in range(ARMY_FLAGS) if flag!=s.map('formation','formation,flag').get(f)],
     'station_selected':lambda s:[{'military_formation':f,'strategic_region':region} for f in settled(s,s.formations('army')) if not demobilizing(s,f)
                                  for region in sorted({region for kind,region in hq_regions(s).values() if kind==0})
-                                 if region not in (home_region(s,f),state_regions(s).get(s.map('formation_status','formation,target_location').get(f)))],
+                                 if region not in (home_region(s,f),state_regions(s).get(s.map('formation_status','formation,target_location').get(f))) and reaches(s,f,region)],
     'transfer_battalions':lambda s:[{'military_formation':source,'target':target} for source in s.formations('army') for target in s.formations('army')
-                                    if source!=target and located(s,source)==located(s,target) and len(s.rows('combat_unit','combat_unit',formation=source))>=2],
+                                    if source!=target and located(s,source)==located(s,target) and len(s.rows('combat_unit','combat_unit',formation=source))>=2
+                                    and not formation_report(s,target,'invading')],
     'upgrade_all_units':lambda s:[{}] if RULES['upgrade_regulars'](s) else [],
     'create_army':lambda s:product(option=range(len({region for kind,region in hq_regions(s).values() if kind==0}))),
     'recruit_from_formation':lambda s:[{'military_formation':combo['military_formation'],'combat_unit_type':combo['combat_unit_type'],'state':s.map('building','building,state')[combo['building']]}
@@ -1660,7 +1691,7 @@ RULES={
                                            for option in mobilization_options(s,formation)],
     'set_supply_priority':lambda s:[{'military_formation':f,'level':level} for f in s.formations('army') for index,level in enumerate(('low','medium','high'))
                             if s.map('formation','formation,supply_priority').get(f)!=index],
-    'disband_regulars':lambda s:formation_units(s,s.formations()),
+    'disband_regulars':lambda s:[] if revolution_brewing(s) else formation_units(s,s.formations()),
     'disband_conscripts':lambda s:[{'military_formation':f,'combat_unit_type':k} for f in armies(s,True) for k in conscript_types(s,f)],
     'upgrade_regulars':lambda s:[combo for combo in formation_units(s,s.formations('army')) if upgradable(s,**combo)],
     'upgrade_conscripts':lambda s:[{'military_formation':f,'combat_unit_type':kind} for f in armies(s,True) for kind in conscript_types(s,f)
@@ -1776,7 +1807,8 @@ RULES={
     'build_ship_for':lambda s:product(ship_type=ship_types(s) if metric(s,'GetShipConstruction')>0 else [],military_formation=s.formations('fleet')),
     'cancel_ship':lambda s:product(ship_type=sorted(set(my_ships(s)))),
     'station_formation':lambda s:[{'military_formation':f,'state':st} for f in settled(s,s.formations('army')) if not demobilizing(s,f)
-                                  for st in s.states() if st!=located(s,f)],
+                                  for st in s.states() if st not in (located(s,f),s.map('formation_status','formation,target_location').get(f))
+                                  and march_components(s).get(st,set())&march_components(s).get(located(s,f),set())],
     'rehome_formation':rehome,
     'deploy_to_front':lambda s:[{'military_formation':f,'front':front} for f in armies(s,True) if f in deployable(s) for front in war_fronts(s)
                                 if s.map('formation_status','formation,target_location').get(f)!=front],
