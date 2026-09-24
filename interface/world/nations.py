@@ -521,17 +521,16 @@ def _diplomacy(rng,data,countries,neighbours,history,localization):
             if j is not None and rng.random()<rate:
                 say('lobbies',i,f'create_political_lobby = {{ type = {kind} target = c:{tags[j]} add_interest_group = ig:{rng.choice(groups)} }}')
     for _ in range(int(n*data['treaty_count']/len(data['trade']))+(rng.random()<n*data['treaty_count']/len(data['trade'])%1)):
-        treaty=rng.choice(data['treaties'])
-        first,second=treaty['sizes']
-        pairs=[(i,j) for i in active for j in active if i!=j and (size[i]>size[j])==(first>second) and (size[i]<size[j])==(first<second)
-               and (i in overlord,j in overlord)==treaty['subjects'] and overlord.get(i)!=j and overlord.get(j)!=i]
-        if not pairs:
-            continue
-        stronger=lambda i,j:all(countries[a]['army']>countries[b]['army'] for kind,forward in treaty['articles'] if kind=='military_assistance' and forward is not None
-                                for a,b in [(i,j) if forward else (j,i)])
-        pairs=[pair for pair in pairs if stronger(*pair)]
-        if not pairs:
-            continue
+        for treaty in rng.sample(data['treaties'],len(data['treaties'])):
+            first,second=treaty['sizes']
+            stronger=lambda i,j:all(countries[a]['army']>countries[b]['army'] for kind,forward in treaty['articles'] if kind=='military_assistance' and forward is not None
+                                    for a,b in [(i,j) if forward else (j,i)])
+            pairs=[(i,j) for i in active for j in active if i!=j and (size[i]>size[j])==(first>second) and (size[i]<size[j])==(first<second)
+                   and (i in overlord,j in overlord)==treaty['subjects'] and overlord.get(i)!=j and overlord.get(j)!=i and stronger(i,j)]
+            if pairs:
+                break
+        else:
+            break
         i,j=max(pairs,key=lambda p:(feeling(*p),rng.random()))
         ends=lambda forward:f'source_country = c:{tags[i if forward else j]} target_country = c:{tags[j if forward else i]}'
         articles=' '.join(f'{{ article = {kind} {"" if forward is None else ends(forward)} }}' for kind,forward in treaty['articles'])
