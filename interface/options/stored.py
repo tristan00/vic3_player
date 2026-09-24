@@ -1,5 +1,6 @@
 from ..actions.catalogue import action_folders
 from ..common import timed
+from ..recording.spec import VOCABULARIES
 from ..runner.memory import MONTH_STARTS
 
 HOURS_PER_DAY=24
@@ -28,7 +29,11 @@ class Stored:
         self.date=date_text(self.hours)
         self.tables={name for name, in connection.execute("select relname from pg_class where relnamespace='public'::regnamespace and relkind='r'")}
         self.name_columns={}
-        for table,column,vocabulary in connection.execute('select table_name,column_name,vocabulary from name_column'):
+        for table,column,vocabulary in connection.execute(
+                "select c.conrelid::regclass::text,a.attname,c.confrelid::regclass::text from pg_constraint c "
+                "join pg_attribute a on a.attrelid=c.conrelid and a.attnum=c.conkey[1] "
+                "where c.connamespace='public'::regnamespace and c.contype='f' and array_length(c.conkey,1)=1 and c.confrelid::regclass::text = any(%s)",
+                (list(VOCABULARIES),)):
             self.name_columns.setdefault(table,{})[column]=vocabulary
         self.names={}
         self.cache={}

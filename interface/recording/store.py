@@ -194,14 +194,16 @@ class Store:
 
     def open_run(self,cursor,constants):
         pending=self.pending
-        tag=self.names('country_definition',[pending.get('tag')])[0]
         run_id=cursor.execute('insert into run (kind,source_session,started_at,heartbeat_at,world_id,ruleset_id,player_country,game_speed,first_start,'
-                              'custom_rng_seed,tag,world_file,cli_seed) values (%s,%s,%s,now(),%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
+                              'custom_rng_seed) values (%s,%s,%s,now(),%s,%s,%s,%s,%s,%s) returning run_id',
                               (pending['kind'],self.session,pending['started_at'],self.world_id,self.ruleset_id,constants['player_country'],
-                               constants['game_speed'],constants['first_start'],constants['custom_rng_seed'],tag,pending.get('world'),pending.get('cli_seed'))).fetchone()[0]
+                               constants['game_speed'],constants['first_start'],constants['custom_rng_seed'])).fetchone()[0]
         if pending['kind']!='attached':
-            cursor.execute('insert into run_generated (run_id,kind,run_seed,years,minutes,profile,pool,journal) values (%s,%s,%s,%s,%s,%s,%s,%s)',
-                           (run_id,pending['kind'],pending['run_seed'],pending['years'],pending['minutes'],pending['profile'],pending['pool'],pending['journal']))
+            tag=self.names('country_definition',[pending['tag']])[0]
+            cursor.execute('insert into run_generated (run_id,kind,tag,world_file,cli_seed,run_seed,years,minutes,profile,pool,journal) '
+                           'values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                           (run_id,pending['kind'],tag,pending['world'],pending['cli_seed'],pending['run_seed'],pending['years'],pending['minutes'],
+                            pending['profile'],pending['pool'],pending['journal']))
         self.copy(cursor,'run_advisor',('run_id','position','advisor'),enumerate_rows(run_id,self.names('advisor',pending['advisors'])))
         self.copy(cursor,'run_game_rule',('run_id','game_rule_setting'),[(run_id,rule) for rule in self.names('game_rule_setting',constants['game_rules'])])
         self.run_id=run_id
@@ -414,13 +416,13 @@ class Store:
             else:
                 connection.execute("update run set game_exited_at=%s where run_id=%s and end_reason='game_crashed' and game_exited_at is null",(exited_at,self.run_id))
 
-    def end_run(self,reason,game_exited_at=None):
+    def end_run(self,reason,detail=None,game_exited_at=None):
         if self.beater is not None:
             self.beating.set()
             self.beater.join()
             self.beater=None
-        self.connection.execute('update run set ended_at=now(),end_reason=%s,game_exited_at=%s where run_id=%s and ended_at is null',
-                                (reason,game_exited_at,self.run_id))
+        self.connection.execute('update run set ended_at=now(),end_reason=%s,end_detail=%s,game_exited_at=%s where run_id=%s and ended_at is null',
+                                (reason,detail,game_exited_at,self.run_id))
 
 
 def enumerate_rows(run_id,values):

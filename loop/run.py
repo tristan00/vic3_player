@@ -263,10 +263,10 @@ class Loop:
     def exit_time(self):
         return self.process.exit_time() if self.process.exits_within(EXIT_GRACE_MS) else None
 
-    def end(self,reason,game_exited_at=None):
+    def end(self,reason,detail=None,game_exited_at=None):
         self.watching.set()
         self.counts['end']=reason
-        self.store.end_run(reason,game_exited_at)
+        self.store.end_run(reason,detail,game_exited_at)
         return self.counts
 
     @timed
@@ -281,12 +281,12 @@ class Loop:
             reacted=datetime.now(timezone.utc)
             if not isinstance(error,GameCrashed) and not self.process.gone() and not self.process.exits_within(EXIT_GRACE_MS):
                 LOG.error('LOOP CRASHED: %s: %s',type(error).__name__,error)
-                self.end(f'loop_crashed: {type(error).__name__}: {error}'[:200])
+                self.end('loop_crashed',f'{type(error).__name__}: {error}'[:500])
                 raise
             exited_at=self.exit_time()
             LOG.error('GAME CRASHED: %s; the loop stopped at %s UTC, %s ms after the exit the OS reports',error,reacted.strftime('%H:%M:%S.%f'),
                       None if exited_at is None else round((reacted-exited_at).total_seconds()*1000))
-            self.end('game_crashed',exited_at)
+            self.end('game_crashed',str(error)[:500],exited_at)
             if isinstance(error,GameCrashed):
                 raise
             raise GameCrashed(f'The game process {self.process.pid} died while the loop hit {type(error).__name__}: {error}') from error

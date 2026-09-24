@@ -104,7 +104,8 @@ create table run (
   started_at timestamptz not null,
   heartbeat_at timestamptz not null,
   ended_at timestamptz,
-  end_reason text,
+  end_reason text check (end_reason in ('time', 'years', 'defeated', 'ui_stuck', 'game_crashed', 'loop_crashed', 'loop_lost')),
+  end_detail text,
   game_exited_at timestamptz,
   world_id int4 not null references world,
   ruleset_id int4 not null references ruleset,
@@ -112,17 +113,18 @@ create table run (
   game_speed int2 not null,
   first_start bool not null,
   custom_rng_seed text not null,
-  tag int2 references country_definition,
-  world_file text,
-  cli_seed int8,
   unique (run_id, world_id),
   unique (run_id, kind),
-  check ((ended_at is null) = (end_reason is null))
+  check ((ended_at is null) = (end_reason is null)),
+  check (end_detail is null or end_reason in ('loop_crashed', 'game_crashed'))
 );
 
 create table run_generated (
   run_id int4 primary key,
   kind text not null check (kind in ('mini', 'vanilla')),
+  tag int2 not null references country_definition,
+  world_file text not null,
+  cli_seed int8 not null,
   run_seed int8 not null,
   years float8 not null,
   minutes float8 not null,

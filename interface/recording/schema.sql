@@ -631,7 +631,8 @@ create table run (
   started_at timestamptz not null,
   heartbeat_at timestamptz not null,
   ended_at timestamptz,
-  end_reason text,
+  end_reason text check (end_reason in ('time', 'years', 'defeated', 'ui_stuck', 'game_crashed', 'loop_crashed', 'loop_lost')),
+  end_detail text,
   game_exited_at timestamptz,
   world_id int4 not null references world,
   ruleset_id int4 not null references ruleset,
@@ -639,17 +640,18 @@ create table run (
   game_speed int2 not null,
   first_start bool not null,
   custom_rng_seed text not null,
-  tag int2 references country_definition,
-  world_file text,
-  cli_seed int8,
   unique (run_id, world_id),
   unique (run_id, kind),
-  check ((ended_at is null) = (end_reason is null))
+  check ((ended_at is null) = (end_reason is null)),
+  check (end_detail is null or end_reason in ('loop_crashed', 'game_crashed'))
 );
 
 create table run_generated (
   run_id int4 primary key,
   kind text not null check (kind in ('mini', 'vanilla')),
+  tag int2 not null references country_definition,
+  world_file text not null,
+  cli_seed int8 not null,
   run_seed int8 not null,
   years float8 not null,
   minutes float8 not null,
@@ -4916,39 +4918,39 @@ create table state_status_report (
 );
 
 create function country_at(run int4, at int4) returns table ("country" int4, "seq" int4, "country_definition" int2, "government" int2, "religion" int2, "country_rank" int2, "country_type" int2, "ruler" int4, "capital" int4, "market" int4, "market_capital" int4, "power_bloc" int4, "founding_company" int4, "map_color_override" int4, "dynamic_name_key" int4, "dynamic_adjective_key" int4, "in_civil_war" bool, "trends_initialized" bool, "bloc_leader" bool) language sql stable as $$
-  select country, seq, country_definition, government, religion, country_rank, country_type, ruler, capital, market, market_capital, power_bloc, founding_company, map_color_override, dynamic_name_key, dynamic_adjective_key, in_civil_war, trends_initialized, bloc_leader from (select distinct on (country) country, seq, country_definition, government, religion, country_rank, country_type, ruler, capital, market, market_capital, power_bloc, founding_company, map_color_override, dynamic_name_key, dynamic_adjective_key, in_civil_war, trends_initialized, bloc_leader, present from country_history where run_id = run and seq <= at order by country, seq desc) latest where present
+  select l.country, l.seq, l.country_definition, l.government, l.religion, l.country_rank, l.country_type, l.ruler, l.capital, l.market, l.market_capital, l.power_bloc, l.founding_company, l.map_color_override, l.dynamic_name_key, l.dynamic_adjective_key, l.in_civil_war, l.trends_initialized, l.bloc_leader from country a, lateral (select country, seq, country_definition, government, religion, country_rank, country_type, ruler, capital, market, market_capital, power_bloc, founding_company, map_color_override, dynamic_name_key, dynamic_adjective_key, in_civil_war, trends_initialized, bloc_leader, present from country_history t where t.run_id = run and t.country = a.country and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function country_culture_at(run int4, at int4) returns table ("country" int4, "culture" int4, "seq" int4) language sql stable as $$
-  select country, culture, seq from (select distinct on (country, culture) country, culture, seq, present from country_culture where run_id = run and seq <= at order by country, culture, seq desc) latest where present
+  select l.country, l.culture, l.seq from country a, lateral (select distinct on (culture) country, culture, seq, present from country_culture t where t.run_id = run and t.country = a.country and t.seq <= at order by culture desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_claim_at(run int4, at int4) returns table ("country" int4, "state_region" int2, "seq" int4) language sql stable as $$
-  select country, state_region, seq from (select distinct on (country, state_region) country, state_region, seq, present from country_claim where run_id = run and seq <= at order by country, state_region, seq desc) latest where present
+  select l.country, l.state_region, l.seq from country a, lateral (select distinct on (state_region) country, state_region, seq, present from country_claim t where t.run_id = run and t.country = a.country and t.seq <= at order by state_region desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_religion_at(run int4, at int4) returns table ("country" int4, "religion" int2, "seq" int4) language sql stable as $$
-  select country, religion, seq from (select distinct on (country, religion) country, religion, seq, present from country_religion where run_id = run and seq <= at order by country, religion, seq desc) latest where present
+  select l.country, l.religion, l.seq from country a, lateral (select distinct on (religion) country, religion, seq, present from country_religion t where t.run_id = run and t.country = a.country and t.seq <= at order by religion desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_dividend_building_at(run int4, at int4) returns table ("country" int4, "building" int4, "seq" int4) language sql stable as $$
-  select country, building, seq from (select distinct on (country, building) country, building, seq, present from country_dividend_building where run_id = run and seq <= at order by country, building, seq desc) latest where present
+  select l.country, l.building, l.seq from country a, lateral (select distinct on (building) country, building, seq, present from country_dividend_building t where t.run_id = run and t.country = a.country and t.seq <= at order by building desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_leverage_at(run int4, at int4) returns table ("country" int4, "power_bloc" int4, "seq" int4, "leverage" float8) language sql stable as $$
-  select country, power_bloc, seq, leverage from (select distinct on (country, power_bloc) country, power_bloc, seq, leverage, present from country_leverage where run_id = run and seq <= at order by country, power_bloc, seq desc) latest where present
+  select l.country, l.power_bloc, l.seq, l.leverage from country a, lateral (select distinct on (power_bloc) country, power_bloc, seq, leverage, present from country_leverage t where t.run_id = run and t.country = a.country and t.seq <= at order by power_bloc desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_timed_modifier_at(run int4, at int4) returns table ("country" int4, "modifier_id" int4, "seq" int4, "modifier" int2, "multiplier" float8, "start_date" game_hours, "end_date" game_hours, "decays" bool) language sql stable as $$
-  select country, modifier_id, seq, modifier, multiplier, start_date, end_date, decays from (select distinct on (country, modifier_id) country, modifier_id, seq, modifier, multiplier, start_date, end_date, decays, present from country_timed_modifier where run_id = run and seq <= at order by country, modifier_id, seq desc) latest where present
+  select l.country, l.modifier_id, l.seq, l.modifier, l.multiplier, l.start_date, l.end_date, l.decays from country a, lateral (select distinct on (modifier_id) country, modifier_id, seq, modifier, multiplier, start_date, end_date, decays, present from country_timed_modifier t where t.run_id = run and t.country = a.country and t.seq <= at order by modifier_id desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_profession_population_at(run int4, at int4) returns table ("country" int4, "pop_type" int2, "seq" int4, "population" int8) language sql stable as $$
-  select country, pop_type, seq, population from (select distinct on (country, pop_type) country, pop_type, seq, population, present from country_profession_population where run_id = run and seq <= at order by country, pop_type, seq desc) latest where present
+  select l.country, l.pop_type, l.seq, l.population from country a, lateral (select distinct on (pop_type) country, pop_type, seq, population, present from country_profession_population t where t.run_id = run and t.country = a.country and t.seq <= at order by pop_type desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_religion_culture_population_at(run int4, at int4) returns table ("country" int4, "religion" int2, "culture" int4, "seq" int4, "population" int8) language sql stable as $$
-  select country, religion, culture, seq, population from (select distinct on (country, religion, culture) country, religion, culture, seq, population, present from country_religion_culture_population where run_id = run and seq <= at order by country, religion, culture, seq desc) latest where present
+  select l.country, l.religion, l.culture, l.seq, l.population from country a, lateral (select distinct on (religion, culture) country, religion, culture, seq, population, present from country_religion_culture_population t where t.run_id = run and t.country = a.country and t.seq <= at order by religion desc, culture desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function player_policy_at(run int4, at int4) returns table ("seq" int4, "heir" int4, "tax_level" int2, "government_wage_level" int2, "military_wage_level" int2, "supply_ship_construction_level" int2, "can_toll_straits" bool, "can_close_straits" bool, "has_bloc_mandates" bool) language sql stable as $$
@@ -4968,711 +4970,711 @@ create function player_military_at(run int4, at int4) returns table ("seq" int4,
 $$;
 
 create function player_budget_line_at(run int4, at int4) returns table ("direction" text, "line" int2, "seq" int4, "amount" float8) language sql stable as $$
-  select direction, line, seq, amount from (select distinct on (direction, line) direction, line, seq, amount, present from player_budget_line where run_id = run and seq <= at order by direction, line, seq desc) latest where present
+  select direction, line, seq, amount from (select distinct on (direction, line) direction, line, seq, amount, present from player_budget_line where run_id = run and seq <= at order by direction desc, line desc, seq desc) latest where present
 $$;
 
 create function player_taxed_goods_at(run int4, at int4) returns table ("goods" int2, "seq" int4) language sql stable as $$
-  select goods, seq from (select distinct on (goods) goods, seq, present from player_taxed_goods where run_id = run and seq <= at order by goods, seq desc) latest where present
+  select goods, seq from (select distinct on (goods) goods, seq, present from player_taxed_goods where run_id = run and seq <= at order by goods desc, seq desc) latest where present
 $$;
 
 create function player_ignored_decision_at(run int4, at int4) returns table ("decision" int2, "seq" int4) language sql stable as $$
-  select decision, seq from (select distinct on (decision) decision, seq, present from player_ignored_decision where run_id = run and seq <= at order by decision, seq desc) latest where present
+  select decision, seq from (select distinct on (decision) decision, seq, present from player_ignored_decision where run_id = run and seq <= at order by decision desc, seq desc) latest where present
 $$;
 
 create function player_interaction_cooldown_at(run int4, at int4) returns table ("character_interaction" int2, "seq" int4, "until" game_hours) language sql stable as $$
-  select character_interaction, seq, until from (select distinct on (character_interaction) character_interaction, seq, until, present from player_interaction_cooldown where run_id = run and seq <= at order by character_interaction, seq desc) latest where present
+  select character_interaction, seq, until from (select distinct on (character_interaction) character_interaction, seq, until, present from player_interaction_cooldown where run_id = run and seq <= at order by character_interaction desc, seq desc) latest where present
 $$;
 
 create function player_tariff_at(run int4, at int4) returns table ("direction" text, "goods" int2, "seq" int4, "level" int2, "previous_level" int2, "last_change" game_hours) language sql stable as $$
-  select direction, goods, seq, level, previous_level, last_change from (select distinct on (direction, goods) direction, goods, seq, level, previous_level, last_change, present from player_tariff where run_id = run and seq <= at order by direction, goods, seq desc) latest where present
+  select direction, goods, seq, level, previous_level, last_change from (select distinct on (direction, goods) direction, goods, seq, level, previous_level, last_change, present from player_tariff where run_id = run and seq <= at order by direction desc, goods desc, seq desc) latest where present
 $$;
 
 create function player_monopoly_at(run int4, at int4) returns table ("building_type" int2, "seq" int4) language sql stable as $$
-  select building_type, seq from (select distinct on (building_type) building_type, seq, present from player_monopoly where run_id = run and seq <= at order by building_type, seq desc) latest where present
+  select building_type, seq from (select distinct on (building_type) building_type, seq, present from player_monopoly where run_id = run and seq <= at order by building_type desc, seq desc) latest where present
 $$;
 
 create function player_production_method_available_at(run int4, at int4) returns table ("production_method" int2, "seq" int4) language sql stable as $$
-  select production_method, seq from (select distinct on (production_method) production_method, seq, present from player_production_method_available where run_id = run and seq <= at order by production_method, seq desc) latest where present
+  select production_method, seq from (select distinct on (production_method) production_method, seq, present from player_production_method_available where run_id = run and seq <= at order by production_method desc, seq desc) latest where present
 $$;
 
 create function player_consumed_goods_at(run int4, at int4) returns table ("consumer" text, "goods" int2, "seq" int4) language sql stable as $$
-  select consumer, goods, seq from (select distinct on (consumer, goods) consumer, goods, seq, present from player_consumed_goods where run_id = run and seq <= at order by consumer, goods, seq desc) latest where present
+  select consumer, goods, seq from (select distinct on (consumer, goods) consumer, goods, seq, present from player_consumed_goods where run_id = run and seq <= at order by consumer desc, goods desc, seq desc) latest where present
 $$;
 
 create function player_objective_at(run int4, at int4) returns table ("objective" int2, "seq" int4) language sql stable as $$
-  select objective, seq from (select distinct on (objective) objective, seq, present from player_objective where run_id = run and seq <= at order by objective, seq desc) latest where present
+  select objective, seq from (select distinct on (objective) objective, seq, present from player_objective where run_id = run and seq <= at order by objective desc, seq desc) latest where present
 $$;
 
 create function player_completed_subgoal_at(run int4, at int4) returns table ("objective_subgoal" int2, "seq" int4) language sql stable as $$
-  select objective_subgoal, seq from (select distinct on (objective_subgoal) objective_subgoal, seq, present from player_completed_subgoal where run_id = run and seq <= at order by objective_subgoal, seq desc) latest where present
+  select objective_subgoal, seq from (select distinct on (objective_subgoal) objective_subgoal, seq, present from player_completed_subgoal where run_id = run and seq <= at order by objective_subgoal desc, seq desc) latest where present
 $$;
 
 create function player_culture_standard_of_living_at(run int4, at int4) returns table ("culture" int4, "seq" int4, "standard_of_living" int8) language sql stable as $$
-  select culture, seq, standard_of_living from (select distinct on (culture) culture, seq, standard_of_living, present from player_culture_standard_of_living where run_id = run and seq <= at order by culture, seq desc) latest where present
+  select culture, seq, standard_of_living from (select distinct on (culture) culture, seq, standard_of_living, present from player_culture_standard_of_living where run_id = run and seq <= at order by culture desc, seq desc) latest where present
 $$;
 
 create function player_culture_political_strength_at(run int4, at int4) returns table ("culture" int4, "seq" int4, "political_strength" int8) language sql stable as $$
-  select culture, seq, political_strength from (select distinct on (culture) culture, seq, political_strength, present from player_culture_political_strength where run_id = run and seq <= at order by culture, seq desc) latest where present
+  select culture, seq, political_strength from (select distinct on (culture) culture, seq, political_strength, present from player_culture_political_strength where run_id = run and seq <= at order by culture desc, seq desc) latest where present
 $$;
 
 create function player_religion_political_strength_at(run int4, at int4) returns table ("religion" int2, "seq" int4, "political_strength" int8) language sql stable as $$
-  select religion, seq, political_strength from (select distinct on (religion) religion, seq, political_strength, present from player_religion_political_strength where run_id = run and seq <= at order by religion, seq desc) latest where present
+  select religion, seq, political_strength from (select distinct on (religion) religion, seq, political_strength, present from player_religion_political_strength where run_id = run and seq <= at order by religion desc, seq desc) latest where present
 $$;
 
 create function player_construction_queue_item_at(run int4, at int4) returns table ("private" bool, "position" int2, "seq" int4, "state" int4, "building_type" int2, "owner_building_type" int2, "speed" float8, "construction_left" float8) language sql stable as $$
-  select private, position, seq, state, building_type, owner_building_type, speed, construction_left from (select distinct on (private, position) private, position, seq, state, building_type, owner_building_type, speed, construction_left, present from player_construction_queue_item where run_id = run and seq <= at order by private, position, seq desc) latest where present
+  select private, position, seq, state, building_type, owner_building_type, speed, construction_left from (select distinct on (private, position) private, position, seq, state, building_type, owner_building_type, speed, construction_left, present from player_construction_queue_item where run_id = run and seq <= at order by private desc, position desc, seq desc) latest where present
 $$;
 
 create function player_proposal_at(run int4, at int4) returns table ("country" int4, "kind" text, "seq" int4) language sql stable as $$
-  select country, kind, seq from (select distinct on (country, kind) country, kind, seq, present from player_proposal where run_id = run and seq <= at order by country, kind, seq desc) latest where present
+  select country, kind, seq from (select distinct on (country, kind) country, kind, seq, present from player_proposal where run_id = run and seq <= at order by country desc, kind desc, seq desc) latest where present
 $$;
 
 create function player_adjacent_country_at(run int4, at int4) returns table ("country" int4, "seq" int4) language sql stable as $$
-  select country, seq from (select distinct on (country) country, seq, present from player_adjacent_country where run_id = run and seq <= at order by country, seq desc) latest where present
+  select country, seq from (select distinct on (country) country, seq, present from player_adjacent_country where run_id = run and seq <= at order by country desc, seq desc) latest where present
 $$;
 
 create function player_diplomat_expulsion_at(run int4, at int4) returns table ("country" int4, "direction" text, "seq" int4) language sql stable as $$
-  select country, direction, seq from (select distinct on (country, direction) country, direction, seq, present from player_diplomat_expulsion where run_id = run and seq <= at order by country, direction, seq desc) latest where present
+  select country, direction, seq from (select distinct on (country, direction) country, direction, seq, present from player_diplomat_expulsion where run_id = run and seq <= at order by country desc, direction desc, seq desc) latest where present
 $$;
 
 create function player_obligation_at(run int4, at int4) returns table ("country" int4, "direction" text, "seq" int4) language sql stable as $$
-  select country, direction, seq from (select distinct on (country, direction) country, direction, seq, present from player_obligation where run_id = run and seq <= at order by country, direction, seq desc) latest where present
+  select country, direction, seq from (select distinct on (country, direction) country, direction, seq, present from player_obligation where run_id = run and seq <= at order by country desc, direction desc, seq desc) latest where present
 $$;
 
 create function player_formable_country_at(run int4, at int4) returns table ("name" text, "seq" int4, "position" int2, "formable" bool, "ignored" bool) language sql stable as $$
-  select name, seq, position, formable, ignored from (select distinct on (name) name, seq, position, formable, ignored, present from player_formable_country where run_id = run and seq <= at order by name, seq desc) latest where present
+  select name, seq, position, formable, ignored from (select distinct on (name) name, seq, position, formable, ignored, present from player_formable_country where run_id = run and seq <= at order by name desc, seq desc) latest where present
 $$;
 
 create function player_releasable_country_at(run int4, at int4) returns table ("name" text, "seq" int4, "position" int2, "possible" bool) language sql stable as $$
-  select name, seq, position, possible from (select distinct on (name) name, seq, position, possible, present from player_releasable_country where run_id = run and seq <= at order by name, seq desc) latest where present
+  select name, seq, position, possible from (select distinct on (name) name, seq, position, possible, present from player_releasable_country where run_id = run and seq <= at order by name desc, seq desc) latest where present
 $$;
 
 create function player_alert_at(run int4, at int4) returns table ("alert_type" int2, "seq" int4, "instances" int4) language sql stable as $$
-  select alert_type, seq, instances from (select distinct on (alert_type) alert_type, seq, instances, present from player_alert where run_id = run and seq <= at order by alert_type, seq desc) latest where present
+  select alert_type, seq, instances from (select distinct on (alert_type) alert_type, seq, instances, present from player_alert where run_id = run and seq <= at order by alert_type desc, seq desc) latest where present
 $$;
 
 create function player_state_alert_at(run int4, at int4) returns table ("alert_type" int2, "state" int4, "seq" int4) language sql stable as $$
-  select alert_type, state, seq from (select distinct on (alert_type, state) alert_type, state, seq, present from player_state_alert where run_id = run and seq <= at order by alert_type, state, seq desc) latest where present
+  select alert_type, state, seq from (select distinct on (alert_type, state) alert_type, state, seq, present from player_state_alert where run_id = run and seq <= at order by alert_type desc, state desc, seq desc) latest where present
 $$;
 
 create function player_decision_at(run int4, at int4) returns table ("decision" int2, "seq" int4, "takeable" bool) language sql stable as $$
-  select decision, seq, takeable from (select distinct on (decision) decision, seq, takeable, present from player_decision where run_id = run and seq <= at order by decision, seq desc) latest where present
+  select decision, seq, takeable from (select distinct on (decision) decision, seq, takeable, present from player_decision where run_id = run and seq <= at order by decision desc, seq desc) latest where present
 $$;
 
 create function player_message_at(run int4, at int4) returns table ("position" int2, "seq" int4, "date_text" text, "message_group" int2, "title" text, "description" text) language sql stable as $$
-  select position, seq, date_text, message_group, title, description from (select distinct on (position) position, seq, date_text, message_group, title, description, present from player_message where run_id = run and seq <= at order by position, seq desc) latest where present
+  select position, seq, date_text, message_group, title, description from (select distinct on (position) position, seq, date_text, message_group, title, description, present from player_message where run_id = run and seq <= at order by position desc, seq desc) latest where present
 $$;
 
 create function player_journal_button_at(run int4, at int4) returns table ("journal_entry_type" int2, "scripted_button" int2, "seq" int4) language sql stable as $$
-  select journal_entry_type, scripted_button, seq from (select distinct on (journal_entry_type, scripted_button) journal_entry_type, scripted_button, seq, present from player_journal_button where run_id = run and seq <= at order by journal_entry_type, scripted_button, seq desc) latest where present
+  select journal_entry_type, scripted_button, seq from (select distinct on (journal_entry_type, scripted_button) journal_entry_type, scripted_button, seq, present from player_journal_button where run_id = run and seq <= at order by journal_entry_type desc, scripted_button desc, seq desc) latest where present
 $$;
 
 create function player_treaty_enforced_at(run int4, at int4) returns table ("first_country" int4, "second_country" int4, "seq" int4) language sql stable as $$
-  select first_country, second_country, seq from (select distinct on (first_country, second_country) first_country, second_country, seq, present from player_treaty_enforced where run_id = run and seq <= at order by first_country, second_country, seq desc) latest where present
+  select first_country, second_country, seq from (select distinct on (first_country, second_country) first_country, second_country, seq, present from player_treaty_enforced where run_id = run and seq <= at order by first_country desc, second_country desc, seq desc) latest where present
 $$;
 
 create function player_diplomatic_option_at(run int4, at int4) returns table ("target_country" int4, "action_type" int2, "seq" int4, "possible" bool) language sql stable as $$
-  select target_country, action_type, seq, possible from (select distinct on (target_country, action_type) target_country, action_type, seq, possible, present from player_diplomatic_option where run_id = run and seq <= at order by target_country, action_type, seq desc) latest where present
+  select target_country, action_type, seq, possible from (select distinct on (target_country, action_type) target_country, action_type, seq, possible, present from player_diplomatic_option where run_id = run and seq <= at order by target_country desc, action_type desc, seq desc) latest where present
 $$;
 
 create function player_diplomatic_option_state_at(run int4, at int4) returns table ("target_country" int4, "action_type" int2, "side" text, "state" int4, "seq" int4) language sql stable as $$
-  select target_country, action_type, side, state, seq from (select distinct on (target_country, action_type, side, state) target_country, action_type, side, state, seq, present from player_diplomatic_option_state where run_id = run and seq <= at order by target_country, action_type, side, state, seq desc) latest where present
+  select target_country, action_type, side, state, seq from (select distinct on (target_country, action_type, side, state) target_country, action_type, side, state, seq, present from player_diplomatic_option_state where run_id = run and seq <= at order by target_country desc, action_type desc, side desc, state desc, seq desc) latest where present
 $$;
 
 create function player_character_interaction_at(run int4, at int4) returns table ("character" int4, "character_interaction" int2, "seq" int4, "possible" bool) language sql stable as $$
-  select character, character_interaction, seq, possible from (select distinct on (character, character_interaction) character, character_interaction, seq, possible, present from player_character_interaction where run_id = run and seq <= at order by character, character_interaction, seq desc) latest where present
+  select character, character_interaction, seq, possible from (select distinct on (character, character_interaction) character, character_interaction, seq, possible, present from player_character_interaction where run_id = run and seq <= at order by character desc, character_interaction desc, seq desc) latest where present
 $$;
 
 create function player_colonization_paused_at(run int4, at int4) returns table ("state" int4, "seq" int4) language sql stable as $$
-  select state, seq from (select distinct on (state) state, seq, present from player_colonization_paused where run_id = run and seq <= at order by state, seq desc) latest where present
+  select state, seq from (select distinct on (state) state, seq, present from player_colonization_paused where run_id = run and seq <= at order by state desc, seq desc) latest where present
 $$;
 
 create function ui_open_window_at(run int4, at int4) returns table ("ui_window" int4, "seq" int4) language sql stable as $$
-  select ui_window, seq from (select distinct on (ui_window) ui_window, seq, present from ui_open_window where run_id = run and seq <= at order by ui_window, seq desc) latest where present
+  select ui_window, seq from (select distinct on (ui_window) ui_window, seq, present from ui_open_window where run_id = run and seq <= at order by ui_window desc, seq desc) latest where present
 $$;
 
 create function player_relation_at(run int4, at int4) returns table ("country" int4, "seq" int4, "relations" int2, "improve_relations" float8, "tension" float8, "player_truce" game_hours, "country_truce" game_hours) language sql stable as $$
-  select country, seq, relations, improve_relations, tension, player_truce, country_truce from (select distinct on (country) country, seq, relations, improve_relations, tension, player_truce, country_truce, present from player_relation where run_id = run and seq <= at order by country, seq desc) latest where present
+  select country, seq, relations, improve_relations, tension, player_truce, country_truce from (select distinct on (country) country, seq, relations, improve_relations, tension, player_truce, country_truce, present from player_relation where run_id = run and seq <= at order by country desc, seq desc) latest where present
 $$;
 
 create function pact_at(run int4, at int4) returns table ("pact" int4, "seq" int4, "first_country" int4, "second_country" int4, "pact_type" int2, "liberty_desire" float8) language sql stable as $$
-  select pact, seq, first_country, second_country, pact_type, liberty_desire from (select distinct on (pact) pact, seq, first_country, second_country, pact_type, liberty_desire, present from pact_history where run_id = run and seq <= at order by pact, seq desc) latest where present
+  select l.pact, l.seq, l.first_country, l.second_country, l.pact_type, l.liberty_desire from pact a, lateral (select pact, seq, first_country, second_country, pact_type, liberty_desire, present from pact_history t where t.run_id = run and t.pact = a.pact and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function diplomatic_catalyst_at(run int4, at int4) returns table ("diplomatic_catalyst" int4, "seq" int4, "diplomatic_catalyst_type" int2) language sql stable as $$
-  select diplomatic_catalyst, seq, diplomatic_catalyst_type from (select distinct on (diplomatic_catalyst) diplomatic_catalyst, seq, diplomatic_catalyst_type, present from diplomatic_catalyst_history where run_id = run and seq <= at order by diplomatic_catalyst, seq desc) latest where present
+  select l.diplomatic_catalyst, l.seq, l.diplomatic_catalyst_type from diplomatic_catalyst a, lateral (select diplomatic_catalyst, seq, diplomatic_catalyst_type, present from diplomatic_catalyst_history t where t.run_id = run and t.diplomatic_catalyst = a.diplomatic_catalyst and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function diplomatic_catalyst_private_at(run int4, at int4) returns table ("diplomatic_catalyst" int4, "seq" int4, "country" int4, "target_country" int4, "date" game_hours) language sql stable as $$
-  select diplomatic_catalyst, seq, country, target_country, date from (select distinct on (diplomatic_catalyst) diplomatic_catalyst, seq, country, target_country, date, present from diplomatic_catalyst_private where run_id = run and seq <= at order by diplomatic_catalyst, seq desc) latest where present
+  select l.diplomatic_catalyst, l.seq, l.country, l.target_country, l.date from diplomatic_catalyst a, lateral (select diplomatic_catalyst, seq, country, target_country, date, present from diplomatic_catalyst_private t where t.run_id = run and t.diplomatic_catalyst = a.diplomatic_catalyst and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function diplomatic_action_at(run int4, at int4) returns table ("diplomatic_action" int4, "seq" int4, "first_country" int4, "second_country" int4, "action_type" int2) language sql stable as $$
-  select diplomatic_action, seq, first_country, second_country, action_type from (select distinct on (diplomatic_action) diplomatic_action, seq, first_country, second_country, action_type, present from diplomatic_action_history where run_id = run and seq <= at order by diplomatic_action, seq desc) latest where present
+  select l.diplomatic_action, l.seq, l.first_country, l.second_country, l.action_type from diplomatic_action a, lateral (select diplomatic_action, seq, first_country, second_country, action_type, present from diplomatic_action_history t where t.run_id = run and t.diplomatic_action = a.diplomatic_action and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function diplomatic_play_at(run int4, at int4) returns table ("diplomatic_play" int4, "seq" int4, "initiator" int4, "target" int4, "diplomatic_play_type" int2, "strategic_region" int2, "initiator_maneuvers" int4, "target_maneuvers" int4, "end_date" game_hours, "escalation" int4, "war" int4) language sql stable as $$
-  select diplomatic_play, seq, initiator, target, diplomatic_play_type, strategic_region, initiator_maneuvers, target_maneuvers, end_date, escalation, war from (select distinct on (diplomatic_play) diplomatic_play, seq, initiator, target, diplomatic_play_type, strategic_region, initiator_maneuvers, target_maneuvers, end_date, escalation, war, present from diplomatic_play_history where run_id = run and seq <= at order by diplomatic_play, seq desc) latest where present
+  select l.diplomatic_play, l.seq, l.initiator, l.target, l.diplomatic_play_type, l.strategic_region, l.initiator_maneuvers, l.target_maneuvers, l.end_date, l.escalation, l.war from diplomatic_play a, lateral (select diplomatic_play, seq, initiator, target, diplomatic_play_type, strategic_region, initiator_maneuvers, target_maneuvers, end_date, escalation, war, present from diplomatic_play_history t where t.run_id = run and t.diplomatic_play = a.diplomatic_play and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function diplomatic_play_country_at(run int4, at int4) returns table ("diplomatic_play" int4, "country" int4, "role" text, "seq" int4) language sql stable as $$
-  select diplomatic_play, country, role, seq from (select distinct on (diplomatic_play, country, role) diplomatic_play, country, role, seq, present from diplomatic_play_country where run_id = run and seq <= at order by diplomatic_play, country, role, seq desc) latest where present
+  select l.diplomatic_play, l.country, l.role, l.seq from diplomatic_play a, lateral (select distinct on (country, role) diplomatic_play, country, role, seq, present from diplomatic_play_country t where t.run_id = run and t.diplomatic_play = a.diplomatic_play and t.seq <= at order by country desc, role desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function diplomatic_play_record_at(run int4, at int4) returns table ("diplomatic_play" int4, "country" int4, "seq" int4, "play_side" int2) language sql stable as $$
-  select diplomatic_play, country, seq, play_side from (select distinct on (diplomatic_play, country) diplomatic_play, country, seq, play_side, present from diplomatic_play_record where run_id = run and seq <= at order by diplomatic_play, country, seq desc) latest where present
+  select l.diplomatic_play, l.country, l.seq, l.play_side from diplomatic_play a, lateral (select distinct on (country) diplomatic_play, country, seq, play_side, present from diplomatic_play_record t where t.run_id = run and t.diplomatic_play = a.diplomatic_play and t.seq <= at order by country desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function treaty_at(run int4, at int4) returns table ("treaty" int4, "seq" int4, "first_country" int4, "second_country" int4, "entered_into_force_on" game_hours, "binding_period" int4, "withdrawn_by" int2, "withdrawn" bool) language sql stable as $$
-  select treaty, seq, first_country, second_country, entered_into_force_on, binding_period, withdrawn_by, withdrawn from (select distinct on (treaty) treaty, seq, first_country, second_country, entered_into_force_on, binding_period, withdrawn_by, withdrawn, present from treaty_history where run_id = run and seq <= at order by treaty, seq desc) latest where present
+  select l.treaty, l.seq, l.first_country, l.second_country, l.entered_into_force_on, l.binding_period, l.withdrawn_by, l.withdrawn from treaty a, lateral (select treaty, seq, first_country, second_country, entered_into_force_on, binding_period, withdrawn_by, withdrawn, present from treaty_history t where t.run_id = run and t.treaty = a.treaty and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function treaty_article_at(run int4, at int4) returns table ("treaty_article" int4, "seq" int4, "treaty" int4, "treaty_article_type" int2, "source_country" int4, "target_country" int4) language sql stable as $$
-  select treaty_article, seq, treaty, treaty_article_type, source_country, target_country from (select distinct on (treaty_article) treaty_article, seq, treaty, treaty_article_type, source_country, target_country, present from treaty_article_history where run_id = run and seq <= at order by treaty_article, seq desc) latest where present
+  select l.treaty_article, l.seq, l.treaty, l.treaty_article_type, l.source_country, l.target_country from treaty_article a, lateral (select treaty_article, seq, treaty, treaty_article_type, source_country, target_country, present from treaty_article_history t where t.run_id = run and t.treaty_article = a.treaty_article and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function power_bloc_at(run int4, at int4) returns table ("power_bloc" int4, "seq" int4, "power_bloc_identity" int2, "power_bloc_map_texture" int2, "cohesion" float8, "mandate_progress" float8) language sql stable as $$
-  select power_bloc, seq, power_bloc_identity, power_bloc_map_texture, cohesion, mandate_progress from (select distinct on (power_bloc) power_bloc, seq, power_bloc_identity, power_bloc_map_texture, cohesion, mandate_progress, present from power_bloc_history where run_id = run and seq <= at order by power_bloc, seq desc) latest where present
+  select l.power_bloc, l.seq, l.power_bloc_identity, l.power_bloc_map_texture, l.cohesion, l.mandate_progress from power_bloc a, lateral (select power_bloc, seq, power_bloc_identity, power_bloc_map_texture, cohesion, mandate_progress, present from power_bloc_history t where t.run_id = run and t.power_bloc = a.power_bloc and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function power_bloc_adopted_principle_at(run int4, at int4) returns table ("power_bloc" int4, "power_bloc_principle" int2, "seq" int4) language sql stable as $$
-  select power_bloc, power_bloc_principle, seq from (select distinct on (power_bloc, power_bloc_principle) power_bloc, power_bloc_principle, seq, present from power_bloc_adopted_principle where run_id = run and seq <= at order by power_bloc, power_bloc_principle, seq desc) latest where present
+  select l.power_bloc, l.power_bloc_principle, l.seq from power_bloc a, lateral (select distinct on (power_bloc_principle) power_bloc, power_bloc_principle, seq, present from power_bloc_adopted_principle t where t.run_id = run and t.power_bloc = a.power_bloc and t.seq <= at order by power_bloc_principle desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function interest_at(run int4, at int4) returns table ("interest" int4, "seq" int4, "country" int4, "strategic_region" int2, "involvement" float8) language sql stable as $$
-  select interest, seq, country, strategic_region, involvement from (select distinct on (interest) interest, seq, country, strategic_region, involvement, present from interest_history where run_id = run and seq <= at order by interest, seq desc) latest where present
+  select l.interest, l.seq, l.country, l.strategic_region, l.involvement from interest a, lateral (select interest, seq, country, strategic_region, involvement, present from interest_history t where t.run_id = run and t.interest = a.interest and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function state_at(run int4, at int4) returns table ("state" int4, "seq" int4, "state_region" int2, "localized_name_key" int4, "country" int4, "mass_migration_culture" int4, "mass_migration_country" int4, "slave_import_marker" int4, "treaty_port_potential" bool) language sql stable as $$
-  select state, seq, state_region, localized_name_key, country, mass_migration_culture, mass_migration_country, slave_import_marker, treaty_port_potential from (select distinct on (state) state, seq, state_region, localized_name_key, country, mass_migration_culture, mass_migration_country, slave_import_marker, treaty_port_potential, present from state_history where run_id = run and seq <= at order by state, seq desc) latest where present
+  select l.state, l.seq, l.state_region, l.localized_name_key, l.country, l.mass_migration_culture, l.mass_migration_country, l.slave_import_marker, l.treaty_port_potential from state a, lateral (select state, seq, state_region, localized_name_key, country, mass_migration_culture, mass_migration_country, slave_import_marker, treaty_port_potential, present from state_history t where t.run_id = run and t.state = a.state and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function state_private_at(run int4, at int4) returns table ("state" int4, "seq" int4, "wage" float8) language sql stable as $$
-  select state, seq, wage from (select distinct on (state) state, seq, wage, present from state_private where run_id = run and seq <= at order by state, seq desc) latest where present
+  select l.state, l.seq, l.wage from state a, lateral (select state, seq, wage, present from state_private t where t.run_id = run and t.state = a.state and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function state_timed_modifier_at(run int4, at int4) returns table ("state" int4, "modifier" int2, "seq" int4, "instances" int4) language sql stable as $$
-  select state, modifier, seq, instances from (select distinct on (state, modifier) state, modifier, seq, instances, present from state_timed_modifier where run_id = run and seq <= at order by state, modifier, seq desc) latest where present
+  select l.state, l.modifier, l.seq, l.instances from state a, lateral (select distinct on (modifier) state, modifier, seq, instances, present from state_timed_modifier t where t.run_id = run and t.state = a.state and t.seq <= at order by modifier desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function state_slave_export_marker_at(run int4, at int4) returns table ("state" int4, "marker" int4, "seq" int4) language sql stable as $$
-  select state, marker, seq from (select distinct on (state, marker) state, marker, seq, present from state_slave_export_marker where run_id = run and seq <= at order by state, marker, seq desc) latest where present
+  select l.state, l.marker, l.seq from state a, lateral (select distinct on (marker) state, marker, seq, present from state_slave_export_marker t where t.run_id = run and t.state = a.state and t.seq <= at order by marker desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function state_migration_at(run int4, at int4) returns table ("state" int4, "direction" text, "other_state" int4, "seq" int4) language sql stable as $$
-  select state, direction, other_state, seq from (select distinct on (state, direction, other_state) state, direction, other_state, seq, present from state_migration where run_id = run and seq <= at order by state, direction, other_state, seq desc) latest where present
+  select l.state, l.direction, l.other_state, l.seq from state a, lateral (select distinct on (direction, other_state) state, direction, other_state, seq, present from state_migration t where t.run_id = run and t.state = a.state and t.seq <= at order by direction desc, other_state desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function state_goods_at(run int4, at int4) returns table ("state" int4, "goods" int2, "seq" int4, "local_price" float8, "production" float8, "consumption" float8, "trade" float8) language sql stable as $$
-  select state, goods, seq, local_price, production, consumption, trade from (select distinct on (state, goods) state, goods, seq, local_price, production, consumption, trade, present from state_goods where run_id = run and seq <= at order by state, goods, seq desc) latest where present
+  select l.state, l.goods, l.seq, l.local_price, l.production, l.consumption, l.trade from state a, lateral (select distinct on (goods) state, goods, seq, local_price, production, consumption, trade, present from state_goods t where t.run_id = run and t.state = a.state and t.seq <= at order by goods desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function state_pop_need_at(run int4, at int4) returns table ("state" int4, "culture_type" int2, "need" int2, "goods" int2, "seq" int4, "weight" float8) language sql stable as $$
-  select state, culture_type, need, goods, seq, weight from (select distinct on (state, culture_type, need, goods) state, culture_type, need, goods, seq, weight, present from state_pop_need where run_id = run and seq <= at order by state, culture_type, need, goods, seq desc) latest where present
+  select l.state, l.culture_type, l.need, l.goods, l.seq, l.weight from state a, lateral (select distinct on (culture_type, need, goods) state, culture_type, need, goods, seq, weight, present from state_pop_need t where t.run_id = run and t.state = a.state and t.seq <= at order by culture_type desc, need desc, goods desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function state_goods_supply_at(run int4, at int4) returns table ("state" int4, "goods" int2, "seq" int4) language sql stable as $$
-  select state, goods, seq from (select distinct on (state, goods) state, goods, seq, present from state_goods_supply where run_id = run and seq <= at order by state, goods, seq desc) latest where present
+  select l.state, l.goods, l.seq from state a, lateral (select distinct on (goods) state, goods, seq, present from state_goods_supply t where t.run_id = run and t.state = a.state and t.seq <= at order by goods desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function state_decree_valid_at(run int4, at int4) returns table ("state" int4, "decree_type" int2, "seq" int4) language sql stable as $$
-  select state, decree_type, seq from (select distinct on (state, decree_type) state, decree_type, seq, present from state_decree_valid where run_id = run and seq <= at order by state, decree_type, seq desc) latest where present
+  select l.state, l.decree_type, l.seq from state a, lateral (select distinct on (decree_type) state, decree_type, seq, present from state_decree_valid t where t.run_id = run and t.state = a.state and t.seq <= at order by decree_type desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function decree_at(run int4, at int4) returns table ("decree" int4, "seq" int4, "owner" int4, "state" int4, "decree_type" int2) language sql stable as $$
-  select decree, seq, owner, state, decree_type from (select distinct on (decree) decree, seq, owner, state, decree_type, present from decree_history where run_id = run and seq <= at order by decree, seq desc) latest where present
+  select l.decree, l.seq, l.owner, l.state, l.decree_type from decree a, lateral (select decree, seq, owner, state, decree_type, present from decree_history t where t.run_id = run and t.decree = a.decree and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function player_active_decree_at(run int4, at int4) returns table ("state" int4, "decree_type" int2, "seq" int4) language sql stable as $$
-  select state, decree_type, seq from (select distinct on (state, decree_type) state, decree_type, seq, present from player_active_decree where run_id = run and seq <= at order by state, decree_type, seq desc) latest where present
+  select state, decree_type, seq from (select distinct on (state, decree_type) state, decree_type, seq, present from player_active_decree where run_id = run and seq <= at order by state desc, decree_type desc, seq desc) latest where present
 $$;
 
 create function pop_at(run int4, at int4) returns table ("pop" int4, "seq" int4, "location" int4, "workplace" int4, "culture" int4, "religion" int2, "pop_type" int2, "social_class" int2, "acceptance_status" int2, "assimilation_culture" int4, "conversion_religion" int2) language sql stable as $$
-  select pop, seq, location, workplace, culture, religion, pop_type, social_class, acceptance_status, assimilation_culture, conversion_religion from (select distinct on (pop) pop, seq, location, workplace, culture, religion, pop_type, social_class, acceptance_status, assimilation_culture, conversion_religion, present from pop_history where run_id = run and seq <= at order by pop, seq desc) latest where present
+  select l.pop, l.seq, l.location, l.workplace, l.culture, l.religion, l.pop_type, l.social_class, l.acceptance_status, l.assimilation_culture, l.conversion_religion from pop a, lateral (select pop, seq, location, workplace, culture, religion, pop_type, social_class, acceptance_status, assimilation_culture, conversion_religion, present from pop_history t where t.run_id = run and t.pop = a.pop and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function pop_movement_support_at(run int4, at int4) returns table ("pop" int4, "political_movement" int4, "seq" int4, "supporters" int8) language sql stable as $$
-  select pop, political_movement, seq, supporters from (select distinct on (pop, political_movement) pop, political_movement, seq, supporters, present from pop_movement_support where run_id = run and seq <= at order by pop, political_movement, seq desc) latest where present
+  select l.pop, l.political_movement, l.seq, l.supporters from pop a, lateral (select distinct on (political_movement) pop, political_movement, seq, supporters, present from pop_movement_support t where t.run_id = run and t.pop = a.pop and t.seq <= at order by political_movement desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function culture_at(run int4, at int4) returns table ("culture" int4, "seq" int4, "culture_type" int2, "fervor" float8, "casualties_from_wars" int4, "national_awakening_state_region" int2, "national_awakening_started" bool) language sql stable as $$
-  select culture, seq, culture_type, fervor, casualties_from_wars, national_awakening_state_region, national_awakening_started from (select distinct on (culture) culture, seq, culture_type, fervor, casualties_from_wars, national_awakening_state_region, national_awakening_started, present from culture_history where run_id = run and seq <= at order by culture, seq desc) latest where present
+  select l.culture, l.seq, l.culture_type, l.fervor, l.casualties_from_wars, l.national_awakening_state_region, l.national_awakening_started from culture a, lateral (select culture, seq, culture_type, fervor, casualties_from_wars, national_awakening_state_region, national_awakening_started, present from culture_history t where t.run_id = run and t.culture = a.culture and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function culture_core_state_at(run int4, at int4) returns table ("culture" int4, "state_region" int2, "seq" int4) language sql stable as $$
-  select culture, state_region, seq from (select distinct on (culture, state_region) culture, state_region, seq, present from culture_core_state where run_id = run and seq <= at order by culture, state_region, seq desc) latest where present
+  select l.culture, l.state_region, l.seq from culture a, lateral (select distinct on (state_region) culture, state_region, seq, present from culture_core_state t where t.run_id = run and t.culture = a.culture and t.seq <= at order by state_region desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function culture_obsession_at(run int4, at int4) returns table ("culture" int4, "goods" int2, "seq" int4) language sql stable as $$
-  select culture, goods, seq from (select distinct on (culture, goods) culture, goods, seq, present from culture_obsession where run_id = run and seq <= at order by culture, goods, seq desc) latest where present
+  select l.culture, l.goods, l.seq from culture a, lateral (select distinct on (goods) culture, goods, seq, present from culture_obsession t where t.run_id = run and t.culture = a.culture and t.seq <= at order by goods desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function culture_taboo_at(run int4, at int4) returns table ("culture" int4, "goods" int2, "seq" int4) language sql stable as $$
-  select culture, goods, seq from (select distinct on (culture, goods) culture, goods, seq, present from culture_taboo where run_id = run and seq <= at order by culture, goods, seq desc) latest where present
+  select l.culture, l.goods, l.seq from culture a, lateral (select distinct on (goods) culture, goods, seq, present from culture_taboo t where t.run_id = run and t.culture = a.culture and t.seq <= at order by goods desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function culture_tradition_at(run int4, at int4) returns table ("culture" int4, "discrimination_trait" int2, "seq" int4) language sql stable as $$
-  select culture, discrimination_trait, seq from (select distinct on (culture, discrimination_trait) culture, discrimination_trait, seq, present from culture_tradition where run_id = run and seq <= at order by culture, discrimination_trait, seq desc) latest where present
+  select l.culture, l.discrimination_trait, l.seq from culture a, lateral (select distinct on (discrimination_trait) culture, discrimination_trait, seq, present from culture_tradition t where t.run_id = run and t.culture = a.culture and t.seq <= at order by discrimination_trait desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function cultural_community_at(run int4, at int4) returns table ("cultural_community" int4, "seq" int4, "culture" int4, "state" int4, "acceptance_delta" float8) language sql stable as $$
-  select cultural_community, seq, culture, state, acceptance_delta from (select distinct on (cultural_community) cultural_community, seq, culture, state, acceptance_delta, present from cultural_community_history where run_id = run and seq <= at order by cultural_community, seq desc) latest where present
+  select l.cultural_community, l.seq, l.culture, l.state, l.acceptance_delta from cultural_community a, lateral (select cultural_community, seq, culture, state, acceptance_delta, present from cultural_community_history t where t.run_id = run and t.cultural_community = a.cultural_community and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function state_region_resource_at(run int4, at int4) returns table ("state_region" int2, "building_type" int2, "seq" int4, "available_levels" int4) language sql stable as $$
-  select state_region, building_type, seq, available_levels from (select distinct on (state_region, building_type) state_region, building_type, seq, available_levels, present from state_region_resource where run_id = run and seq <= at order by state_region, building_type, seq desc) latest where present
+  select state_region, building_type, seq, available_levels from (select distinct on (state_region, building_type) state_region, building_type, seq, available_levels, present from state_region_resource where run_id = run and seq <= at order by state_region desc, building_type desc, seq desc) latest where present
 $$;
 
 create function state_region_trait_at(run int4, at int4) returns table ("state_region" int2, "state_trait" int2, "seq" int4) language sql stable as $$
-  select state_region, state_trait, seq from (select distinct on (state_region, state_trait) state_region, state_trait, seq, present from state_region_trait where run_id = run and seq <= at order by state_region, state_trait, seq desc) latest where present
+  select state_region, state_trait, seq from (select distinct on (state_region, state_trait) state_region, state_trait, seq, present from state_region_trait where run_id = run and seq <= at order by state_region desc, state_trait desc, seq desc) latest where present
 $$;
 
 create function harvest_condition_at(run int4, at int4) returns table ("harvest_condition" int4, "seq" int4, "harvest_condition_type" int2, "state_region" int2) language sql stable as $$
-  select harvest_condition, seq, harvest_condition_type, state_region from (select distinct on (harvest_condition) harvest_condition, seq, harvest_condition_type, state_region, present from harvest_condition_history where run_id = run and seq <= at order by harvest_condition, seq desc) latest where present
+  select l.harvest_condition, l.seq, l.harvest_condition_type, l.state_region from harvest_condition a, lateral (select harvest_condition, seq, harvest_condition_type, state_region, present from harvest_condition_history t where t.run_id = run and t.harvest_condition = a.harvest_condition and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function harvest_condition_area_at(run int4, at int4) returns table ("harvest_condition" int4, "position" int2, "seq" int4, "intensity" float8, "duration" int4) language sql stable as $$
-  select harvest_condition, position, seq, intensity, duration from (select distinct on (harvest_condition, position) harvest_condition, position, seq, intensity, duration, present from harvest_condition_area where run_id = run and seq <= at order by harvest_condition, position, seq desc) latest where present
+  select l.harvest_condition, l.position, l.seq, l.intensity, l.duration from harvest_condition a, lateral (select distinct on (position) harvest_condition, position, seq, intensity, duration, present from harvest_condition_area t where t.run_id = run and t.harvest_condition = a.harvest_condition and t.seq <= at order by position desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function famine_at(run int4, at int4) returns table ("famine" int4, "seq" int4, "state" int4, "start_date" game_hours, "num_births" int4, "num_deaths" int4) language sql stable as $$
-  select famine, seq, state, start_date, num_births, num_deaths from (select distinct on (famine) famine, seq, state, start_date, num_births, num_deaths, present from famine_history where run_id = run and seq <= at order by famine, seq desc) latest where present
+  select l.famine, l.seq, l.state, l.start_date, l.num_births, l.num_deaths from famine a, lateral (select famine, seq, state, start_date, num_births, num_deaths, present from famine_history t where t.run_id = run and t.famine = a.famine and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function province_at(run int4, at int4) returns table ("province" int4, "seq" int4, "state" int4, "controller" int4) language sql stable as $$
-  select province, seq, state, controller from (select distinct on (province) province, seq, state, controller, present from province_history where run_id = run and seq <= at order by province, seq desc) latest where present
+  select l.province, l.seq, l.state, l.controller from province a, lateral (select province, seq, state, controller, present from province_history t where t.run_id = run and t.province = a.province and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function building_at(run int4, at int4) returns table ("building" int4, "seq" int4, "building_type" int2, "state" int4, "levels" int4, "slave_basket" int2, "active" bool, "subsidized" bool, "privatization_requested" int2, "dead" bool) language sql stable as $$
-  select building, seq, building_type, state, levels, slave_basket, active, subsidized, privatization_requested, dead from (select distinct on (building) building, seq, building_type, state, levels, slave_basket, active, subsidized, privatization_requested, dead, present from building_history where run_id = run and seq <= at order by building, seq desc) latest where present
+  select l.building, l.seq, l.building_type, l.state, l.levels, l.slave_basket, l.active, l.subsidized, l.privatization_requested, l.dead from building a, lateral (select building, seq, building_type, state, levels, slave_basket, active, subsidized, privatization_requested, dead, present from building_history t where t.run_id = run and t.building = a.building and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function building_private_at(run int4, at int4) returns table ("building" int4, "seq" int4, "auto_expand" bool, "output_paused" bool, "monopoly" bool, "privatizable" bool) language sql stable as $$
-  select building, seq, auto_expand, output_paused, monopoly, privatizable from (select distinct on (building) building, seq, auto_expand, output_paused, monopoly, privatizable, present from building_private where run_id = run and seq <= at order by building, seq desc) latest where present
+  select l.building, l.seq, l.auto_expand, l.output_paused, l.monopoly, l.privatizable from building a, lateral (select building, seq, auto_expand, output_paused, monopoly, privatizable, present from building_private t where t.run_id = run and t.building = a.building and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function building_production_method_active_at(run int4, at int4) returns table ("building" int4, "production_method" int2, "seq" int4) language sql stable as $$
-  select building, production_method, seq from (select distinct on (building, production_method) building, production_method, seq, present from building_production_method_active where run_id = run and seq <= at order by building, production_method, seq desc) latest where present
+  select l.building, l.production_method, l.seq from building a, lateral (select distinct on (production_method) building, production_method, seq, present from building_production_method_active t where t.run_id = run and t.building = a.building and t.seq <= at order by production_method desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function building_privatization_enabled_at(run int4, at int4) returns table ("building" int4, "country" int4, "seq" int4) language sql stable as $$
-  select building, country, seq from (select distinct on (building, country) building, country, seq, present from building_privatization_enabled where run_id = run and seq <= at order by building, country, seq desc) latest where present
+  select l.building, l.country, l.seq from building a, lateral (select distinct on (country) building, country, seq, present from building_privatization_enabled t where t.run_id = run and t.building = a.building and t.seq <= at order by country desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function building_goods_at(run int4, at int4) returns table ("building" int4, "goods" int2, "seq" int4, "input" float8, "output" float8, "slave_input" float8) language sql stable as $$
-  select building, goods, seq, input, output, slave_input from (select distinct on (building, goods) building, goods, seq, input, output, slave_input, present from building_goods where run_id = run and seq <= at order by building, goods, seq desc) latest where present
+  select l.building, l.goods, l.seq, l.input, l.output, l.slave_input from building a, lateral (select distinct on (goods) building, goods, seq, input, output, slave_input, present from building_goods t where t.run_id = run and t.building = a.building and t.seq <= at order by goods desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function building_failed_hire_at(run int4, at int4) returns table ("building" int4, "position" int2, "seq" int4, "workplace" int4) language sql stable as $$
-  select building, position, seq, workplace from (select distinct on (building, position) building, position, seq, workplace, present from building_failed_hire where run_id = run and seq <= at order by building, position, seq desc) latest where present
+  select l.building, l.position, l.seq, l.workplace from building a, lateral (select distinct on (position) building, position, seq, workplace, present from building_failed_hire t where t.run_id = run and t.building = a.building and t.seq <= at order by position desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function building_ownership_at(run int4, at int4) returns table ("building_ownership" int4, "seq" int4, "building" int4, "owner_type" int2, "owner" int4, "levels" int4, "privatization" bool, "in_owner_assets" bool) language sql stable as $$
-  select building_ownership, seq, building, owner_type, owner, levels, privatization, in_owner_assets from (select distinct on (building_ownership) building_ownership, seq, building, owner_type, owner, levels, privatization, in_owner_assets, present from building_ownership_history where run_id = run and seq <= at order by building_ownership, seq desc) latest where present
+  select l.building_ownership, l.seq, l.building, l.owner_type, l.owner, l.levels, l.privatization, l.in_owner_assets from building_ownership a, lateral (select building_ownership, seq, building, owner_type, owner, levels, privatization, in_owner_assets, present from building_ownership_history t where t.run_id = run and t.building_ownership = a.building_ownership and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function market_at(run int4, at int4) returns table ("market" int4, "seq" int4, "owner" int4) language sql stable as $$
-  select market, seq, owner from (select distinct on (market) market, seq, owner, present from market_history where run_id = run and seq <= at order by market, seq desc) latest where present
+  select l.market, l.seq, l.owner from market a, lateral (select market, seq, owner, present from market_history t where t.run_id = run and t.market = a.market and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function market_goods_at(run int4, at int4) returns table ("market" int4, "goods" int2, "seq" int4, "price" float8, "sell_orders" float8, "buy_orders" float8) language sql stable as $$
-  select market, goods, seq, price, sell_orders, buy_orders from (select distinct on (market, goods) market, goods, seq, price, sell_orders, buy_orders, present from market_goods where run_id = run and seq <= at order by market, goods, seq desc) latest where present
+  select l.market, l.goods, l.seq, l.price, l.sell_orders, l.buy_orders from market a, lateral (select distinct on (goods) market, goods, seq, price, sell_orders, buy_orders, present from market_goods t where t.run_id = run and t.market = a.market and t.seq <= at order by goods desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function market_area_at(run int4, at int4) returns table ("market_area" int4, "seq" int4, "market" int4) language sql stable as $$
-  select market_area, seq, market from (select distinct on (market_area) market_area, seq, market, present from market_area_history where run_id = run and seq <= at order by market_area, seq desc) latest where present
+  select l.market_area, l.seq, l.market from market_area a, lateral (select market_area, seq, market, present from market_area_history t where t.run_id = run and t.market_area = a.market_area and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function market_area_state_at(run int4, at int4) returns table ("market_area" int4, "state" int4, "seq" int4, "port" bool) language sql stable as $$
-  select market_area, state, seq, port from (select distinct on (market_area, state) market_area, state, seq, port, present from market_area_state where run_id = run and seq <= at order by market_area, state, seq desc) latest where present
+  select l.market_area, l.state, l.seq, l.port from market_area a, lateral (select distinct on (state) market_area, state, seq, port, present from market_area_state t where t.run_id = run and t.market_area = a.market_area and t.seq <= at order by state desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function world_market_hub_at(run int4, at int4) returns table ("state" int4, "seq" int4, "trade_centers" int2) language sql stable as $$
-  select state, seq, trade_centers from (select distinct on (state) state, seq, trade_centers, present from world_market_hub where run_id = run and seq <= at order by state, seq desc) latest where present
+  select state, seq, trade_centers from (select distinct on (state) state, seq, trade_centers, present from world_market_hub where run_id = run and seq <= at order by state desc, seq desc) latest where present
 $$;
 
 create function world_market_price_channel_at(run int4, at int4) returns table ("goods" int2, "seq" int4, "bucket" int2) language sql stable as $$
-  select goods, seq, bucket from (select distinct on (goods) goods, seq, bucket, present from world_market_price_channel where run_id = run and seq <= at order by goods, seq desc) latest where present
+  select goods, seq, bucket from (select distinct on (goods) goods, seq, bucket, present from world_market_price_channel where run_id = run and seq <= at order by goods desc, seq desc) latest where present
 $$;
 
 create function company_at(run int4, at int4) returns table ("company" int4, "seq" int4, "country" int4, "building" int4, "ceo" int4, "prosperity" float8, "company_type" int2, "company_name_key" int4, "investment_charter" bool, "trade_charter" bool, "established" game_hours) language sql stable as $$
-  select company, seq, country, building, ceo, prosperity, company_type, company_name_key, investment_charter, trade_charter, established from (select distinct on (company) company, seq, country, building, ceo, prosperity, company_type, company_name_key, investment_charter, trade_charter, established, present from company_history where run_id = run and seq <= at order by company, seq desc) latest where present
+  select l.company, l.seq, l.country, l.building, l.ceo, l.prosperity, l.company_type, l.company_name_key, l.investment_charter, l.trade_charter, l.established from company a, lateral (select company, seq, country, building, ceo, prosperity, company_type, company_name_key, investment_charter, trade_charter, established, present from company_history t where t.run_id = run and t.company = a.company and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function company_owned_country_at(run int4, at int4) returns table ("company" int4, "country" int4, "seq" int4) language sql stable as $$
-  select company, country, seq from (select distinct on (company, country) company, country, seq, present from company_owned_country where run_id = run and seq <= at order by company, country, seq desc) latest where present
+  select l.company, l.country, l.seq from company a, lateral (select distinct on (country) company, country, seq, present from company_owned_country t where t.run_id = run and t.company = a.company and t.seq <= at order by country desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function charter_at(run int4, at int4) returns table ("charter" int4, "seq" int4, "company" int4, "company_charter_type" int2) language sql stable as $$
-  select charter, seq, company, company_charter_type from (select distinct on (charter) charter, seq, company, company_charter_type, present from charter_history where run_id = run and seq <= at order by charter, seq desc) latest where present
+  select l.charter, l.seq, l.company, l.company_charter_type from charter a, lateral (select charter, seq, company, company_charter_type, present from charter_history t where t.run_id = run and t.charter = a.charter and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function charter_private_at(run int4, at int4) returns table ("charter" int4, "seq" int4, "unlock" game_hours) language sql stable as $$
-  select charter, seq, unlock from (select distinct on (charter) charter, seq, unlock, present from charter_private where run_id = run and seq <= at order by charter, seq desc) latest where present
+  select l.charter, l.seq, l.unlock from charter a, lateral (select charter, seq, unlock, present from charter_private t where t.run_id = run and t.charter = a.charter and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function hq_at(run int4, at int4) returns table ("hq" int4, "seq" int4, "country" int4) language sql stable as $$
-  select hq, seq, country from (select distinct on (hq) hq, seq, country, present from hq_history where run_id = run and seq <= at order by hq, seq desc) latest where present
+  select l.hq, l.seq, l.country from hq a, lateral (select hq, seq, country, present from hq_history t where t.run_id = run and t.hq = a.hq and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function hq_private_at(run int4, at int4) returns table ("hq" int4, "seq" int4, "hq_type" int2, "hq_region" int2) language sql stable as $$
-  select hq, seq, hq_type, hq_region from (select distinct on (hq) hq, seq, hq_type, hq_region, present from hq_private where run_id = run and seq <= at order by hq, seq desc) latest where present
+  select l.hq, l.seq, l.hq_type, l.hq_region from hq a, lateral (select hq, seq, hq_type, hq_region, present from hq_private t where t.run_id = run and t.hq = a.hq and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function shipping_lane_at(run int4, at int4) returns table ("shipping_lane" int4, "seq" int4, "country" int4, "begin_point" int4, "end_point" int4, "convoy_cost" float8, "lane_type" int2) language sql stable as $$
-  select shipping_lane, seq, country, begin_point, end_point, convoy_cost, lane_type from (select distinct on (shipping_lane) shipping_lane, seq, country, begin_point, end_point, convoy_cost, lane_type, present from shipping_lane_history where run_id = run and seq <= at order by shipping_lane, seq desc) latest where present
+  select l.shipping_lane, l.seq, l.country, l.begin_point, l.end_point, l.convoy_cost, l.lane_type from shipping_lane a, lateral (select shipping_lane, seq, country, begin_point, end_point, convoy_cost, lane_type, present from shipping_lane_history t where t.run_id = run and t.shipping_lane = a.shipping_lane and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function strait_at(run int4, at int4) returns table ("strait" int4, "seq" int4, "strait_definition" int2, "first_last_access_change" game_hours, "second_last_access_change" game_hours, "first_toll_rate" int2, "second_toll_rate" int2) language sql stable as $$
-  select strait, seq, strait_definition, first_last_access_change, second_last_access_change, first_toll_rate, second_toll_rate from (select distinct on (strait) strait, seq, strait_definition, first_last_access_change, second_last_access_change, first_toll_rate, second_toll_rate, present from strait_history where run_id = run and seq <= at order by strait, seq desc) latest where present
+  select l.strait, l.seq, l.strait_definition, l.first_last_access_change, l.second_last_access_change, l.first_toll_rate, l.second_toll_rate from strait a, lateral (select strait, seq, strait_definition, first_last_access_change, second_last_access_change, first_toll_rate, second_toll_rate, present from strait_history t where t.run_id = run and t.strait = a.strait and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function strait_endpoint_at(run int4, at int4) returns table ("strait" int4, "seq" int4, "first_state" int4, "second_state" int4, "strait_type" text) language sql stable as $$
-  select strait, seq, first_state, second_state, strait_type from (select distinct on (strait) strait, seq, first_state, second_state, strait_type, present from strait_endpoint where run_id = run and seq <= at order by strait, seq desc) latest where present
+  select l.strait, l.seq, l.first_state, l.second_state, l.strait_type from strait a, lateral (select strait, seq, first_state, second_state, strait_type, present from strait_endpoint t where t.run_id = run and t.strait = a.strait and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function country_research_at(run int4, at int4) returns table ("country_research" int4, "seq" int4, "country" int4, "researching" int2) language sql stable as $$
-  select country_research, seq, country, researching from (select distinct on (country_research) country_research, seq, country, researching, present from country_research_history where run_id = run and seq <= at order by country_research, seq desc) latest where present
+  select l.country_research, l.seq, l.country, l.researching from country_research a, lateral (select country_research, seq, country, researching, present from country_research_history t where t.run_id = run and t.country_research = a.country_research and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function country_research_acquired_at(run int4, at int4) returns table ("country_research" int4, "technology" int2, "seq" int4) language sql stable as $$
-  select country_research, technology, seq from (select distinct on (country_research, technology) country_research, technology, seq, present from country_research_acquired where run_id = run and seq <= at order by country_research, technology, seq desc) latest where present
+  select l.country_research, l.technology, l.seq from country_research a, lateral (select distinct on (technology) country_research, technology, seq, present from country_research_acquired t where t.run_id = run and t.country_research = a.country_research and t.seq <= at order by technology desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_research_spreading_at(run int4, at int4) returns table ("country_research" int4, "technology" int2, "seq" int4) language sql stable as $$
-  select country_research, technology, seq from (select distinct on (country_research, technology) country_research, technology, seq, present from country_research_spreading where run_id = run and seq <= at order by country_research, technology, seq desc) latest where present
+  select l.country_research, l.technology, l.seq from country_research a, lateral (select distinct on (technology) country_research, technology, seq, present from country_research_spreading t where t.run_id = run and t.country_research = a.country_research and t.seq <= at order by technology desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_research_queued_at(run int4, at int4) returns table ("country_research" int4, "position" int2, "seq" int4, "technology" int2) language sql stable as $$
-  select country_research, position, seq, technology from (select distinct on (country_research, position) country_research, position, seq, technology, present from country_research_queued where run_id = run and seq <= at order by country_research, position, seq desc) latest where present
+  select l.country_research, l.position, l.seq, l.technology from country_research a, lateral (select distinct on (position) country_research, position, seq, technology, present from country_research_queued t where t.run_id = run and t.country_research = a.country_research and t.seq <= at order by position desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_research_progress_at(run int4, at int4) returns table ("country_research" int4, "technology" int2, "seq" int4, "progress" float8) language sql stable as $$
-  select country_research, technology, seq, progress from (select distinct on (country_research, technology) country_research, technology, seq, progress, present from country_research_progress where run_id = run and seq <= at order by country_research, technology, seq desc) latest where present
+  select l.country_research, l.technology, l.seq, l.progress from country_research a, lateral (select distinct on (technology) country_research, technology, seq, progress, present from country_research_progress t where t.run_id = run and t.country_research = a.country_research and t.seq <= at order by technology desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function interest_group_at(run int4, at int4) returns table ("interest_group" int4, "seq" int4, "country" int4, "interest_group_type" int2, "name_key" int4, "party" int4, "leader" int4, "approval_state" int2, "influence_type" int2, "in_government" bool, "influence_type_reason" int2) language sql stable as $$
-  select interest_group, seq, country, interest_group_type, name_key, party, leader, approval_state, influence_type, in_government, influence_type_reason from (select distinct on (interest_group) interest_group, seq, country, interest_group_type, name_key, party, leader, approval_state, influence_type, in_government, influence_type_reason, present from interest_group_history where run_id = run and seq <= at order by interest_group, seq desc) latest where present
+  select l.interest_group, l.seq, l.country, l.interest_group_type, l.name_key, l.party, l.leader, l.approval_state, l.influence_type, l.in_government, l.influence_type_reason from interest_group a, lateral (select interest_group, seq, country, interest_group_type, name_key, party, leader, approval_state, influence_type, in_government, influence_type_reason, present from interest_group_history t where t.run_id = run and t.interest_group = a.interest_group and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function interest_group_private_at(run int4, at int4) returns table ("interest_group" int4, "seq" int4, "civil_war_side" int2, "party_to_join" int4, "wants_to_leave_party" bool, "amenability" float8, "negotiated" bool) language sql stable as $$
-  select interest_group, seq, civil_war_side, party_to_join, wants_to_leave_party, amenability, negotiated from (select distinct on (interest_group) interest_group, seq, civil_war_side, party_to_join, wants_to_leave_party, amenability, negotiated, present from interest_group_private where run_id = run and seq <= at order by interest_group, seq desc) latest where present
+  select l.interest_group, l.seq, l.civil_war_side, l.party_to_join, l.wants_to_leave_party, l.amenability, l.negotiated from interest_group a, lateral (select interest_group, seq, civil_war_side, party_to_join, wants_to_leave_party, amenability, negotiated, present from interest_group_private t where t.run_id = run and t.interest_group = a.interest_group and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function interest_group_ideology_at(run int4, at int4) returns table ("interest_group" int4, "ideology" int2, "seq" int4) language sql stable as $$
-  select interest_group, ideology, seq from (select distinct on (interest_group, ideology) interest_group, ideology, seq, present from interest_group_ideology where run_id = run and seq <= at order by interest_group, ideology, seq desc) latest where present
+  select l.interest_group, l.ideology, l.seq from interest_group a, lateral (select distinct on (ideology) interest_group, ideology, seq, present from interest_group_ideology t where t.run_id = run and t.interest_group = a.interest_group and t.seq <= at order by ideology desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function interest_group_character_ideology_at(run int4, at int4) returns table ("interest_group" int4, "ideology" int2, "seq" int4) language sql stable as $$
-  select interest_group, ideology, seq from (select distinct on (interest_group, ideology) interest_group, ideology, seq, present from interest_group_character_ideology where run_id = run and seq <= at order by interest_group, ideology, seq desc) latest where present
+  select l.interest_group, l.ideology, l.seq from interest_group a, lateral (select distinct on (ideology) interest_group, ideology, seq, present from interest_group_character_ideology t where t.run_id = run and t.interest_group = a.interest_group and t.seq <= at order by ideology desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function interest_group_held_trait_at(run int4, at int4) returns table ("interest_group" int4, "interest_group_trait" int2, "seq" int4, "enabled" bool) language sql stable as $$
-  select interest_group, interest_group_trait, seq, enabled from (select distinct on (interest_group, interest_group_trait) interest_group, interest_group_trait, seq, enabled, present from interest_group_held_trait where run_id = run and seq <= at order by interest_group, interest_group_trait, seq desc) latest where present
+  select l.interest_group, l.interest_group_trait, l.seq, l.enabled from interest_group a, lateral (select distinct on (interest_group_trait) interest_group, interest_group_trait, seq, enabled, present from interest_group_held_trait t where t.run_id = run and t.interest_group = a.interest_group and t.seq <= at order by interest_group_trait desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function interest_group_influencing_movement_at(run int4, at int4) returns table ("interest_group" int4, "political_movement" int4, "seq" int4) language sql stable as $$
-  select interest_group, political_movement, seq from (select distinct on (interest_group, political_movement) interest_group, political_movement, seq, present from interest_group_influencing_movement where run_id = run and seq <= at order by interest_group, political_movement, seq desc) latest where present
+  select l.interest_group, l.political_movement, l.seq from interest_group a, lateral (select distinct on (political_movement) interest_group, political_movement, seq, present from interest_group_influencing_movement t where t.run_id = run and t.interest_group = a.interest_group and t.seq <= at order by political_movement desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function interest_group_movement_support_at(run int4, at int4) returns table ("interest_group" int4, "political_movement" int4, "seq" int4, "clout" float8) language sql stable as $$
-  select interest_group, political_movement, seq, clout from (select distinct on (interest_group, political_movement) interest_group, political_movement, seq, clout, present from interest_group_movement_support where run_id = run and seq <= at order by interest_group, political_movement, seq desc) latest where present
+  select l.interest_group, l.political_movement, l.seq, l.clout from interest_group a, lateral (select distinct on (political_movement) interest_group, political_movement, seq, clout, present from interest_group_movement_support t where t.run_id = run and t.interest_group = a.interest_group and t.seq <= at order by political_movement desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function interest_group_pop_at(run int4, at int4) returns table ("interest_group" int4, "pop" int4, "seq" int4) language sql stable as $$
-  select interest_group, pop, seq from (select distinct on (interest_group, pop) interest_group, pop, seq, present from interest_group_pop where run_id = run and seq <= at order by interest_group, pop, seq desc) latest where present
+  select l.interest_group, l.pop, l.seq from interest_group a, lateral (select distinct on (pop) interest_group, pop, seq, present from interest_group_pop t where t.run_id = run and t.interest_group = a.interest_group and t.seq <= at order by pop desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function political_movement_at(run int4, at int4) returns table ("political_movement" int4, "seq" int4, "country" int4, "political_movement_type" int2, "ideology" int2, "radicalism" float8, "managed_status" int2, "civil_war" int4) language sql stable as $$
-  select political_movement, seq, country, political_movement_type, ideology, radicalism, managed_status, civil_war from (select distinct on (political_movement) political_movement, seq, country, political_movement_type, ideology, radicalism, managed_status, civil_war, present from political_movement_history where run_id = run and seq <= at order by political_movement, seq desc) latest where present
+  select l.political_movement, l.seq, l.country, l.political_movement_type, l.ideology, l.radicalism, l.managed_status, l.civil_war from political_movement a, lateral (select political_movement, seq, country, political_movement_type, ideology, radicalism, managed_status, civil_war, present from political_movement_history t where t.run_id = run and t.political_movement = a.political_movement and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function political_movement_character_at(run int4, at int4) returns table ("political_movement" int4, "character" int4, "seq" int4) language sql stable as $$
-  select political_movement, character, seq from (select distinct on (political_movement, character) political_movement, character, seq, present from political_movement_character where run_id = run and seq <= at order by political_movement, character, seq desc) latest where present
+  select l.political_movement, l.character, l.seq from political_movement a, lateral (select distinct on (character) political_movement, character, seq, present from political_movement_character t where t.run_id = run and t.political_movement = a.political_movement and t.seq <= at order by character desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function political_movement_character_ideology_at(run int4, at int4) returns table ("political_movement" int4, "ideology" int2, "seq" int4) language sql stable as $$
-  select political_movement, ideology, seq from (select distinct on (political_movement, ideology) political_movement, ideology, seq, present from political_movement_character_ideology where run_id = run and seq <= at order by political_movement, ideology, seq desc) latest where present
+  select l.political_movement, l.ideology, l.seq from political_movement a, lateral (select distinct on (ideology) political_movement, ideology, seq, present from political_movement_character_ideology t where t.run_id = run and t.political_movement = a.political_movement and t.seq <= at order by ideology desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function political_movement_timed_modifier_at(run int4, at int4) returns table ("political_movement" int4, "modifier" int2, "seq" int4, "end_date" game_hours) language sql stable as $$
-  select political_movement, modifier, seq, end_date from (select distinct on (political_movement, modifier) political_movement, modifier, seq, end_date, present from political_movement_timed_modifier where run_id = run and seq <= at order by political_movement, modifier, seq desc) latest where present
+  select l.political_movement, l.modifier, l.seq, l.end_date from political_movement a, lateral (select distinct on (modifier) political_movement, modifier, seq, end_date, present from political_movement_timed_modifier t where t.run_id = run and t.political_movement = a.political_movement and t.seq <= at order by modifier desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function law_at(run int4, at int4) returns table ("law" int4, "seq" int4, "country" int4, "law_type" int2, "progress" float8, "phase" int2, "checkpoint_or_stop_date" game_hours, "active" bool, "imposer" int4) language sql stable as $$
-  select law, seq, country, law_type, progress, phase, checkpoint_or_stop_date, active, imposer from (select distinct on (law) law, seq, country, law_type, progress, phase, checkpoint_or_stop_date, active, imposer, present from law_history where run_id = run and seq <= at order by law, seq desc) latest where present
+  select l.law, l.seq, l.country, l.law_type, l.progress, l.phase, l.checkpoint_or_stop_date, l.active, l.imposer from law a, lateral (select law, seq, country, law_type, progress, phase, checkpoint_or_stop_date, active, imposer, present from law_history t where t.run_id = run and t.law = a.law and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function law_private_at(run int4, at int4) returns table ("law" int4, "seq" int4, "checkpoint_result" int2, "replacing_law_type" int2, "enactment_start_date" game_hours, "chance" float8) language sql stable as $$
-  select law, seq, checkpoint_result, replacing_law_type, enactment_start_date, chance from (select distinct on (law) law, seq, checkpoint_result, replacing_law_type, enactment_start_date, chance, present from law_private where run_id = run and seq <= at order by law, seq desc) latest where present
+  select l.law, l.seq, l.checkpoint_result, l.replacing_law_type, l.enactment_start_date, l.chance from law a, lateral (select law, seq, checkpoint_result, replacing_law_type, enactment_start_date, chance, present from law_private t where t.run_id = run and t.law = a.law and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function law_amendment_at(run int4, at int4) returns table ("law" int4, "amendment" int4, "seq" int4) language sql stable as $$
-  select law, amendment, seq from (select distinct on (law, amendment) law, amendment, seq, present from law_amendment where run_id = run and seq <= at order by law, amendment, seq desc) latest where present
+  select l.law, l.amendment, l.seq from law a, lateral (select distinct on (amendment) law, amendment, seq, present from law_amendment t where t.run_id = run and t.law = a.law and t.seq <= at order by amendment desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function amendment_at(run int4, at int4) returns table ("amendment" int4, "seq" int4, "law" int4, "amendment_type" int2, "sponsor" int4, "timeout" int4, "timeout_date" game_hours) language sql stable as $$
-  select amendment, seq, law, amendment_type, sponsor, timeout, timeout_date from (select distinct on (amendment) amendment, seq, law, amendment_type, sponsor, timeout, timeout_date, present from amendment_history where run_id = run and seq <= at order by amendment, seq desc) latest where present
+  select l.amendment, l.seq, l.law, l.amendment_type, l.sponsor, l.timeout, l.timeout_date from amendment a, lateral (select amendment, seq, law, amendment_type, sponsor, timeout, timeout_date, present from amendment_history t where t.run_id = run and t.amendment = a.amendment and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function party_at(run int4, at int4) returns table ("party" int4, "seq" int4, "country" int4, "party_type" int2, "votes" int4) language sql stable as $$
-  select party, seq, country, party_type, votes from (select distinct on (party) party, seq, country, party_type, votes, present from party_history where run_id = run and seq <= at order by party, seq desc) latest where present
+  select l.party, l.seq, l.country, l.party_type, l.votes from party a, lateral (select party, seq, country, party_type, votes, present from party_history t where t.run_id = run and t.party = a.party and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function party_private_at(run int4, at int4) returns table ("party" int4, "seq" int4, "num_voters" int4, "leader" int4) language sql stable as $$
-  select party, seq, num_voters, leader from (select distinct on (party) party, seq, num_voters, leader, present from party_private where run_id = run and seq <= at order by party, seq desc) latest where present
+  select l.party, l.seq, l.num_voters, l.leader from party a, lateral (select party, seq, num_voters, leader, present from party_private t where t.run_id = run and t.party = a.party and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function party_member_at(run int4, at int4) returns table ("party" int4, "interest_group" int4, "seq" int4) language sql stable as $$
-  select party, interest_group, seq from (select distinct on (party, interest_group) party, interest_group, seq, present from party_member where run_id = run and seq <= at order by party, interest_group, seq desc) latest where present
+  select l.party, l.interest_group, l.seq from party a, lateral (select distinct on (interest_group) party, interest_group, seq, present from party_member t where t.run_id = run and t.party = a.party and t.seq <= at order by interest_group desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function election_at(run int4, at int4) returns table ("election" int4, "seq" int4, "country" int4, "next_election" game_hours, "last_election" game_hours, "electoral_confidence" float8, "campaign_period" bool) language sql stable as $$
-  select election, seq, country, next_election, last_election, electoral_confidence, campaign_period from (select distinct on (election) election, seq, country, next_election, last_election, electoral_confidence, campaign_period, present from election_history where run_id = run and seq <= at order by election, seq desc) latest where present
+  select l.election, l.seq, l.country, l.next_election, l.last_election, l.electoral_confidence, l.campaign_period from election a, lateral (select election, seq, country, next_election, last_election, electoral_confidence, campaign_period, present from election_history t where t.run_id = run and t.election = a.election and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function election_vote_at(run int4, at int4) returns table ("election" int4, "party" int4, "seq" int4, "momentum" float8, "raw_votes" int4, "raw_num_voters" int4, "last_votes" int4, "last_num_voters" int4, "last_vote_date" game_hours) language sql stable as $$
-  select election, party, seq, momentum, raw_votes, raw_num_voters, last_votes, last_num_voters, last_vote_date from (select distinct on (election, party) election, party, seq, momentum, raw_votes, raw_num_voters, last_votes, last_num_voters, last_vote_date, present from election_vote where run_id = run and seq <= at order by election, party, seq desc) latest where present
+  select l.election, l.party, l.seq, l.momentum, l.raw_votes, l.raw_num_voters, l.last_votes, l.last_num_voters, l.last_vote_date from election a, lateral (select distinct on (party) election, party, seq, momentum, raw_votes, raw_num_voters, last_votes, last_num_voters, last_vote_date, present from election_vote t where t.run_id = run and t.election = a.election and t.seq <= at order by party desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function institution_at(run int4, at int4) returns table ("institution" int4, "seq" int4, "country" int4, "institution_type" int2, "investment" int2) language sql stable as $$
-  select institution, seq, country, institution_type, investment from (select distinct on (institution) institution, seq, country, institution_type, investment, present from institution_history where run_id = run and seq <= at order by institution, seq desc) latest where present
+  select l.institution, l.seq, l.country, l.institution_type, l.investment from institution a, lateral (select institution, seq, country, institution_type, investment, present from institution_history t where t.run_id = run and t.institution = a.institution and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function institution_private_at(run int4, at int4) returns table ("institution" int4, "seq" int4, "target_investment" int2, "growth" float8) language sql stable as $$
-  select institution, seq, target_investment, growth from (select distinct on (institution) institution, seq, target_investment, growth, present from institution_private where run_id = run and seq <= at order by institution, seq desc) latest where present
+  select l.institution, l.seq, l.target_investment, l.growth from institution a, lateral (select institution, seq, target_investment, growth, present from institution_private t where t.run_id = run and t.institution = a.institution and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function political_lobby_at(run int4, at int4) returns table ("political_lobby" int4, "seq" int4, "country" int4, "target_country" int4, "political_lobby_type" int2, "appeasement" int2) language sql stable as $$
-  select political_lobby, seq, country, target_country, political_lobby_type, appeasement from (select distinct on (political_lobby) political_lobby, seq, country, target_country, political_lobby_type, appeasement, present from political_lobby_history where run_id = run and seq <= at order by political_lobby, seq desc) latest where present
+  select l.political_lobby, l.seq, l.country, l.target_country, l.political_lobby_type, l.appeasement from political_lobby a, lateral (select political_lobby, seq, country, target_country, political_lobby_type, appeasement, present from political_lobby_history t where t.run_id = run and t.political_lobby = a.political_lobby and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function political_lobby_member_at(run int4, at int4) returns table ("political_lobby" int4, "interest_group" int4, "seq" int4) language sql stable as $$
-  select political_lobby, interest_group, seq from (select distinct on (political_lobby, interest_group) political_lobby, interest_group, seq, present from political_lobby_member where run_id = run and seq <= at order by political_lobby, interest_group, seq desc) latest where present
+  select l.political_lobby, l.interest_group, l.seq from political_lobby a, lateral (select distinct on (interest_group) political_lobby, interest_group, seq, present from political_lobby_member t where t.run_id = run and t.political_lobby = a.political_lobby and t.seq <= at order by interest_group desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function civil_war_at(run int4, at int4) returns table ("civil_war" int4, "seq" int4, "origin_country" int4, "civil_war_type" int2, "progress" float8, "time" float8, "political_movement" int4, "conscription_rate" float8) language sql stable as $$
-  select civil_war, seq, origin_country, civil_war_type, progress, time, political_movement, conscription_rate from (select distinct on (civil_war) civil_war, seq, origin_country, civil_war_type, progress, time, political_movement, conscription_rate, present from civil_war_history where run_id = run and seq <= at order by civil_war, seq desc) latest where present
+  select l.civil_war, l.seq, l.origin_country, l.civil_war_type, l.progress, l.time, l.political_movement, l.conscription_rate from civil_war a, lateral (select civil_war, seq, origin_country, civil_war_type, progress, time, political_movement, conscription_rate, present from civil_war_history t where t.run_id = run and t.civil_war = a.civil_war and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function civil_war_interest_group_at(run int4, at int4) returns table ("civil_war" int4, "interest_group" int4, "seq" int4) language sql stable as $$
-  select civil_war, interest_group, seq from (select distinct on (civil_war, interest_group) civil_war, interest_group, seq, present from civil_war_interest_group where run_id = run and seq <= at order by civil_war, interest_group, seq desc) latest where present
+  select l.civil_war, l.interest_group, l.seq from civil_war a, lateral (select distinct on (interest_group) civil_war, interest_group, seq, present from civil_war_interest_group t where t.run_id = run and t.civil_war = a.civil_war and t.seq <= at order by interest_group desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function civil_war_seceded_state_at(run int4, at int4) returns table ("civil_war" int4, "state_region" int2, "seq" int4, "incorporated" bool) language sql stable as $$
-  select civil_war, state_region, seq, incorporated from (select distinct on (civil_war, state_region) civil_war, state_region, seq, incorporated, present from civil_war_seceded_state where run_id = run and seq <= at order by civil_war, state_region, seq desc) latest where present
+  select l.civil_war, l.state_region, l.seq, l.incorporated from civil_war a, lateral (select distinct on (state_region) civil_war, state_region, seq, incorporated, present from civil_war_seceded_state t where t.run_id = run and t.civil_war = a.civil_war and t.seq <= at order by state_region desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function character_at(run int4, at int4) returns table ("character" int4, "seq" int4, "culture" int4, "religion" int2, "birth_date" game_hours, "first_name_key" int4, "last_name_key" int4, "noble" bool, "historical" bool, "adult" bool, "country" int4, "interest_group" int4, "ideology" int2, "prominence" int4, "order_type" int2, "rank" int2, "formation" int4, "travel_arrival_date" game_hours, "assigned_state" int4) language sql stable as $$
-  select character, seq, culture, religion, birth_date, first_name_key, last_name_key, noble, historical, adult, country, interest_group, ideology, prominence, order_type, rank, formation, travel_arrival_date, assigned_state from (select distinct on (character) character, seq, culture, religion, birth_date, first_name_key, last_name_key, noble, historical, adult, country, interest_group, ideology, prominence, order_type, rank, formation, travel_arrival_date, assigned_state, present from character_history where run_id = run and seq <= at order by character, seq desc) latest where present
+  select l.character, l.seq, l.culture, l.religion, l.birth_date, l.first_name_key, l.last_name_key, l.noble, l.historical, l.adult, l.country, l.interest_group, l.ideology, l.prominence, l.order_type, l.rank, l.formation, l.travel_arrival_date, l.assigned_state from character a, lateral (select character, seq, culture, religion, birth_date, first_name_key, last_name_key, noble, historical, adult, country, interest_group, ideology, prominence, order_type, rank, formation, travel_arrival_date, assigned_state, present from character_history t where t.run_id = run and t.character = a.character and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function character_private_at(run int4, at int4) returns table ("character" int4, "seq" int4, "loyalty" int2, "recruitable" bool) language sql stable as $$
-  select character, seq, loyalty, recruitable from (select distinct on (character) character, seq, loyalty, recruitable, present from character_private where run_id = run and seq <= at order by character, seq desc) latest where present
+  select l.character, l.seq, l.loyalty, l.recruitable from character a, lateral (select character, seq, loyalty, recruitable, present from character_private t where t.run_id = run and t.character = a.character and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function character_status_at(run int4, at int4) returns table ("character" int4, "seq" int4, "popularity" float8, "has_formation" bool) language sql stable as $$
-  select character, seq, popularity, has_formation from (select distinct on (character) character, seq, popularity, has_formation, present from character_status where run_id = run and seq <= at order by character, seq desc) latest where present
+  select l.character, l.seq, l.popularity, l.has_formation from character a, lateral (select character, seq, popularity, has_formation, present from character_status t where t.run_id = run and t.character = a.character and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function character_assigned_trait_at(run int4, at int4) returns table ("character" int4, "character_trait" int2, "seq" int4) language sql stable as $$
-  select character, character_trait, seq from (select distinct on (character, character_trait) character, character_trait, seq, present from character_assigned_trait where run_id = run and seq <= at order by character, character_trait, seq desc) latest where present
+  select l.character, l.character_trait, l.seq from character a, lateral (select distinct on (character_trait) character, character_trait, seq, present from character_assigned_trait t where t.run_id = run and t.character = a.character and t.seq <= at order by character_trait desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function character_assigned_role_at(run int4, at int4) returns table ("character" int4, "character_role" int2, "seq" int4) language sql stable as $$
-  select character, character_role, seq from (select distinct on (character, character_role) character, character_role, seq, present from character_assigned_role where run_id = run and seq <= at order by character, character_role, seq desc) latest where present
+  select l.character, l.character_role, l.seq from character a, lateral (select distinct on (character_role) character, character_role, seq, present from character_assigned_role t where t.run_id = run and t.character = a.character and t.seq <= at order by character_role desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function character_timed_modifier_at(run int4, at int4) returns table ("character" int4, "modifier" int2, "seq" int4, "instances" int4) language sql stable as $$
-  select character, modifier, seq, instances from (select distinct on (character, modifier) character, modifier, seq, instances, present from character_timed_modifier where run_id = run and seq <= at order by character, modifier, seq desc) latest where present
+  select l.character, l.modifier, l.seq, l.instances from character a, lateral (select distinct on (modifier) character, modifier, seq, instances, present from character_timed_modifier t where t.run_id = run and t.character = a.character and t.seq <= at order by modifier desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function combat_unit_at(run int4, at int4) returns table ("combat_unit" int4, "seq" int4, "country" int4, "formation" int4, "building" int4, "battle" int4, "combat_unit_type" int2, "veterancy_level" int2, "manpower" int4, "mobilization" float8, "experience" float8) language sql stable as $$
-  select combat_unit, seq, country, formation, building, battle, combat_unit_type, veterancy_level, manpower, mobilization, experience from (select distinct on (combat_unit) combat_unit, seq, country, formation, building, battle, combat_unit_type, veterancy_level, manpower, mobilization, experience, present from combat_unit_history where run_id = run and seq <= at order by combat_unit, seq desc) latest where present
+  select l.combat_unit, l.seq, l.country, l.formation, l.building, l.battle, l.combat_unit_type, l.veterancy_level, l.manpower, l.mobilization, l.experience from combat_unit a, lateral (select combat_unit, seq, country, formation, building, battle, combat_unit_type, veterancy_level, manpower, mobilization, experience, present from combat_unit_history t where t.run_id = run and t.combat_unit = a.combat_unit and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function casualties_at(run int4, at int4) returns table ("casualties" int4, "seq" int4, "unit" int4, "building" int4) language sql stable as $$
-  select casualties, seq, unit, building from (select distinct on (casualties) casualties, seq, unit, building, present from casualties_history where run_id = run and seq <= at order by casualties, seq desc) latest where present
+  select l.casualties, l.seq, l.unit, l.building from casualties a, lateral (select casualties, seq, unit, building, present from casualties_history t where t.run_id = run and t.casualties = a.casualties and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function casualties_event_at(run int4, at int4) returns table ("casualties" int4, "position" int2, "seq" int4, "battle" int4) language sql stable as $$
-  select casualties, position, seq, battle from (select distinct on (casualties, position) casualties, position, seq, battle, present from casualties_event where run_id = run and seq <= at order by casualties, position, seq desc) latest where present
+  select l.casualties, l.position, l.seq, l.battle from casualties a, lateral (select distinct on (position) casualties, position, seq, battle, present from casualties_event t where t.run_id = run and t.casualties = a.casualties and t.seq <= at order by position desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function formation_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "country" int4, "formation_type" int2, "name_key" int4, "flag" int2, "color_red" int2, "color_green" int2, "color_blue" int2, "supply_hub" int4, "supply_priority" int2, "attached_to_fleet" int4, "dead" bool) language sql stable as $$
-  select formation, seq, country, formation_type, name_key, flag, color_red, color_green, color_blue, supply_hub, supply_priority, attached_to_fleet, dead from (select distinct on (formation) formation, seq, country, formation_type, name_key, flag, color_red, color_green, color_blue, supply_hub, supply_priority, attached_to_fleet, dead, present from formation_history where run_id = run and seq <= at order by formation, seq desc) latest where present
+  select l.formation, l.seq, l.country, l.formation_type, l.name_key, l.flag, l.color_red, l.color_green, l.color_blue, l.supply_hub, l.supply_priority, l.attached_to_fleet, l.dead from formation a, lateral (select formation, seq, country, formation_type, name_key, flag, color_red, color_green, color_blue, supply_hub, supply_priority, attached_to_fleet, dead, present from formation_history t where t.run_id = run and t.formation = a.formation and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function formation_private_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "home_hq" int4, "strategic_objective" int4, "travel_distance" float8) language sql stable as $$
-  select formation, seq, home_hq, strategic_objective, travel_distance from (select distinct on (formation) formation, seq, home_hq, strategic_objective, travel_distance, present from formation_private where run_id = run and seq <= at order by formation, seq desc) latest where present
+  select l.formation, l.seq, l.home_hq, l.strategic_objective, l.travel_distance from formation a, lateral (select formation, seq, home_hq, strategic_objective, travel_distance, present from formation_private t where t.run_id = run and t.formation = a.formation and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function formation_report_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "default_fleet" bool, "demobilizing" bool, "invading" bool, "embarked" bool, "docked" bool, "recalled" bool, "hit_points_percent" float8, "deployable" bool, "display_name" text) language sql stable as $$
-  select formation, seq, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name from (select distinct on (formation) formation, seq, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name, present from formation_report where run_id = run and seq <= at order by formation, seq desc) latest where present
+  select l.formation, l.seq, l.default_fleet, l.demobilizing, l.invading, l.embarked, l.docked, l.recalled, l.hit_points_percent, l.deployable, l.display_name from formation a, lateral (select formation, seq, default_fleet, demobilizing, invading, embarked, docked, recalled, hit_points_percent, deployable, display_name, present from formation_report t where t.run_id = run and t.formation = a.formation and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function formation_mobilization_option_at(run int4, at int4) returns table ("formation" int4, "mobilization_option" int2, "seq" int4) language sql stable as $$
-  select formation, mobilization_option, seq from (select distinct on (formation, mobilization_option) formation, mobilization_option, seq, present from formation_mobilization_option where run_id = run and seq <= at order by formation, mobilization_option, seq desc) latest where present
+  select l.formation, l.mobilization_option, l.seq from formation a, lateral (select distinct on (mobilization_option) formation, mobilization_option, seq, present from formation_mobilization_option t where t.run_id = run and t.formation = a.formation and t.seq <= at order by mobilization_option desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function formation_upgrade_unit_type_at(run int4, at int4) returns table ("formation" int4, "combat_unit_type" int2, "seq" int4) language sql stable as $$
-  select formation, combat_unit_type, seq from (select distinct on (formation, combat_unit_type) formation, combat_unit_type, seq, present from formation_upgrade_unit_type where run_id = run and seq <= at order by formation, combat_unit_type, seq desc) latest where present
+  select l.formation, l.combat_unit_type, l.seq from formation a, lateral (select distinct on (combat_unit_type) formation, combat_unit_type, seq, present from formation_upgrade_unit_type t where t.run_id = run and t.formation = a.formation and t.seq <= at order by combat_unit_type desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function formation_selected_unit_type_at(run int4, at int4) returns table ("formation" int4, "combat_unit_group" int2, "seq" int4, "combat_unit_type" int2) language sql stable as $$
-  select formation, combat_unit_group, seq, combat_unit_type from (select distinct on (formation, combat_unit_group) formation, combat_unit_group, seq, combat_unit_type, present from formation_selected_unit_type where run_id = run and seq <= at order by formation, combat_unit_group, seq desc) latest where present
+  select l.formation, l.combat_unit_group, l.seq, l.combat_unit_type from formation a, lateral (select distinct on (combat_unit_group) formation, combat_unit_group, seq, combat_unit_type, present from formation_selected_unit_type t where t.run_id = run and t.formation = a.formation and t.seq <= at order by combat_unit_group desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function formation_borrow_setting_at(run int4, at int4) returns table ("formation" int4, "name" text, "seq" int4, "position" int2, "selected" bool) language sql stable as $$
-  select formation, name, seq, position, selected from (select distinct on (formation, name) formation, name, seq, position, selected, present from formation_borrow_setting where run_id = run and seq <= at order by formation, name, seq desc) latest where present
+  select l.formation, l.name, l.seq, l.position, l.selected from formation a, lateral (select distinct on (name) formation, name, seq, position, selected, present from formation_borrow_setting t where t.run_id = run and t.formation = a.formation and t.seq <= at order by name desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function ship_at(run int4, at int4) returns table ("ship" int4, "seq" int4, "fleet" int4, "hit_points" float8, "experience" float8) language sql stable as $$
-  select ship, seq, fleet, hit_points, experience from (select distinct on (ship) ship, seq, fleet, hit_points, experience, present from ship_history where run_id = run and seq <= at order by ship, seq desc) latest where present
+  select l.ship, l.seq, l.fleet, l.hit_points, l.experience from ship a, lateral (select ship, seq, fleet, hit_points, experience, present from ship_history t where t.run_id = run and t.ship = a.ship and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function ship_crew_at(run int4, at int4) returns table ("ship" int4, "position" int2, "seq" int4, "state" int4, "crew" int4) language sql stable as $$
-  select ship, position, seq, state, crew from (select distinct on (ship, position) ship, position, seq, state, crew, present from ship_crew where run_id = run and seq <= at order by ship, position, seq desc) latest where present
+  select l.ship, l.position, l.seq, l.state, l.crew from ship a, lateral (select distinct on (position) ship, position, seq, state, crew, present from ship_crew t where t.run_id = run and t.ship = a.ship and t.seq <= at order by position desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function ship_construction_at(run int4, at int4) returns table ("ship_construction" int4, "seq" int4, "queue" int4, "list_index" int4, "ship_type" int2, "construction_left" float8) language sql stable as $$
-  select ship_construction, seq, queue, list_index, ship_type, construction_left from (select distinct on (ship_construction) ship_construction, seq, queue, list_index, ship_type, construction_left, present from ship_construction_history where run_id = run and seq <= at order by ship_construction, seq desc) latest where present
+  select l.ship_construction, l.seq, l.queue, l.list_index, l.ship_type, l.construction_left from ship_construction a, lateral (select ship_construction, seq, queue, list_index, ship_type, construction_left, present from ship_construction_history t where t.run_id = run and t.ship_construction = a.ship_construction and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function ship_queue_at(run int4, at int4) returns table ("ship_queue" int4, "seq" int4, "country" int4) language sql stable as $$
-  select ship_queue, seq, country from (select distinct on (ship_queue) ship_queue, seq, country, present from ship_queue_history where run_id = run and seq <= at order by ship_queue, seq desc) latest where present
+  select l.ship_queue, l.seq, l.country from ship_queue a, lateral (select ship_queue, seq, country, present from ship_queue_history t where t.run_id = run and t.ship_queue = a.ship_queue and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function ship_template_at(run int4, at int4) returns table ("ship_template" int4, "seq" int4, "country" int4, "ship_type" int2, "ordinal_number" int2, "year" int2) language sql stable as $$
-  select ship_template, seq, country, ship_type, ordinal_number, year from (select distinct on (ship_template) ship_template, seq, country, ship_type, ordinal_number, year, present from ship_template_history where run_id = run and seq <= at order by ship_template, seq desc) latest where present
+  select l.ship_template, l.seq, l.country, l.ship_type, l.ordinal_number, l.year from ship_template a, lateral (select ship_template, seq, country, ship_type, ordinal_number, year, present from ship_template_history t where t.run_id = run and t.ship_template = a.ship_template and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function ship_template_private_at(run int4, at int4) returns table ("ship_template" int4, "seq" int4, "flags" int2, "base" bool) language sql stable as $$
-  select ship_template, seq, flags, base from (select distinct on (ship_template) ship_template, seq, flags, base, present from ship_template_private where run_id = run and seq <= at order by ship_template, seq desc) latest where present
+  select l.ship_template, l.seq, l.flags, l.base from ship_template a, lateral (select ship_template, seq, flags, base, present from ship_template_private t where t.run_id = run and t.ship_template = a.ship_template and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function ship_template_fleet_at(run int4, at int4) returns table ("ship_template" int4, "fleet" int4, "seq" int4) language sql stable as $$
-  select ship_template, fleet, seq from (select distinct on (ship_template, fleet) ship_template, fleet, seq, present from ship_template_fleet where run_id = run and seq <= at order by ship_template, fleet, seq desc) latest where present
+  select l.ship_template, l.fleet, l.seq from ship_template a, lateral (select distinct on (fleet) ship_template, fleet, seq, present from ship_template_fleet t where t.run_id = run and t.ship_template = a.ship_template and t.seq <= at order by fleet desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function ship_template_version_at(run int4, at int4) returns table ("ship_template_version" int4, "seq" int4, "ship_template" int4, "position" int2, "ship_type" int2) language sql stable as $$
-  select ship_template_version, seq, ship_template, position, ship_type from (select distinct on (ship_template_version) ship_template_version, seq, ship_template, position, ship_type, present from ship_template_version_history where run_id = run and seq <= at order by ship_template_version, seq desc) latest where present
+  select l.ship_template_version, l.seq, l.ship_template, l.position, l.ship_type from ship_template_version a, lateral (select ship_template_version, seq, ship_template, position, ship_type, present from ship_template_version_history t where t.run_id = run and t.ship_template_version = a.ship_template_version and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function ship_template_version_modification_at(run int4, at int4) returns table ("ship_template_version" int4, "position" int2, "seq" int4, "ship_modification" int2) language sql stable as $$
-  select ship_template_version, position, seq, ship_modification from (select distinct on (ship_template_version, position) ship_template_version, position, seq, ship_modification, present from ship_template_version_modification where run_id = run and seq <= at order by ship_template_version, position, seq desc) latest where present
+  select l.ship_template_version, l.position, l.seq, l.ship_modification from ship_template_version a, lateral (select distinct on (position) ship_template_version, position, seq, ship_modification, present from ship_template_version_modification t where t.run_id = run and t.ship_template_version = a.ship_template_version and t.seq <= at order by position desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function naval_mission_at(run int4, at int4) returns table ("naval_mission" int4, "seq" int4, "naval_mission_type" int2) language sql stable as $$
-  select naval_mission, seq, naval_mission_type from (select distinct on (naval_mission) naval_mission, seq, naval_mission_type, present from naval_mission_history where run_id = run and seq <= at order by naval_mission, seq desc) latest where present
+  select l.naval_mission, l.seq, l.naval_mission_type from naval_mission a, lateral (select naval_mission, seq, naval_mission_type, present from naval_mission_history t where t.run_id = run and t.naval_mission = a.naval_mission and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function war_at(run int4, at int4) returns table ("war" int4, "seq" int4, "diplomatic_play" int4, "days_since_exhaustion" int4, "peace_date" game_hours, "peace_proposer" int4, "peace_proposal_date" game_hours, "dead" bool) language sql stable as $$
-  select war, seq, diplomatic_play, days_since_exhaustion, peace_date, peace_proposer, peace_proposal_date, dead from (select distinct on (war) war, seq, diplomatic_play, days_since_exhaustion, peace_date, peace_proposer, peace_proposal_date, dead, present from war_history where run_id = run and seq <= at order by war, seq desc) latest where present
+  select l.war, l.seq, l.diplomatic_play, l.days_since_exhaustion, l.peace_date, l.peace_proposer, l.peace_proposal_date, l.dead from war a, lateral (select war, seq, diplomatic_play, days_since_exhaustion, peace_date, peace_proposer, peace_proposal_date, dead, present from war_history t where t.run_id = run and t.war = a.war and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function war_participant_at(run int4, at int4) returns table ("war" int4, "country" int4, "seq" int4, "diplomatic_play" int4, "war_support" float8) language sql stable as $$
-  select war, country, seq, diplomatic_play, war_support from (select distinct on (war, country) war, country, seq, diplomatic_play, war_support, present from war_participant where run_id = run and seq <= at order by war, country, seq desc) latest where present
+  select l.war, l.country, l.seq, l.diplomatic_play, l.war_support from war a, lateral (select distinct on (country) war, country, seq, diplomatic_play, war_support, present from war_participant t where t.run_id = run and t.war = a.war and t.seq <= at order by country desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function war_goal_at(run int4, at int4) returns table ("war_goal" int4, "seq" int4, "holder" int4, "creator" int4, "diplomatic_play" int4, "war_goal_type" int2, "target_state" int4, "target_country" int4, "target_other" int4, "demand_type" int2, "status" int2, "pressed" int2) language sql stable as $$
-  select war_goal, seq, holder, creator, diplomatic_play, war_goal_type, target_state, target_country, target_other, demand_type, status, pressed from (select distinct on (war_goal) war_goal, seq, holder, creator, diplomatic_play, war_goal_type, target_state, target_country, target_other, demand_type, status, pressed, present from war_goal_history where run_id = run and seq <= at order by war_goal, seq desc) latest where present
+  select l.war_goal, l.seq, l.holder, l.creator, l.diplomatic_play, l.war_goal_type, l.target_state, l.target_country, l.target_other, l.demand_type, l.status, l.pressed from war_goal a, lateral (select war_goal, seq, holder, creator, diplomatic_play, war_goal_type, target_state, target_country, target_other, demand_type, status, pressed, present from war_goal_history t where t.run_id = run and t.war_goal = a.war_goal and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function front_at(run int4, at int4) returns table ("front" int4, "seq" int4, "x" float8, "y" float8) language sql stable as $$
-  select front, seq, x, y from (select distinct on (front) front, seq, x, y, present from front_history where run_id = run and seq <= at order by front, seq desc) latest where present
+  select l.front, l.seq, l.x, l.y from front a, lateral (select front, seq, x, y, present from front_history t where t.run_id = run and t.front = a.front and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function front_advantage_at(run int4, at int4) returns table ("front" int4, "seq" int4, "advantage" float8) language sql stable as $$
-  select front, seq, advantage from (select distinct on (front) front, seq, advantage, present from front_advantage where run_id = run and seq <= at order by front, seq desc) latest where present
+  select l.front, l.seq, l.advantage from front a, lateral (select front, seq, advantage, present from front_advantage t where t.run_id = run and t.front = a.front and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function front_listed_side_at(run int4, at int4) returns table ("front" int4, "front_side" int4, "seq" int4) language sql stable as $$
-  select front, front_side, seq from (select distinct on (front, front_side) front, front_side, seq, present from front_listed_side where run_id = run and seq <= at order by front, front_side, seq desc) latest where present
+  select l.front, l.front_side, l.seq from front a, lateral (select distinct on (front_side) front, front_side, seq, present from front_listed_side t where t.run_id = run and t.front = a.front and t.seq <= at order by front_side desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function invasion_at(run int4, at int4) returns table ("front" int4, "invader" int4, "invaded" int4, "state" int4, "seq" int4, "ended" bool) language sql stable as $$
-  select front, invader, invaded, state, seq, ended from (select distinct on (front, invader, invaded, state) front, invader, invaded, state, seq, ended, present from invasion where run_id = run and seq <= at order by front, invader, invaded, state, seq desc) latest where present
+  select l.front, l.invader, l.invaded, l.state, l.seq, l.ended from front a, lateral (select distinct on (invader, invaded, state) front, invader, invaded, state, seq, ended, present from invasion t where t.run_id = run and t.front = a.front and t.seq <= at order by invader desc, invaded desc, state desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function front_side_at(run int4, at int4) returns table ("front_side" int4, "seq" int4, "front" int4, "war" int4, "play_side" int2) language sql stable as $$
-  select front_side, seq, front, war, play_side from (select distinct on (front_side) front_side, seq, front, war, play_side, present from front_side_history where run_id = run and seq <= at order by front_side, seq desc) latest where present
+  select l.front_side, l.seq, l.front, l.war, l.play_side from front_side a, lateral (select front_side, seq, front, war, play_side, present from front_side_history t where t.run_id = run and t.front_side = a.front_side and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function occupation_at(run int4, at int4) returns table ("occupation" int4, "seq" int4, "state" int4, "controller" int4) language sql stable as $$
-  select occupation, seq, state, controller from (select distinct on (occupation) occupation, seq, state, controller, present from occupation_history where run_id = run and seq <= at order by occupation, seq desc) latest where present
+  select l.occupation, l.seq, l.state, l.controller from occupation a, lateral (select occupation, seq, state, controller, present from occupation_history t where t.run_id = run and t.occupation = a.occupation and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function occupation_country_at(run int4, at int4) returns table ("occupation" int4, "country" int4, "seq" int4, "fraction" float8) language sql stable as $$
-  select occupation, country, seq, fraction from (select distinct on (occupation, country) occupation, country, seq, fraction, present from occupation_country where run_id = run and seq <= at order by occupation, country, seq desc) latest where present
+  select l.occupation, l.country, l.seq, l.fraction from occupation a, lateral (select distinct on (country) occupation, country, seq, fraction, present from occupation_country t where t.run_id = run and t.occupation = a.occupation and t.seq <= at order by country desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function battle_at(run int4, at int4) returns table ("battle" int4, "seq" int4, "war" int4, "front" int4, "province" int4, "battle_type" int2, "status" int2, "invasion" int4, "name_key" int4, "start_date" game_hours, "end_date" game_hours, "victory_score" float8, "occupation_score" float8, "still_fighting_samples" int4, "still_fighting_date" game_hours) language sql stable as $$
-  select battle, seq, war, front, province, battle_type, status, invasion, name_key, start_date, end_date, victory_score, occupation_score, still_fighting_samples, still_fighting_date from (select distinct on (battle) battle, seq, war, front, province, battle_type, status, invasion, name_key, start_date, end_date, victory_score, occupation_score, still_fighting_samples, still_fighting_date, present from battle_history where run_id = run and seq <= at order by battle, seq desc) latest where present
+  select l.battle, l.seq, l.war, l.front, l.province, l.battle_type, l.status, l.invasion, l.name_key, l.start_date, l.end_date, l.victory_score, l.occupation_score, l.still_fighting_samples, l.still_fighting_date from battle a, lateral (select battle, seq, war, front, province, battle_type, status, invasion, name_key, start_date, end_date, victory_score, occupation_score, still_fighting_samples, still_fighting_date, present from battle_history t where t.run_id = run and t.battle = a.battle and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function battle_side_at(run int4, at int4) returns table ("battle" int4, "side" text, "seq" int4, "commander" int4, "country" int4, "formation" int4, "order_type" int2, "condition" int2, "start_battalions" int4, "end_battalions" int4, "start_manpower" int4, "end_manpower" int4, "start_morale" float8, "end_morale" float8) language sql stable as $$
-  select battle, side, seq, commander, country, formation, order_type, condition, start_battalions, end_battalions, start_manpower, end_manpower, start_morale, end_morale from (select distinct on (battle, side) battle, side, seq, commander, country, formation, order_type, condition, start_battalions, end_battalions, start_manpower, end_manpower, start_morale, end_morale, present from battle_side where run_id = run and seq <= at order by battle, side, seq desc) latest where present
+  select l.battle, l.side, l.seq, l.commander, l.country, l.formation, l.order_type, l.condition, l.start_battalions, l.end_battalions, l.start_manpower, l.end_manpower, l.start_morale, l.end_morale from battle a, lateral (select distinct on (side) battle, side, seq, commander, country, formation, order_type, condition, start_battalions, end_battalions, start_manpower, end_manpower, start_morale, end_morale, present from battle_side t where t.run_id = run and t.battle = a.battle and t.seq <= at order by side desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function battle_occupation_at(run int4, at int4) returns table ("battle" int4, "state" int4, "seq" int4, "fraction" float8, "occupation_progress" float8) language sql stable as $$
-  select battle, state, seq, fraction, occupation_progress from (select distinct on (battle, state) battle, state, seq, fraction, occupation_progress, present from battle_occupation where run_id = run and seq <= at order by battle, state, seq desc) latest where present
+  select l.battle, l.state, l.seq, l.fraction, l.occupation_progress from battle a, lateral (select distinct on (state) battle, state, seq, fraction, occupation_progress, present from battle_occupation t where t.run_id = run and t.battle = a.battle and t.seq <= at order by state desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_ai_at(run int4, at int4) returns table ("country_ai" int4, "seq" int4, "country" int4) language sql stable as $$
-  select country_ai, seq, country from (select distinct on (country_ai) country_ai, seq, country, present from country_ai_history where run_id = run and seq <= at order by country_ai, seq desc) latest where present
+  select l.country_ai, l.seq, l.country from country_ai a, lateral (select country_ai, seq, country, present from country_ai_history t where t.run_id = run and t.country_ai = a.country_ai and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function country_ai_strategy_at(run int4, at int4) returns table ("country_ai" int4, "position" int2, "seq" int4, "ai_strategy" int2) language sql stable as $$
-  select country_ai, position, seq, ai_strategy from (select distinct on (country_ai, position) country_ai, position, seq, ai_strategy, present from country_ai_strategy where run_id = run and seq <= at order by country_ai, position, seq desc) latest where present
+  select l.country_ai, l.position, l.seq, l.ai_strategy from country_ai a, lateral (select distinct on (position) country_ai, position, seq, ai_strategy, present from country_ai_strategy t where t.run_id = run and t.country_ai = a.country_ai and t.seq <= at order by position desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_ai_region_stance_at(run int4, at int4) returns table ("country_ai" int4, "strategic_region" int2, "seq" int4, "stance" int2) language sql stable as $$
-  select country_ai, strategic_region, seq, stance from (select distinct on (country_ai, strategic_region) country_ai, strategic_region, seq, stance, present from country_ai_region_stance where run_id = run and seq <= at order by country_ai, strategic_region, seq desc) latest where present
+  select l.country_ai, l.strategic_region, l.seq, l.stance from country_ai a, lateral (select distinct on (strategic_region) country_ai, strategic_region, seq, stance, present from country_ai_region_stance t where t.run_id = run and t.country_ai = a.country_ai and t.seq <= at order by strategic_region desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_ai_goal_at(run int4, at int4) returns table ("country_ai" int4, "target_country" int4, "seq" int4, "neighbour" bool, "diplomatic_relevance" bool, "attitude" int2) language sql stable as $$
-  select country_ai, target_country, seq, neighbour, diplomatic_relevance, attitude from (select distinct on (country_ai, target_country) country_ai, target_country, seq, neighbour, diplomatic_relevance, attitude, present from country_ai_goal where run_id = run and seq <= at order by country_ai, target_country, seq desc) latest where present
+  select l.country_ai, l.target_country, l.seq, l.neighbour, l.diplomatic_relevance, l.attitude from country_ai a, lateral (select distinct on (target_country) country_ai, target_country, seq, neighbour, diplomatic_relevance, attitude, present from country_ai_goal t where t.run_id = run and t.country_ai = a.country_ai and t.seq <= at order by target_country desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_ai_antagonize_reason_at(run int4, at int4) returns table ("country_ai" int4, "target_country" int4, "position" int2, "seq" int4, "reason" int4, "score" float8) language sql stable as $$
-  select country_ai, target_country, position, seq, reason, score from (select distinct on (country_ai, target_country, position) country_ai, target_country, position, seq, reason, score, present from country_ai_antagonize_reason where run_id = run and seq <= at order by country_ai, target_country, position, seq desc) latest where present
+  select l.country_ai, l.target_country, l.position, l.seq, l.reason, l.score from country_ai a, lateral (select distinct on (target_country, position) country_ai, target_country, position, seq, reason, score, present from country_ai_antagonize_reason t where t.run_id = run and t.country_ai = a.country_ai and t.seq <= at order by target_country desc, position desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function journal_entry_at(run int4, at int4) returns table ("journal_entry" int4, "seq" int4, "country" int4, "journal_entry_type" int2, "active" bool, "goal_value" float8, "baseline_value" float8, "progress" float8, "goal" float8, "percent" float8) language sql stable as $$
-  select journal_entry, seq, country, journal_entry_type, active, goal_value, baseline_value, progress, goal, percent from (select distinct on (journal_entry) journal_entry, seq, country, journal_entry_type, active, goal_value, baseline_value, progress, goal, percent, present from journal_entry_history where run_id = run and seq <= at order by journal_entry, seq desc) latest where present
+  select l.journal_entry, l.seq, l.country, l.journal_entry_type, l.active, l.goal_value, l.baseline_value, l.progress, l.goal, l.percent from journal_entry a, lateral (select journal_entry, seq, country, journal_entry_type, active, goal_value, baseline_value, progress, goal, percent, present from journal_entry_history t where t.run_id = run and t.journal_entry = a.journal_entry and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function journal_entry_target_at(run int4, at int4) returns table ("journal_entry" int4, "name_key" int4, "seq" int4, "scope_type" int2, "scope_target" int8) language sql stable as $$
-  select journal_entry, name_key, seq, scope_type, scope_target from (select distinct on (journal_entry, name_key) journal_entry, name_key, seq, scope_type, scope_target, present from journal_entry_target where run_id = run and seq <= at order by journal_entry, name_key, seq desc) latest where present
+  select l.journal_entry, l.name_key, l.seq, l.scope_type, l.scope_target from journal_entry a, lateral (select distinct on (name_key) journal_entry, name_key, seq, scope_type, scope_target, present from journal_entry_target t where t.run_id = run and t.journal_entry = a.journal_entry and t.seq <= at order by name_key desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function journal_entry_progress_bar_at(run int4, at int4) returns table ("journal_entry" int4, "scripted_progress_bar" int2, "seq" int4, "value" float8) language sql stable as $$
-  select journal_entry, scripted_progress_bar, seq, value from (select distinct on (journal_entry, scripted_progress_bar) journal_entry, scripted_progress_bar, seq, value, present from journal_entry_progress_bar where run_id = run and seq <= at order by journal_entry, scripted_progress_bar, seq desc) latest where present
+  select l.journal_entry, l.scripted_progress_bar, l.seq, l.value from journal_entry a, lateral (select distinct on (scripted_progress_bar) journal_entry, scripted_progress_bar, seq, value, present from journal_entry_progress_bar t where t.run_id = run and t.journal_entry = a.journal_entry and t.seq <= at order by scripted_progress_bar desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function journal_entry_timed_modifier_at(run int4, at int4) returns table ("journal_entry" int4, "modifier" int2, "seq" int4) language sql stable as $$
-  select journal_entry, modifier, seq from (select distinct on (journal_entry, modifier) journal_entry, modifier, seq, present from journal_entry_timed_modifier where run_id = run and seq <= at order by journal_entry, modifier, seq desc) latest where present
+  select l.journal_entry, l.modifier, l.seq from journal_entry a, lateral (select distinct on (modifier) journal_entry, modifier, seq, present from journal_entry_timed_modifier t where t.run_id = run and t.journal_entry = a.journal_entry and t.seq <= at order by modifier desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function journal_entry_involved_country_at(run int4, at int4) returns table ("journal_entry" int4, "country" int4, "seq" int4) language sql stable as $$
-  select journal_entry, country, seq from (select distinct on (journal_entry, country) journal_entry, country, seq, present from journal_entry_involved_country where run_id = run and seq <= at order by journal_entry, country, seq desc) latest where present
+  select l.journal_entry, l.country, l.seq from journal_entry a, lateral (select distinct on (country) journal_entry, country, seq, present from journal_entry_involved_country t where t.run_id = run and t.journal_entry = a.journal_entry and t.seq <= at order by country desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function event_at(run int4, at int4) returns table ("event" int4, "seq" int4, "event_type" int2, "origin_country" int4, "status" int2) language sql stable as $$
-  select event, seq, event_type, origin_country, status from (select distinct on (event) event, seq, event_type, origin_country, status, present from event_history where run_id = run and seq <= at order by event, seq desc) latest where present
+  select l.event, l.seq, l.event_type, l.origin_country, l.status from event a, lateral (select event, seq, event_type, origin_country, status, present from event_history t where t.run_id = run and t.event = a.event and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function event_target_at(run int4, at int4) returns table ("event" int4, "name_key" int4, "seq" int4, "scope_type" int2, "scope_target" int8) language sql stable as $$
-  select event, name_key, seq, scope_type, scope_target from (select distinct on (event, name_key) event, name_key, seq, scope_type, scope_target, present from event_target where run_id = run and seq <= at order by event, name_key, seq desc) latest where present
+  select l.event, l.name_key, l.seq, l.scope_type, l.scope_target from event a, lateral (select distinct on (name_key) event, name_key, seq, scope_type, scope_target, present from event_target t where t.run_id = run and t.event = a.event and t.seq <= at order by name_key desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function event_option_at(run int4, at int4) returns table ("event" int4, "option" int2, "seq" int4, "enabled" bool, "default_option" bool, "visible_position" int2, "text" text, "description" text) language sql stable as $$
-  select event, option, seq, enabled, default_option, visible_position, text, description from (select distinct on (event, option) event, option, seq, enabled, default_option, visible_position, text, description, present from event_option where run_id = run and seq <= at order by event, option, seq desc) latest where present
+  select l.event, l.option, l.seq, l.enabled, l.default_option, l.visible_position, l.text, l.description from event a, lateral (select distinct on (option) event, option, seq, enabled, default_option, visible_position, text, description, present from event_option t where t.run_id = run and t.event = a.event and t.seq <= at order by option desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function country_economy_report_at(run int4, at int4) returns table ("country" int4, "seq" int4, "gdp" float8, "domestically_owned_gdp" float8, "foreign_owned_gdp" float8, "gdp_owned_in_foreign_countries" float8, "gdp_with_ownerships_in_foreign_countries" float8, "total_exported_amount" float8, "total_imported_amount" float8, "arable_land_total" int4, "used_free_charters" int4) language sql stable as $$
-  select country, seq, gdp, domestically_owned_gdp, foreign_owned_gdp, gdp_owned_in_foreign_countries, gdp_with_ownerships_in_foreign_countries, total_exported_amount, total_imported_amount, arable_land_total, used_free_charters from (select distinct on (country) country, seq, gdp, domestically_owned_gdp, foreign_owned_gdp, gdp_owned_in_foreign_countries, gdp_with_ownerships_in_foreign_countries, total_exported_amount, total_imported_amount, arable_land_total, used_free_charters, present from country_economy_report where run_id = run and seq <= at order by country, seq desc) latest where present
+  select l.country, l.seq, l.gdp, l.domestically_owned_gdp, l.foreign_owned_gdp, l.gdp_owned_in_foreign_countries, l.gdp_with_ownerships_in_foreign_countries, l.total_exported_amount, l.total_imported_amount, l.arable_land_total, l.used_free_charters from country a, lateral (select country, seq, gdp, domestically_owned_gdp, foreign_owned_gdp, gdp_owned_in_foreign_countries, gdp_with_ownerships_in_foreign_countries, total_exported_amount, total_imported_amount, arable_land_total, used_free_charters, present from country_economy_report t where t.run_id = run and t.country = a.country and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function player_economy_at(run int4, at int4) returns table ("seq" int4, "num_isolated_states" int4, "num_low_market_access_states" int4, "num_insufficient_tax_capacity_states" int4, "merchant_marine_shortage" float8, "num_companies_reported" int4, "max_num_companies" int4, "num_previous_autonomous_investments" int4, "total_foreign_constructions" int4) language sql stable as $$
@@ -5684,15 +5686,15 @@ create function player_spending_at(run int4, at int4) returns table ("seq" int4,
 $$;
 
 create function country_population_report_at(run int4, at int4) returns table ("country" int4, "seq" int4, "dependents" int8, "inactive_population" int8, "incorporated_population" int8, "politically_involved_population" int8, "salaried_working_adults" int8, "subsisting_working_adults" int8, "unemployed_working_adults" int8, "people_abroad" int8, "incorporated_literacy_rate" float8, "num_incorporated_literate_pops" int8, "num_total_literate_pops" int8, "total_literacy_rate" float8, "limited_mass_migration_country_attraction" float8) language sql stable as $$
-  select country, seq, dependents, inactive_population, incorporated_population, politically_involved_population, salaried_working_adults, subsisting_working_adults, unemployed_working_adults, people_abroad, incorporated_literacy_rate, num_incorporated_literate_pops, num_total_literate_pops, total_literacy_rate, limited_mass_migration_country_attraction from (select distinct on (country) country, seq, dependents, inactive_population, incorporated_population, politically_involved_population, salaried_working_adults, subsisting_working_adults, unemployed_working_adults, people_abroad, incorporated_literacy_rate, num_incorporated_literate_pops, num_total_literate_pops, total_literacy_rate, limited_mass_migration_country_attraction, present from country_population_report where run_id = run and seq <= at order by country, seq desc) latest where present
+  select l.country, l.seq, l.dependents, l.inactive_population, l.incorporated_population, l.politically_involved_population, l.salaried_working_adults, l.subsisting_working_adults, l.unemployed_working_adults, l.people_abroad, l.incorporated_literacy_rate, l.num_incorporated_literate_pops, l.num_total_literate_pops, l.total_literacy_rate, l.limited_mass_migration_country_attraction from country a, lateral (select country, seq, dependents, inactive_population, incorporated_population, politically_involved_population, salaried_working_adults, subsisting_working_adults, unemployed_working_adults, people_abroad, incorporated_literacy_rate, num_incorporated_literate_pops, num_total_literate_pops, total_literacy_rate, limited_mass_migration_country_attraction, present from country_population_report t where t.run_id = run and t.country = a.country and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function country_standard_of_living_report_at(run int4, at int4) returns table ("country" int4, "seq" int4, "average_standard_of_living_by_political_strength" float8, "average_standard_of_living_by_population" float8, "average_standard_of_living_middle" float8, "average_standard_of_living_poor" float8, "average_standard_of_living_rich" float8, "expected_standard_of_living_by_population" float8, "expected_standard_of_living_middle" float8, "expected_standard_of_living_poor" float8, "expected_standard_of_living_rich" float8) language sql stable as $$
-  select country, seq, average_standard_of_living_by_political_strength, average_standard_of_living_by_population, average_standard_of_living_middle, average_standard_of_living_poor, average_standard_of_living_rich, expected_standard_of_living_by_population, expected_standard_of_living_middle, expected_standard_of_living_poor, expected_standard_of_living_rich from (select distinct on (country) country, seq, average_standard_of_living_by_political_strength, average_standard_of_living_by_population, average_standard_of_living_middle, average_standard_of_living_poor, average_standard_of_living_rich, expected_standard_of_living_by_population, expected_standard_of_living_middle, expected_standard_of_living_poor, expected_standard_of_living_rich, present from country_standard_of_living_report where run_id = run and seq <= at order by country, seq desc) latest where present
+  select l.country, l.seq, l.average_standard_of_living_by_political_strength, l.average_standard_of_living_by_population, l.average_standard_of_living_middle, l.average_standard_of_living_poor, l.average_standard_of_living_rich, l.expected_standard_of_living_by_population, l.expected_standard_of_living_middle, l.expected_standard_of_living_poor, l.expected_standard_of_living_rich from country a, lateral (select country, seq, average_standard_of_living_by_political_strength, average_standard_of_living_by_population, average_standard_of_living_middle, average_standard_of_living_poor, average_standard_of_living_rich, expected_standard_of_living_by_population, expected_standard_of_living_middle, expected_standard_of_living_poor, expected_standard_of_living_rich, present from country_standard_of_living_report t where t.run_id = run and t.country = a.country and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function country_politics_report_at(run int4, at int4) returns table ("country" int4, "seq" int4, "government_legitimacy" int4, "law_enactment_progress" float8) language sql stable as $$
-  select country, seq, government_legitimacy, law_enactment_progress from (select distinct on (country) country, seq, government_legitimacy, law_enactment_progress, present from country_politics_report where run_id = run and seq <= at order by country, seq desc) latest where present
+  select l.country, l.seq, l.government_legitimacy, l.law_enactment_progress from country a, lateral (select country, seq, government_legitimacy, law_enactment_progress, present from country_politics_report t where t.run_id = run and t.country = a.country and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function player_politics_at(run int4, at int4) returns table ("seq" int4, "days_until_election" int4, "has_elections" bool, "max_law_enactment_setbacks" int4, "num_available_negotiations" int4, "is_negotiating" bool, "num_interest_group_members" int8, "empty_agitator_slots" int4, "has_interest_group_approval_from_loyalists" bool, "has_interest_group_approval_from_radicals" bool, "power_delta_authority" float8, "power_delta_bureaucracy" float8, "power_delta_influence" float8, "power_income_authority" float8, "power_income_bureaucracy" float8, "power_income_influence" float8, "num_turmoil_states" int4, "num_states_that_can_be_incorporated" int4, "institution_investment" float8, "institution_investment_bureaucracy_cost" float8, "institution_investment_bureaucracy_factor" float8) language sql stable as $$
@@ -5700,11 +5702,11 @@ create function player_politics_at(run int4, at int4) returns table ("seq" int4,
 $$;
 
 create function country_military_report_at(run int4, at int4) returns table ("country" int4, "seq" int4, "conscriptable_battalions" int4, "battalions" int4, "regular_battalions" int4, "mobilization_ratio" float8, "num_ships" int4, "supply_network_num_sea_nodes" int4, "supply_network_strength" float8, "supply_network_strength_target" float8, "supply_network_strength_weekly_change" float8, "enemy_occupation" float8) language sql stable as $$
-  select country, seq, conscriptable_battalions, battalions, regular_battalions, mobilization_ratio, num_ships, supply_network_num_sea_nodes, supply_network_strength, supply_network_strength_target, supply_network_strength_weekly_change, enemy_occupation from (select distinct on (country) country, seq, conscriptable_battalions, battalions, regular_battalions, mobilization_ratio, num_ships, supply_network_num_sea_nodes, supply_network_strength, supply_network_strength_target, supply_network_strength_weekly_change, enemy_occupation, present from country_military_report where run_id = run and seq <= at order by country, seq desc) latest where present
+  select l.country, l.seq, l.conscriptable_battalions, l.battalions, l.regular_battalions, l.mobilization_ratio, l.num_ships, l.supply_network_num_sea_nodes, l.supply_network_strength, l.supply_network_strength_target, l.supply_network_strength_weekly_change, l.enemy_occupation from country a, lateral (select country, seq, conscriptable_battalions, battalions, regular_battalions, mobilization_ratio, num_ships, supply_network_num_sea_nodes, supply_network_strength, supply_network_strength_target, supply_network_strength_weekly_change, enemy_occupation, present from country_military_report t where t.run_id = run and t.country = a.country and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function country_construction_report_at(run int4, at int4) returns table ("country" int4, "seq" int4, "base_construction_speed" float8, "used_construction" float8, "has_construction_queued" bool, "is_construction_paused" bool, "is_ship_construction_paused" bool) language sql stable as $$
-  select country, seq, base_construction_speed, used_construction, has_construction_queued, is_construction_paused, is_ship_construction_paused from (select distinct on (country) country, seq, base_construction_speed, used_construction, has_construction_queued, is_construction_paused, is_ship_construction_paused, present from country_construction_report where run_id = run and seq <= at order by country, seq desc) latest where present
+  select l.country, l.seq, l.base_construction_speed, l.used_construction, l.has_construction_queued, l.is_construction_paused, l.is_ship_construction_paused from country a, lateral (select country, seq, base_construction_speed, used_construction, has_construction_queued, is_construction_paused, is_ship_construction_paused, present from country_construction_report t where t.run_id = run and t.country = a.country and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function player_construction_at(run int4, at int4) returns table ("seq" int4, "num_active_government_construction_queue_elements" int4, "num_active_private_construction_queue_elements" int4, "num_government_constructions_in_queue" int4, "num_inactive_and_non_shown_government_construction_queue_elements" int4, "num_inactive_and_non_shown_private_construction_queue_elements" int4, "num_inactive_construction_queue_elements" int4, "num_inactive_private_construction_queue_elements" int4, "num_private_constructions_in_queue" int4, "free_military_construction_capacity" float8, "free_supply_construction_capacity" float8, "military_construction_capacity" float8, "military_construction_queue_usage" float8, "military_construction_usage_total" float8, "supply_construction_capacity" float8, "supply_construction_queue_usage" float8, "ship_construction_capacity" float8, "ship_construction_usage" float8, "ship_construction_weeks_left" int4) language sql stable as $$
@@ -5712,7 +5714,7 @@ create function player_construction_at(run int4, at int4) returns table ("seq" i
 $$;
 
 create function country_diplomacy_report_at(run int4, at int4) returns table ("country" int4, "seq" int4, "prestige" int4, "rank_progress" float8, "country_score_position" int4, "liberty_desire_raw" float8, "weekly_liberty_desire_change" float8, "weekly_liberty_desire_change_from_support_independence" float8, "leverage_resistance" float8, "power_blocs_total_leverage_share" float8, "total_leverage_factors_with_resistance" float8, "unclaimed_leverage" float8, "unclaimed_leverage_share" float8, "unclaimed_leverage_share_target" float8, "unclaimed_leverage_target" float8, "has_higher_unclaimed_leverage" bool, "current_power_struggle_month" int4, "max_power_struggle_month" int4, "is_power_struggling" bool, "has_active_diplomacy" bool, "is_colonizable" bool) language sql stable as $$
-  select country, seq, prestige, rank_progress, country_score_position, liberty_desire_raw, weekly_liberty_desire_change, weekly_liberty_desire_change_from_support_independence, leverage_resistance, power_blocs_total_leverage_share, total_leverage_factors_with_resistance, unclaimed_leverage, unclaimed_leverage_share, unclaimed_leverage_share_target, unclaimed_leverage_target, has_higher_unclaimed_leverage, current_power_struggle_month, max_power_struggle_month, is_power_struggling, has_active_diplomacy, is_colonizable from (select distinct on (country) country, seq, prestige, rank_progress, country_score_position, liberty_desire_raw, weekly_liberty_desire_change, weekly_liberty_desire_change_from_support_independence, leverage_resistance, power_blocs_total_leverage_share, total_leverage_factors_with_resistance, unclaimed_leverage, unclaimed_leverage_share, unclaimed_leverage_share_target, unclaimed_leverage_target, has_higher_unclaimed_leverage, current_power_struggle_month, max_power_struggle_month, is_power_struggling, has_active_diplomacy, is_colonizable, present from country_diplomacy_report where run_id = run and seq <= at order by country, seq desc) latest where present
+  select l.country, l.seq, l.prestige, l.rank_progress, l.country_score_position, l.liberty_desire_raw, l.weekly_liberty_desire_change, l.weekly_liberty_desire_change_from_support_independence, l.leverage_resistance, l.power_blocs_total_leverage_share, l.total_leverage_factors_with_resistance, l.unclaimed_leverage, l.unclaimed_leverage_share, l.unclaimed_leverage_share_target, l.unclaimed_leverage_target, l.has_higher_unclaimed_leverage, l.current_power_struggle_month, l.max_power_struggle_month, l.is_power_struggling, l.has_active_diplomacy, l.is_colonizable from country a, lateral (select country, seq, prestige, rank_progress, country_score_position, liberty_desire_raw, weekly_liberty_desire_change, weekly_liberty_desire_change_from_support_independence, leverage_resistance, power_blocs_total_leverage_share, total_leverage_factors_with_resistance, unclaimed_leverage, unclaimed_leverage_share, unclaimed_leverage_share_target, unclaimed_leverage_target, has_higher_unclaimed_leverage, current_power_struggle_month, max_power_struggle_month, is_power_struggling, has_active_diplomacy, is_colonizable, present from country_diplomacy_report t where t.run_id = run and t.country = a.country and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function player_diplomacy_at(run int4, at int4) returns table ("seq" int4, "prestige_to_maintain_rank" int4, "days_until_rank_loss" int4) language sql stable as $$
@@ -5724,55 +5726,55 @@ create function player_research_at(run int4, at int4) returns table ("seq" int4,
 $$;
 
 create function state_population_report_at(run int4, at int4) returns table ("state" int4, "seq" int4, "number_of_pops_poor" int8, "number_of_pops_middle" int8, "number_of_pops_rich" int8, "pop_birthrate" float8, "pop_mortality" float8, "pop_net_growth" int8, "pop_total_change" int8, "weekly_pop_net_migration" int8, "migration_pull" float8, "num_jobseekers" int8, "total_labor" int8, "literacy" float8, "urbanization" int4, "urbanization_needed_per_level_raw" int4, "has_insufficient_qualifications_for_available_positions" bool, "conscription_limit" int4) language sql stable as $$
-  select state, seq, number_of_pops_poor, number_of_pops_middle, number_of_pops_rich, pop_birthrate, pop_mortality, pop_net_growth, pop_total_change, weekly_pop_net_migration, migration_pull, num_jobseekers, total_labor, literacy, urbanization, urbanization_needed_per_level_raw, has_insufficient_qualifications_for_available_positions, conscription_limit from (select distinct on (state) state, seq, number_of_pops_poor, number_of_pops_middle, number_of_pops_rich, pop_birthrate, pop_mortality, pop_net_growth, pop_total_change, weekly_pop_net_migration, migration_pull, num_jobseekers, total_labor, literacy, urbanization, urbanization_needed_per_level_raw, has_insufficient_qualifications_for_available_positions, conscription_limit, present from state_population_report where run_id = run and seq <= at order by state, seq desc) latest where present
+  select l.state, l.seq, l.number_of_pops_poor, l.number_of_pops_middle, l.number_of_pops_rich, l.pop_birthrate, l.pop_mortality, l.pop_net_growth, l.pop_total_change, l.weekly_pop_net_migration, l.migration_pull, l.num_jobseekers, l.total_labor, l.literacy, l.urbanization, l.urbanization_needed_per_level_raw, l.has_insufficient_qualifications_for_available_positions, l.conscription_limit from state a, lateral (select state, seq, number_of_pops_poor, number_of_pops_middle, number_of_pops_rich, pop_birthrate, pop_mortality, pop_net_growth, pop_total_change, weekly_pop_net_migration, migration_pull, num_jobseekers, total_labor, literacy, urbanization, urbanization_needed_per_level_raw, has_insufficient_qualifications_for_available_positions, conscription_limit, present from state_population_report t where t.run_id = run and t.state = a.state and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function state_standard_of_living_report_at(run int4, at int4) returns table ("state" int4, "seq" int4, "average_standard_of_living_all" float8, "average_standard_of_living_middle" float8, "average_standard_of_living_poor" float8, "average_standard_of_living_rich" float8, "expected_standard_of_living_all" float8, "expected_standard_of_living_middle" float8, "expected_standard_of_living_poor" float8, "expected_standard_of_living_rich" float8, "population_ratio_below_expected_standard_of_living" float8, "obstinance" float8, "num_obstinance_supporters" int8, "turmoil" float8, "has_turmoil_effects" bool) language sql stable as $$
-  select state, seq, average_standard_of_living_all, average_standard_of_living_middle, average_standard_of_living_poor, average_standard_of_living_rich, expected_standard_of_living_all, expected_standard_of_living_middle, expected_standard_of_living_poor, expected_standard_of_living_rich, population_ratio_below_expected_standard_of_living, obstinance, num_obstinance_supporters, turmoil, has_turmoil_effects from (select distinct on (state) state, seq, average_standard_of_living_all, average_standard_of_living_middle, average_standard_of_living_poor, average_standard_of_living_rich, expected_standard_of_living_all, expected_standard_of_living_middle, expected_standard_of_living_poor, expected_standard_of_living_rich, population_ratio_below_expected_standard_of_living, obstinance, num_obstinance_supporters, turmoil, has_turmoil_effects, present from state_standard_of_living_report where run_id = run and seq <= at order by state, seq desc) latest where present
+  select l.state, l.seq, l.average_standard_of_living_all, l.average_standard_of_living_middle, l.average_standard_of_living_poor, l.average_standard_of_living_rich, l.expected_standard_of_living_all, l.expected_standard_of_living_middle, l.expected_standard_of_living_poor, l.expected_standard_of_living_rich, l.population_ratio_below_expected_standard_of_living, l.obstinance, l.num_obstinance_supporters, l.turmoil, l.has_turmoil_effects from state a, lateral (select state, seq, average_standard_of_living_all, average_standard_of_living_middle, average_standard_of_living_poor, average_standard_of_living_rich, expected_standard_of_living_all, expected_standard_of_living_middle, expected_standard_of_living_poor, expected_standard_of_living_rich, population_ratio_below_expected_standard_of_living, obstinance, num_obstinance_supporters, turmoil, has_turmoil_effects, present from state_standard_of_living_report t where t.run_id = run and t.state = a.state and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function state_economy_report_at(run int4, at int4) returns table ("state" int4, "seq" int4, "gdp_contribution" float8, "gdp_contribution_percentage" float8, "yearly_gdp" float8, "average_annual_wage" float8, "taxation_revenue" float8, "tax_capacity" float8, "tax_capacity_usage" float8, "government_expenses" float8, "bureaucracy_cost" float8, "base_bureaucracy_cost_raw" float8, "base_pop_bureaucracy_cost_raw" float8, "pop_institution_bureaucracy_cost" float8, "market_access" float8, "world_market_access" float8, "trade_potential" float8, "infrastructure_recomputed" float8, "infrastructure_usage_recomputed" float8, "num_buildings_affected_by_goods_shortage" int4, "num_free_arable_land" int4, "num_base_free_arable_land" int4, "num_arable_land_reserved_for_subsistence" int4, "pollution_generation" float8, "is_market_capital_reported" bool, "is_slave_state" bool) language sql stable as $$
-  select state, seq, gdp_contribution, gdp_contribution_percentage, yearly_gdp, average_annual_wage, taxation_revenue, tax_capacity, tax_capacity_usage, government_expenses, bureaucracy_cost, base_bureaucracy_cost_raw, base_pop_bureaucracy_cost_raw, pop_institution_bureaucracy_cost, market_access, world_market_access, trade_potential, infrastructure_recomputed, infrastructure_usage_recomputed, num_buildings_affected_by_goods_shortage, num_free_arable_land, num_base_free_arable_land, num_arable_land_reserved_for_subsistence, pollution_generation, is_market_capital_reported, is_slave_state from (select distinct on (state) state, seq, gdp_contribution, gdp_contribution_percentage, yearly_gdp, average_annual_wage, taxation_revenue, tax_capacity, tax_capacity_usage, government_expenses, bureaucracy_cost, base_bureaucracy_cost_raw, base_pop_bureaucracy_cost_raw, pop_institution_bureaucracy_cost, market_access, world_market_access, trade_potential, infrastructure_recomputed, infrastructure_usage_recomputed, num_buildings_affected_by_goods_shortage, num_free_arable_land, num_base_free_arable_land, num_arable_land_reserved_for_subsistence, pollution_generation, is_market_capital_reported, is_slave_state, present from state_economy_report where run_id = run and seq <= at order by state, seq desc) latest where present
+  select l.state, l.seq, l.gdp_contribution, l.gdp_contribution_percentage, l.yearly_gdp, l.average_annual_wage, l.taxation_revenue, l.tax_capacity, l.tax_capacity_usage, l.government_expenses, l.bureaucracy_cost, l.base_bureaucracy_cost_raw, l.base_pop_bureaucracy_cost_raw, l.pop_institution_bureaucracy_cost, l.market_access, l.world_market_access, l.trade_potential, l.infrastructure_recomputed, l.infrastructure_usage_recomputed, l.num_buildings_affected_by_goods_shortage, l.num_free_arable_land, l.num_base_free_arable_land, l.num_arable_land_reserved_for_subsistence, l.pollution_generation, l.is_market_capital_reported, l.is_slave_state from state a, lateral (select state, seq, gdp_contribution, gdp_contribution_percentage, yearly_gdp, average_annual_wage, taxation_revenue, tax_capacity, tax_capacity_usage, government_expenses, bureaucracy_cost, base_bureaucracy_cost_raw, base_pop_bureaucracy_cost_raw, pop_institution_bureaucracy_cost, market_access, world_market_access, trade_potential, infrastructure_recomputed, infrastructure_usage_recomputed, num_buildings_affected_by_goods_shortage, num_free_arable_land, num_base_free_arable_land, num_arable_land_reserved_for_subsistence, pollution_generation, is_market_capital_reported, is_slave_state, present from state_economy_report t where t.run_id = run and t.state = a.state and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function state_status_report_at(run int4, at int4) returns table ("state" int4, "seq" int4, "colony_progress_as_days" int4, "daily_colony_progress" float8, "num_colonizers" int4, "is_colony_progress_blocked_by_inactive_interest" bool, "is_company_colony" bool, "is_incorporated" bool, "is_incorporating" bool, "years_to_incorporate" float8, "blockade_level" float8, "current_blockade_strength" float8, "required_blockade_strength" float8, "devastation_daily_change" float8, "daily_devastation_increase_from_bombardment" float8, "has_famine_reported" bool, "is_split_state" bool) language sql stable as $$
-  select state, seq, colony_progress_as_days, daily_colony_progress, num_colonizers, is_colony_progress_blocked_by_inactive_interest, is_company_colony, is_incorporated, is_incorporating, years_to_incorporate, blockade_level, current_blockade_strength, required_blockade_strength, devastation_daily_change, daily_devastation_increase_from_bombardment, has_famine_reported, is_split_state from (select distinct on (state) state, seq, colony_progress_as_days, daily_colony_progress, num_colonizers, is_colony_progress_blocked_by_inactive_interest, is_company_colony, is_incorporated, is_incorporating, years_to_incorporate, blockade_level, current_blockade_strength, required_blockade_strength, devastation_daily_change, daily_devastation_increase_from_bombardment, has_famine_reported, is_split_state, present from state_status_report where run_id = run and seq <= at order by state, seq desc) latest where present
+  select l.state, l.seq, l.colony_progress_as_days, l.daily_colony_progress, l.num_colonizers, l.is_colony_progress_blocked_by_inactive_interest, l.is_company_colony, l.is_incorporated, l.is_incorporating, l.years_to_incorporate, l.blockade_level, l.current_blockade_strength, l.required_blockade_strength, l.devastation_daily_change, l.daily_devastation_increase_from_bombardment, l.has_famine_reported, l.is_split_state from state a, lateral (select state, seq, colony_progress_as_days, daily_colony_progress, num_colonizers, is_colony_progress_blocked_by_inactive_interest, is_company_colony, is_incorporated, is_incorporating, years_to_incorporate, blockade_level, current_blockade_strength, required_blockade_strength, devastation_daily_change, daily_devastation_increase_from_bombardment, has_famine_reported, is_split_state, present from state_status_report t where t.run_id = run and t.state = a.state and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function country_population_at(run int4, at int4) returns table ("country" int4, "seq" int4, "loyalists_increase" int4, "loyalists_decrease" int4, "radicals_increase" int4, "radicals_decrease" int4) language sql stable as $$
-  select latest.* from (select distinct on (country) country, seq, loyalists_increase, loyalists_decrease, radicals_increase, radicals_decrease from country_population where run_id = run and seq <= at order by country, seq desc) latest where exists (select 1 from country_at(run, at) alive where alive.country = latest.country)
+  select l.country, l.seq, l.loyalists_increase, l.loyalists_decrease, l.radicals_increase, l.radicals_decrease from country a, lateral (select present from country_history h where h.run_id = run and h.country = a.country and h.seq <= at order by h.seq desc limit 1) o, lateral (select country, seq, loyalists_increase, loyalists_decrease, radicals_increase, radicals_decrease from country_population t where t.run_id = run and t.country = a.country and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and o.present
 $$;
 
 create function country_diplomacy_at(run int4, at int4) returns table ("country" int4, "seq" int4, "infamy" float8) language sql stable as $$
-  select latest.* from (select distinct on (country) country, seq, infamy from country_diplomacy where run_id = run and seq <= at order by country, seq desc) latest where exists (select 1 from country_at(run, at) alive where alive.country = latest.country)
+  select l.country, l.seq, l.infamy from country a, lateral (select present from country_history h where h.run_id = run and h.country = a.country and h.seq <= at order by h.seq desc limit 1) o, lateral (select country, seq, infamy from country_diplomacy t where t.run_id = run and t.country = a.country and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and o.present
 $$;
 
 create function state_population_at(run int4, at int4) returns table ("state" int4, "seq" int4, "lower_strata" int8, "middle_strata" int8, "upper_strata" int8, "radicals" int8, "loyalists" int8, "subsisting_workforce" int8, "unemployed_workforce" int8, "last_week_emigration" int4, "last_week_immigration" int4, "last_week_slave_emigration" int4, "last_week_slave_immigration" int4) language sql stable as $$
-  select latest.* from (select distinct on (state) state, seq, lower_strata, middle_strata, upper_strata, radicals, loyalists, subsisting_workforce, unemployed_workforce, last_week_emigration, last_week_immigration, last_week_slave_emigration, last_week_slave_immigration from state_population where run_id = run and seq <= at order by state, seq desc) latest where exists (select 1 from state_at(run, at) alive where alive.state = latest.state)
+  select l.state, l.seq, l.lower_strata, l.middle_strata, l.upper_strata, l.radicals, l.loyalists, l.subsisting_workforce, l.unemployed_workforce, l.last_week_emigration, l.last_week_immigration, l.last_week_slave_emigration, l.last_week_slave_immigration from state a, lateral (select present from state_history h where h.run_id = run and h.state = a.state and h.seq <= at order by h.seq desc limit 1) o, lateral (select state, seq, lower_strata, middle_strata, upper_strata, radicals, loyalists, subsisting_workforce, unemployed_workforce, last_week_emigration, last_week_immigration, last_week_slave_emigration, last_week_slave_immigration from state_population t where t.run_id = run and t.state = a.state and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and o.present
 $$;
 
 create function state_economy_at(run int4, at int4) returns table ("state" int4, "seq" int4, "arable_land" int4, "infrastructure" float8, "infrastructure_usage" float8, "trade_capacity" int4, "trade_capacity_usage" int4, "treaty_port" bool) language sql stable as $$
-  select latest.* from (select distinct on (state) state, seq, arable_land, infrastructure, infrastructure_usage, trade_capacity, trade_capacity_usage, treaty_port from state_economy where run_id = run and seq <= at order by state, seq desc) latest where exists (select 1 from state_at(run, at) alive where alive.state = latest.state)
+  select l.state, l.seq, l.arable_land, l.infrastructure, l.infrastructure_usage, l.trade_capacity, l.trade_capacity_usage, l.treaty_port from state a, lateral (select present from state_history h where h.run_id = run and h.state = a.state and h.seq <= at order by h.seq desc limit 1) o, lateral (select state, seq, arable_land, infrastructure, infrastructure_usage, trade_capacity, trade_capacity_usage, treaty_port from state_economy t where t.run_id = run and t.state = a.state and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and o.present
 $$;
 
 create function state_status_at(run int4, at int4) returns table ("state" int4, "seq" int4, "incorporation" float8, "colony_progress" float8, "devastation" float8, "next_colony_province" int4) language sql stable as $$
-  select latest.* from (select distinct on (state) state, seq, incorporation, colony_progress, devastation, next_colony_province from state_status where run_id = run and seq <= at order by state, seq desc) latest where exists (select 1 from state_at(run, at) alive where alive.state = latest.state)
+  select l.state, l.seq, l.incorporation, l.colony_progress, l.devastation, l.next_colony_province from state a, lateral (select present from state_history h where h.run_id = run and h.state = a.state and h.seq <= at order by h.seq desc limit 1) o, lateral (select state, seq, incorporation, colony_progress, devastation, next_colony_province from state_status t where t.run_id = run and t.state = a.state and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and o.present
 $$;
 
 create function pop_status_at(run int4, at int4) returns table ("pop" int4, "seq" int4, "wealth_progress" float8, "num_literate" int4, "loyalists_and_radicals" int4, "wealth" int4, "food_security" float8, "political_strength" int8, "workforce" int8, "dependents" int8, "job_satisfaction" float8) language sql stable as $$
-  select latest.* from (select distinct on (pop) pop, seq, wealth_progress, num_literate, loyalists_and_radicals, wealth, food_security, political_strength, workforce, dependents, job_satisfaction from pop_status where run_id = run and seq <= at order by pop, seq desc) latest where exists (select 1 from pop_at(run, at) alive where alive.pop = latest.pop)
+  select l.pop, l.seq, l.wealth_progress, l.num_literate, l.loyalists_and_radicals, l.wealth, l.food_security, l.political_strength, l.workforce, l.dependents, l.job_satisfaction from pop a, lateral (select present from pop_history h where h.run_id = run and h.pop = a.pop and h.seq <= at order by h.seq desc limit 1) o, lateral (select pop, seq, wealth_progress, num_literate, loyalists_and_radicals, wealth, food_security, political_strength, workforce, dependents, job_satisfaction from pop_status t where t.run_id = run and t.pop = a.pop and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and o.present
 $$;
 
 create function building_flow_at(run int4, at int4) returns table ("building" int4, "seq" int4, "balance_subsidies" float8, "trade_revenue" float8, "input_goods_shortage" float8, "tariffs" float8, "tolls" float8, "subventions" float8, "supply_ship_construction" float8, "military_ship_construction" float8, "produced_supply" float8, "income_taxes" float8, "cash_reserves" float8, "staffing" float8, "throughput" float8, "salary_rate" float8, "dividends" float8, "goods_cost" float8, "goods_sales" float8, "slave_upkeep" float8) language sql stable as $$
-  select latest.* from (select distinct on (building) building, seq, balance_subsidies, trade_revenue, input_goods_shortage, tariffs, tolls, subventions, supply_ship_construction, military_ship_construction, produced_supply, income_taxes, cash_reserves, staffing, throughput, salary_rate, dividends, goods_cost, goods_sales, slave_upkeep from building_flow where run_id = run and seq <= at order by building, seq desc) latest where exists (select 1 from building_at(run, at) alive where alive.building = latest.building)
+  select l.building, l.seq, l.balance_subsidies, l.trade_revenue, l.input_goods_shortage, l.tariffs, l.tolls, l.subventions, l.supply_ship_construction, l.military_ship_construction, l.produced_supply, l.income_taxes, l.cash_reserves, l.staffing, l.throughput, l.salary_rate, l.dividends, l.goods_cost, l.goods_sales, l.slave_upkeep from building a, lateral (select present from building_history h where h.run_id = run and h.building = a.building and h.seq <= at order by h.seq desc limit 1) o, lateral (select building, seq, balance_subsidies, trade_revenue, input_goods_shortage, tariffs, tolls, subventions, supply_ship_construction, military_ship_construction, produced_supply, income_taxes, cash_reserves, staffing, throughput, salary_rate, dividends, goods_cost, goods_sales, slave_upkeep from building_flow t where t.run_id = run and t.building = a.building and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and o.present
 $$;
 
 create function interest_group_stats_at(run int4, at int4) returns table ("interest_group" int4, "seq" int4, "approval" int2, "political_strength" int8, "radicals_political_strength" int8, "loyalists_political_strength" int8, "clout" float8) language sql stable as $$
-  select latest.* from (select distinct on (interest_group) interest_group, seq, approval, political_strength, radicals_political_strength, loyalists_political_strength, clout from interest_group_stats where run_id = run and seq <= at order by interest_group, seq desc) latest where exists (select 1 from interest_group_at(run, at) alive where alive.interest_group = latest.interest_group)
+  select l.interest_group, l.seq, l.approval, l.political_strength, l.radicals_political_strength, l.loyalists_political_strength, l.clout from interest_group a, lateral (select present from interest_group_history h where h.run_id = run and h.interest_group = a.interest_group and h.seq <= at order by h.seq desc limit 1) o, lateral (select interest_group, seq, approval, political_strength, radicals_political_strength, loyalists_political_strength, clout from interest_group_stats t where t.run_id = run and t.interest_group = a.interest_group and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and o.present
 $$;
 
 create function formation_status_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "province" int4, "current_location" int4, "target_location" int4, "naval_mission" int4, "x" float8, "y" float8, "organization" float8, "sea_presence" float8, "supply" float8, "delivered_supply" float8, "supply_ships" int4, "mobilized" bool, "raised_conscripts" bool) language sql stable as $$
-  select latest.* from (select distinct on (formation) formation, seq, province, current_location, target_location, naval_mission, x, y, organization, sea_presence, supply, delivered_supply, supply_ships, mobilized, raised_conscripts from formation_status where run_id = run and seq <= at order by formation, seq desc) latest where exists (select 1 from formation_at(run, at) alive where alive.formation = latest.formation)
+  select l.formation, l.seq, l.province, l.current_location, l.target_location, l.naval_mission, l.x, l.y, l.organization, l.sea_presence, l.supply, l.delivered_supply, l.supply_ships, l.mobilized, l.raised_conscripts from formation a, lateral (select present from formation_history h where h.run_id = run and h.formation = a.formation and h.seq <= at order by h.seq desc limit 1) o, lateral (select formation, seq, province, current_location, target_location, naval_mission, x, y, organization, sea_presence, supply, delivered_supply, supply_ships, mobilized, raised_conscripts from formation_status t where t.run_id = run and t.formation = a.formation and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and o.present
 $$;
 
 create index country_history_seq on country_history using brin (run_id, seq) with (autosummarize = on);
@@ -6006,152 +6008,6 @@ create index state_population_report_seq on state_population_report using brin (
 create index state_standard_of_living_report_seq on state_standard_of_living_report using brin (run_id, seq) with (autosummarize = on);
 create index state_economy_report_seq on state_economy_report using brin (run_id, seq) with (autosummarize = on);
 create index state_status_report_seq on state_status_report using brin (run_id, seq) with (autosummarize = on);
-
-create table name_column (
-  table_name text not null,
-  column_name text not null,
-  vocabulary text not null,
-  primary key (table_name, column_name)
-);
-insert into name_column values
-  ('country_history', 'country_definition', 'country_definition'),
-  ('country_history', 'government', 'government_type'),
-  ('country_history', 'religion', 'religion'),
-  ('country_history', 'country_rank', 'country_rank'),
-  ('country_history', 'country_type', 'country_type'),
-  ('country_history', 'dynamic_name_key', 'localization_key'),
-  ('country_history', 'dynamic_adjective_key', 'localization_key'),
-  ('country_claim', 'state_region', 'state_region'),
-  ('country_religion', 'religion', 'religion'),
-  ('country_timed_modifier', 'modifier', 'modifier'),
-  ('country_profession_population', 'pop_type', 'pop_type'),
-  ('country_religion_culture_population', 'religion', 'religion'),
-  ('player_taxed_goods', 'goods', 'goods'),
-  ('player_ignored_decision', 'decision', 'decision'),
-  ('player_interaction_cooldown', 'character_interaction', 'character_interaction'),
-  ('player_tariff', 'goods', 'goods'),
-  ('player_monopoly', 'building_type', 'building_type'),
-  ('player_production_method_available', 'production_method', 'production_method'),
-  ('player_consumed_goods', 'goods', 'goods'),
-  ('player_objective', 'objective', 'objective'),
-  ('player_completed_subgoal', 'objective_subgoal', 'objective_subgoal'),
-  ('player_religion_political_strength', 'religion', 'religion'),
-  ('player_construction_queue_item', 'building_type', 'building_type'),
-  ('player_construction_queue_item', 'owner_building_type', 'building_type'),
-  ('player_alert', 'alert_type', 'alert_type'),
-  ('player_state_alert', 'alert_type', 'alert_type'),
-  ('player_decision', 'decision', 'decision'),
-  ('player_message', 'message_group', 'message_group'),
-  ('player_journal_button', 'journal_entry_type', 'journal_entry_type'),
-  ('player_journal_button', 'scripted_button', 'scripted_button'),
-  ('player_diplomatic_option', 'action_type', 'diplomatic_action_type'),
-  ('player_diplomatic_option_state', 'action_type', 'diplomatic_action_type'),
-  ('player_character_interaction', 'character_interaction', 'character_interaction'),
-  ('ui_open_window', 'ui_window', 'ui_window'),
-  ('pact_history', 'pact_type', 'diplomatic_action_type'),
-  ('diplomatic_catalyst_history', 'diplomatic_catalyst_type', 'diplomatic_catalyst_type'),
-  ('diplomatic_action_history', 'action_type', 'diplomatic_action_type'),
-  ('diplomatic_play_history', 'diplomatic_play_type', 'diplomatic_play_type'),
-  ('diplomatic_play_history', 'strategic_region', 'strategic_region'),
-  ('treaty_article_history', 'treaty_article_type', 'treaty_article_type'),
-  ('power_bloc_history', 'power_bloc_identity', 'power_bloc_identity'),
-  ('power_bloc_history', 'power_bloc_map_texture', 'power_bloc_map_texture'),
-  ('power_bloc_adopted_principle', 'power_bloc_principle', 'power_bloc_principle'),
-  ('interest_history', 'strategic_region', 'strategic_region'),
-  ('state_history', 'state_region', 'state_region'),
-  ('state_history', 'localized_name_key', 'localization_key'),
-  ('state_timed_modifier', 'modifier', 'modifier'),
-  ('state_goods', 'goods', 'goods'),
-  ('state_pop_need', 'culture_type', 'culture_type'),
-  ('state_pop_need', 'goods', 'goods'),
-  ('state_goods_supply', 'goods', 'goods'),
-  ('state_decree_valid', 'decree_type', 'decree_type'),
-  ('decree_history', 'decree_type', 'decree_type'),
-  ('player_active_decree', 'decree_type', 'decree_type'),
-  ('pop_history', 'religion', 'religion'),
-  ('pop_history', 'pop_type', 'pop_type'),
-  ('pop_history', 'social_class', 'social_class'),
-  ('pop_history', 'acceptance_status', 'acceptance_status'),
-  ('pop_history', 'conversion_religion', 'religion'),
-  ('culture_history', 'culture_type', 'culture_type'),
-  ('culture_history', 'national_awakening_state_region', 'state_region'),
-  ('culture_core_state', 'state_region', 'state_region'),
-  ('culture_obsession', 'goods', 'goods'),
-  ('culture_taboo', 'goods', 'goods'),
-  ('culture_tradition', 'discrimination_trait', 'discrimination_trait'),
-  ('state_region_resource', 'state_region', 'state_region'),
-  ('state_region_resource', 'building_type', 'building_type'),
-  ('state_region_trait', 'state_region', 'state_region'),
-  ('state_region_trait', 'state_trait', 'state_trait'),
-  ('harvest_condition_history', 'harvest_condition_type', 'harvest_condition_type'),
-  ('harvest_condition_history', 'state_region', 'state_region'),
-  ('building_history', 'building_type', 'building_type'),
-  ('building_production_method_active', 'production_method', 'production_method'),
-  ('building_goods', 'goods', 'goods'),
-  ('market_goods', 'goods', 'goods'),
-  ('world_market_price_channel', 'goods', 'goods'),
-  ('world_market_price_sample', 'goods', 'goods'),
-  ('company_history', 'company_type', 'company_type'),
-  ('company_history', 'company_name_key', 'localization_key'),
-  ('charter_history', 'company_charter_type', 'company_charter_type'),
-  ('hq_private', 'hq_region', 'strategic_region'),
-  ('strait_history', 'strait_definition', 'strait_definition'),
-  ('country_research_history', 'researching', 'technology'),
-  ('country_research_acquired', 'technology', 'technology'),
-  ('country_research_spreading', 'technology', 'technology'),
-  ('country_research_queued', 'technology', 'technology'),
-  ('country_research_progress', 'technology', 'technology'),
-  ('interest_group_history', 'interest_group_type', 'interest_group_type'),
-  ('interest_group_history', 'name_key', 'localization_key'),
-  ('interest_group_ideology', 'ideology', 'ideology'),
-  ('interest_group_character_ideology', 'ideology', 'ideology'),
-  ('interest_group_held_trait', 'interest_group_trait', 'interest_group_trait'),
-  ('political_movement_history', 'political_movement_type', 'political_movement_type'),
-  ('political_movement_history', 'ideology', 'ideology'),
-  ('political_movement_character_ideology', 'ideology', 'ideology'),
-  ('political_movement_timed_modifier', 'modifier', 'modifier'),
-  ('law_history', 'law_type', 'law_type'),
-  ('law_private', 'replacing_law_type', 'law_type'),
-  ('amendment_history', 'amendment_type', 'amendment_type'),
-  ('party_history', 'party_type', 'party_type'),
-  ('institution_history', 'institution_type', 'institution_type'),
-  ('political_lobby_history', 'political_lobby_type', 'political_lobby_type'),
-  ('civil_war_seceded_state', 'state_region', 'state_region'),
-  ('character_history', 'religion', 'religion'),
-  ('character_history', 'first_name_key', 'localization_key'),
-  ('character_history', 'last_name_key', 'localization_key'),
-  ('character_history', 'ideology', 'ideology'),
-  ('character_history', 'order_type', 'commander_order'),
-  ('character_history', 'rank', 'commander_rank'),
-  ('character_assigned_trait', 'character_trait', 'character_trait'),
-  ('character_assigned_role', 'character_role', 'character_role'),
-  ('character_timed_modifier', 'modifier', 'modifier'),
-  ('combat_unit_history', 'combat_unit_type', 'combat_unit_type'),
-  ('combat_unit_history', 'veterancy_level', 'veterancy_level'),
-  ('formation_history', 'name_key', 'localization_key'),
-  ('formation_mobilization_option', 'mobilization_option', 'mobilization_option'),
-  ('formation_upgrade_unit_type', 'combat_unit_type', 'combat_unit_type'),
-  ('formation_selected_unit_type', 'combat_unit_group', 'combat_unit_group'),
-  ('formation_selected_unit_type', 'combat_unit_type', 'combat_unit_type'),
-  ('ship_construction_history', 'ship_type', 'ship_type'),
-  ('ship_template_history', 'ship_type', 'ship_type'),
-  ('ship_template_version_history', 'ship_type', 'ship_type'),
-  ('ship_template_version_modification', 'ship_modification', 'ship_modification'),
-  ('naval_mission_history', 'naval_mission_type', 'naval_mission_type'),
-  ('war_goal_history', 'war_goal_type', 'war_goal_type'),
-  ('battle_history', 'name_key', 'localization_key'),
-  ('battle_side', 'order_type', 'commander_order'),
-  ('battle_side', 'condition', 'battle_condition'),
-  ('country_ai_strategy', 'ai_strategy', 'ai_strategy'),
-  ('country_ai_region_stance', 'strategic_region', 'strategic_region'),
-  ('country_ai_region_stance', 'stance', 'ai_region_stance'),
-  ('country_ai_antagonize_reason', 'reason', 'antagonize_reason'),
-  ('journal_entry_history', 'journal_entry_type', 'journal_entry_type'),
-  ('journal_entry_target', 'name_key', 'scope_name'),
-  ('journal_entry_progress_bar', 'scripted_progress_bar', 'scripted_progress_bar'),
-  ('journal_entry_timed_modifier', 'modifier', 'modifier'),
-  ('event_history', 'event_type', 'event_type'),
-  ('event_target', 'name_key', 'scope_name');
 
 create view referenced_only as
   select run_id, 'country' as entity, country as identity, first_seq from country a

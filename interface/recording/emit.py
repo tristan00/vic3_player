@@ -76,16 +76,27 @@ def at_function(table):
     keys=[k.name for k in key_columns(table)]
     data=[c.name for c in table.columns]
     columns=', '.join(keys+['seq']+data)
+    picked=', '.join('l.'+name for name in keys+['seq']+data)
     returns=', '.join(f'"{name}" {typ}' for name,typ in [(k.name,kind(k)) for k in key_columns(table)]+[('seq','int4')]+[(c.name,kind(c)) for c in table.columns])
+    owner=table.owner
+    subkeys=[k.name for k in table.keys]
     if table.kind=='singleton':
         body=f'select {columns} from {table.name} where run_id = run and seq <= at order by seq desc limit 1'
+    elif owner is None:
+        latest=(f"select distinct on ({', '.join(keys)}) {columns}, present from {table.name} where run_id = run and seq <= at "
+                f"order by {', '.join(k+' desc' for k in keys)}, seq desc")
+        body=f'select {columns} from ({latest}) latest where present'
     else:
-        latest=(f"select distinct on ({', '.join(keys)}) {columns}{'' if table.kind=='subject' else ', present'} from {table.name} "
-                f"where run_id = run and seq <= at order by {', '.join(keys)}, seq desc")
-        if table.kind=='subject':
-            body=f'select latest.* from ({latest}) latest where exists (select 1 from {table.owner}_at(run, at) alive where alive.{table.owner} = latest.{table.owner})'
+        if subkeys:
+            latest=(f"select distinct on ({', '.join(subkeys)}) {columns}, present from {table.name} t where t.run_id = run and t.{owner} = a.{owner} and t.seq <= at "
+                    f"order by {', '.join(k+' desc' for k in subkeys)}, t.seq desc")
         else:
-            body=f'select {columns} from ({latest}) latest where present'
+            latest=(f"select {columns}{'' if table.kind=='subject' else ', present'} from {table.name} t where t.run_id = run and t.{owner} = a.{owner} and t.seq <= at "
+                    f"order by t.seq desc limit 1")
+        alive=(f", lateral (select present from {owner}_history h where h.run_id = run and h.{owner} = a.{owner} and h.seq <= at order by h.seq desc limit 1) o"
+               if table.kind=='subject' else '')
+        live='o.present' if table.kind=='subject' else 'l.present'
+        body=f'select {picked} from {owner} a{alive}, lateral ({latest}) l where a.run_id = run and {live}'
     name=table.name[:-len('_history')] if table.kind=='history' else table.name
     return f'create function {name}_at(run int4, at int4) returns table ({returns}) language sql stable as $$\n  {body}\n$$;\n'
 
@@ -115,19 +126,13 @@ def referenced_only():
     return 'create view referenced_only as\n'+'\n  union all\n'.join(parts)+';\n'
 
 
-def name_columns():
-    rows=[(t.name,c.name,c.vocabulary) for t in TABLES for c in key_columns(t)+t.columns if c.vocabulary]
-    return ('create table name_column (\n  table_name text not null,\n  column_name text not null,\n  vocabulary text not null,\n'
-            '  primary key (table_name, column_name)\n);\ninsert into name_column values\n'+',\n'.join(f"  ('{t}', '{c}', '{v}')" for t,c,v in rows)+';\n')
-
-
 def main():
     order=[t for t in TABLES if t.kind in ('history','child','listing','singleton')]+[t for t in TABLES if t.kind=='subject']
     parts=[(HERE/'schema_head.sql').open().read().rstrip()+'\n\n','\n'.join(vocabulary(name) for name in sorted(VOCABULARIES)),'\n'+'\n'.join(enum(name) for name in ENUMS),
            '\n'+(HERE/'schema_meta.sql').open().read().rstrip()+'\n\n','\n'.join(anchor(name) for name in ENTITIES),'\n'+'\n'.join(emit(t) for t in TABLES),
            '\n'+'\n'.join(at_function(t) for t in order),
            '\n'+''.join(f'create index {t.name}_seq on {t.name} using brin (run_id, seq) with (autosummarize = on);\n' for t in TABLES),
-           '\n'+name_columns(),'\n'+referenced_only(),
+           '\n'+referenced_only(),
            '\n'+(HERE/'schema_tail.sql').open().read().rstrip()+'\n']
     sql=''.join(parts)
     names=re.findall(r'create table (\w+)',sql)
