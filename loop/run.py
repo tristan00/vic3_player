@@ -33,7 +33,11 @@ PARKED=set()
 RUN_DAYS=(10,90)
 WORLD_STATES=(80,150)
 PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
-WEIGHTS={'cancel_enactment':.1,'nationalize':.1,'bulk_nationalize_state':.1,'build':3,'research':3,'enact_law':2,'switch_production_method':3,'bulk_switch_production_method_state':3,'deploy_to_front':5,'set_strategic_objective':3,'start_play_country':.1,'start_play_state':.1,'mobilize':5,'mobilize_all':5,'raise_conscripts':3,'demobilize':.2,'demobilize_all':.2,'cancel_construction':.1,'cancel_queue_item':.1,'downsize':.1,'pause_construction':.1,'dequeue_research':.1,'pause_all_construction':.05}
+WEIGHTS={'start_play_country':0,'start_play_state':0,'start_play_confirmed':0,'add_war_goal':0,'make_primary_demand':0,'dequeue_research':0,'cancel_construction':0,'cancel_queue_item':0,
+         'build':3,'research':3,'enact_law':2,'switch_production_method':3,'bulk_switch_production_method_state':3,'deploy_to_front':5,'set_strategic_objective':3,'mobilize':5,'mobilize_all':5,'raise_conscripts':3,
+         'cancel_enactment':.1,'nationalize':.1,'bulk_nationalize_state':.1,'demobilize':.2,'demobilize_all':.2,'downsize':.1,'pause_construction':.1,'pause_all_construction':.05,
+         'disband_formation':.1,'disband_regulars':.1,'disband_conscripts':.1,'decommission_ship':.1,'cancel_ship':.1,'cancel_ship_item':.1,'delete_ship_template':.1,'declare_bankruptcy':.1,
+         'abandon_colony':.1,'unincorporate':.1,'remove_company':.1,'remove_decree':.1,'capitulate':.1,'white_peace':.1,'leave_power_bloc':.1,'kick_from_power_bloc':.1}
 NAVY_WEIGHT=3
 STRAIT_WEIGHT=3
 HOURS_PER_DAY=24
