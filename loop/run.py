@@ -56,7 +56,7 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
        'authority':('toggle_bolster_movement','toggle_suppress_movement','issue_decree','toggle_monopoly','toggle_charter','toggle_consumption_tax',
                     'set_government_wages','character_interaction'),
        'pausing':('pause_all_construction','resume_all_construction','pause_ship_construction','resume_ship_construction','declare_bankruptcy'),
-       'bureaucracy':('set_tax_level','set_institution_level'),
+       'bureaucracy':('set_tax_level','set_institution_level','switch_production_method','bulk_switch_production_method_state'),
        'money':('nationalize','bulk_nationalize_state','declare_bankruptcy'),
        'companies':('create_company','remove_company'),
        'decisions':('take_decision','toggle_ignore_decision'),
