@@ -11,6 +11,7 @@ import threading
 import time
 
 from advisors import ADVISORS
+from advisors.random_picker import TIME_CONTROL
 from interface import GameInterface, generate, record
 from interface.actions import Executor
 from interface.actions.catalogue import BY_NAME, GROUP
@@ -84,6 +85,10 @@ def targets(name,params,links={}):
     objects={(kinds[key],value) for key,value in params.items() if kinds.get(key) not in (None,'int','choice')}
     objects|={links[item] for item in objects if item in links}
     return (objects or {('group',GROUP[name])})|{('shared',slot) for slot,names in SLOTS.items() if name in names}
+
+
+def nothing_offered(options):
+    return not any(combos for name,combos in options.items() if name not in TIME_CONTROL)
 
 
 @timed
@@ -171,6 +176,8 @@ class Loop:
         batch=[]
         touched=set()
         options=available(snapshot)
+        if nothing_offered(options):
+            raise GameCrashed(f'No action was available during the pause at snapshot {snapshot.seq}')
         events=options['choose_event_option']
         for event in sorted({combo['event'] for combo in events}):
             name,params=self.advisors[0].choose({'choose_event_option':[combo for combo in events if combo['event']==event]},snapshot)

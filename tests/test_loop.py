@@ -81,6 +81,11 @@ class AdvisorTests(unittest.TestCase):
     def test_random_advisor_returns_nothing_when_nothing_is_offered(self):
         self.assertIsNone(RandomAdvisor(0).choose({'research':[],'unpause':[{}]},Queue()))
 
+    def test_a_pause_offering_only_time_control_counts_as_nothing(self):
+        from loop.run import nothing_offered
+        self.assertTrue(nothing_offered({'research':[],'unpause':[{}],'set_speed':[{'speed':1}]}))
+        self.assertFalse(nothing_offered({'research':[{'technology':'x'}],'unpause':[{}]}))
+
     def test_a_zero_weight_action_is_never_picked(self):
         options={'build':[{'state':1}],'subsidies_on':[{'building':2}]}
         advisor=RandomAdvisor(0,{'subsidies_on':0})
