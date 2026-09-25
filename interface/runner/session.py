@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import random
 import subprocess
+import sys
 import time
 import uuid
 
@@ -120,6 +121,14 @@ class GameInterface:
         process=self.process()
         if process is None:
             raise GameCrashed(f'The game process {self.session()["pid"]} is gone')
+        guard=self.session()['guard']
+        try:
+            alive=abs(psutil.Process(guard['pid']).create_time()-guard['created'])<.01
+        except psutil.NoSuchProcess:
+            alive=False
+        if not alive:
+            self.close()
+            raise RuntimeError(f'The GPU guard {guard["pid"]} is gone, so the unguarded game was closed')
         return process
 
     def settings(self,changes=None):
@@ -148,7 +157,8 @@ class GameInterface:
         started=time.time()
         self.since=time.strftime('%H:%M:%S',time.localtime(started))
         process=_spawn(arguments,self.exe.parent)
-        session={'pid':process.pid,'created':process.create_time(),'started':started,'arguments':arguments,'mods':mods}
+        guard=_spawn([sys.executable,'-m','interface.runner.guard',str(process.pid),repr(process.create_time()),str(self.profile/'gpu_guard.log')],Path(__file__).resolve().parents[2])
+        session={'pid':process.pid,'created':process.create_time(),'guard':{'pid':guard.pid,'created':guard.create_time()},'started':started,'arguments':arguments,'mods':mods}
         write_json(self.session_file,session)
         if 'tail' in self.__dict__:
             self.__dict__.pop('tail').close()
