@@ -31,15 +31,13 @@ ACTIONS_PER_PAUSE=(6,16)
 ENDS_PAUSE={'capitulate','back_down','white_peace','declare_bankruptcy','leave_power_bloc'}
 PARKED=set()
 RUN_DAYS=(10,90)
-WORLD_STATES=(80,150)
+WORLD_STATES=(25,150)
 PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
 WEIGHTS={'start_play_country':0,'start_play_state':0,'start_play_confirmed':0,'add_war_goal':0,'make_primary_demand':0,'dequeue_research':0,'cancel_construction':0,'cancel_queue_item':0,
          'build':3,'research':3,'enact_law':2,'switch_production_method':3,'bulk_switch_production_method_state':3,'deploy_to_front':5,'set_strategic_objective':3,'mobilize':5,'mobilize_all':5,'raise_conscripts':3,
          'cancel_enactment':.1,'nationalize':.1,'bulk_nationalize_state':.1,'demobilize':.2,'demobilize_all':.2,'downsize':.1,'pause_construction':.1,'pause_all_construction':.05,
          'disband_formation':.1,'disband_regulars':.1,'disband_conscripts':.1,'decommission_ship':.1,'cancel_ship':.1,'cancel_ship_item':.1,'delete_ship_template':.1,'declare_bankruptcy':.1,
          'abandon_colony':.1,'unincorporate':.1,'remove_company':.1,'remove_decree':.1,'capitulate':.1,'white_peace':.1,'leave_power_bloc':.1,'kick_from_power_bloc':.1}
-NAVY_WEIGHT=3
-STRAIT_WEIGHT=3
 HOURS_PER_DAY=24
 MAX_TECH=1.5
 HOURS_PER_YEAR=365*HOURS_PER_DAY
@@ -447,7 +445,6 @@ TOP_PRESTIGE=('GBR','CHI','FRA','RUS','BIC','PRU','AUS','TUR','USA','EGY','JAP',
 
 
 RECENT_ROUNDS=5
-MIN_SESSION_SECONDS=240
 
 
 @timed
@@ -457,11 +454,8 @@ def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds):
     recent=store.recent_tags(RECENT_ROUNDS)
     if chosen in recent:
         raise ValueError(f'{chosen} was played in one of the last {RECENT_ROUNDS} rounds: {recent}')
-    manifest=json.loads(world.read_text(encoding='utf-8')) if world else {'countries':[],'straits':[]}
-    countries=[country for country in manifest['countries'] if country['country_type']!='decentralized']
-    endpoints={province for strait in manifest['straits'] for province in (strait['from'],strait['to'])}
-    tag=chosen or (rng.choices([country['tag'] for country in countries],
-                               weights=[(NAVY_WEIGHT if country['navy'] else 1)*(STRAIT_WEIGHT if endpoints&set(country['provinces']) else 1) for country in countries])[0] if world else
+    manifest=json.loads(world.read_text(encoding='utf-8')) if world else {'countries':[]}
+    tag=chosen or (rng.choice([country['tag'] for country in manifest['countries'] if country['country_type']!='decentralized']) if world else
                    rng.choice([tag for tag in TOP_PRESTIGE if tag not in recent]))
     game.close()
     game.campaign(tag,world=str(world) if world else None,debug=False)
@@ -485,8 +479,9 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--profile',default='actions')
     parser.add_argument('--advisors',nargs='+',default=['random'])
-    parser.add_argument('--years',type=float,default=20)
-    parser.add_argument('--minutes',type=float,default=10)
+    parser.add_argument('--runs',type=int,required=True)
+    parser.add_argument('--years',type=float,default=100)
+    parser.add_argument('--minutes',type=float,default=30)
     parser.add_argument('--seed',type=int,default=int(time.strftime('%Y%m%d%H%M%S')))
     parser.add_argument('--pool',type=int,default=0)
     parser.add_argument('--vanilla',action='store_true')
@@ -508,12 +503,12 @@ def main():
     weights={**WEIGHTS,**{name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}}
     advisors=[ADVISORS[name](rng.randrange(10**9),weights) for name in arguments.advisors]
     worlds=Vanilla(rng) if arguments.vanilla else WorldPool(rng,arguments.pool,levels) if arguments.pool else Fresh(rng,levels)
-    deadline=time.monotonic()+arguments.minutes*60
     chosen=arguments.tag
     crashes=0
-    while (remaining:=deadline-time.monotonic())>=MIN_SESSION_SECONDS:
+    completed=0
+    while completed<arguments.runs:
         try:
-            counts=session(game,watchdog,rng,worlds,advisors,arguments,chosen,remaining)
+            counts=session(game,watchdog,rng,worlds,advisors,arguments,chosen,arguments.minutes*60)
         except GameCrashed as error:
             crashes+=1
             LOG.error('GAME CRASHED (%d in a row): %s',crashes,error)
@@ -527,6 +522,7 @@ def main():
             raise
         chosen=None
         crashes=0
+        completed+=1
         print(json.dumps(counts),flush=True)
 
 
