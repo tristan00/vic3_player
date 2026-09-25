@@ -1,13 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 set LOG=D:\vic3_data\interface\%~1.log
-set ARGS=
-:next
-shift
-if "%~1"=="" goto run
-set ARGS=!ARGS! %1
-goto next
-:run
+set "ARGS=%*"
+for /f "tokens=1,* delims= " %%a in ("!ARGS!") do set "ARGS=%%b"
 cd /d D:\vic3_agent
 echo ROUND STARTED args=!ARGS! at !DATE! !TIME! > "!LOG!"
 .venv\Scripts\python.exe -m loop.run !ARGS! >> "!LOG!" 2>&1
