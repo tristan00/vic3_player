@@ -726,7 +726,7 @@ def generate(seed,countries,states,tech,pop,*,game_dir=DEFAULT_GAME,data_dir=DEF
                          'hubs':s['hubs'],'template':s['template']} for s in regions],
               'seas':[{'id':s['id'],'key':s['key'],'name':s['name'],'province':codes[s['province']]} for s in seas],
               'lakes':[codes[p] for p in lakes],
-              'straits':[{'from':codes[s['from']],'to':codes[s['to']]} for s in straits]}
+              'straits':[{'from':codes[s['from']],'to':codes[s['to']]} for s in chokepoints]}
     write_json(work/'manifest.json',manifest)
     work.rename(out)
     return out/'manifest.json'
