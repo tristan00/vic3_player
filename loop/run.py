@@ -11,7 +11,6 @@ import threading
 import time
 
 from advisors import ADVISORS
-from advisors.random_picker import TIME_CONTROL
 from interface import GameInterface, generate, record
 from interface.actions import Executor
 from interface.actions.catalogue import BY_NAME, GROUP
@@ -37,8 +36,6 @@ PARKED=set()
 RUN_DAYS=(10,90)
 WORLD_STATES=(80,150)
 PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
-WEIGHTS={'cancel_enactment':.1,'nationalize':.1,'bulk_nationalize_state':.1,'build':3,'research':3,'enact_law':2,'switch_production_method':3,'bulk_switch_production_method_state':3,'deploy_to_front':5,'set_strategic_objective':3,'start_play_country':.1,'start_play_state':.1,'mobilize':5,'mobilize_all':5,'raise_conscripts':3,'demobilize':.2,'demobilize_all':.2,'cancel_construction':.1,'cancel_queue_item':.1,'downsize':.1,'pause_construction':.1,'dequeue_research':.1,'pause_all_construction':.05}
-UNVERIFIED_WEIGHT=10
 NAVY_WEIGHT=3
 STRAIT_WEIGHT=3
 HOURS_PER_DAY=24
@@ -87,14 +84,10 @@ def targets(name,params,links={}):
     return (objects or {('group',GROUP[name])})|{('shared',slot) for slot,names in SLOTS.items() if name in names}
 
 
-def nothing_offered(options):
-    return not any(combos for name,combos in options.items() if name not in TIME_CONTROL)
-
-
 @timed
-def unverified_actions():
+def verified_actions():
     with psycopg.connect(DSN) as connection:
-        return {name for name, in connection.execute('select action from action_verification where not verified_by_standard')}
+        return {name for name, in connection.execute('select action from action_verification where verified_by_standard')}
 
 
 def game_hours(snapshot):
@@ -102,8 +95,9 @@ def game_hours(snapshot):
 
 
 class Loop:
-    def __init__(self,game,advisors,rng,run,journal=None,context=None):
+    def __init__(self,game,advisors,rng,run,excluded,journal=None,context=None):
         self.game=game
+        self.excluded=excluded
         self.context=context or {}
         self.advisors=advisors
         self.rng=rng
@@ -176,8 +170,6 @@ class Loop:
         batch=[]
         touched=set()
         options=available(snapshot)
-        if nothing_offered(options):
-            raise GameCrashed(f'No action was available during the pause at snapshot {snapshot.seq}')
         events=options['choose_event_option']
         for event in sorted({combo['event'] for combo in events}):
             name,params=self.advisors[0].choose({'choose_event_option':[combo for combo in events if combo['event']==event]},snapshot)
@@ -198,10 +190,13 @@ class Loop:
                 choices={name:[dict(combo)] for name in pair if dict(combo) in answers[name]}
                 name,params=self.advisors[0].choose({**choices,**({'quick_decline_proposal':[dict(combo)]} if dict(combo) in quick else {})},snapshot)
                 self.perform(self.advisors[0].name,name,params,snapshot,batch)
-        for _ in range(self.rng.randint(*ACTIONS_PER_PAUSE)):
+        options={name:combos for name,combos in options.items() if name not in self.excluded}
+        for n in range(self.rng.randint(*ACTIONS_PER_PAUSE)):
             advisor=self.rng.choice(self.advisors)
             pick=advisor.choose({name:[combo for combo in combos if not targets(name,combo,links)&touched] for name,combos in options.items()},snapshot)
             if pick is None:
+                if not n:
+                    raise GameCrashed(f'No selectable action during the pause at snapshot {snapshot.seq}; {len(self.excluded)} verified actions are excluded')
                 break
             touched|=targets(*pick,links)
             self.perform(advisor.name,*pick,snapshot,batch)
@@ -498,7 +493,7 @@ def recent_tags():
 
 
 @timed
-def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds):
+def session(game,watchdog,rng,worlds,advisors,excluded,arguments,chosen,seconds):
     world=worlds.take()
     recent=recent_tags()
     if chosen in recent:
@@ -513,7 +508,7 @@ def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds):
     game.campaign(tag,world=str(world) if world else None,debug=False)
     seed=rng.randrange(10**9)
     name=world.parent.name if world else 'vanilla'
-    loop=Loop(game,advisors,random.Random(seed),run_record(arguments,'vanilla' if world is None else 'mini',name,tag,seed),
+    loop=Loop(game,advisors,random.Random(seed),run_record(arguments,'vanilla' if world is None else 'mini',name,tag,seed),excluded,
               context={'world':name,'tag':tag})
     watchdog.store=loop.store
     counts=loop.run(arguments.years,seconds)
@@ -555,11 +550,13 @@ def main():
     watchdog=Watchdog(game)
     watchdog.start()
     rng=random.Random(arguments.seed)
-    weights={**WEIGHTS,**{name:UNVERIFIED_WEIGHT for name in unverified_actions()},**{name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}}
+    weights={name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}
     advisors=[ADVISORS[name](rng.randrange(10**9),weights) for name in arguments.advisors]
+    excluded=verified_actions()
+    LOG.info('%d verified actions are excluded from selection: %s',len(excluded),' '.join(sorted(excluded)))
     if arguments.attach:
         seed=rng.randrange(10**9)
-        loop=Loop(game,advisors,random.Random(seed),run_record(arguments,'attached',None,None,seed))
+        loop=Loop(game,advisors,random.Random(seed),run_record(arguments,'attached',None,None,seed),excluded)
         watchdog.store=loop.store
         print(json.dumps(loop.run(arguments.years,arguments.minutes*60)),loop.journal)
         return
@@ -569,7 +566,7 @@ def main():
     crashes=0
     while (remaining:=deadline-time.monotonic())>=MIN_SESSION_SECONDS:
         try:
-            counts,journal=session(game,watchdog,rng,worlds,advisors,arguments,chosen,remaining)
+            counts,journal=session(game,watchdog,rng,worlds,advisors,excluded,arguments,chosen,remaining)
         except GameCrashed as error:
             crashes+=1
             LOG.error('GAME CRASHED (%d in a row): %s',crashes,error)
