@@ -127,11 +127,12 @@ def prepare(game,tag,world,extra=()):
     mod=game.data_dir/'control'/game.profile.name
     token=uuid.uuid4().hex
     shutil.rmtree(mod,ignore_errors=True)
-    actions=[START,'MapListPanelManager.ToggleFailedOptions','MapListPanelManager.ToggleInvalidOptions',f"TimeKeeper.SetGameSpeed('(int32){SPEED-1}')"]+list(extra)+request(tag,token)
+    camera=[]
     if world:
         width,height=world['width'],world['height']
-        actions=["ExecuteConsoleCommand('Camera.ForceDisableWrap yes')",
-                 f"ExecuteConsoleCommand('Camera.SetTransform {width/2} 0 {height/2} {max(width*.65,height*1.2)} 85 0')"]+actions
+        camera=["ExecuteConsoleCommand('Camera.ForceDisableWrap yes')",
+                f"ExecuteConsoleCommand('Camera.SetTransform {width/2} 0 {height/2} {max(width*.65,height*1.2)} 85 0')"]
+    actions=[START,'MapListPanelManager.ToggleFailedOptions','MapListPanelManager.ToggleInvalidOptions',f"TimeKeeper.SetGameSpeed('(int32){SPEED-1}')"]+camera+list(extra)+request(tag,token)
     gui=game.game_dir/'game/gui'
     hud=(gui/'ingame_hud.gui').read_text(encoding='utf-8-sig')
     write_script(mod/'gui/ingame_hud.gui',hud.replace('name = "ingame_hud"','name = "ingame_hud"\n'+widget(actions)+CAPTURE_WIDGET(tag)+UI_WIDGET+capture_widgets()+event_capture_widget(game.game_dir,[world['mod']] if world else [])

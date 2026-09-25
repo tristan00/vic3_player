@@ -16,7 +16,11 @@ from .tail import LogTail
 STARTUP_QUIET=30
 
 
-FAST={'Graphics':{'quality':'low','resolution':'1280x720','display_mode':'windowed','setting_framerate_cap':'120','vsync':False},
+FAST={'Graphics':{'quality':'low','resolution':'1280x720','display_mode':'windowed','setting_framerate_cap':'30','vsync':False,
+                  'shader_quality':'low','texture_quality':'low','texture_streaming':False,'shadowmap_resolution':'disabled','anti_aliasing':'DISABLED',
+                  'anisotropic_filtering':'DISABLED','refraction_quality':'disabled','mapobject_quality':'low','buildings_cutoff':True,'mesh_lod_bias':'low',
+                  'mesh_lod_fade':False,'bloom_quality':'low','animated_portraits':False,'portraits_ssao':False,
+                  'portrait_render_scale':'none'},
       'Audio':{'volume.bus:/':0},'GUI':{'scale':'1'},'game':{'pause_on_event':False}}
 
 
