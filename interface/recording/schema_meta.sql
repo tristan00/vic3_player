@@ -188,7 +188,7 @@ create table loop_action (
   action int4 not null references action,
   before_seq int4 not null,
   after_seq int4,
-  status text not null check (status in ('verified', 'unverified', 'no_effect', 'invalid', 'raced', 'no_object', 'ui_leftover')),
+  status text not null check (status in ('done', 'invalid', 'raced', 'no_object', 'ui_leftover')),
   detail text,
   ms int4,
   logged_at timestamptz not null,

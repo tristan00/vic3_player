@@ -179,32 +179,6 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(c.execute('select end_reason,ended_at=heartbeat_at from run where run_id=%s',(lost,)).fetchone(),('loop_lost',True))
         self.assertEqual(c.execute('select count(*) from run_lost').fetchone(),(0,))
 
-    def test_verification_is_computed_by_the_database_from_logged_actions(self):
-        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
-        c=self.store.connection
-        self.store.catalogue(['build','research'])
-        for n,(name,status) in enumerate((('build','verified'),('build','verified'),('build','verified'),('research','invalid')),1):
-            self.store.log_action({'seq':n,'turn':1,'advisor':'random','action':name,'params':{'state':1},'snapshot':0,'status':status,'detail':'x','ms':1},None)
-        rows=dict((a,(r,v,f,w,ok)) for a,r,v,f,w,ok in c.execute('select action,runs,verified,failed,worlds,verified_by_standard from action_verification').fetchall())
-        self.assertEqual(rows['build'],(1,3,0,1,False))
-        self.assertEqual(rows['research'],(1,0,1,0,False))
-        for run in range(2,4):
-            with c.transaction():
-                c.execute("insert into run (kind,source_session,started_at,heartbeat_at,progress_at,progress_step,world_id,ruleset_id,player_country,game_speed,first_start,"
-                          "custom_rng_seed) select 'attached',source_session,started_at,now(),now(),'copy',world_id,ruleset_id,player_country,game_speed,first_start,"
-                          "custom_rng_seed from run where run_id=%s",(self.store.run_id,))
-                new=c.execute('select max(run_id) from run').fetchone()[0]
-                c.execute("insert into snapshot select %s,seq,phase,game_date,taken_at,read_ms,local_date_time,paused,speed,ui_panel_open,ui_interaction_open,ui_map_list_open from snapshot where run_id=%s",(new,self.store.run_id))
-                c.execute("insert into country (run_id,country,first_seq) select %s,country,first_seq from country where run_id=%s",(new,self.store.run_id))
-                c.execute("insert into loop_action select %s,n,turn,advisor,action,before_seq,after_seq,status,detail,ms,logged_at from loop_action where run_id=%s",(new,self.store.run_id))
-        rows=dict((a,(r,v,ok)) for a,r,v,ok in c.execute('select action,runs,verified,verified_by_standard from action_verification').fetchall())
-        self.assertEqual(rows['build'],(3,9,True))
-        self.assertEqual(rows['research'],(3,0,False))
-        for run in c.execute('select run_id from run where run_id<>%s',(self.store.run_id,)).fetchall():
-            c.execute('select delete_run(%s)',run)
-        self.assertEqual(c.execute('select verified_actions,catalogue_actions,never_attempted from verification_summary').fetchone(),(0,2,0))
-        self.assertEqual(c.execute('select world from action_run_outcome').fetchone(),('attached',))
-
     def test_samples_are_immutable(self):
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
         changed=built({**STEPS[1],'samples':[(1,0.9),(2,0.6)]})

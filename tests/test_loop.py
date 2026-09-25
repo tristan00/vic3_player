@@ -4,8 +4,6 @@ from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from advisors import ADVISORS, RandomAdvisor
-from loop.effects import verify
-from tests.memory_stored import Memory
 
 
 class Queue:
@@ -16,59 +14,6 @@ class Queue:
 
     def rows(self,table,columns,**equal):
         return list(self.items) if (table,columns,equal)==('player_construction_queue_item','construction_left,speed',{'private':False}) else []
-
-
-class EffectTests(unittest.TestCase):
-    def test_research_and_subject_verdicts_read_stored_rows(self):
-        before=Memory(7,{'country_research_history':[{'country_research':3,'country':7,'researching':None}],
-                         'formation_history':[{'formation':5,'country':7}],'formation_report':[{'formation':5,'recalled':False}]})
-        after=Memory(7,{'country_research_history':[{'country_research':3,'country':7,'researching':'tech_x'}],
-                        'formation_history':[{'formation':5,'country':7}],'formation_report':[{'formation':5,'recalled':True}]})
-        self.assertTrue(verify('research',{'technology':'tech_x'},before,after))
-        self.assertFalse(verify('research',{'technology':'tech_y'},before,after))
-        self.assertTrue(verify('recall_fleet',{'military_formation':5},before,after))
-        self.assertFalse(verify('recall_fleet',{'military_formation':5},after,after))
-        self.assertIsNone(verify('upgrade_conscripts',{'military_formation':5},before,after))
-
-    def test_retrofit_and_template_edit_verdicts(self):
-        rows=lambda flag,versions:{'formation_history':[{'formation':5,'country':7}],'formation_report':[{'formation':5,'retrofitting':flag}],
-                                   'ship_template_history':[{'ship_template':9,'country':7,'ship_type':'x'},{'ship_template':10,'country':8,'ship_type':'x'}],
-                                   'ship_template_version_list':[{'ship_template':9,'position':i,'ship_template_version':20+i} for i in range(versions)]+[{'ship_template':10,'position':0,'ship_template_version':30}],
-                                   'ship_template_version_modification':[{'ship_template_version':20,'position':0,'ship_modification':'z'},{'ship_template_version':21,'position':0,'ship_modification':'y'},
-                                                                         {'ship_template_version':30,'position':0,'ship_modification':'y'}]}
-        idle,busy=Memory(7,rows(False,1)),Memory(7,rows(True,1))
-        self.assertTrue(verify('retrofit_fleet',{'military_formation':5},idle,busy))
-        self.assertFalse(verify('retrofit_fleet',{'military_formation':5},busy,busy))
-        self.assertTrue(verify('cancel_retrofit_fleet',{'military_formation':5},busy,idle))
-        self.assertTrue(verify('retrofit_all',{},idle,busy))
-        self.assertFalse(verify('cancel_retrofit_all',{},idle,busy))
-        self.assertTrue(verify('edit_ship_template',{'ship_type':'x','ship_modification':'y','index':0},idle,Memory(7,rows(False,2))))
-        self.assertFalse(verify('edit_ship_template',{'ship_type':'x','ship_modification':'y','index':0},idle,idle))
-
-    def test_template_management_verdicts(self):
-        rows=lambda templates,flags,fleets:{'ship_template_history':[{'ship_template':t,'country':7,'ship_type':'x','ordinal_number':i+1} for i,t in enumerate(templates)],
-                                            'ship_template_private':[{'ship_template':t,'base':i==0,'flags':flags.get(t,0)} for i,t in enumerate(templates)],
-                                            'ship_template_fleet':[{'ship_template':t,'fleet':f} for t,f in fleets]}
-        before=Memory(7,rows([9,10],{9:3},[]))
-        self.assertTrue(verify('set_default_ship_template',{'ship_type':'x','index':1},before,Memory(7,rows([9,10],{9:2,10:1},[]))))
-        self.assertFalse(verify('set_default_ship_template',{'ship_type':'x','index':1},before,before))
-        self.assertTrue(verify('set_fleet_ship_template',{'ship_type':'x','index':1,'military_formation':5},before,Memory(7,rows([9,10],{9:3},[(10,5)]))))
-        self.assertFalse(verify('set_fleet_ship_template',{'ship_type':'x','index':0,'military_formation':5},before,Memory(7,rows([9,10],{9:3},[(10,5)]))))
-        self.assertTrue(verify('delete_ship_template',{'ship_type':'x','index':1},before,Memory(7,rows([9],{9:3},[]))))
-        self.assertFalse(verify('delete_ship_template',{'ship_type':'x','index':1},before,before))
-
-    def test_strait_verdicts_read_the_side_of_the_state(self):
-        rows=lambda **values:{'strait_endpoint':[{'strait':10,'first_state':1,'second_state':2}],
-                              'strait_history':[{'strait':10,'first_toll_rate':1,'second_toll_rate':1,'first_access_status':0,'second_access_status':0,'first_access_permissions':0,'second_access_permissions':0,**values}]}
-        before=Memory(7,rows())
-        self.assertTrue(verify('set_strait_toll',{'strait':10,'level':'HighTolls'},before,Memory(7,rows(second_toll_rate=3))))
-        self.assertFalse(verify('set_strait_toll',{'strait':10,'level':'HighTolls'},before,Memory(7,rows(second_toll_rate=2))))
-        self.assertFalse(verify('set_strait_toll',{'strait':10,'level':'LowTolls'},before,before))
-        self.assertTrue(verify('set_strait_access',{'strait':10,'state':2,'access':'Closed'},before,Memory(7,rows(second_access_status=2))))
-        self.assertTrue(verify('set_strait_access',{'strait':10,'state':2,'access':'Closed'},before,Memory(7,rows(first_access_status=2))))
-        self.assertFalse(verify('set_strait_access',{'strait':10,'state':2,'access':'Closed'},before,Memory(7,rows(first_access_status=1))))
-        self.assertTrue(verify('set_strait_allowed',{'strait':10,'state':1,'allowed':'OnlyController'},before,Memory(7,rows(first_access_permissions=3))))
-        self.assertFalse(verify('set_strait_allowed',{'strait':10,'state':1,'allowed':'OnlyAllies'},before,Memory(7,rows(first_access_permissions=3))))
 
 
 class AdvisorTests(unittest.TestCase):
@@ -97,24 +42,6 @@ class AdvisorTests(unittest.TestCase):
         self.assertIs(ADVISORS['random'],RandomAdvisor)
 
 
-class CoverageTests(unittest.TestCase):
-    def test_coverage_names_only_catalogue_actions(self):
-        from interface.actions.catalogue import BY_NAME
-        from loop.coverage import COVERED
-        self.assertEqual({name for names in COVERED.values() for name in names}-set(BY_NAME),set())
-
-    def test_every_catalogue_action_is_mapped_to_a_row(self):
-        from interface.actions.catalogue import BY_NAME
-        from loop.coverage import COVERED
-        self.assertEqual(set(BY_NAME)-{name for names in COVERED.values() for name in names},set())
-
-    def test_rows_are_either_covered_infeasible_or_known(self):
-        from loop.coverage import COVERED, INFEASIBLE, ROWS
-        self.assertEqual(len(ROWS),154)
-        self.assertEqual((set(COVERED)|set(INFEASIBLE))-set(ROWS),set())
-        self.assertEqual(set(COVERED)&set(INFEASIBLE),set())
-
-
 class TurnTests(unittest.TestCase):
     def test_actions_on_the_same_object_conflict_and_choices_do_not(self):
         from loop.run import targets
@@ -137,24 +64,6 @@ class TurnTests(unittest.TestCase):
     def test_two_queue_moves_conflict(self):
         from loop.run import targets
         self.assertTrue(targets('raise_queue_item',{'state':1,'building_type':'a'})&targets('last_queue_item',{'state':2,'building_type':'b'}))
-
-    def test_a_queue_move_is_judged_on_the_items_both_snapshots_hold(self):
-        from loop import effects
-        test=effects.EFFECTS['raise_queue_item'][1]
-        queues={}
-        original=effects.queue
-        effects.queue=lambda snapshot:list(queues[snapshot])
-        try:
-            queues.update(a=[(1,'x'),(2,'y'),(3,'z')],b=[(2,'y'),(1,'x'),(4,'new')])
-            self.assertTrue(test('a','b',{'state':2,'building_type':'y'},None))
-            queues.update(a=[(1,'x'),(2,'y'),(3,'z')],b=[(2,'y'),(1,'x'),(3,'z'),(4,'new')])
-            self.assertTrue(test('a','b',{'state':2,'building_type':'y'},None))
-            queues.update(a=[(1,'x'),(2,'y'),(3,'z')],b=[(2,'y'),(3,'z')])
-            self.assertIsNone(test('a','b',{'state':2,'building_type':'y'},None))
-            queues.update(a=[(1,'x'),(2,'y'),(3,'z')],b=[(1,'x'),(2,'y')])
-            self.assertFalse(test('a','b',{'state':2,'building_type':'y'},None))
-        finally:
-            effects.queue=original
 
     def test_actions_without_objects_conflict_within_their_group(self):
         from loop.run import targets

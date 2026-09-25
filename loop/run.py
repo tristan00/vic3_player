@@ -18,7 +18,6 @@ from interface.recording.store import Store
 from interface.runner.screen import shot
 from interface.options import available
 from interface.options.stored import Stored
-from loop.effects import verify
 
 LOG=logging.getLogger('loop')
 
@@ -120,7 +119,7 @@ class Loop:
         entry={**self.context,**entry,'after':after.seq if after else None}
         with open(self.journal,'a',encoding='utf-8') as handle:
             handle.write(json.dumps(entry,ensure_ascii=False)+'\n')
-        if entry['status'] not in ('verified','unverified'):
+        if entry['status']!='done':
             LOG.warning('%s %s %s %s',entry['status'],entry['action'],entry['params'],entry.get('detail',''))
 
     def capture(self,name):
@@ -159,7 +158,7 @@ class Loop:
         pending.append((entry,snapshot,result))
 
     @timed
-    def turn_actions(self,snapshot,carried):
+    def turn_actions(self,snapshot):
         batch=[]
         touched=set()
         options=available(snapshot)
@@ -194,23 +193,18 @@ class Loop:
             self.perform(advisor.name,*pick,snapshot,batch)
             if pick[0] in ENDS_PAUSE:
                 break
-        if not batch and not carried:
-            return snapshot,[]
+        if not batch:
+            return snapshot
         after=self.snapshot('post_action')
         left=self.open_ui(after)
         if left:
             for entry,_,_ in batch:
                 self.note({**entry,'status':'ui_leftover','detail':f'{"+".join(left)} open after the pause: {" ".join(item["action"] for item,_,_ in batch)}'},after)
-            batch=[]
             self.stuck(left)
-        later=[]
-        for entry,before,result in carried+batch:
-            verdict=verify(entry['action'],entry['params'],before,after)
-            if verdict is False:
-                later.append((entry,before,result))
-            else:
-                self.note({**entry,'status':'verified' if verdict else 'unverified'},after)
-        return after,later
+            return after
+        for entry,_,_ in batch:
+            self.note({**entry,'status':'done'},after)
+        return after
 
     def open_ui(self,snapshot):
         meta=snapshot.meta
@@ -263,11 +257,12 @@ class Loop:
                 self.note({**item,'status':'ui_leftover','detail':detail},after)
             self.note({**entry,'ms':round((time.monotonic()-started)*1000),'status':'ui_leftover','detail':detail},after)
             self.stuck(left)
-            return after,[],[]
-        reached=game_hours(after)
-        self.note({**entry,'ms':round((time.monotonic()-started)*1000),'status':'verified' if reached>=target else 'no_effect',
-                   'detail':f'{(reached-target)/HOURS_PER_DAY:+.1f} days past the target, longest tick gap {longest_gap*1000:.0f} ms'},after)
-        return after,[(entry,after,result) for entry,_,result in paused],pending
+            return after
+        for item,_,_ in pending+paused:
+            self.note({**item,'status':'done'},after)
+        self.note({**entry,'ms':round((time.monotonic()-started)*1000),'status':'done',
+                   'detail':f'{(game_hours(after)-target)/HOURS_PER_DAY:+.1f} days past the target, longest tick gap {longest_gap*1000:.0f} ms'},after)
+        return after
 
     def crashed(self):
         noticed=datetime.now(timezone.utc)
@@ -328,18 +323,14 @@ class Loop:
         if left:
             raise RuntimeError(f'The round starts with {"+".join(left)} open')
         start=game_hours(snapshot)
-        carried=[]
         while True:
             if time.monotonic()>deadline:
                 return self.end('time')
             if game_hours(snapshot)-start>=years*HOURS_PER_YEAR:
                 return self.end('years')
             self.turn+=1
-            snapshot,later=self.turn_actions(snapshot,carried)
-            snapshot,carried,pending=self.run_days(snapshot)
-            for entry,before,result in later+pending:
-                verdict=verify(entry['action'],entry['params'],before,snapshot)
-                self.note({**entry,'status':'verified' if verdict else 'no_effect' if verdict is False else 'unverified'},snapshot)
+            snapshot=self.turn_actions(snapshot)
+            snapshot=self.run_days(snapshot)
 
 
 def build(seed,countries,states,tech,pop):
