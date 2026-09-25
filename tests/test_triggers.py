@@ -32,6 +32,15 @@ class TriggerTests(unittest.TestCase):
         self.assertFalse(evaluate(parse('has_government_type = gov_chartered_company'),country_scope(s)))
         self.assertTrue(evaluate(parse('has_government_type = gov_chartered_company'),country_scope(s,9)))
 
+    def test_play_enemy_is_the_opposite_side_of_a_present_play(self):
+        s=Memory(7,{'country_history':[{'country':7},{'country':9},{'country':4},{'country':5}],
+                    'diplomatic_play_history':[{'diplomatic_play':1,'initiator':7,'target':9}],
+                    'diplomatic_play_country':[{'diplomatic_play':1,'country':5,'role':'initiator'}]})
+        rule=parse('is_diplomatic_play_enemy_of = scope:target_country')
+        self.assertTrue(evaluate(rule,country_scope(s,target_country=('country',9))))
+        self.assertFalse(evaluate(rule,country_scope(s,target_country=('country',5))))
+        self.assertFalse(evaluate(rule,country_scope(s,target_country=('country',4))))
+
     def test_play_participation_alongside_counts_the_same_side_including_oneself(self):
         s=Memory(7,{'country_history':[{'country':7},{'country':9},{'country':4},{'country':5}],
                     'diplomatic_play_history':[{'diplomatic_play':1,'initiator':7,'target':9}],

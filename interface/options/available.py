@@ -8,7 +8,7 @@ from ..recording.spec import METRIC_COLUMNS
 from ..runner.memory import MONTH_STARTS
 
 from .triggers import ENGAGED, Scope, autonomous, bloc_advantage, modifier_flag, character_scope, country_scope, evaluate, overlords, parse, subject_pairs
-from .triggers import play_sides, stance, coastal as trigger_coastal, laws as trigger_laws, technologies as trigger_technologies
+from .triggers import play_sides, play_enemies, indirect_overlords, stance, coastal as trigger_coastal, laws as trigger_laws, technologies as trigger_technologies
 
 SLOT=0xFFFFFF
 
@@ -1285,6 +1285,10 @@ def in_play(s,country):
     return any(country in members for members in play_sides(s).values())
 
 
+def play_opposed(s,country):
+    return bool(play_enemies(s,s.player)&({country}|overlords(s,country)|indirect_overlords(s,country)))
+
+
 def incorporation(s):
     return s.map('state_status','state,incorporation')
 
@@ -1870,11 +1874,11 @@ RULES={
                                              for obligation,direction,wanted in (('CallInObligation','owes_player',True),('OweObligation','player_owes',False))
                                              if ((option['country'],direction) in obligations(s))==wanted],
     'start_play_confirmed':lambda s:[{**option,'mode':mode} for option in RULES['start_play_country'](s) for mode in ('AsDemand','ForcePlay')],
-    'start_play_country':lambda s:[{'country':country,'diplomatic_play_type':play} for country in s.countries() if reachable_country(s,country)
+    'start_play_country':lambda s:[{'country':country,'diplomatic_play_type':play} for country in s.countries() if reachable_country(s,country) and not play_opposed(s,country)
                                    for play in play_types(s,'country') if play_allowed(s,play,target_country=('country',country))
                                    and not country_regions(s,country)&regions_in_play(s)
                                    and (not marker_required(s,play) or state_regions(s).get(s.map('country','country,capital').get(country)) in engaged(s))],
-    'start_play_state':lambda s:[{'state':state,'diplomatic_play_type':play} for state,country in s.rows('state','state,country') if country!=s.player and reachable_state(s,state)
+    'start_play_state':lambda s:[{'state':state,'diplomatic_play_type':play} for state,country in s.rows('state','state,country') if country!=s.player and reachable_state(s,state) and not play_opposed(s,country)
                                  for play in play_types(s,'state') if play_allowed(s,play,target_country=('country',country),target_state=('state',state))
                                  and state_regions(s).get(state) not in regions_in_play(s)
                                  and (not marker_required(s,play) or state_regions(s).get(state) in engaged(s))],

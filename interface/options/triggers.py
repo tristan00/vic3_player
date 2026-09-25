@@ -322,6 +322,11 @@ def play_participants(s,first,second):
     return any(first in members and second in members for members in play_sides(s).values())
 
 
+def play_enemies(s,country):
+    sides=play_sides(s)
+    return {member for (play,side),members in sides.items() if country in sides.get((play,1-side),set()) for member in members}
+
+
 def interest_tier(s,country,region):
     involvement=next((value for owner,key,value in s.rows('interest','country,strategic_region,involvement') if owner==country and key==region),0)
     tiers=s.definitions('common/interest_tier_types').values()
@@ -877,7 +882,7 @@ def country_test(key,operator,value,scope):
     if key=='has_journal_entry':
         return value in journal_types(s,country)
     if key=='is_diplomatic_play_enemy_of':
-        return False
+        return resolve(scope,value) in play_enemies(s,country)
     if key=='this':
         return resolve(scope,value)==scope.ident
     if key=='has_modifier':
