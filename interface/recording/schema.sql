@@ -636,7 +636,7 @@ create table budget_line (
 
 create table run (
   run_id int4 generated always as identity primary key,
-  kind text not null check (kind in ('mini', 'vanilla', 'attached')),
+  kind text not null check (kind in ('mini', 'vanilla')),
   source_session text not null,
   started_at timestamptz not null,
   heartbeat_at timestamptz not null,
@@ -654,16 +654,6 @@ create table run (
   game_speed int2 not null,
   first_start bool not null,
   custom_rng_seed text not null,
-  unique (run_id, world_id),
-  unique (run_id, kind),
-  check ((ended_at is null) = (end_reason is null)),
-  check (end_detail is null or end_reason in ('loop_crashed', 'game_crashed', 'loop_stalled')),
-  check ((longest_step is null) = (longest_step_ms is null))
-);
-
-create table run_generated (
-  run_id int4 primary key,
-  kind text not null check (kind in ('mini', 'vanilla')),
   tag int2 not null references country_definition,
   world_file text not null,
   cli_seed int8 not null,
@@ -672,8 +662,10 @@ create table run_generated (
   minutes float8 not null,
   profile text not null,
   pool int4 not null,
-  journal text not null,
-  foreign key (run_id, kind) references run (run_id, kind)
+  unique (run_id, world_id),
+  check ((ended_at is null) = (end_reason is null)),
+  check (end_detail is null or end_reason in ('loop_crashed', 'game_crashed', 'loop_stalled')),
+  check ((longest_step is null) = (longest_step_ms is null))
 );
 
 create table run_advisor (
@@ -692,7 +684,7 @@ create table run_game_rule (
 create table snapshot (
   run_id int4 not null references run,
   seq int4 not null,
-  phase text not null check (phase in ('start', 'post_action', 'post_run', 'manual')),
+  phase text not null check (phase in ('start', 'post_action', 'post_run')),
   game_date game_hours not null,
   taken_at timestamptz not null,
   read_ms float4 not null,

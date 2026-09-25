@@ -13,9 +13,8 @@ from advisors import ADVISORS
 from interface import GameInterface, generate, record
 from interface.actions import Executor
 from interface.actions.catalogue import BY_NAME, GROUP
-from interface.common import DEFAULT_DATA, STALL_LIMIT, GameCrashed, progress, progress_age, timed
+from interface.common import STALL_LIMIT, GameCrashed, progress, progress_age, timed
 from interface.recording.store import Store
-from interface.runner.screen import shot
 from interface.options import available
 from interface.options.stored import Stored
 
@@ -88,21 +87,16 @@ def game_hours(snapshot):
 
 
 class Loop:
-    def __init__(self,game,advisors,rng,run,journal=None,context=None):
+    def __init__(self,game,advisors,rng,store,run):
         self.game=game
-        self.context=context or {}
         self.advisors=advisors
         self.rng=rng
-        self.store=Store()
+        self.store=store
         self.store.catalogue([name for name in BY_NAME if GROUP[name]!='time'])
         self.executor=Executor(game)
         self.process=game.reader().process
         self.watching=self.process.watch(self.crashed)
-        self.journal=journal or DEFAULT_DATA/'loop'/f'{time.strftime("%Y%m%dT%H%M%S")}.jsonl'
-        self.journal.parent.mkdir(parents=True,exist_ok=True)
-        self.attached=run['kind']=='attached'
-        loop={} if self.attached else {'journal':self.journal.name,'advisors':[advisor.name for advisor in advisors]}
-        self.store.begin_run(started_at=datetime.now(timezone.utc),**run,**loop)
+        self.store.begin_run(started_at=datetime.now(timezone.utc),advisors=[advisor.name for advisor in advisors],**run)
         self.counts={}
         self.misses=0
         self.dirty=0
@@ -111,25 +105,17 @@ class Loop:
 
     def entry(self,source,name,params,snapshot):
         self.seq+=1
-        return {'turn':self.turn,'seq':self.seq,'advisor':source,'action':name,'params':params,'snapshot':snapshot.seq,'date':snapshot.date}
+        return {'turn':self.turn,'seq':self.seq,'advisor':source,'action':name,'params':params,'snapshot':snapshot.seq}
 
     def note(self,entry,after=None):
         self.counts[entry['status']]=self.counts.get(entry['status'],0)+1
         self.store.log_action(entry,after.seq if after else None)
-        entry={**self.context,**entry,'after':after.seq if after else None}
-        with open(self.journal,'a',encoding='utf-8') as handle:
-            handle.write(json.dumps(entry,ensure_ascii=False)+'\n')
         if entry['status']!='done':
             LOG.warning('%s %s %s %s',entry['status'],entry['action'],entry['params'],entry.get('detail',''))
 
-    def capture(self,name):
-        screens=DEFAULT_DATA/'screens'
-        screens.mkdir(parents=True,exist_ok=True)
-        shot(screens/f'{self.journal.stem}_{name}.png')
-
     def snapshot(self,phase):
         try:
-            return Stored(self.store.connection,*record(self.game,self.store,'manual' if self.attached else phase))
+            return Stored(self.store.connection,*record(self.game,self.store,phase))
         except RuntimeError as error:
             if 'no longer owns any state' in str(error):
                 raise Defeated() from error
@@ -145,7 +131,6 @@ class Loop:
             if dead(self.game.reader()):
                 raise Defeated() from error
             self.note({**entry,'status':'no_object','detail':str(error)})
-            self.capture(f'{entry["seq"]}_{name}')
             self.misses+=1
             if self.misses>=NO_OBJECT_STREAK:
                 raise RuntimeError(f'{self.misses} actions in a row found no game object; the executor or GUI is not responding') from error
@@ -210,8 +195,6 @@ class Loop:
         meta=snapshot.meta
         left=sorted({name for name in ('panel','interaction','map_list') if meta[f'ui_{name}_open']}|{window for window, in snapshot.rows('ui_open_window','ui_window')})
         self.dirty=self.dirty+1 if left else 0
-        if left:
-            self.capture(f'ui_{snapshot.seq}')
         return left
 
     def stuck(self,left):
@@ -463,22 +446,11 @@ RECENT_ROUNDS=5
 MIN_SESSION_SECONDS=240
 
 
-def recent_tags():
-    rounds=[]
-    for path in sorted((DEFAULT_DATA/'loop').glob('*.jsonl'),reverse=True):
-        with open(path,encoding='utf-8') as handle:
-            line=handle.readline()
-        if line:
-            rounds.append(json.loads(line)['tag'])
-        if len(rounds)==RECENT_ROUNDS:
-            break
-    return rounds
-
-
 @timed
 def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds):
     world=worlds.take()
-    recent=recent_tags()
+    store=Store()
+    recent=store.recent_tags(RECENT_ROUNDS)
     if chosen in recent:
         raise ValueError(f'{chosen} was played in one of the last {RECENT_ROUNDS} rounds: {recent}')
     manifest=json.loads(world.read_text(encoding='utf-8')) if world else {'countries':[],'straits':[]}
@@ -491,19 +463,16 @@ def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds):
     game.campaign(tag,world=str(world) if world else None,debug=False)
     seed=rng.randrange(10**9)
     name=world.parent.name if world else 'vanilla'
-    loop=Loop(game,advisors,random.Random(seed),run_record(arguments,'vanilla' if world is None else 'mini',name,tag,seed),
-              context={'world':name,'tag':tag})
-    watchdog.store=loop.store
+    loop=Loop(game,advisors,random.Random(seed),store,run_record(arguments,'vanilla' if world is None else 'mini',name,tag,seed))
+    watchdog.store=store
     counts=loop.run(arguments.years,seconds)
     if isinstance(worlds,(WorldPool,Fresh)):
         game.close()
         shutil.rmtree(world.parent)
-    return counts,loop.journal
+    return counts
 
 
 def run_record(arguments,kind,world,tag,seed):
-    if kind=='attached':
-        return {'kind':kind}
     return {'kind':kind,'world':world,'tag':tag,'cli_seed':arguments.seed,'run_seed':seed,
             'years':arguments.years,'minutes':arguments.minutes,'profile':arguments.profile,'pool':arguments.pool}
 
@@ -515,7 +484,6 @@ def main():
     parser.add_argument('--years',type=float,default=20)
     parser.add_argument('--minutes',type=float,default=10)
     parser.add_argument('--seed',type=int,default=int(time.strftime('%Y%m%d%H%M%S')))
-    parser.add_argument('--attach',action='store_true')
     parser.add_argument('--pool',type=int,default=0)
     parser.add_argument('--vanilla',action='store_true')
     parser.add_argument('--tag')
@@ -535,19 +503,13 @@ def main():
     rng=random.Random(arguments.seed)
     weights={**WEIGHTS,**{name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}}
     advisors=[ADVISORS[name](rng.randrange(10**9),weights) for name in arguments.advisors]
-    if arguments.attach:
-        seed=rng.randrange(10**9)
-        loop=Loop(game,advisors,random.Random(seed),run_record(arguments,'attached',None,None,seed))
-        watchdog.store=loop.store
-        print(json.dumps(loop.run(arguments.years,arguments.minutes*60)),loop.journal)
-        return
     worlds=Vanilla(rng) if arguments.vanilla else WorldPool(rng,arguments.pool,levels) if arguments.pool else Fresh(rng,levels)
     deadline=time.monotonic()+arguments.minutes*60
     chosen=arguments.tag
     crashes=0
     while (remaining:=deadline-time.monotonic())>=MIN_SESSION_SECONDS:
         try:
-            counts,journal=session(game,watchdog,rng,worlds,advisors,arguments,chosen,remaining)
+            counts=session(game,watchdog,rng,worlds,advisors,arguments,chosen,remaining)
         except GameCrashed as error:
             crashes+=1
             LOG.error('GAME CRASHED (%d in a row): %s',crashes,error)
@@ -561,7 +523,7 @@ def main():
             raise
         chosen=None
         crashes=0
-        print(json.dumps(counts),journal,flush=True)
+        print(json.dumps(counts),flush=True)
 
 
 if __name__=='__main__':

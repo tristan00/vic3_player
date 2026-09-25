@@ -53,6 +53,7 @@ def built(step):
                   'ui_map_list_open':False},{PROVINCE:1})
 
 
+RUN={'kind':'mini','advisors':['random'],'tag':'AAA','world':'w','cli_seed':1,'run_seed':2,'years':1.0,'minutes':1.0,'profile':'actions','pool':0}
 STEPS=[{'progress':0.1,'second':True,'head':1,'samples':[(1,0.5)]},
        {'progress':0.2,'second':True,'head':2,'samples':[(1,0.5),(2,0.6)]},
        {'progress':0.2,'second':False,'head':2,'samples':[(2,0.6)]}]
@@ -74,7 +75,7 @@ class StoreTests(unittest.TestCase):
                              [('income',1,'income_taxes')])
         self.store.world('ab',[{'color':'x000001','region':'STATE_TEST','terrain':'plains','area_pixels':4,'x':1.0,'y':2.0}],[],{})
         self.store.session='test'
-        self.store.begin_run(started_at=datetime(2026,9,23,tzinfo=timezone.utc),kind='attached')
+        self.store.begin_run(started_at=datetime(2026,9,23,tzinfo=timezone.utc),**RUN)
 
     def tearDown(self):
         if self.store.run_id is not None:
@@ -174,7 +175,7 @@ class StoreTests(unittest.TestCase):
         lost=self.store.run_id
         c.execute("update run set heartbeat_at=now()-interval '9 seconds' where run_id=%s",(lost,))
         other=Store(DSN)
-        other.begin_run(started_at=datetime(2026,9,23,tzinfo=timezone.utc),kind='attached')
+        other.begin_run(started_at=datetime(2026,9,23,tzinfo=timezone.utc),**RUN)
         other.connection.close()
         self.assertEqual(c.execute('select end_reason,ended_at=heartbeat_at from run where run_id=%s',(lost,)).fetchone(),('loop_lost',True))
         self.assertEqual(c.execute('select count(*) from run_lost').fetchone(),(0,))

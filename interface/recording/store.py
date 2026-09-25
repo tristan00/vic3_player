@@ -184,11 +184,15 @@ class Store:
         self.world_id=world_id
         return world_id
 
-    def begin_run(self,started_at,kind,advisors=(),**generated):
+    @timed
+    def recent_tags(self,count):
+        return [name for name, in self.connection.execute('select d.name from run r join country_definition d on d.country_definition=r.tag order by run_id desc limit %s',(count,))]
+
+    def begin_run(self,started_at,kind,advisors,tag,world,cli_seed,run_seed,years,minutes,profile,pool):
         lost=self.connection.execute("update run set ended_at=heartbeat_at,end_reason='loop_lost' where ended_at is null returning run_id,heartbeat_at").fetchall()
         for run_id,heartbeat_at in lost:
             LOG.error('RUN %s WAS LOST: its loop last beat at %s UTC',run_id,heartbeat_at)
-        self.pending={'started_at':started_at,'kind':kind,'advisors':list(advisors),**generated}
+        self.pending={'started_at':started_at,'kind':kind,'advisors':list(advisors),'tag':tag,'world':world,'cli_seed':cli_seed,'run_seed':run_seed,'years':years,'minutes':minutes,'profile':profile,'pool':pool}
         self.run_id=None
         self.constants=None
         self.seq=0
@@ -203,16 +207,13 @@ class Store:
 
     def open_run(self,cursor,constants):
         pending=self.pending
+        tag=self.names('country_definition',[pending['tag']])[0]
         run_id=cursor.execute('insert into run (kind,source_session,started_at,heartbeat_at,progress_at,progress_step,world_id,ruleset_id,player_country,'
-                              'game_speed,first_start,custom_rng_seed) values (%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s) returning run_id',
+                              'game_speed,first_start,custom_rng_seed,tag,world_file,cli_seed,run_seed,years,minutes,profile,pool) '
+                              'values (%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
                               (pending['kind'],self.session,pending['started_at'],'open_run',self.world_id,self.ruleset_id,constants['player_country'],
-                               constants['game_speed'],constants['first_start'],constants['custom_rng_seed'])).fetchone()[0]
-        if pending['kind']!='attached':
-            tag=self.names('country_definition',[pending['tag']])[0]
-            cursor.execute('insert into run_generated (run_id,kind,tag,world_file,cli_seed,run_seed,years,minutes,profile,pool,journal) '
-                           'values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
-                           (run_id,pending['kind'],tag,pending['world'],pending['cli_seed'],pending['run_seed'],pending['years'],pending['minutes'],
-                            pending['profile'],pending['pool'],pending['journal']))
+                               constants['game_speed'],constants['first_start'],constants['custom_rng_seed'],tag,pending['world'],pending['cli_seed'],
+                               pending['run_seed'],pending['years'],pending['minutes'],pending['profile'],pending['pool'])).fetchone()[0]
         self.copy(cursor,'run_advisor',('run_id','position','advisor'),enumerate_rows(run_id,self.names('advisor',pending['advisors'])))
         self.copy(cursor,'run_game_rule',('run_id','game_rule_setting'),[(run_id,rule) for rule in self.names('game_rule_setting',constants['game_rules'])])
         self.run_id=run_id

@@ -3,3 +3,4 @@ __pycache__/
 .idea/
 .playwright-mcp/
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
