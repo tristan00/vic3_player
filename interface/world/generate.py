@@ -536,8 +536,8 @@ def _network(cells,kinds,points,regions,state_neighbours,seas,borders,height,rng
 def generate(seed,countries,states,tech,pop,*,game_dir=DEFAULT_GAME,data_dir=DEFAULT_DATA):
     if not 1<=countries<=states:
         raise ValueError('Need at least one country and no more countries than states')
-    if not 0<=tech<=1.5 or not 0<=pop<=1:
-        raise ValueError(f'tech must be within 0..1.5 and pop within 0..1, got {tech} and {pop}')
+    if not 0<=tech<=2 or not 0<=pop<=2:
+        raise ValueError(f'tech and pop must be within 0..2, got {tech} and {pop}')
     game=Path(game_dir)/'game'
     out=Path(data_dir)/'worlds'/f'seed_{seed}_{countries}_{states}_tech{tech}_pop{pop}'
     if out.exists():

@@ -390,11 +390,6 @@ create table battle_type (
   name text unique
 );
 
-create table building_owner_type (
-  building_owner_type int2 primary key,
-  name text unique
-);
-
 create table civil_war_side (
   civil_war_side int2 primary key,
   name text unique
@@ -612,6 +607,51 @@ create table building_production_method (
   primary key (ruleset_id, building_type, production_method_group, production_method)
 );
 
+create table production_method_goods (
+  ruleset_id int4 not null references ruleset,
+  production_method int2 not null references production_method,
+  goods int2 not null references goods,
+  direction text not null check (direction in ('input', 'output')),
+  scaling text not null check (scaling in ('workforce_scaled', 'level_scaled', 'throughput_scaled', 'unscaled')),
+  amount float8 not null,
+  primary key (ruleset_id, production_method, goods, direction, scaling)
+);
+
+create table production_method_employment (
+  ruleset_id int4 not null references ruleset,
+  production_method int2 not null references production_method,
+  pop_type int2 not null references pop_type,
+  scaling text not null check (scaling in ('workforce_scaled', 'level_scaled', 'throughput_scaled', 'unscaled')),
+  amount float8 not null,
+  primary key (ruleset_id, production_method, pop_type, scaling)
+);
+
+create table production_method_modifier (
+  ruleset_id int4 not null references ruleset,
+  production_method int2 not null references production_method,
+  target text not null check (target in ('building', 'state', 'country')),
+  scaling text not null check (scaling in ('workforce_scaled', 'level_scaled', 'throughput_scaled', 'unscaled')),
+  modifier text not null,
+  value float8 not null,
+  primary key (ruleset_id, production_method, target, scaling, modifier)
+);
+
+create table production_method_requirement (
+  ruleset_id int4 not null references ruleset,
+  production_method int2 not null references production_method,
+  kind text not null,
+  key text not null,
+  primary key (ruleset_id, production_method, kind, key)
+);
+
+create table production_method_profession_ratio (
+  ruleset_id int4 not null references ruleset,
+  production_method int2 not null references production_method,
+  pop_type int2 not null references pop_type,
+  ratio float8 not null,
+  primary key (ruleset_id, production_method, pop_type)
+);
+
 create table dlc (
   ruleset_id int4 not null references ruleset,
   name text not null,
@@ -645,7 +685,7 @@ create table run (
   longest_step text,
   longest_step_ms int4,
   ended_at timestamptz,
-  end_reason text check (end_reason in ('time', 'years', 'defeated', 'ui_stuck', 'game_crashed', 'loop_crashed', 'loop_lost', 'loop_stalled')),
+  end_reason text check (end_reason in ('time', 'years', 'defeated', 'debt_cap', 'ui_stuck', 'game_crashed', 'loop_crashed', 'loop_lost', 'loop_stalled')),
   end_detail text,
   game_exited_at timestamptz,
   world_id int4 not null references world,
@@ -662,6 +702,14 @@ create table run (
   minutes float8 not null,
   profile text not null,
   pool int4 not null,
+  runs_requested int4 not null,
+  world_seed int8,
+  countries int2,
+  states int2,
+  tech float8,
+  pop float8,
+  check ((kind = 'mini') = (num_nonnulls(world_seed, countries, states, tech, pop) = 5)),
+  check ((kind = 'vanilla') = (num_nulls(world_seed, countries, states, tech, pop) = 5)),
   unique (run_id, world_id),
   check ((ended_at is null) = (end_reason is null)),
   check (end_detail is null or end_reason in ('loop_crashed', 'game_crashed', 'loop_stalled')),
@@ -679,6 +727,22 @@ create table run_game_rule (
   run_id int4 not null references run,
   game_rule_setting int2 not null references game_rule_setting,
   primary key (run_id, game_rule_setting)
+);
+
+create table run_weight (
+  run_id int4 not null references run,
+  action int4 not null references action,
+  weight float8 not null,
+  primary key (run_id, action)
+);
+
+create table run_param_weight (
+  run_id int4 not null references run,
+  action int4 not null references action,
+  param text not null,
+  value text not null,
+  weight float8 not null,
+  primary key (run_id, action, param, value)
 );
 
 create table snapshot (
@@ -2768,8 +2832,10 @@ create table building_ownership_history (
   seq int4 not null,
   present bool not null,
   building int4,
-  owner_type int2,
-  owner int4,
+  owner_kind text,
+  owner_country int4,
+  owner_building int4,
+  owner_company int4,
   levels int4,
   privatization bool,
   in_owner_assets bool,
@@ -2777,9 +2843,12 @@ create table building_ownership_history (
   foreign key (run_id, building_ownership) references building_ownership,
   foreign key (run_id, seq) references snapshot,
   foreign key (run_id, building) references building,
-  foreign key (owner_type) references building_owner_type,
-  check (present = (num_nulls(building, owner_type, owner, levels, privatization, in_owner_assets) = 0)),
-  check (present or num_nonnulls(building, owner_type, owner, levels, privatization, in_owner_assets) = 0)
+  check (owner_kind in ('country', 'self', 'manor_house', 'financial_district', 'company', 'company_regional_headquarter')),
+  foreign key (run_id, owner_country) references country,
+  foreign key (run_id, owner_building) references building,
+  foreign key (run_id, owner_company) references company,
+  check (present = (num_nulls(building, owner_kind, levels, privatization, in_owner_assets) = 0)),
+  check (present or num_nonnulls(building, owner_kind, owner_country, owner_building, owner_company, levels, privatization, in_owner_assets) = 0)
 );
 
 create table market_history (
@@ -3345,12 +3414,14 @@ create table political_movement_timed_modifier (
   modifier int2 not null,
   seq int4 not null,
   present bool not null,
-  end_date game_hours,
+  instances int4,
+  last_end_date game_hours,
   primary key (run_id, political_movement, modifier, seq),
   foreign key (run_id, political_movement) references political_movement,
   foreign key (run_id, seq) references snapshot,
   foreign key (modifier) references modifier,
-  check (present or num_nonnulls(end_date) = 0)
+  check (present = (num_nulls(instances) = 0)),
+  check (present or num_nonnulls(instances, last_end_date) = 0)
 );
 
 create table law_history (
@@ -5310,8 +5381,8 @@ create function building_failed_hire_at(run int4, at int4) returns table ("build
   select l.building, l.position, l.seq, l.workplace from building a, lateral (select distinct on (position) building, position, seq, workplace, present from building_failed_hire t where t.run_id = run and t.building = a.building and t.seq <= at order by position desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
-create function building_ownership_at(run int4, at int4) returns table ("building_ownership" int4, "seq" int4, "building" int4, "owner_type" int2, "owner" int4, "levels" int4, "privatization" bool, "in_owner_assets" bool) language sql stable as $$
-  select l.building_ownership, l.seq, l.building, l.owner_type, l.owner, l.levels, l.privatization, l.in_owner_assets from building_ownership a, lateral (select building_ownership, seq, building, owner_type, owner, levels, privatization, in_owner_assets, present from building_ownership_history t where t.run_id = run and t.building_ownership = a.building_ownership and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
+create function building_ownership_at(run int4, at int4) returns table ("building_ownership" int4, "seq" int4, "building" int4, "owner_kind" text, "owner_country" int4, "owner_building" int4, "owner_company" int4, "levels" int4, "privatization" bool, "in_owner_assets" bool) language sql stable as $$
+  select l.building_ownership, l.seq, l.building, l.owner_kind, l.owner_country, l.owner_building, l.owner_company, l.levels, l.privatization, l.in_owner_assets from building_ownership a, lateral (select building_ownership, seq, building, owner_kind, owner_country, owner_building, owner_company, levels, privatization, in_owner_assets, present from building_ownership_history t where t.run_id = run and t.building_ownership = a.building_ownership and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function market_at(run int4, at int4) returns table ("market" int4, "seq" int4, "owner" int4) language sql stable as $$
@@ -5438,8 +5509,8 @@ create function political_movement_character_ideology_at(run int4, at int4) retu
   select l.political_movement, l.ideology, l.seq from political_movement a, lateral (select distinct on (ideology) political_movement, ideology, seq, present from political_movement_character_ideology t where t.run_id = run and t.political_movement = a.political_movement and t.seq <= at order by ideology desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
-create function political_movement_timed_modifier_at(run int4, at int4) returns table ("political_movement" int4, "modifier" int2, "seq" int4, "end_date" game_hours) language sql stable as $$
-  select l.political_movement, l.modifier, l.seq, l.end_date from political_movement a, lateral (select distinct on (modifier) political_movement, modifier, seq, end_date, present from political_movement_timed_modifier t where t.run_id = run and t.political_movement = a.political_movement and t.seq <= at order by modifier desc, t.seq desc) l where a.run_id = run and l.present
+create function political_movement_timed_modifier_at(run int4, at int4) returns table ("political_movement" int4, "modifier" int2, "seq" int4, "instances" int4, "last_end_date" game_hours) language sql stable as $$
+  select l.political_movement, l.modifier, l.seq, l.instances, l.last_end_date from political_movement a, lateral (select distinct on (modifier) political_movement, modifier, seq, instances, last_end_date, present from political_movement_timed_modifier t where t.run_id = run and t.political_movement = a.political_movement and t.seq <= at order by modifier desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function law_at(run int4, at int4) returns table ("law" int4, "seq" int4, "country" int4, "law_type" int2, "progress" float8, "phase" int2, "checkpoint_or_stop_date" game_hours, "active" bool, "imposer" int4) language sql stable as $$

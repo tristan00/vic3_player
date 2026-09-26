@@ -34,13 +34,13 @@ VOCABULARIES={
     'war_goal_type':('common/war_goal_types',),'game_rule_setting':('common/game_rules',),
     'localization_key':None,'scope_name':None,'ui_window':None,'antagonize_reason':None,'advisor':None,'action':None}
 
-ENUMS=('ai_attitude','approval_state','battle_status','battle_type','building_owner_type','civil_war_side','civil_war_type','event_status','formation_flag',
+ENUMS=('ai_attitude','approval_state','battle_status','battle_type','civil_war_side','civil_war_type','event_status','formation_flag',
        'formation_type','hq_type','influence_type','influence_type_reason','law_checkpoint_result','law_phase','managed_status','play_side','privatization_request',
        'scope_type','shipping_lane_type','slave_basket','strait_access_permissions','strait_access_status','supply_priority','supply_ship_construction_level',
        'tariff_level','tax_level','toll_rate','treaty_side',
        'wage_level','war_goal_demand_type','war_goal_pressed','war_goal_status')
 
-CHECKS={'budget_direction':('income','expense'),'tariff_direction':('import','export'),'goods_consumer':('pops','buildings','government','military'),
+CHECKS={'ownership_owner':('country','self','manor_house','financial_district','company','company_regional_headquarter'),'budget_direction':('income','expense'),'tariff_direction':('import','export'),'goods_consumer':('pops','buildings','government','military'),
         'migration_direction':('inbound','outbound'),'diplomatic_play_role':('initiator','target','initiator_ally','target_ally','interested'),
         'diplomatic_side':('source','target'),'battle_role':('attacker','defender'),'expulsion_direction':('by_player','of_player'),
         'obligation_direction':('owes_player','player_owes'),'strait_type':('NATURAL','ARTIFICIAL'),'proposal_kind':('treaty','demand','sway','action_proposal')}
@@ -258,7 +258,8 @@ child('building_production_method_active','building',[v('production_method')])
 child('building_privatization_enabled','building',[rr('country')])
 child('building_goods','building',[v('goods')],[o('input',F),o('output',F),o('slave_input',F)])
 child('building_failed_hire','building',[f('position',I2)],[r('workplace','building')])
-entity('building_ownership',[rr('building'),e('owner_type','building_owner_type'),f('owner',I4),f('levels',I4),f('privatization',B),f('in_owner_assets',B)])
+entity('building_ownership',[rr('building'),x('owner_kind','ownership_owner'),r('owner_country','country'),r('owner_building','building'),r('owner_company','company'),
+                             f('levels',I4),f('privatization',B),f('in_owner_assets',B)])
 entity('market',[rr('owner','country')])
 child('market_goods','market',[v('goods')],[f('price',F),f('sell_orders',F),f('buy_orders',F)])
 entity('market_area',[rr('market')])
@@ -302,7 +303,7 @@ sample('interest_group_loyalists_sample','interest_group',[f('loyalists',I8)])
 entity('political_movement',[rr('country'),v('political_movement_type'),v('ideology'),f('radicalism',F),oe('managed_status'),r('civil_war')])
 child('political_movement_character','political_movement',[rr('character')])
 child('political_movement_character_ideology','political_movement',[v('ideology')])
-child('political_movement_timed_modifier','political_movement',[v('modifier')],[d('end_date')])
+child('political_movement_timed_modifier','political_movement',[v('modifier')],[f('instances',I4),d('last_end_date')])
 entity('law',[rr('country'),v('law_type'),f('progress',F),e('phase','law_phase'),d('checkpoint_or_stop_date',NULL_DATE),f('active',B),r('imposer','country')])
 private('law',[e('checkpoint_result','law_checkpoint_result'),ov('replacing_law_type','law_type'),d('enactment_start_date',NULL_DATE),o('chance',F)])
 child('law_amendment','law',[rr('amendment')])

@@ -253,7 +253,7 @@ def claims(s):
 
 def owns_here(s,country):
     mine=set(building_ids(s))
-    return any(owner==country and building in mine for building,owner in s.rows('building_ownership','building,owner',owner_type=COUNTRY_OWNER))
+    return any(owner==country and building in mine for building,owner in s.rows('building_ownership','building,owner_country',owner_kind='country'))
 
 
 def own_subject_type(s):
@@ -319,13 +319,17 @@ def recently_disbanded(s):
     return s.memo('recently_disbanded',compute)
 
 
+def held_companies(s):
+    return {kind for kind, in s.rows('company','company_type',country=s.player)}
+
+
 def companies(s):
     if metric(s,'GetNumCompanies')>=metric(s,'GetMaxNumCompanies'):
         return []
     if any(second==s.player and kind=='chartered_company' for _,second,kind in s.rows('pact','first_country,second_country,pact_type')):
         return []
     acquired,_,_,_=technologies(s)
-    held={kind for kind, in s.rows('company','company_type')}
+    held=held_companies(s)
     potential={combo['building_type'] for combo in buildable(s)}|{kind for _,kind,_ in s.buildings()}
     scope=country_scope(s)
     return [name for name in s.keys('company_type') if name not in held and name not in recently_disbanded(s)
@@ -347,12 +351,12 @@ def company_levels(s,kinds):
         mine=set(s.states())
         located=located_buildings(s)
         totals={}
-        for building,kind,owner,levels in s.rows('building_ownership','building,owner_type,owner,levels'):
+        for building,kind,country,owner,levels in s.rows('building_ownership','building,owner_kind,owner_country,owner_building,levels'):
             name,state=located.get(building,(None,None))
             if state not in mine:
                 continue
-            owner_kind,owner_state=located.get(owner,('',None))
-            if (owner==s.player if kind==COUNTRY_OWNER else not owner_kind.startswith('building_company') and owner_state in mine):
+            owner_state=located.get(owner,(None,None))[1]
+            if (country==s.player if kind=='country' else kind not in COMPANY_OWNERS and owner_state in mine):
                 totals.setdefault(name,{})[state]=totals.get(name,{}).get(state,0)+levels
         return totals
     totals={}
@@ -408,7 +412,7 @@ def my_ships(s):
     return [kind for kind,queue in s.rows('ship_construction','ship_type,queue') if queue in queues]
 
 
-COUNTRY_OWNER=2
+COMPANY_OWNERS={'company','company_regional_headquarter'}
 
 
 def private_levels(s):
@@ -417,8 +421,8 @@ def private_levels(s):
     located=s.map('building','building,state')
     countries=s.map('state','state,country')
     levels={}
-    for building,kind,owner,count in s.rows('building_ownership','building,owner_type,owner,levels'):
-        if kinds.get(building) in buildable and kind!=COUNTRY_OWNER and count and countries.get(located.get(owner))==s.player:
+    for building,kind,owner,count in s.rows('building_ownership','building,owner_kind,owner_building,levels'):
+        if kinds.get(building) in buildable and kind!='country' and count and countries.get(located.get(owner))==s.player:
             levels[building]=levels.get(building,0)+int(count)
     return levels
 
@@ -436,7 +440,7 @@ def nationalization_cost(s,building):
 
 def government_owned(s):
     mine=set(building_ids(s))
-    return {building for building,owner,count in s.rows('building_ownership','building,owner,levels',owner_type=COUNTRY_OWNER)
+    return {building for building,owner,count in s.rows('building_ownership','building,owner_country,levels',owner_kind='country')
             if building in mine and owner==s.player and count}
 
 
@@ -499,12 +503,12 @@ def ownership_classes(s):
         mine=set(s.states())
         located=located_buildings(s)
         classes={}
-        for building,kind,owner in s.rows('building_ownership','building,owner_type,owner'):
-            if kind==COUNTRY_OWNER:
-                found='owned_national' if owner==s.player else 'owned_foreign'
+        for building,kind,country,owner in s.rows('building_ownership','building,owner_kind,owner_country,owner_building'):
+            if kind=='country':
+                found='owned_national' if country==s.player else 'owned_foreign'
             elif owner in located:
-                owner_kind,owner_state=located[owner]
-                found='owned_company' if owner_kind.startswith('building_company') else 'owned_private' if owner_state in mine else 'owned_foreign'
+                owner_state=located[owner][1]
+                found='owned_company' if kind in COMPANY_OWNERS else 'owned_private' if owner_state in mine else 'owned_foreign'
             else:
                 continue
             classes.setdefault(building,set()).add(found)
@@ -1866,9 +1870,6 @@ RULES={
                                       if character in chosen and interaction not in cooling(s) and possible],
     'diplomatic_action':lambda s:[{'country':country,'diplomatic_action':action} for country,action in sorted(diplomatic_shown(s))
                                   if not definition(s,'common/diplomatic_actions',action,'picks_states') and diplomatic_allowed(s,country,action)],
-    'diplomatic_action_state':lambda s:[{'country':country,'diplomatic_action':action,'state':state,'side':{'source':'First','target':'Second'}[side]}
-                                        for country,action,side,state in s.rows('player_diplomatic_option_state','target_country,action_type,side,state')
-                                        if (country,action) in diplomatic_shown(s) and diplomatic_allowed(s,country,action)],
     'diplomatic_action_obligation':lambda s:[{**option,'obligation':obligation} for option in RULES['diplomatic_action'](s)
                                              if definition(s,'common/diplomatic_actions',option['diplomatic_action'],'can_use_obligations')==['yes']
                                              for obligation,direction,wanted in (('CallInObligation','owes_player',True),('OweObligation','player_owes',False))

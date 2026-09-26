@@ -60,16 +60,8 @@ def _create(tag,kind,levels,owner,state):
     return f'create_building = {{ building = "{kind}" add_ownership = {{ {_ownership(tag,owner,levels,state)} }} reserves = 1 }}'
 
 
-def _religions(rng,data,count,used):
-    religions=[]
-    for i in range(count):
-        template=rng.choice(data['religions'])
-        key=f'religion_interface_{i+1}'
-        taboos=f'taboos = {{ {" ".join(template["taboos"])} }}' if template['taboos'] else ''
-        religions.append({'key':key,'name':word(rng,used),'heritage':template['heritage'],
-                          'text':f'{key} = {{ icon = "{template["icon"]}" heritage = {template["heritage"]} '
-                                 f'color = {{ {" ".join(f"{rng.random():.2f}" for _ in range(3))} }} {taboos} }}'})
-    return religions
+def _religions(rng,data,count):
+    return [{'key':religion['key'],'heritage':religion['heritage']} for religion in rng.sample(data['religions'],count)]
 
 
 def _cultures(rng,data,count,religions,used,names):
@@ -230,7 +222,7 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
     by_id={s['id']:s for s in regions}
     region_of={s['id']:r['key'] for r in strategic for s in r['states']}
     count=len(groups)
-    religions=_religions(rng,data,max(2,min(len(data['religions']),count//3+1)),used)
+    religions=_religions(rng,data,max(2,min(len(data['religions']),count//3+1)))
     native=max(1,round(count*data['primary_cultures']))
     cultures=_cultures(rng,data,native+int(count*data['stateless_cultures']+rng.random()),religions,used,names)
     homes={}
@@ -328,7 +320,8 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
             military={'building_barrack':troops,'building_naval_administration':trade['naval'] if state is naval_home and buildable('building_naval_administration') else 0}
             buildings,made,levels=_buildings(rng,tag,state,band,state is capital,state['id'] not in reachable,size,centers.get(state['id']),military,data['allowed'][band],data['owners'],buildable)
             history['buildings'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {" ".join(buildings)} }} }}')
-            holdings+=[(level,kind,state['key']) for kind,level in levels.items()]
+            holdings+=[(level,kind,state['key'],line,len(history['buildings'])-1) for kind,level in levels.items()
+                       for line in buildings if f'building = "{kind}"' in line]
             if regiments:
                 units.append((state['key'],regiments))
             for building in made:
@@ -379,8 +372,6 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
         history['cultures'].append(f'cu:{culture["key"]} = {{ set_fervor = {rng.randint(5,40)} }}')
         localization.append(f' {culture["key"]}: "{culture["name"]}"')
         localization+=[f' nm_{n}: "{n}"' for n in itertools.chain(*culture['lists'].values())]
-    for religion in religions:
-        localization+=[f' {religion["key"]}: "{religion["name"]}"',f' {religion["key"]}_ADJ: "{religion["name"]}"']
     roots=dict(data['roots'],diplomacy='DIPLOMACY',diplomatic_plays='DIPLOMATIC_PLAYS',military_deployments='MILITARY_DEPLOYMENTS',power_blocs='POWER_BLOCS',treaties='TREATIES',lobbies='LOBBIES',trade='TRADE',
                states='STATES',pops='POPS',buildings='BUILDINGS')
     for folder,lines in history.items():
@@ -388,15 +379,14 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
     files['common/country_definitions/interface.txt']='\n'.join(definitions)
     files['common/character_templates/interface.txt']='\n'.join(templates)
     files['common/cultures/interface.txt']='\n'.join(c['text'] for c in cultures)
-    files['common/religions/interface.txt']='\n'.join(r['text'] for r in religions)
     modifiers=[]
     kinds=[('standard_of_living','state_{}_standard_of_living_add'),('cultural_acceptance','country_{}_cultural_acceptance_add'),('fervor_target','country_fervor_target_{}_add')]
-    for key,used in [(c['key'],kinds) for c in cultures]+[(r['key'],kinds[:1]) for r in religions]:
+    for key,used in [(c['key'],kinds) for c in cultures]:
         for kind,modifier in used:
             for sign in ['positive','negative']:
                 modifiers.append(f'{key}_{kind}_modifier_{sign} = {{ icon = "gfx/interface/icons/timed_modifier_icons/modifier_flag_{sign}.dds" {modifier.format(key)} = 1 }}')
     files['common/static_modifiers/interface.txt']='\n'.join(modifiers)
-    types=[kind.format(key) for key,used in [(c['key'],kinds) for c in cultures]+[(r['key'],kinds[:1]) for r in religions] for _,kind in used]
+    types=[kind.format(key) for key,used in [(c['key'],kinds) for c in cultures] for _,kind in used]
     files['common/modifier_type_definitions/interface.txt']='\n'.join(f'{t} = {{ decimals = 1 color = good game_data = {{ ai_value = 0 }} }}' for t in types)
     return {'countries':countries,'files':files,'localization':localization}
 
@@ -434,14 +424,30 @@ def _claims(rng,data,regions,state_neighbours,history,natives):
             history['states'].append(f's:{state["key"]} = {{ add_claim = c:{rng.choice(rivals)} }}')
 
 
+COMPANY_LEVELS=5
+
+
+def _company_buildings(country,kinds):
+    chosen=[]
+    for holding in sorted((h for h in country['holdings'] if h[1] in kinds),key=lambda h:(-h[0],h[1],h[2])):
+        if sum(h[0] for h in chosen)>=COMPANY_LEVELS:
+            break
+        chosen.append(holding)
+    return chosen if sum(h[0] for h in chosen)>=COMPANY_LEVELS else []
+
+
 def _companies(rng,data,countries,history):
-    options=lambda country:sorted(((level,company,state) for level,kind,state in country['holdings'] for company,kinds in data['companies'].items()
-                                   if kind in kinds and company not in taken),reverse=True)
+    options=lambda country:sorted(((chosen[0][0],company,chosen) for company,kinds in data['companies'].items() if company not in taken
+                                   for chosen in [_company_buildings(country,set(kinds))] if chosen),key=lambda o:(-o[0],o[1]))
     taken=set()
     for country in _picked(rng,data,data['company_count'],len(countries),[c for c in countries if options(c)]):
         if options(country):
-            _,company,state=options(country)[0];taken.add(company)
-            history['countries'].append(f'c:{country["tag"]} ?= {{ add_company = company_type:{company} company:{company} = {{ set_company_establishment_date = 1830.1.1 set_company_state_region = s:{state} }} }}')
+            _,company,chosen=options(country)[0];taken.add(company)
+            for level,kind,state,line,index in chosen:
+                owned=f'create_building = {{ building = "{kind}" add_ownership = {{ company = {{ type = {company} country = "c:{country["tag"]}" levels = {level} }} }} reserves = 1 }}'
+                history['buildings'][index]=history['buildings'][index].replace(line,owned)
+            history['countries'].append(f'c:{country["tag"]} ?= {{ add_company = company_type:{company} company:{company} = {{ set_company_establishment_date = 1830.1.1 '
+                                        f'set_company_state_region = s:{chosen[0][2]} }} }}')
 
 
 def _amendments(rng,data,countries,history):

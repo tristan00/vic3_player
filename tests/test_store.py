@@ -19,7 +19,11 @@ LAW=11
 GROUP=13
 PROVINCE=21
 MEMBERS={'common/country_definitions':['AAA','BBB'],'common/laws':['law_one','law_two'],'map_data/state_regions':['STATE_TEST'],'common/terrain':['plains'],
-         'common/buildings':['building_farm'],'common/interest_groups':['ig_test'],'common/government_types':['gov_test'],'common/religions':['faith']}
+         'common/buildings':['building_farm'],'common/interest_groups':['ig_test'],'common/government_types':['gov_test'],'common/religions':['faith'],
+         'common/production_methods':['pm_farm'],'common/goods':['grain','tools'],'common/pop_types':['farmers','soldiers']}
+EFFECTS={'goods':[('pm_farm','grain','output','workforce_scaled',20.0),('pm_farm','tools','input','workforce_scaled',5.0)],
+         'employment':[('pm_farm','farmers','level_scaled',1000.0)],'modifiers':[('pm_farm','state','unscaled','state_pollution_generation_add',2.0)],
+         'requirements':[('pm_farm','unlocking_technologies','tech_x')],'ratios':[('pm_farm','soldiers',97.0)]}
 ENUMS={'approval_state':{0:'angry'},'influence_type':{0:'influential'},'influence_type_reason':{0:'above_influential_threshold'}}
 
 
@@ -53,7 +57,9 @@ def built(step):
                   'ui_map_list_open':False},{PROVINCE:1})
 
 
-RUN={'kind':'mini','advisors':['random'],'tag':'AAA','world':'w','cli_seed':1,'run_seed':2,'years':1.0,'minutes':1.0,'profile':'actions','pool':0}
+RUN={'kind':'mini','advisors':['random'],'tag':'AAA','world':'w','cli_seed':1,'run_seed':2,'years':1.0,'minutes':1.0,'profile':'actions','pool':0,'runs_requested':3,
+     'generated':{'seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5},'weights':{'build':3,'enact_law':2},
+     'param_weights':[('build','building_type','building_x',3)]}
 STEPS=[{'progress':0.1,'second':True,'head':1,'samples':[(1,0.5)]},
        {'progress':0.2,'second':True,'head':2,'samples':[(1,0.5),(2,0.6)]},
        {'progress':0.2,'second':False,'head':2,'samples':[(2,0.6)]}]
@@ -72,7 +78,7 @@ class StoreTests(unittest.TestCase):
     def setUp(self):
         self.store=Store(DSN)
         self.store.ruleset(b'rules',{folder:list(names) for folder,names in {**{f:[] for f in self.folders()},**MEMBERS}.items()},[],[],[],[],[],ENUMS,
-                             [('income',1,'income_taxes')])
+                             [('income',1,'income_taxes')],EFFECTS)
         self.store.world('ab',[{'color':'x000001','region':'STATE_TEST','terrain':'plains','area_pixels':4,'x':1.0,'y':2.0}],[],{})
         self.store.session='test'
         self.store.begin_run(started_at=datetime(2026,9,23,tzinfo=timezone.utc),**RUN)

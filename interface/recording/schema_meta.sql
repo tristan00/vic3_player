@@ -75,6 +75,51 @@ create table building_production_method (
   primary key (ruleset_id, building_type, production_method_group, production_method)
 );
 
+create table production_method_goods (
+  ruleset_id int4 not null references ruleset,
+  production_method int2 not null references production_method,
+  goods int2 not null references goods,
+  direction text not null check (direction in ('input', 'output')),
+  scaling text not null check (scaling in ('workforce_scaled', 'level_scaled', 'throughput_scaled', 'unscaled')),
+  amount float8 not null,
+  primary key (ruleset_id, production_method, goods, direction, scaling)
+);
+
+create table production_method_employment (
+  ruleset_id int4 not null references ruleset,
+  production_method int2 not null references production_method,
+  pop_type int2 not null references pop_type,
+  scaling text not null check (scaling in ('workforce_scaled', 'level_scaled', 'throughput_scaled', 'unscaled')),
+  amount float8 not null,
+  primary key (ruleset_id, production_method, pop_type, scaling)
+);
+
+create table production_method_modifier (
+  ruleset_id int4 not null references ruleset,
+  production_method int2 not null references production_method,
+  target text not null check (target in ('building', 'state', 'country')),
+  scaling text not null check (scaling in ('workforce_scaled', 'level_scaled', 'throughput_scaled', 'unscaled')),
+  modifier text not null,
+  value float8 not null,
+  primary key (ruleset_id, production_method, target, scaling, modifier)
+);
+
+create table production_method_requirement (
+  ruleset_id int4 not null references ruleset,
+  production_method int2 not null references production_method,
+  kind text not null,
+  key text not null,
+  primary key (ruleset_id, production_method, kind, key)
+);
+
+create table production_method_profession_ratio (
+  ruleset_id int4 not null references ruleset,
+  production_method int2 not null references production_method,
+  pop_type int2 not null references pop_type,
+  ratio float8 not null,
+  primary key (ruleset_id, production_method, pop_type)
+);
+
 create table dlc (
   ruleset_id int4 not null references ruleset,
   name text not null,
@@ -108,7 +153,7 @@ create table run (
   longest_step text,
   longest_step_ms int4,
   ended_at timestamptz,
-  end_reason text check (end_reason in ('time', 'years', 'defeated', 'ui_stuck', 'game_crashed', 'loop_crashed', 'loop_lost', 'loop_stalled')),
+  end_reason text check (end_reason in ('time', 'years', 'defeated', 'debt_cap', 'ui_stuck', 'game_crashed', 'loop_crashed', 'loop_lost', 'loop_stalled')),
   end_detail text,
   game_exited_at timestamptz,
   world_id int4 not null references world,
@@ -125,6 +170,14 @@ create table run (
   minutes float8 not null,
   profile text not null,
   pool int4 not null,
+  runs_requested int4 not null,
+  world_seed int8,
+  countries int2,
+  states int2,
+  tech float8,
+  pop float8,
+  check ((kind = 'mini') = (num_nonnulls(world_seed, countries, states, tech, pop) = 5)),
+  check ((kind = 'vanilla') = (num_nulls(world_seed, countries, states, tech, pop) = 5)),
   unique (run_id, world_id),
   check ((ended_at is null) = (end_reason is null)),
   check (end_detail is null or end_reason in ('loop_crashed', 'game_crashed', 'loop_stalled')),
@@ -142,6 +195,22 @@ create table run_game_rule (
   run_id int4 not null references run,
   game_rule_setting int2 not null references game_rule_setting,
   primary key (run_id, game_rule_setting)
+);
+
+create table run_weight (
+  run_id int4 not null references run,
+  action int4 not null references action,
+  weight float8 not null,
+  primary key (run_id, action)
+);
+
+create table run_param_weight (
+  run_id int4 not null references run,
+  action int4 not null references action,
+  param text not null,
+  value text not null,
+  weight float8 not null,
+  primary key (run_id, action, param, value)
 );
 
 create table snapshot (

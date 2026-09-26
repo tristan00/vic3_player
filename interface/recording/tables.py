@@ -3,7 +3,7 @@ import logging
 from dataclasses import dataclass
 
 from ..common import progress, slot, timed
-from .spec import DROPPED_COUNTRY_METRICS,DROPPED_STATE_METRICS,METRIC_COLUMNS,METRICS_KINDS,TABLE,TABLES
+from .spec import DROPPED_COUNTRY_METRICS,DROPPED_STATE_METRICS,EPOCH_DATE,METRIC_COLUMNS,METRICS_KINDS,TABLE,TABLES
 
 SLOT=0xffffff
 
@@ -94,6 +94,41 @@ class Context:
         if set(items)-{self.player}:
             raise RuntimeError(f'{table} holds rows of countries other than the player: {sorted(set(items)-{self.player})[:5]}')
         return items.get(self.player,[])
+
+
+OWNER_COUNTRY=2
+OWNER_BUILDING=1
+OWNING_TYPES={'building_manor_house':'manor_house','building_financial_district':'financial_district'}
+
+
+def owning_types(company_types):
+    return {**OWNING_TYPES,**{f'building_{company}':'company' for company in company_types},
+            **{f'building_regional_{company}':'company_regional_headquarter' for company in company_types}}
+
+
+def ownership_owner(ident,building,owner_type,owner,types,headquarters,owning):
+    if owner_type==OWNER_COUNTRY:
+        return {'owner_kind':'country','owner_country':owner,'owner_building':None,'owner_company':None}
+    if owner_type!=OWNER_BUILDING:
+        raise RuntimeError(f'Ownership {ident} has owner type {owner_type}, neither a country nor a building')
+    if owner==building:
+        kind='self'
+    elif types.get(owner) in owning:
+        kind=owning[types[owner]]
+    else:
+        raise RuntimeError(f'Ownership {ident} is owned by building {owner} of type {types.get(owner)}, which is no ownership building')
+    if kind=='company' and owner not in headquarters:
+        raise RuntimeError(f'Ownership {ident} is owned by company headquarters {owner}, which no captured company names as its headquarters')
+    return {'owner_kind':kind,'owner_country':None,'owner_building':owner,'owner_company':headquarters.get(owner) if kind=='company' else None}
+
+
+def movement_modifiers(children,ids,label):
+    ends=defaultdict(list)
+    for i,items in children.items():
+        for modifier,end in items:
+            ends[ids[i],label(modifier)].append(end)
+    return [{'political_movement':movement,'modifier':modifier,'instances':len(found),'last_end_date':EPOCH_DATE if EPOCH_DATE in found else max(found)}
+            for (movement,modifier),found in ends.items()]
 
 
 def flag(value):
@@ -665,6 +700,9 @@ def buildings(c):
         owners={value&SLOT:(building,value) for building,_,value in c.rows('building_owners','id','ord','value')}
         assets={value&SLOT:(owner,value) for owner,_,value in c.rows('building_assets','id','ord','value')}
         captured=set(c.table('building')['ident']) if c.table('building') else set()
+        types={ident:c.label(code) for ident,code in zip(c.table('building')['ident'],c.table('building')['building'])} if c.table('building') else {}
+        headquarters={building:ident for ident,building in zip(c.table('company')['ident'],c.table('company')['building']) if building!=-1} if c.table('company') else {}
+        owning=owning_types(c.order('common/company_types'))
         for i,ident,building,owner_type,owner,levels,privatization in zip(t['id'],t['ident'],t['building'],t['identity_type'],t['identity_building'],
                                                                            t['levels'],t['privatization']):
             listed=owners.pop(i,None)
@@ -676,8 +714,8 @@ def buildings(c):
             asset=assets.pop(i,None)
             if asset is not None and (asset[0]!=owner&SLOT or asset[1]!=ident):
                 raise RuntimeError(f'Ownership {ident} is listed among the assets of {asset[0]}, not of its owner {owner}')
-            c.add('building_ownership_history',building_ownership=ident,building=building,owner_type=owner_type,owner=owner,levels=levels,
-                  privatization=flag(privatization),in_owner_assets=asset is not None)
+            c.add('building_ownership_history',building_ownership=ident,building=building,**ownership_owner(ident,building,owner_type,owner,types,headquarters,owning),
+                  levels=levels,privatization=flag(privatization),in_owner_assets=asset is not None)
         if owners or assets:
             raise RuntimeError(f'Owner or asset entries without an ownership: {sorted(owners)[:3]} {sorted(assets)[:3]}')
 
@@ -862,9 +900,8 @@ def politics(c):
         for i,items in c.children('political_movement_character_ideologies','id','value').items():
             for ideology, in items:
                 c.add('political_movement_character_ideology',political_movement=ids[i],ideology=c.label(ideology))
-        for i,items in c.children('political_movement_timed_modifier','id','modifier','end_date').items():
-            for modifier,end in items:
-                c.add('political_movement_timed_modifier',political_movement=ids[i],modifier=c.label(modifier),end_date=end)
+        for row in movement_modifiers(c.children('political_movement_timed_modifier','id','modifier','end_date'),ids,c.label):
+            c.add('political_movement_timed_modifier',**row)
     t=c.table('law')
     if t:
         ids=idents(t)

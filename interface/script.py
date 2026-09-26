@@ -85,6 +85,52 @@ def production_methods(game,mods=()):
         yield name,entry
 
 
+METHOD_TARGETS={'building_modifiers':'building','state_modifiers':'state','country_modifiers':'country'}
+METHOD_SCALINGS=('workforce_scaled','level_scaled','throughput_scaled','unscaled')
+METHOD_GOODS=re.compile(r'goods_(input|output)_(\w+)_add')
+METHOD_EMPLOYMENT=re.compile(r'building_employment_(\w+)_add')
+METHOD_REQUIREMENTS=('unlocking_technologies','unlocking_laws','disallowing_laws','unlocking_production_methods','unlocking_principles','unlocking_identity',
+                     'unlocking_company_categories','unlocking_geographic_regions','unlocking_religions','disallowing_religions','unlocking_global_technologies',
+                     'required_input_goods')
+
+
+def method_value(name,modifier,values):
+    if len(values)!=1:
+        raise RuntimeError(f'{name}.{modifier} holds {values}, not one value')
+    value=values[0]
+    if value in ('yes','no'):
+        return 1.0 if value=='yes' else 0.0
+    if not re.fullmatch(r'-?\d+(\.\d+)?',value):
+        raise RuntimeError(f'{name}.{modifier} holds {value}, not a number')
+    return float(value)
+
+
+def method_effects(game,mods=()):
+    goods,employment,modifiers,requirements,ratios=[],[],[],[],[]
+    for name,entry in production_methods(game,mods):
+        for field,values in entry.items():
+            if field in METHOD_TARGETS:
+                target=METHOD_TARGETS[field]
+                for scaling,inner in fields(' '.join(values)):
+                    if scaling not in METHOD_SCALINGS:
+                        raise RuntimeError(f'{name}.{field} has an unknown scaling {scaling}')
+                    for modifier,found in fields(' '.join(inner)):
+                        value=method_value(name,modifier,found)
+                        flow=METHOD_GOODS.fullmatch(modifier) if target=='building' else None
+                        job=METHOD_EMPLOYMENT.fullmatch(modifier) if target=='building' else None
+                        if flow:
+                            goods.append((name,flow[2],flow[1],scaling,value))
+                        elif job:
+                            employment.append((name,job[1],scaling,value))
+                        else:
+                            modifiers.append((name,target,scaling,modifier,value))
+            elif field in METHOD_REQUIREMENTS:
+                requirements+=[(name,field,key) for key in values]
+            elif field=='profession_ratio':
+                ratios+=[(name,pop,method_value(name,pop,found)) for pop,found in fields(' '.join(values))]
+    return {'goods':goods,'employment':employment,'modifiers':modifiers,'requirements':requirements,'ratios':ratios}
+
+
 def diplomatic_actions(game,mods=()):
     for name,text in read(game,'common/diplomatic_actions',mods):
         inner=dict(blocks(body(text)))

@@ -174,6 +174,25 @@ class NationTests(unittest.TestCase):
             for folder in ('diplomacy', 'treaties', 'diplomatic_plays', 'power_blocs', 'lobbies'):
                 self.assertNotIn(f'c:{tag} ', files[f'common/history/{folder}/interface.txt'], folder)
 
+    def test_every_starting_company_owns_a_building_of_its_own_type(self):
+        neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
+        founded = 0
+        for seed in range(12):
+            world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
+                            [{'key': 'region_interface_1', 'states': self.regions}], .5, .5)
+            files = world['files']
+            for tag, company, state in re.findall(r'c:(\w+) \?= \{ add_company = company_type:(\w+) .*?set_company_state_region = s:(\w+)',
+                                                 files['common/history/countries/interface.txt']):
+                founded += 1
+                kinds = self.data['companies'][company]
+                block = re.search(rf's:{state} = \{{ region_state:{tag} = \{{ (.*) \}} \}}', files['common/history/buildings/interface.txt'])[1]
+                self.assertTrue(re.search(rf'building = "\w+" add_ownership = \{{ company = \{{ type = {company} ', block), (seed, tag, company))
+                owned = re.findall(rf'building = "(\w+)" add_ownership = \{{ company = \{{ type = {company} country = "c:{tag}" levels = (\d+)',
+                                   files['common/history/buildings/interface.txt'])
+                self.assertTrue(all(kind in kinds for kind, _ in owned))
+                self.assertGreaterEqual(sum(int(levels) for _, levels in owned), 5, (seed, tag, company))
+        self.assertTrue(founded)
+
     def test_every_state_is_owned_by_its_group(self):
         tags = [c['tag'] for c in self.world['countries']]
         for tag, members in zip(tags, self.groups):
@@ -184,7 +203,7 @@ class NationTests(unittest.TestCase):
         for country in self.world['countries']:
             self.assertNotIn(country['tag'], self.data['tags'])
             self.assertTrue(country['culture'].startswith('culture_interface_'))
-            self.assertTrue(country['religion'].startswith('religion_interface_'))
+            self.assertIn(country['religion'], {r['key'] for r in self.data['religions']})
 
     def test_generated_script_is_balanced_and_covers_the_vanilla_history_folders(self):
         files = self.world['files']

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
-from interface.options.available import RULES, barred_regions, capital_frontier, months_later, repealable, trade_level
+from interface.options.available import RULES, barred_regions, capital_frontier, held_companies, months_later, repealable, trade_level
 from tests.memory_stored import Memory
 from interface.runner.memory import Reader, HEAP_LOW, visible_columns
 from interface.script import event_options
@@ -430,3 +430,10 @@ class DecodeFilterTests(unittest.TestCase):
         decoded=[]
         self.reader(decoded).snapshot()
         self.assertEqual(decoded,['country'])
+
+
+class CompanyOptionTests(unittest.TestCase):
+    def test_a_company_type_founded_abroad_stays_open_to_the_player(self):
+        s=snapshot(company_history=[{'company':1,'country':PLAYER,'company_type':'company_basic_fishing'},
+                                    {'company':2,'country':OTHER,'company_type':'company_basic_forestry'}])
+        self.assertEqual(held_companies(s),{'company_basic_fishing'})

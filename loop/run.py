@@ -34,12 +34,14 @@ RUN_DAYS=(10,90)
 WORLD_STATES=(25,150)
 PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
 WEIGHTS={'start_play_country':0,'start_play_state':0,'start_play_confirmed':0,'add_war_goal':0,'make_primary_demand':0,'dequeue_research':0,'cancel_construction':0,'cancel_queue_item':0,
-         'build':3,'research':3,'enact_law':2,'switch_production_method':3,'bulk_switch_production_method_state':3,'deploy_to_front':5,'set_strategic_objective':3,'mobilize':5,'mobilize_all':5,'raise_conscripts':3,
-         'cancel_enactment':.1,'nationalize':.1,'bulk_nationalize_state':.1,'demobilize':.2,'demobilize_all':.2,'downsize':.1,'pause_construction':.1,'pause_all_construction':.05,
+         'build':3,'research':3,'create_army':.01,'enact_law':2,'switch_production_method':3,'bulk_switch_production_method_state':3,'deploy_to_front':5,'set_strategic_objective':3,'mobilize':5,'mobilize_all':5,'raise_conscripts':3,
+         'cancel_enactment':.1,'nationalize':.1,'bulk_nationalize_state':.1,'demobilize':.2,'demobilize_all':.2,'downsize':.1,'pause_construction':.01,'pause_all_construction':.01,
          'disband_formation':.1,'disband_regulars':.1,'disband_conscripts':.1,'decommission_ship':.1,'cancel_ship':.1,'cancel_ship_item':.1,'delete_ship_template':.1,'declare_bankruptcy':.1,
-         'abandon_colony':.1,'unincorporate':.1,'remove_company':.1,'remove_decree':.1,'capitulate':.1,'white_peace':.1,'leave_power_bloc':.1,'kick_from_power_bloc':.1}
+         'abandon_colony':.1,'unincorporate':.1,'remove_company':.1,'remove_decree':.1,'capitulate':.1,'white_peace':.1,'leave_power_bloc':.01,'kick_from_power_bloc':.01}
+PARAM_WEIGHTS={'build':{'building_type':{'building_construction_sector':3}}}
 HOURS_PER_DAY=24
-MAX_TECH=1.5
+MAX_TECH=2
+POP_RANGE=(.5,2)
 HOURS_PER_YEAR=365*HOURS_PER_DAY
 
 
@@ -62,7 +64,7 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
        'retrofit':('retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all','decommission_ship','disband_formation',
                    'build_ship','build_ship_for','cancel_ship','raise_ship_item','lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item',
                    'start_naval_mission','start_naval_mission_selected'),
-       'influence':('diplomatic_action','diplomatic_action_state','diplomatic_action_obligation','request_join_power_bloc'),
+       'influence':('diplomatic_action','diplomatic_action_obligation','request_join_power_bloc'),
        'research':('research','queue_research','dequeue_research'),
        'imposition':('impose_law',),
        'play':('start_play_country','start_play_state','start_play_confirmed','abandon_colony'),
@@ -313,9 +315,17 @@ class Loop:
                 return self.end('time')
             if game_hours(snapshot)-start>=years*HOURS_PER_YEAR:
                 return self.end('years')
+            if at_debt_cap(snapshot):
+                LOG.info('debt cap reached at snapshot %s: principal %s, credit %s',snapshot.seq,*snapshot.rows('player_treasury','principal,credit')[0])
+                return self.end('debt_cap')
             self.turn+=1
             snapshot=self.turn_actions(snapshot)
             snapshot=self.run_days(snapshot)
+
+
+def at_debt_cap(snapshot):
+    rows=snapshot.rows('player_treasury','principal,credit')
+    return bool(rows) and rows[0][0]>0 and rows[0][0]>=rows[0][1]
 
 
 def build(seed,countries,states,tech,pop):
@@ -326,7 +336,7 @@ def world_size(rng,levels):
     states=rng.randint(*WORLD_STATES)
     tech,pop=levels
     return (rng.randrange(10**9),rng.randint(states//6,states//3),states,
-            round(rng.uniform(0,MAX_TECH),2) if tech is None else tech,round(rng.uniform(0,1),2) if pop is None else pop)
+            round(rng.uniform(0,MAX_TECH),2) if tech is None else tech,round(rng.uniform(*POP_RANGE),2) if pop is None else pop)
 
 
 class WorldPool:
@@ -448,7 +458,7 @@ RECENT_ROUNDS=5
 
 
 @timed
-def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds):
+def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds,weights):
     world=worlds.take()
     store=Store()
     recent=store.recent_tags(RECENT_ROUNDS)
@@ -461,7 +471,9 @@ def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds):
     game.campaign(tag,world=str(world) if world else None,debug=False)
     seed=rng.randrange(10**9)
     name=world.parent.name if world else 'vanilla'
-    loop=Loop(game,advisors,random.Random(seed),store,run_record(arguments,'vanilla' if world is None else 'mini',name,tag,seed))
+    generated=None if world is None else {'seed':manifest['seed'],'countries':len(manifest['countries']),'states':len(manifest['states']),
+                                          'tech':manifest['tech'],'pop':manifest['pop']}
+    loop=Loop(game,advisors,random.Random(seed),store,run_record(arguments,'vanilla' if world is None else 'mini',name,tag,seed,generated,weights))
     watchdog.store=store
     counts=loop.run(arguments.years,seconds)
     if isinstance(worlds,(WorldPool,Fresh)):
@@ -470,9 +482,11 @@ def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds):
     return counts
 
 
-def run_record(arguments,kind,world,tag,seed):
+def run_record(arguments,kind,world,tag,seed,generated,weights):
     return {'kind':kind,'world':world,'tag':tag,'cli_seed':arguments.seed,'run_seed':seed,
-            'years':arguments.years,'minutes':arguments.minutes,'profile':arguments.profile,'pool':arguments.pool}
+            'years':arguments.years,'minutes':arguments.minutes,'profile':arguments.profile,'pool':arguments.pool,'runs_requested':arguments.runs,
+            'generated':generated,'weights':{name:weights.get(name,1) for name in BY_NAME if GROUP[name]!='time'},
+            'param_weights':[(action,param,value,weight) for action,params in PARAM_WEIGHTS.items() for param,values in params.items() for value,weight in values.items()]}
 
 
 def main():
@@ -501,14 +515,14 @@ def main():
     watchdog.start()
     rng=random.Random(arguments.seed)
     weights={**WEIGHTS,**{name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}}
-    advisors=[ADVISORS[name](rng.randrange(10**9),weights) for name in arguments.advisors]
+    advisors=[ADVISORS[name](rng.randrange(10**9),weights,PARAM_WEIGHTS) for name in arguments.advisors]
     worlds=Vanilla(rng) if arguments.vanilla else WorldPool(rng,arguments.pool,levels) if arguments.pool else Fresh(rng,levels)
     chosen=arguments.tag
     crashes=0
     completed=0
     while completed<arguments.runs:
         try:
-            counts=session(game,watchdog,rng,worlds,advisors,arguments,chosen,arguments.minutes*60)
+            counts=session(game,watchdog,rng,worlds,advisors,arguments,chosen,arguments.minutes*60,weights)
         except GameCrashed as error:
             crashes+=1
             LOG.error('GAME CRASHED (%d in a row): %s',crashes,error)

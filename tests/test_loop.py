@@ -31,6 +31,28 @@ class AdvisorTests(unittest.TestCase):
         advisor=RandomAdvisor(0,{'subsidies_on':0})
         self.assertEqual({advisor.choose(options,Queue())[0] for _ in range(30)},{'build'})
 
+    def test_a_parameter_weight_shifts_the_combination_picked(self):
+        options={'build':[{'state':1,'building_type':'building_x'},{'state':1,'building_type':'building_y'}]}
+        advisor=RandomAdvisor(0,param_weights={'build':{'building_type':{'building_y':0}}})
+        self.assertEqual({advisor.choose(options,Queue())[1]['building_type'] for _ in range(30)},{'building_x'})
+        heavy=RandomAdvisor(0,param_weights={'build':{'building_type':{'building_y':3}}})
+        picks=[heavy.choose(options,Queue())[1]['building_type'] for _ in range(4000)]
+        self.assertAlmostEqual(picks.count('building_y')/len(picks),.75,delta=.03)
+
+    def test_a_parameter_weight_scales_the_pick_even_when_it_is_the_only_option(self):
+        options={'give_away':[{'side':'First'}],'research':[{'technology':'x'}]}
+        advisor=RandomAdvisor(0,param_weights={'give_away':{'side':{'First':.01}}})
+        picks=[advisor.choose(options,Queue())[0] for _ in range(4000)]
+        self.assertAlmostEqual(picks.count('give_away')/len(picks),.01/1.01,delta=.006)
+
+    def test_an_action_whose_options_all_weigh_zero_is_never_picked(self):
+        options={'give_away':[{'side':'First'}],'research':[{'technology':'x'}]}
+        advisor=RandomAdvisor(0,param_weights={'give_away':{'side':{'First':0}}})
+        self.assertEqual({advisor.choose(options,Queue())[0] for _ in range(200)},{'research'})
+        self.assertIsNone(advisor.choose({'give_away':[{'side':'First'}]},Queue()))
+        mixed={'give_away':[{'side':'First'},{'side':'Second'}]}
+        self.assertEqual({advisor.choose(mixed,Queue())[1]['side'] for _ in range(200)},{'Second'})
+
     def test_building_waits_while_the_queue_exceeds_a_year_of_output(self):
         options={'build':[{'state':1}],'research':[{'technology':'x'}]}
         advisor=RandomAdvisor(0)
@@ -72,6 +94,23 @@ class TurnTests(unittest.TestCase):
         self.assertEqual(targets('set_tax_level',{'level':'High'}),{('group','budget'),('shared','bureaucracy')})
         self.assertTrue(targets('set_tax_level',{'level':'High'})&targets('set_government_wages',{'level':'Low'}))
         self.assertTrue(targets('set_tax_level',{'level':'High'})&targets('set_institution_level',{'institution':3,'level':2}))
+
+
+class Treasury:
+    def __init__(self,principal,credit):
+        self.values=[(principal,credit)]
+
+    def rows(self,table,columns,**equal):
+        return self.values if (table,columns)==('player_treasury','principal,credit') else []
+
+
+class DebtCapTests(unittest.TestCase):
+    def test_debt_cap_is_reached_once_principal_meets_credit(self):
+        from loop.run import at_debt_cap
+        self.assertTrue(at_debt_cap(Treasury(1218470.4,1206406.3)))
+        self.assertTrue(at_debt_cap(Treasury(500.0,500.0)))
+        self.assertFalse(at_debt_cap(Treasury(499.0,500.0)))
+        self.assertFalse(at_debt_cap(Treasury(0.0,0.0)))
 
 
 if __name__=='__main__':

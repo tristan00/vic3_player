@@ -120,7 +120,7 @@ class Store:
             self.enums[enum].update(fresh)
 
     @timed
-    def ruleset(self,identity,members,definitions,event_options,building_methods,dlc,gaps,enums,lines):
+    def ruleset(self,identity,members,definitions,event_options,building_methods,dlc,gaps,enums,lines,effects):
         found=self.connection.execute('select ruleset_id from ruleset where digest=%s',(identity,)).fetchone()
         self.members={}
         for vocabulary,folders in VOCABULARIES.items():
@@ -159,10 +159,24 @@ class Store:
             self.copy(cursor,'building_production_method',('ruleset_id','building_type','production_method_group','production_method'),
                       [(ruleset_id,self.vocabulary['building_type'][b],self.vocabulary['production_method_group'][g],self.vocabulary['production_method'][m])
                        for b,g,m in building_methods])
+            self.method_effects(cursor,ruleset_id,effects)
             self.copy(cursor,'dlc',('ruleset_id','name'),[(ruleset_id,name) for name in dlc])
             self.copy(cursor,'capture_gap',('ruleset_id','kind','subject','detail'),[(ruleset_id,*row) for row in gaps])
         self.ruleset_id=ruleset_id
         return ruleset_id
+
+    def method_effects(self,cursor,ruleset_id,effects):
+        words=self.vocabulary
+        self.copy(cursor,'production_method_goods',('ruleset_id','production_method','goods','direction','scaling','amount'),
+                  [(ruleset_id,words['production_method'][m],words['goods'][g],d,s,v) for m,g,d,s,v in effects['goods']])
+        self.copy(cursor,'production_method_employment',('ruleset_id','production_method','pop_type','scaling','amount'),
+                  [(ruleset_id,words['production_method'][m],words['pop_type'][p],s,v) for m,p,s,v in effects['employment']])
+        self.copy(cursor,'production_method_modifier',('ruleset_id','production_method','target','scaling','modifier','value'),
+                  [(ruleset_id,words['production_method'][m],*rest) for m,*rest in effects['modifiers']])
+        self.copy(cursor,'production_method_requirement',('ruleset_id','production_method','kind','key'),
+                  [(ruleset_id,words['production_method'][m],k,key) for m,k,key in effects['requirements']])
+        self.copy(cursor,'production_method_profession_ratio',('ruleset_id','production_method','pop_type','ratio'),
+                  [(ruleset_id,words['production_method'][m],words['pop_type'][p],r) for m,p,r in effects['ratios']])
 
     @timed
     def world(self,identity,provinces,adjacencies,assets):
@@ -188,11 +202,13 @@ class Store:
     def recent_tags(self,count):
         return [name for name, in self.connection.execute('select d.name from run r join country_definition d on d.country_definition=r.tag order by run_id desc limit %s',(count,))]
 
-    def begin_run(self,started_at,kind,advisors,tag,world,cli_seed,run_seed,years,minutes,profile,pool):
+    def begin_run(self,started_at,kind,advisors,tag,world,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,generated,weights,param_weights):
         lost=self.connection.execute("update run set ended_at=heartbeat_at,end_reason='loop_lost' where ended_at is null returning run_id,heartbeat_at").fetchall()
         for run_id,heartbeat_at in lost:
             LOG.error('RUN %s WAS LOST: its loop last beat at %s UTC',run_id,heartbeat_at)
-        self.pending={'started_at':started_at,'kind':kind,'advisors':list(advisors),'tag':tag,'world':world,'cli_seed':cli_seed,'run_seed':run_seed,'years':years,'minutes':minutes,'profile':profile,'pool':pool}
+        self.pending={'started_at':started_at,'kind':kind,'advisors':list(advisors),'tag':tag,'world':world,'cli_seed':cli_seed,'run_seed':run_seed,'years':years,'minutes':minutes,'profile':profile,'pool':pool,
+                      'runs_requested':runs_requested,'generated':generated,'weights':dict(weights),
+                      'param_weights':list(param_weights)}
         self.run_id=None
         self.constants=None
         self.seq=0
@@ -209,11 +225,18 @@ class Store:
         pending=self.pending
         tag=self.names('country_definition',[pending['tag']])[0]
         run_id=cursor.execute('insert into run (kind,source_session,started_at,heartbeat_at,progress_at,progress_step,world_id,ruleset_id,player_country,'
-                              'game_speed,first_start,custom_rng_seed,tag,world_file,cli_seed,run_seed,years,minutes,profile,pool) '
-                              'values (%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
+                              'game_speed,first_start,custom_rng_seed,tag,world_file,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,'
+                              'world_seed,countries,states,tech,pop) '
+                              'values (%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
                               (pending['kind'],self.session,pending['started_at'],'open_run',self.world_id,self.ruleset_id,constants['player_country'],
                                constants['game_speed'],constants['first_start'],constants['custom_rng_seed'],tag,pending['world'],pending['cli_seed'],
-                               pending['run_seed'],pending['years'],pending['minutes'],pending['profile'],pending['pool'])).fetchone()[0]
+                               pending['run_seed'],pending['years'],pending['minutes'],pending['profile'],pending['pool'],pending['runs_requested'],
+                               *[None if pending['generated'] is None else pending['generated'][k] for k in ('seed','countries','states','tech','pop')])).fetchone()[0]
+        names=sorted(pending['weights'])
+        self.copy(cursor,'run_weight',('run_id','action','weight'),[(run_id,action,pending['weights'][name]) for name,action in zip(names,self.names('action',names))])
+        rows=pending['param_weights']
+        self.copy(cursor,'run_param_weight',('run_id','action','param','value','weight'),
+                  [(run_id,action,param,value,weight) for (_,param,value,weight),action in zip(rows,self.names('action',[row[0] for row in rows]))])
         self.copy(cursor,'run_advisor',('run_id','position','advisor'),enumerate_rows(run_id,self.names('advisor',pending['advisors'])))
         self.copy(cursor,'run_game_rule',('run_id','game_rule_setting'),[(run_id,rule) for rule in self.names('game_rule_setting',constants['game_rules'])])
         self.run_id=run_id

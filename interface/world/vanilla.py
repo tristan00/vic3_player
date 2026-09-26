@@ -115,7 +115,7 @@ def _cultures(game):
     religions=[]
     for key,value in read(game,'common/religions'):
         inner=dict(blocks(body(value)))
-        religions.append({'heritage':scalar(value,'heritage'),'icon':scalar(value,'icon'),
+        religions.append({'key':key,'heritage':scalar(value,'heritage'),'icon':scalar(value,'icon'),
                           'taboos':re.findall(r'\w+',body(inner.get('taboos','{}')))})
     return cultures,religions
 
