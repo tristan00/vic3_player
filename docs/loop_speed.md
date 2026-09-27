@@ -2,7 +2,13 @@
 
 This records what has been done to cut the time the loop spends on its own scaffolding, and what each change measured. Nothing here may change what a run does. Every hour the timing tables are reviewed and this document is replaced with the current state.
 
-Last review: 2026-09-27 04:00, covering runs 241 to 244.
+Last review: 2026-09-27 04:45, covering runs 244 and 245.
+
+## Blocked
+
+The speedups are committed but no run has used them. Round collect_63 started at 03:06, before the first commit, and a round keeps the code it loaded until its process exits. It is asked for 1000 runs, so it will not exit by itself soon. The supervisor starts the next round on the new code.
+
+Ending the round is the owner's decision. Until a run has used the new code, live verification cannot start and no further change is stacked on top.
 
 ## Where a run spent its time before any change
 
@@ -17,18 +23,18 @@ Setup took about 120 seconds from the start of a session to the first action, an
 | ruleset and geography registration | 3 |
 | first capture, validation and write | 2 |
 
-During play, per snapshot:
+During play, per snapshot, from run 245:
 
 | step | milliseconds | note |
 | --- | --- | --- |
-| capture request | 455 | waiting on the game |
-| foreign key validation | 250 to 345 | 870 queries, grew with the run |
-| row building | 100 to 320 | grew with the run |
-| copy into Postgres | 350 to 550 | grew with the run |
+| capture request | 473 | waiting on the game |
+| rest of the memory read | 223 | |
+| foreign key validation | 304 | 870 queries |
+| row building | 294 | grows with the run |
+| copy and staging in the write | 207 | grows with the run |
+| offered actions, per pause | 176 | |
 
-Run 244 wrote 434 snapshots and spent 152 seconds in validation alone.
-
-Action dispatch averages 340 ms and the wait between game days is set by the game. Both are pacing against the game and were left alone.
+Run 244 wrote 520 snapshots in its hour and spent 198 seconds in validation.
 
 ## Changes
 
@@ -46,6 +52,8 @@ World generation as a whole, three seeds in sequence: 95.0 s before, 64.3 s afte
 
 Expected setup after these changes is about 65 seconds: world and training together 25, game 31, registration 3, first snapshot 6.
 
+Expected saving during play is about 260 ms per snapshot, which is 135 seconds over a run the length of run 244.
+
 ## Proof that runs are unchanged
 
 | change | evidence |
@@ -57,33 +65,42 @@ Expected setup after these changes is about 65 seconds: world and training toget
 
 One thing did change order. The picker and the number of candidates are now drawn from the round's random stream before the world size, not after the run seed. The distributions are the same. A round replayed with the same `--seed` draws different values than it did before commit 7b49bf3.
 
-## Live verification
+## Baseline for live verification
 
-The round running when these changes landed, collect_63, loaded the old code and keeps it until it exits. The supervisor starts the next round on the new code. No run has used the new code yet.
+All of these runs used the old code.
 
-Baseline to compare the first new runs against:
+| measure | run 243 | run 244 | run 245, still playing |
+| --- | --- | --- | --- |
+| end reason | debt_cap | time | |
+| snapshots | 112 | 520 | 245 |
+| actions | 628 | 2750 | 1552 |
+| advisor actions per pause | | 7.2 | 9.1 |
+| action status | all done | all done | 1551 done, 1 no_object |
+| validation per snapshot, ms | 250 | 380 | 304 |
+| statistics refresh, s | 18.5 | 19.0 | 17.7 |
+| world generation, s | 43.3 | 38.2 | 49.3 |
+| picker training, s | 24.4 | 25.4 | 21.4 |
 
-| measure | runs 241 to 244 |
-| --- | --- |
-| end reasons | debt_cap 2, loop_crashed 1, one still running |
-| action status | done 3339, no_object 1 |
-| actions per snapshot | 5.2 to 7.6 |
-| validation per snapshot | 228 to 350 ms |
-| statistics refresh | 18.5 to 19.0 s |
-| world generation | 23.4 to 54.6 s |
-| picker training | 23.3 to 26.0 s |
+Logs for collect_63 hold no traceback, stall, crash or block. The one failed span is the action that found no game object in run 245, which the loop handles.
 
 Known failures that predate the changes: run 241 ended with the game date still moving 3 s after pausing, and round collect_62 exited because the heartbeat process died.
 
+## Looked at and left alone
+
+| item | finding |
+| --- | --- |
+| action dispatch | Three quarters of actions take 230 to 300 ms and the rest 700 to 1300 ms. The floor is a fixed 100 ms wait plus the game's answer. This is pacing against the game. |
+| log tail | 136,000 polls in 30 minutes cost 0.75 s per snapshot interval, mostly on its own thread or inside waits that would sleep anyway. Skipping reads when the size is unchanged would alter how a rotated log is detected. |
+| death check while days run | Reads game memory 500 times per snapshot interval, all inside the wait for the game. No wall time to save. |
+| vanilla map rasters | 4 to 5 s once per round. A disk cache would add invalidation logic for a saving of seconds per round. |
+
 ## Candidates not yet done
 
-| candidate | cost today | idea |
+| candidate | cost today | what it needs |
 | --- | --- | --- |
-| row building per snapshot | 100 to 320 ms, growing | find what grows with the run |
-| copy into Postgres | 350 to 550 ms, growing | same |
-| vanilla map rasters and boxes | 4 to 5 s in the first world of each round | keep the decoded arrays on disk, keyed by the game files |
-| log tail polling | 100,000 file reads per run | read only when the file size changed |
-| offered actions | 270 to 430 ms per pause | profile the queries |
+| row building per snapshot | 100 to 320 ms, growing | a real capture with its name table, goods codes and orders to profile against; the refusal dumps hold only the tables |
+| staging and copy in the write | 150 to 210 ms, growing | same |
+| offered actions | 176 ms per pause | same |
 | world generation during play | 25 s per run | `--pool 1` builds the next world while the current run plays; it competes with the game for CPU and the supervisor arguments are the owner's choice |
 
 ## Simplifications and fallbacks noticed
