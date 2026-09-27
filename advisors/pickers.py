@@ -34,7 +34,7 @@ class PickFirst:
 
     trained=None
 
-    def start_run(self,store,world,objective):
+    def start_run(self,store,objective):
         pass
 
     def pick(self,candidates,snapshot):
@@ -96,7 +96,7 @@ class CatBoostPicker:
         self.trained=None
 
     @timed
-    def start_run(self,store,world,objective):
+    def start_run(self,store,objective):
         rows,y,runs=training_rows(store.connection,objective)
         if len(y)<MIN_PAUSES:
             raise RuntimeError(f'the catboost picker needs {MIN_PAUSES} scored pauses to train on, found {len(y)} in {runs} runs')

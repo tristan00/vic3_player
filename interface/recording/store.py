@@ -1,4 +1,5 @@
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import logging
 import multiprocessing
@@ -23,6 +24,7 @@ FIXED={'pact_history':('first_country','second_country'),'treaty_history':('firs
 HEARTBEAT=.1
 SLOW_BEAT=.25
 TIMING_EVERY=1
+ANALYZERS=8
 
 
 @timed_often
@@ -478,9 +480,15 @@ class Store:
 
     @timed
     def analyze(self,tables):
-        for table in tables:
-            progress(f'analyze {table}')
-            self.connection.execute(f'analyze {table}')
+        with ThreadPoolExecutor(ANALYZERS) as pool:
+            list(pool.map(self.analyze_batch,[tables[start::ANALYZERS] for start in range(ANALYZERS)]))
+
+    @timed
+    def analyze_batch(self,tables):
+        with psycopg.connect(self.dsn,autocommit=True) as connection:
+            for table in tables:
+                progress(f'analyze {table}')
+                connection.execute(f'analyze {table}')
 
     @timed
     def validate(self,cursor,seq):

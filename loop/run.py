@@ -532,7 +532,14 @@ def session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,seconds):
     objective=draw_objective(rng)
     advisor=advisors[rng.choice(arguments.advisors)]
     advisor.start_run(store,ACTIONS,objective)
-    world=worlds.take()
+    picker=pickers[rng.choice(arguments.pickers)]
+    candidates=1 if picker.name=='first' else rng.randint(*CANDIDATES)
+    with ThreadPoolExecutor(1) as trainer:
+        training=trainer.submit(picker.start_run,store,objective)
+        world=worlds.take()
+        while not wait([training],timeout=1)[0]:
+            progress('picker training')
+        training.result()
     recent=store.recent_tags(RECENT_ROUNDS)
     if chosen in recent:
         raise ValueError(f'{chosen} was played in one of the last {RECENT_ROUNDS} rounds: {recent}')
@@ -545,9 +552,6 @@ def session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,seconds):
     name=world.parent.name if world else 'vanilla'
     generated=None if world is None else {'seed':manifest['seed'],'countries':len(manifest['countries']),'states':len(manifest['states']),
                                           'tech':manifest['tech'],'pop':manifest['pop']}
-    picker=pickers[rng.choice(arguments.pickers)]
-    candidates=1 if picker.name=='first' else rng.randint(*CANDIDATES)
-    picker.start_run(store,generated,objective)
     loop=Loop(game,[advisor],random.Random(seed),store,run_record(arguments,'vanilla' if world is None else 'mini',name,tag,seed,generated,advisor,picker,candidates,objective),picker,candidates)
     watchdog.store=store
     counts=loop.run(arguments.years,seconds)

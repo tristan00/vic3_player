@@ -84,6 +84,9 @@ class StoreTests(unittest.TestCase):
         self.store.begin_run(started_at=datetime(2026,9,23,tzinfo=timezone.utc),**RUN)
 
     def tearDown(self):
+        if self.store.beater is not None:
+            self.store.beater.kill()
+            self.store.beater.join()
         if self.store.run_id is not None:
             self.store.connection.execute('select delete_run(%s)',(self.store.run_id,))
         self.store.connection.close()
@@ -144,8 +147,11 @@ class StoreTests(unittest.TestCase):
             self.store.write(bad,'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
 
     def test_the_first_write_opens_the_run_and_starts_the_heartbeat_with_progress(self):
+        since=self.store.connection.execute('select clock_timestamp()').fetchone()[0]
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
         c=self.store.connection
+        analyzed={name for name, in c.execute('select relname from pg_class where pg_stat_get_last_analyze_time(oid)>=%s',(since,))}
+        self.assertLessEqual({'country','law','law_history','state_history','player_treasury'},analyzed)
         run=self.store.run_id
         self.assertTrue(self.store.beater.is_alive())
         time.sleep(.6)
@@ -210,6 +216,10 @@ class StoreTests(unittest.TestCase):
         lost=self.store.run_id
         self.store.beater.kill()
         self.store.beater.join()
+        deadline=time.monotonic()+3
+        while c.execute('select count(*) from pg_stat_activity where datname=current_database() and pid<>pg_backend_pid()').fetchone()[0]:
+            self.assertLess(time.monotonic(),deadline,'the killed heartbeat kept its database session')
+            time.sleep(.01)
         c.execute("update run set heartbeat_at=now()-interval '9 seconds' where run_id=%s",(lost,))
         other=Store(DSN)
         other.begin_run(started_at=datetime(2026,9,23,tzinfo=timezone.utc),**RUN)
