@@ -537,17 +537,17 @@ def session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,seconds):
     with ThreadPoolExecutor(1) as trainer:
         training=trainer.submit(picker.start_run,store,objective)
         world=worlds.take()
+        recent=store.recent_tags(RECENT_ROUNDS)
+        if chosen in recent:
+            raise ValueError(f'{chosen} was played in one of the last {RECENT_ROUNDS} rounds: {recent}')
+        manifest=json.loads(world.read_text(encoding='utf-8')) if world else {'countries':[]}
+        tag=chosen or (rng.choice([country['tag'] for country in manifest['countries'] if country['country_type']!='decentralized']) if world else
+                       rng.choice([tag for tag in TOP_PRESTIGE if tag not in recent]))
+        game.close()
+        game.campaign(tag,world=str(world) if world else None,debug=False)
         while not wait([training],timeout=1)[0]:
             progress('picker training')
         training.result()
-    recent=store.recent_tags(RECENT_ROUNDS)
-    if chosen in recent:
-        raise ValueError(f'{chosen} was played in one of the last {RECENT_ROUNDS} rounds: {recent}')
-    manifest=json.loads(world.read_text(encoding='utf-8')) if world else {'countries':[]}
-    tag=chosen or (rng.choice([country['tag'] for country in manifest['countries'] if country['country_type']!='decentralized']) if world else
-                   rng.choice([tag for tag in TOP_PRESTIGE if tag not in recent]))
-    game.close()
-    game.campaign(tag,world=str(world) if world else None,debug=False)
     seed=rng.randrange(10**9)
     name=world.parent.name if world else 'vanilla'
     generated=None if world is None else {'seed':manifest['seed'],'countries':len(manifest['countries']),'states':len(manifest['states']),
