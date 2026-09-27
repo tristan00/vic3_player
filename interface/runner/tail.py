@@ -1,4 +1,5 @@
 import ctypes
+from fnmatch import fnmatchcase
 from ctypes import wintypes
 import logging
 import msvcrt
@@ -32,7 +33,6 @@ def shared_read(path,offset):
         return stream.read()
 
 
-@timed_often
 def rotation(path):
     return int(path.stem.partition('.')[2] or 0)
 
@@ -62,7 +62,10 @@ class LogTail:
     @timed_often
     def files(self):
         found={}
-        for path in self.directory.glob('debug*.log'):
+        for name in os.listdir(self.directory):
+            if not fnmatchcase(name,'debug*.log'):
+                continue
+            path=self.directory/name
             try:
                 stat=os.stat(path)
             except FileNotFoundError:

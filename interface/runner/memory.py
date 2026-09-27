@@ -405,7 +405,6 @@ class Reader:
             raise OSError(f'No string at {address:#x}')
         return (self.read(struct.unpack_from('<Q',raw)[0],size) if capacity>=16 else raw[:size]).decode('utf-8','replace')
 
-    @timed_often
     def codes(self,kind,pointers,inner=0x18):
         if kind in LAYOUT.get('key_sentinels',{}):
             pointers=np.where(pointers==self.word(self.base+LAYOUT['key_sentinels'][kind]),0,pointers)

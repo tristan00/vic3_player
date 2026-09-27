@@ -85,6 +85,7 @@
  "interface/runner/guard.py": "monitor",
  "interface/runner/memory.py": {
   "Reader.array": "hot",
+  "Reader.codes": "hot",
   "Reader.is_object": "hot",
   "Reader.item": "hot",
   "Reader.read": "hot",
@@ -93,7 +94,8 @@
   "Reader.word": "hot"
  },
  "interface/runner/tail.py": {
-  "LogTail.run": "loop"
+  "LogTail.run": "loop",
+  "rotation": "hot"
  },
  "interface/script.py": {
   "body": "hot",
