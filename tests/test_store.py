@@ -1,12 +1,13 @@
 from datetime import datetime, timezone
 import time
 import unittest
+from unittest import mock
 
 import psycopg
 
 from advisors.pickers import PARAMS
 from interface.options.stored import Stored
-from interface.recording.store import Store, install
+from interface.recording.store import Store, digest, install
 from interface.recording.spec import TABLES
 from interface.recording.tables import Built
 
@@ -66,6 +67,38 @@ STEPS=[{'progress':0.1,'second':True,'head':1,'samples':[(1,0.5)]},
        {'progress':0.2,'second':False,'head':2,'samples':[(2,0.6)]}]
 
 
+def clean(connection):
+    installed=connection.execute("select to_regclass('schema_digest') is not null").fetchone()[0]
+    if installed and connection.execute('select digest from schema_digest').fetchone()==(digest(),):
+        connection.execute('select delete_run(run_id) from run')
+    else:
+        install(connection)
+
+
+class Still:
+    exitcode=None
+
+    def __init__(self,target,args,daemon,name):
+        self.stop=args[5]
+        self.killed=False
+
+    def start(self):
+        pass
+
+    def is_alive(self):
+        return not self.killed and not self.stop.is_set()
+
+    def kill(self):
+        self.killed=True
+
+    def join(self,timeout=None):
+        pass
+
+
+BEATING={'test_the_first_write_opens_the_run_and_starts_the_heartbeat_with_progress',
+         'test_a_run_whose_loop_vanished_is_closed_by_the_next_loop_with_its_last_heartbeat'}
+
+
 class StoreTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -73,10 +106,14 @@ class StoreTests(unittest.TestCase):
             connection=psycopg.connect(DSN,autocommit=True)
         except psycopg.OperationalError as error:
             raise unittest.SkipTest(f'test database unavailable: {error}')
-        install(connection)
+        clean(connection)
         connection.close()
 
     def setUp(self):
+        if self._testMethodName not in BEATING:
+            still=mock.patch('multiprocessing.Process',Still)
+            still.start()
+            self.addCleanup(still.stop)
         self.store=Store(DSN)
         self.store.ruleset(b'rules',{folder:list(names) for folder,names in {**{f:[] for f in self.folders()},**MEMBERS}.items()},[],[],[],[],[],ENUMS,
                              [('income',1,'income_taxes')],EFFECTS)
@@ -141,18 +178,22 @@ class StoreTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'did not capture'):
             self.store.write(bad,'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
 
-    def test_validation_checks_exactly_the_tables_a_snapshot_wrote(self):
+    def test_validation_refuses_a_written_value_whose_target_is_missing(self):
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
-        asked=[]
-        checks=self.store.checks
-        self.store.checks=[(table,label,asked.append(table) or sql) for table,label,sql in checks if table in ('law_history','pop_history')]
-        self.assertEqual(set(asked),{'law_history','pop_history'})
+        names=self.store.layouts['law_history'].names
+        rows=self.store.connection.execute(f'select {",".join(names)} from law_history where run_id=%s',(self.store.run_id,)).fetchall()
+        broken=[tuple(-5 if name=='law_type' else value for name,value in zip(names,rows[0]))]
         with self.store.connection.cursor() as cursor:
-            self.store.connection.execute('alter table law_history disable trigger all')
-            cursor.execute('update law_history set law_type=-5 where run_id=%s',(self.store.run_id,))
-            self.store.validate(cursor,0,{'pop_history'})
-            with self.assertRaisesRegex(RuntimeError,'law_history'):
-                self.store.validate(cursor,0,{'law_history'})
+            self.store.validate(cursor,0,{'law_history':(names,rows)})
+            with self.assertRaisesRegex(RuntimeError,r'law_history\(law_type\) -> law_type'):
+                self.store.validate(cursor,0,{'law_history':(names,broken)})
+
+    def test_validation_asks_nothing_about_tables_that_wrote_no_rows(self):
+        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+        names=self.store.layouts['law_history'].names
+        with self.store.connection.cursor() as cursor,mock.patch.object(self.store,'connection',wraps=self.store.connection) as asked:
+            self.store.validate(cursor,0,{'law_history':(names,[])})
+        asked.execute.assert_not_called()
 
     def test_names_must_belong_to_the_ruleset(self):
         bad=built(STEPS[0])

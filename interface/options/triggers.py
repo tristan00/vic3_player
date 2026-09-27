@@ -3,6 +3,7 @@ import re
 
 from ..recording.spec import DROPPED_COUNTRY_METRICS, METRIC_COLUMNS
 from .stored import script_hours
+from ..common import timed_often
 
 TOKEN=re.compile(r'\?=|>=|<=|!=|[{}=<>]|[^\s{}=<>?!]+')
 COMPARE={'>=':lambda a,b:a>=b,'<=':lambda a,b:a<=b,'>':lambda a,b:a>b,'<':lambda a,b:a<b,'=':lambda a,b:a==b,'!=':lambda a,b:a!=b}
@@ -14,6 +15,7 @@ COMMAND_LAWS={"law_monarchy","law_autocracy"}
 HOURS_PER_YEAR=24*365
 
 
+@timed_often
 def parse(text):
     tokens=TOKEN.findall(text)
     position=0
@@ -66,12 +68,14 @@ class Scope:
         return None
 
 
+@timed_often
 def country_scope(s,country=None,**saved):
     scope=Scope(s,'country',s.player if country is None else country)
     scope.saved={name:(kind,ident) for name,(kind,ident) in saved.items()}
     return scope
 
 
+@timed_often
 def character_scope(s,character,**saved):
     scope=Scope(s,'character',character)
     scope.saved=dict(saved)
@@ -83,15 +87,18 @@ def both(results):
     return False if False in results else None if None in results else True
 
 
+@timed_often
 def either(results):
     results=list(results)
     return True if True in results else None if None in results else False
 
 
+@timed_often
 def negate(result):
     return None if result is None else not result
 
 
+@timed_often
 def counted(operator,needed,results):
     certain=results.count(True)
     possible=certain+results.count(None)
@@ -128,6 +135,7 @@ def evaluate(nodes,scope):
     return result
 
 
+@timed_often
 def number(value):
     try:
         return float(value)
@@ -135,6 +143,7 @@ def number(value):
         return None
 
 
+@timed_often
 def amount(s,value):
     found=number(value)
     if found is not None:
@@ -152,16 +161,19 @@ class Unknown(Exception):
     pass
 
 
+@timed_often
 def known(value,what):
     if value is None:
         raise Unknown(f'{what} is not captured')
     return value
 
 
+@timed_often
 def yes(value):
     return value=='yes'
 
 
+@timed_often
 def technologies(s,country):
     def compute():
         research={ident for ident, in s.rows('country_research','country_research',country=country)}
@@ -169,6 +181,7 @@ def technologies(s,country):
     return s.memo(('technologies',country),compute)
 
 
+@timed_often
 def laws(s,country):
     def compute():
         grouped={}
@@ -184,6 +197,7 @@ DLC_FEATURES={'power_bloc_features':'ep1','lobbies':'ep1','foreign_investment':'
               'voice_of_the_people_preorder':'voice_of_the_people_preorder'}
 
 
+@timed_often
 def dlc_feature(s,feature):
     prefix=feature.split('_')[0]
     token=DLC_FEATURES.get(feature,prefix if re.fullmatch(r'(ep|ip|mp|rp|ap)\d',prefix) else None)
@@ -192,28 +206,33 @@ def dlc_feature(s,feature):
     return token in set(s.dlc)
 
 
+@timed_often
 def amendments(s,country):
     mine={law for law, in s.rows('law','law',country=country)}
     return [kind for law,kind in s.rows('amendment','law,amendment_type') if law in mine]
 
 
+@timed_often
 def modifier_texts(s,country):
     sources=([('common/laws',law) for law in laws(s,country)]+[('common/technology/technologies',tech) for tech in technologies(s,country)]
              +[('common/amendments',kind) for kind in amendments(s,country)])
     return [text for folder,key in sources for text in s.definitions(folder).get(key,{}).get('modifier',())]
 
 
+@timed_often
 def active_modifiers(s,country):
     timed={kind for kind, in s.rows('country_timed_modifier','modifier',country=country)}
     return timed|{kind for entry in journal_types(s,country) for text in s.definitions('common/journal_entries').get(entry,{}).get('modifiers_while_active',()) for kind in text.split()}
 
 
+@timed_often
 def modifier_flag(s,country,name):
     pattern=re.compile(re.escape(name)+r'\s*=\s*yes')
     return (any(pattern.search(text) for text in modifier_texts(s,country))
             or any(s.definitions('common/static_modifiers').get(kind,{}).get(name)==['yes'] for kind in active_modifiers(s,country)))
 
 
+@timed_often
 def modifier_value(s,country,name):
     pattern=re.compile(re.escape(name)+r'\s*=\s*(-?[\d.]+)')
     return (sum(float(found) for text in modifier_texts(s,country) for found in pattern.findall(text))
@@ -225,10 +244,12 @@ def subject_pairs(s):
                                           if s.definitions('common/diplomatic_actions').get(action,{}).get('subject_pact')})
 
 
+@timed_often
 def subjects(s,country):
     return {second for first,second in subject_pairs(s) if first==country}
 
 
+@timed_often
 def autonomous(s,country):
     actions=s.definitions('common/diplomatic_actions')
     kinds=s.definitions('common/subject_types')
@@ -237,6 +258,7 @@ def autonomous(s,country):
                if second==country and actions.get(action,{}).get('subject_pact'))
 
 
+@timed_often
 def subject_type_of(s,country):
     actions=s.definitions('common/diplomatic_actions')
     return next((next(iter(actions.get(action,{}).get('subject_type',[])),None) for first,second,action in s.rows('pact','first_country,second_country,pact_type')
@@ -247,6 +269,7 @@ def overlords(s,country):
     return {first for first,second in subject_pairs(s) if second==country}
 
 
+@timed_often
 def liberty_desire(s,country):
     return next((desire for first,second,desire in s.rows('pact','first_country,second_country,liberty_desire') if second==country and first in overlords(s,country)),0)
 
@@ -256,11 +279,13 @@ POWERFUL=0
 MARGINAL_TYPE=2
 
 
+@timed_often
 def stance(s,ideologies,law):
     return sum(STANCES.get(value,0) for ideology in ideologies for entry in s.definitions('common/ideologies').get(ideology,{}).get('stance',())
                for key,value in [entry.split()] if key==law)
 
 
+@timed_often
 def scope_ideologies(scope):
     s=scope.s
     if scope.kind=='character':
@@ -268,6 +293,7 @@ def scope_ideologies(scope):
     return [value for value, in s.rows('interest_group_ideology','ideology',interest_group=scope.ident)]
 
 
+@timed_often
 def enactment_stance(operator,value,scope):
     s=scope.s
     fields={k:(o,v) for k,o,v in value}
@@ -279,11 +305,13 @@ def enactment_stance(operator,value,scope):
     return COMPARE[fields['value'][0]](stance(s,ideologies,law)-stance(s,ideologies,current),STANCES[wanted] if wanted in STANCES else amount(s,wanted))
 
 
+@timed_often
 def top_overlord(s,country):
     above=overlords(s,country)
     return top_overlord(s,next(iter(above))) if above else country
 
 
+@timed_often
 def below(s,country):
     found=set()
     for subject in subjects(s,country):
@@ -291,6 +319,7 @@ def below(s,country):
     return found
 
 
+@timed_often
 def indirect_overlords(s,country):
     direct=overlords(s,country)
     found=set()
@@ -300,6 +329,7 @@ def indirect_overlords(s,country):
     return found
 
 
+@timed_often
 def play_sides(s):
     def compute():
         sides={}
@@ -313,32 +343,38 @@ def play_sides(s):
     return s.memo('play_sides',compute)
 
 
+@timed_often
 def warleaders(s,war):
     play=s.map('war','war,diplomatic_play').get(war)
     return {country for ident,initiator,target in s.rows('diplomatic_play','diplomatic_play,initiator,target') if ident==play for country in (initiator,target)}
 
 
+@timed_often
 def play_participants(s,first,second):
     return any(first in members and second in members for members in play_sides(s).values())
 
 
+@timed_often
 def play_enemies(s,country):
     sides=play_sides(s)
     return {member for (play,side),members in sides.items() if country in sides.get((play,1-side),set()) for member in members}
 
 
+@timed_often
 def interest_tier(s,country,region):
     involvement=next((value for owner,key,value in s.rows('interest','country,strategic_region,involvement') if owner==country and key==region),0)
     tiers=s.definitions('common/interest_tier_types').values()
     return max((int(fields['rank'][0]) for fields in tiers if float(fields['min_involvement'][0])<=involvement),default=0)
 
 
+@timed_often
 def region_tier(operator,value,scope):
     fields={k:(o,v) for k,o,v in value}
     region=resolve(scope,fields['strategic_region'][1])
     return region is not None and COMPARE[fields['value'][0]](interest_tier(scope.s,scope.country(),region),amount(scope.s,fields['value'][1]))
 
 
+@timed_often
 def journal_types(s,country):
     def compute():
         held={}
@@ -351,34 +387,41 @@ def journal_types(s,country):
     return s.memo('journal_types',compute).get(country,set())
 
 
+@timed_often
 def bloc_modifier(s,bloc,name):
     pattern=re.compile(re.escape(name)+r'\s*=\s*yes')
     principles={kind for kind, in s.rows('power_bloc_adopted_principle','power_bloc_principle',power_bloc=bloc)}
     return any(pattern.search(text) for principle in principles for text in s.definitions('common/power_bloc_principles').get(principle,{}).get('power_bloc_modifier',()))
 
 
+@timed_often
 def at_war(s,country):
     def compute():
         return any(owner==country for owner, in s.rows('war_participant','country'))
     return s.memo(('at_war',country),compute)
 
 
+@timed_often
 def roles(s,character):
     return {role for role, in s.rows('character_assigned_role','character_role',character=character)}
 
 
+@timed_often
 def ruler(s,country):
     return next((ident for ident, in s.rows('character','character',country=country) if 'character_role_ruler' in roles(s,ident)),None)
 
 
+@timed_often
 def now(s):
     return s.hours
 
 
+@timed_often
 def years_since(s,start):
     return (now(s)-start)/HOURS_PER_YEAR if start is not None else 0
 
 
+@timed_often
 def children(scope,iterator):
     s=scope.s
     country=scope.country()
@@ -466,10 +509,12 @@ def step(scope,name):
     return None
 
 
+@timed_often
 def tagged(s):
     return s.memo('tagged',lambda:{definition:ident for ident,definition in s.rows('country','country,country_definition')})
 
 
+@timed_often
 def strategic_region(s,state):
     def compute():
         regions={member:region for region,fields in s.definitions('common/strategic_regions').items() for member in fields.get('states',())}
@@ -477,20 +522,24 @@ def strategic_region(s,state):
     return s.memo('strategic_regions',compute).get(state)
 
 
+@timed_often
 def culture_names(s,cultures):
     kinds=s.map('culture','culture,culture_type')
     return {kinds.get(culture) for culture in cultures}
 
 
+@timed_often
 def primary_cultures(s,country):
     return culture_names(s,[value for value, in s.rows('country_culture','culture',country=country)])
 
 
+@timed_often
 def homeland(s,state,culture):
     region=s.map('state','state,state_region').get(state)
     return any(value==region and culture in culture_names(s,[owner]) for owner,value in s.rows('culture_core_state','culture,state_region'))
 
 
+@timed_often
 def geographic(s,state,name):
     fields=s.definitions('common/geographic_regions').get(name,{})
     region=s.map('state','state,state_region').get(state)
@@ -506,10 +555,12 @@ def target(scope,name):
 SCOPES={'root','ROOT','owner','ruler','heir','interest_group','commander_military_formation','state_region','power_bloc','market','top_overlord','leader','capital'}
 
 
+@timed_often
 def is_scope(key):
     return all(part in SCOPES or part.startswith(('scope:','c:','s:','mg:','ig:')) for part in key.split('.'))
 
 
+@timed_often
 def resolve(scope,value):
     found=target(scope,value)
     return found.ident if found else None
@@ -571,11 +622,13 @@ def test(key,operator,value,scope):
     return country_test(key,operator,value,scope)
 
 
+@timed_often
 def coastal(s,state):
     region=s.map('state','state,state_region').get(state)
     return bool(s.definitions('map_data/state_regions').get(region,{}).get('naval_exit_id'))
 
 
+@timed_often
 def state_metric(scope,name):
     table,column=METRIC_COLUMNS['state',name]
     value=scope.s.map(table,'state,'+column).get(scope.ident)
@@ -584,6 +637,7 @@ def state_metric(scope,name):
     return value
 
 
+@timed_often
 def devastation_level(scope):
     value=scope.s.map('state_status','state,devastation').get(scope.ident)
     if value is None:
@@ -591,11 +645,13 @@ def devastation_level(scope):
     return int(value*1000)/100000
 
 
+@timed_often
 def character_ideology(scope):
     s=scope.s
     return s.map('character','character,ideology').get(scope.ident)
 
 
+@timed_often
 def group_row(scope):
     s=scope.s
     government=s.map('interest_group','interest_group,in_government').get(scope.ident)
@@ -605,6 +661,7 @@ def group_row(scope):
     return government,clout
 
 
+@timed_often
 def leverage_advantage(operator,value,scope):
     s=scope.s
     fields={k:(o,v) for k,o,v in value}
@@ -614,6 +671,7 @@ def leverage_advantage(operator,value,scope):
     return COMPARE[fields['value'][0]](bloc_advantage(s,scope.ident,found.country()),amount(s,fields['value'][1]))
 
 
+@timed_often
 def bloc_advantage(s,bloc,country):
     held=dict(s.rows('country_leverage','power_bloc,leverage',country=country))
     if bloc not in held:
@@ -621,6 +679,7 @@ def bloc_advantage(s,bloc,country):
     return held[bloc]-max([metric(s,country,'GetUnclaimedLeverage')]+[amount for other,amount in held.items() if other!=bloc])
 
 
+@timed_often
 def supplied(s,market,goods):
     def compute():
         areas={area for area,owner in s.rows('market_area','market_area,market') if owner==market}
@@ -629,6 +688,7 @@ def supplied(s,market,goods):
     return goods in s.memo(('market_supply',market),compute)
 
 
+@timed_often
 def formation_fraction(operator,value,scope):
     s=scope.s
     fields={k:(o,v) for k,o,v in value}
@@ -638,6 +698,7 @@ def formation_fraction(operator,value,scope):
     return COMPARE[fields['value'][0]](share,amount(s,fields['value'][1]))
 
 
+@timed_often
 def discrimination_traits(scope):
     fields=scope.s.definitions('common/cultures').get(scope.s.map('culture','culture,culture_type').get(scope.ident),{})
     return {trait for field in ('heritage','language','traditions') for trait in fields.get(field,())}
@@ -726,6 +787,7 @@ HANDLERS={
 }
 
 
+@timed_often
 def metric(s,country,name):
     table,column=METRIC_COLUMNS.get(('country',name)) or DROPPED_COUNTRY_METRICS[name]
     if not column.isidentifier():
@@ -740,6 +802,7 @@ def metric(s,country,name):
     return value
 
 
+@timed_often
 def relation_between(s,first,second):
     other=second if first==s.player else first if second==s.player else None
     value=s.map('player_relation','country,relations').get(other)
@@ -748,6 +811,7 @@ def relation_between(s,first,second):
     return value
 
 
+@timed_often
 def expelled(s,expeller,expelled_country):
     expulsions=set(s.rows('player_diplomat_expulsion','country,direction'))
     if expelled_country==s.player:
@@ -757,11 +821,13 @@ def expelled(s,expeller,expelled_country):
     return False
 
 
+@timed_often
 def pact_exists(s,first,second,kind):
     pacts=s.memo('pacts',lambda:set(s.rows('pact','first_country,second_country,pact_type')))
     return (first,second,kind) in pacts or (second,first,kind) in pacts
 
 
+@timed_often
 def war_between(s,first,second):
     sides={}
     for war,country in s.rows('war_participant','war,country'):
@@ -769,6 +835,7 @@ def war_between(s,first,second):
     return any({first,second}<=members for members in sides.values())
 
 
+@timed_often
 def rank_of(s,country):
     rank=s.map('country','country,country_rank').get(country)
     return float(next(iter(s.definitions('common/country_ranks').get(rank,{}).get('rank_value',[])),-1))
@@ -908,6 +975,7 @@ ENGAGED=1000
 RELEVANT_TIER=2
 
 
+@timed_often
 def engaged_regions(s,country):
     def compute():
         grouped={}
@@ -918,6 +986,7 @@ def engaged_regions(s,country):
     return s.memo('engaged_regions',compute).get(country,set())
 
 
+@timed_often
 def modifiers(s,kind,ident):
     if kind=='country':
         return {modifier for modifier, in s.rows('country_timed_modifier','modifier',country=ident)}
@@ -937,6 +1006,7 @@ HANDLED={'AND','OR','NOT','NOR','NAND','any_scope_war','calc_true_if','amount','
          'country_has_primary_culture','country_has_state_religion','can_increase_autonomy','strategic_region','law','owns_entire_state_region','country_or_subject_owns_entire_state_region'}|set(METRIC_KEYS)|SCOPES|{key for table in HANDLERS.values() for key in table}
 
 
+@timed_often
 def unsupported(nodes):
     found=set()
     for key,_,value in nodes:

@@ -1,10 +1,11 @@
+import logging
 from pathlib import Path
 import random
 import re
 import struct
 import time
 
-from ..common import progress, slot, timed
+from ..common import progress, slot, timed, timed_often
 from ..timing import span
 from ..recording.capture import plain
 from ..runner.memory import SCALE
@@ -18,10 +19,12 @@ PRIME=.1
 TABLES={'military_formation':'formation'}
 IDENTITY_OFFSETS={'building':16,'country':24}
 LIMIT=5
+POLL=.005
 ABORT_LIMIT=1
 
 
 class Executor:
+    @timed_often
     def __init__(self,game):
         self.game=game
         self.mods=[mod for mod in game.session()['mods'] if (Path(mod).parent/'manifest.json').is_file()]
@@ -31,12 +34,14 @@ class Executor:
         self.started=0
         self.flips={}
 
+    @timed_often
     def index(self,kind,name):
         folder=TYPES[kind][2]
         if folder not in self.indexes:
             self.indexes[folder]={key:position for position,key in enumerate(keys(self.game.game_dir/'game',folder,self.mods))}
         return self.indexes[folder][name]
 
+    @timed_often
     def identity(self,kind,ident):
         reader=self.game.reader()
         database=reader.word(reader.base+reader.tables[TABLES.get(kind,kind)]['rva'])
@@ -51,6 +56,7 @@ class Executor:
             raise LookupError(f'{kind} {ident} resolves to identity {identity:#x}')
         return identity
 
+    @timed_often
     def encode(self,action,params):
         if set(params)!=({split(p)[0] for p in action.params}):
             raise ValueError(f'{action.name} takes {action.params}, got {sorted(params)}')
@@ -74,6 +80,16 @@ class Executor:
                 values['interface_choice']=action.choices.index(value)
         return values,slots
 
+    @timed_often
+    def answer(self,reader,mark,done,started):
+        while time.monotonic()-started<LIMIT:
+            progress('executor')
+            reader.check()
+            text=self.game.log_since(mark)
+            if done in text:
+                return text
+            time.sleep(POLL)
+
     @timed
     def run(self,name,check=False,**params):
         action=BY_NAME[name]
@@ -88,31 +104,34 @@ class Executor:
         self.flips[key]=flip=self.flips.get(key,0)^1
         for variable,value in (*values.items(),('interface_seq',seq),('interface_mode',0),('interface_action',list(BY_NAME).index(name)+1)):
             writes.append((addresses[variable]+24,struct.pack('<q',value*SCALE)))
-        time.sleep(max(0,self.last+GAP-time.monotonic(),self.started+CYCLE-time.monotonic()))
+        mark=self.game.log_mark()
+        with span('interface.actions.execute.Executor.pace','interface',logging.DEBUG):
+            time.sleep(max(0,self.last+GAP-time.monotonic(),self.started+CYCLE-time.monotonic()))
         started=self.started=time.monotonic()
         done=f'INTERFACE|action|{seq}|'
         with span('interface.actions.execute.Executor.dispatch','interface') as dispatch:
             reader.write(writes)
-            time.sleep(PRIME)
+            with span('interface.actions.execute.Executor.prime','interface',logging.DEBUG):
+                time.sleep(PRIME)
             reader.write([(addresses[variable]+24,struct.pack('<q',value*SCALE)) for variable,value in (('interface_mode',2 if check else 1),('interface_flip',flip))])
-            while time.monotonic()-started<LIMIT:
-                progress('executor')
-                reader.check()
-                text=self.game.log()
-                if done in text:
-                    self.last=time.monotonic()
-                    valid,_,desc=re.split(r'\n(?=\[\d\d:\d\d:\d\d\])',text.rsplit(done,1)[1],maxsplit=1)[0].partition('|')
-                    transport=re.findall(rf'INTERFACE\|transport\|{seq}\|(\w+)',text)
-                    if transport and transport[-1]=='started':
-                        valid,desc='1','transport started'
-                    return {'action':name,'valid':valid=='1','desc':plain(desc),'ms':round(dispatch.ms)}
-                time.sleep(.005)
+            text=self.answer(reader,mark,done,started)
+            if text is not None:
+                self.last=time.monotonic()
+                valid,_,desc=re.split(r'\n(?=\[\d\d:\d\d:\d\d\])',text.rsplit(done,1)[1],maxsplit=1)[0].partition('|')
+                transport=re.findall(rf'INTERFACE\|transport\|{seq}\|(\w+)',text)
+                if transport and transport[-1]=='started':
+                    valid,desc='1','transport started'
+                return {'action':name,'valid':valid=='1','desc':plain(desc),'ms':round(dispatch.ms)}
+        self.abort(reader,addresses,mark,done)
+        raise LookupError(f'{name}: no game object matched {params}')
+
+    @timed_often
+    def abort(self,reader,addresses,mark,done):
         reader.write([(addresses['interface_mode']+24,struct.pack('<q',ABORT*SCALE))])
         aborted=time.monotonic()
-        while done not in self.game.log() and time.monotonic()-aborted<ABORT_LIMIT:
+        while done not in self.game.log_since(mark) and time.monotonic()-aborted<ABORT_LIMIT:
             progress('executor abort')
             reader.check()
-            time.sleep(.005)
+            time.sleep(POLL)
         reader.write([(addresses['interface_action']+24,struct.pack('<q',0))])
         self.last=time.monotonic()
-        raise LookupError(f'{name}: no game object matched {params}')

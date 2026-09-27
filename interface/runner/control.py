@@ -2,7 +2,7 @@ import shutil
 import uuid
 
 from ..actions import gui as action_gui
-from ..common import timed, write_json, write_script
+from ..common import timed, write_json, write_script, timed_often
 from ..recording.capture import UI_CHECKS, capture_body, capture_guis, capture_widgets
 from ..script import read, scalar
 
@@ -94,6 +94,7 @@ TRANSPORT_GUI=('interface_transport = { scope = country effect = { debug_log = "
                '|[GetVariableSystem.Get(\'interface_transport_result\')]" } }\n')
 
 
+@timed_often
 def request(tag,token):
     return [f"GetVariableSystem.Set('interface_request','{token}')",f"ExecuteConsoleCommand('event interface.1 {tag}')"]
 
@@ -101,6 +102,7 @@ def request(tag,token):
 CONSOLE_GAP=2
 
 
+@timed_often
 def widget(actions):
     timed=[]
     delay=.15

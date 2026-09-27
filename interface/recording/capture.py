@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import re
 
-from ..common import timed
+from ..common import timed, timed_often
 from ..script import alerts, blocks, body, character_interactions, decisions, diplomatic_actions, diplomatic_state_triggers, journal_buttons, production_methods, read
 from ..visibility import Visibility
 
@@ -73,11 +73,13 @@ CHUNK=32
 UI_CHECKS=(('panel','InformationPanelBar.IsAnyPanelOpen'),('interaction','MapListPanelManager.HasCurrentInteraction'),('map_list','MapListPanelManager.IsVisible'))
 
 
+@timed_often
 def unmet_scopes(valid):
     return (set(re.findall(r'scope:(\w+)',valid))-set(re.findall(r'save_(?:temporary_)?scope_as\s*=\s*(\w+)',valid))
             -PROVIDED_SCOPES)
 
 
+@timed_often
 def missing_references(text,world):
     if world is None:
         return []
@@ -98,10 +100,12 @@ def on_root(effect):
     return 'root = { '+effect+' }'
 
 
+@timed_often
 def when(test,effect):
     return 'if = { limit = { '+test+' } '+effect+' }'
 
 
+@timed_often
 def method_condition(gates):
     if any(gate in gates for gate in BUILDING_GATES):
         return None
@@ -119,21 +123,25 @@ def method_condition(gates):
     return ' '.join(tests) or 'always = yes'
 
 
+@timed_often
 def method_block(name,gates):
     condition=method_condition(gates)
     return None if condition is None else when(condition,listed('cap_method','flag:'+name))
 
 
+@timed_often
 def decision_block(name,shown,possible):
     inner=(when(possible,listed('cap_decision_possible','flag:'+name)) if possible is not None
            else listed('cap_decision_unevaluable','flag:'+name))
     return when(shown,listed('cap_decision','flag:'+name)+' '+inner)
 
 
+@timed_often
 def diplomatic_evaluable(selectable,potential):
     return not unmet_scopes(selectable+' '+potential)-{'target_country'}
 
 
+@timed_often
 def shown_diplomatic(actions):
     tests='\n'.join(when(selectable+' '+potential,listed('cap_diplomatic_'+name,'scope:target_country')
                          +(' '+when(possible,listed('cap_possible_diplomatic_'+name,'scope:target_country')+picks) if possible is not None else ''))
@@ -145,34 +153,40 @@ def shown_diplomatic(actions):
 STATE_PICK_SCOPES={'cap_state','country','target_country'}
 
 
+@timed_often
 def state_picks(name,side,listing,trigger):
     pick='save_scope_as = cap_state '+when(state_rooted(trigger),'scope:target_country = { '+listed(f'capd_{side}_{name}','scope:cap_state')+' }')
     states=f'every_scope_state = {{ {pick} }}'+(f' every_subject_or_below = {{ every_scope_state = {{ {pick} }} }}' if listing.endswith('_and_subjects') else '')
     return f' {"root" if side=="first" else "scope:target_country"} = {{ {states} }}'
 
 
+@timed_often
 def pick_clears(body):
     names=sorted(set(re.findall(r'name = (capd_\w+)',body)))
     clear=' '.join(f'clear_variable_list = {name}' for name in names)
     return f'every_country = {{ {clear} }}\nevery_decentralized_country = {{ {clear} }}\n' if names else ''
 
 
+@timed_often
 def shown_interactions(interactions):
     tests='\n'.join(when(potential,on_root(listed('cap_interaction_'+name,'prev'))+' '+when(possible,on_root(listed('cap_possible_interaction_'+name,'prev'))))
                     for name,potential,possible in interactions)
     return 'every_scope_character = {\n'+tests+'\n}\nevery_character_in_exile_pool = {\n'+tests+'\n}'
 
 
+@timed_often
 def shown_buttons(entries):
     return '\n'.join('je:'+entry+' ?= {\nsave_scope_as = journal_entry\nPREV = {\n'
                      +'\n'.join(when(visible,listed('cap_button_'+entry,'flag:'+button)) for button,visible in buttons)+'\n}\n}'
                      for entry,buttons in entries)
 
 
+@timed_often
 def evaluable(context,valid):
     return context in ALERT_SCOPES and not unmet_scopes(valid)
 
 
+@timed_often
 def alert_block(name,context,valid):
     effect=on_root(listed('cap_alert_'+name,'prev') if context=='player_state' else 'change_variable = { name = cap_alert_'+name+' add = 1 }')
     test=when(valid,effect)
@@ -181,15 +195,18 @@ def alert_block(name,context,valid):
     return test
 
 
+@timed_often
 def decree_triggers(game_dir,mods):
     return [(kind,body(inner['state_trigger'])) for kind,text in read(game_dir/'game','common/decrees',mods)
             for inner in [dict(blocks(body(text)))] if 'state_trigger' in inner]
 
 
+@timed_often
 def state_rooted(trigger):
     return re.sub(r'\b(?:ROOT|root)\b','scope:cap_state',trigger)
 
 
+@timed_often
 def collect(name,*openers,limit=None):
     effect=('limit = { '+limit+' } ' if limit else '')+on_root(listed(name,'prev'))
     for opener in reversed(openers):
@@ -197,6 +214,7 @@ def collect(name,*openers,limit=None):
     return effect
 
 
+@timed_often
 def fixed(expression,kind):
     if kind=='CFixedPoint':
         return expression
@@ -205,14 +223,17 @@ def fixed(expression,kind):
     raise ValueError(f'No fixed-point conversion for {kind}')
 
 
+@timed_often
 def segments(expression):
     return FLOAT_SEGMENTS.get(expression,((1,FLOAT_STEP),))
 
 
+@timed_often
 def limit(expression):
     return segments(expression)[-1][0]
 
 
+@timed_often
 def thresholds(expression):
     found=[];start=0
     for upper,step in segments(expression):
@@ -221,12 +242,14 @@ def thresholds(expression):
     return found
 
 
+@timed_often
 def balanced(terms):
     while len(terms)>1:
         terms=[f'Add_CFixedPoint({terms[index]},{terms[index+1]})' if index+1<len(terms) else terms[index] for index in range(0,len(terms),2)]
     return terms[0]
 
 
+@timed_often
 def integer_parts(expression,kind):
     base=f"'({kind}){PART}'"
     parts=[]
@@ -237,6 +260,7 @@ def integer_parts(expression,kind):
     return [f'MakeScopeFlag(ToString_{kind}({part}))' for part in parts]
 
 
+@timed_often
 def expanded(fields):
     result=[]
     for field,expression,kind in fields:
@@ -249,6 +273,7 @@ def expanded(fields):
     return result
 
 
+@timed_often
 def scoped(expression,kind):
     if kind=='scope':
         return expression
@@ -266,41 +291,49 @@ def scoped(expression,kind):
     return f'MakeScopeValue({fixed(expression,kind)})'
 
 
+@timed_often
 def fields_of(kind,names):
     prefix='Country.' if kind=='country' else 'State.'
     return [(name,prefix+name,METRICS[kind][name]) for name in names]
 
 
+@timed_often
 def metric_map(kind,name):
     base,_,suffix=name.partition('__')
     return f'cap_metric_{kind}_{sorted(METRICS[kind]).index(base)}'+('__'+suffix if suffix else '')
 
 
 class Group:
+    @timed_often
     def __init__(self,name,source,context,key,fields,naming=None):
         self.name,self.source,self.context,self.key=name,source,context,key
         self.fields=expanded(fields)
         self.maps={field:(naming(field) if naming else f'cap_{name}_{field}') for field,_,_ in self.fields}
 
+    @timed_often
     def chunks(self):
         return [self.fields[start:start+CHUNK] for start in range(0,len(self.fields),CHUNK)]
 
+    @timed_often
     def write(self,field,position):
         if self.key:
             return mapped(self.maps[field],'scope:o',f'scope:v{position}')
         return f'set_variable = {{ name = {self.maps[field]} value = scope:v{position} }}'
 
+    @timed_often
     def effects(self):
         return '\n'.join(f'cap_set_{self.name}_{index} = {{ scope = country effect = {{ '
                          +' '.join(self.write(field,position) for position,(field,_,_) in enumerate(chunk))+' } }'
                          for index,chunk in enumerate(self.chunks()))
 
+    @timed_often
     def calls(self):
         return [f"GetScriptedGui('cap_set_{self.name}_{index}').Execute(GuiScope.SetRoot(GetPlayer.MakeScope)"
                 +(f".AddScope('o',{self.key})" if self.key else '')
                 +''.join(f".AddScope('v{position}',{scoped(expression,kind)})" for position,(_,expression,kind) in enumerate(chunk))+'.End)'
                 for index,chunk in enumerate(self.chunks())]
 
+    @timed_often
     def widget(self):
         states=' '.join(f'on_finish = "[{call}]"' for call in self.calls())
         item=f'widget = {{ size = {{ 0 0 }} datacontext = "[{self.context}]" state = {{ name = capture_values duration = 0.001 {states} }} }}'
@@ -309,6 +342,7 @@ class Group:
         return f"flowcontainer = {{ datamodel = \"[AccessPlayer.MakeScope.GetList('{self.source}')]\" item = {{ {item} }} }}"
 
 
+@timed_often
 def metric_groups():
     return [Group('metric_public','cap_obj_country','Scope.GetCountry','Country.MakeScope',fields_of('country',GROUPS['public']),lambda field:metric_map('country',field)),
             Group('metric_player',None,'GetPlayer','Country.MakeScope',fields_of('country',GROUPS['player']),lambda field:metric_map('country',field)),
@@ -352,10 +386,12 @@ GROUP_SPECS=(
 )
 
 
+@timed_often
 def groups():
     return metric_groups()+[Group(*spec) for spec in GROUP_SPECS]
 
 
+@timed_often
 def object_lists():
     return '\n'.join([
         collect('cap_obj_building','every_scope_state =','every_scope_building ='),
@@ -374,6 +410,7 @@ def object_lists():
     ])
 
 
+@timed_often
 def country_typing(game_dir,tag,mods,world):
     typing=[when(f'is_country_type = {kind}',on_root(mapped('cap_country_type','scope:cap_country',f'flag:{kind}')))
             for kind in dict(read(game_dir/'game','common/country_types',mods))]
@@ -392,6 +429,7 @@ def country_typing(game_dir,tag,mods,world):
             f'every_decentralized_country = {{ save_scope_as = cap_country\n{body}\n}}')
 
 
+@timed_often
 def map_data(game_dir,world):
     return Path(world['mod'])/'map_data' if world else Path(game_dir)/'game'/'map_data'
 
@@ -406,6 +444,7 @@ def province_block(maps):
                      +' controller ?= { '+on_root(mapped('cap_province_controller','scope:cap_province','prev'))+' } }' for color in colors)
 
 
+@timed_often
 def province_colors(maps):
     return re.findall(r'p:(x[0-9A-Fa-f]{6}) ',province_block(maps))
 
@@ -456,6 +495,7 @@ def capture_body(game_dir,tag,world=None):
     return clears(body)+pick_clears(body)+body
 
 
+@timed_often
 def clears(body):
     lists=sorted(set(re.findall(r'add_to_variable_list = \{ name = (cap_\w+)',body)))
     maps=sorted(set(re.findall(r'add_to_variable_map = \{ name = (cap_\w+)',body))|{name for group in groups() if group.key for name in group.maps.values()}
@@ -502,6 +542,7 @@ FORMABLE_WIDGET=('flowcontainer = { datamodel = "[AccessPlayer.AccessFormableCou
                  '.AddScope(\'formable\',MakeScopeValue(Select_CFixedPoint(IsValid(CountryFormation.FormCountry(GetPlayer)),\'(CFixedPoint)1\',\'(CFixedPoint)0\'))).End)]" } } } }\n')
 
 
+@timed_often
 def counted(counter,maps):
     return (f'change_variable = {{ name = {counter} add = 1 }} '
             +' '.join(mapped(name,f'var:{counter}',f'scope:{name.rsplit("_",1)[1]}') for name in maps))
@@ -516,13 +557,16 @@ CAPTURE_GUIS=('cap_message = { scope = country effect = { '+counted('cap_message
               'cap_formable = { scope = country effect = { '+' '.join(mapped(name,'scope:index',f'scope:{name.rsplit("_",1)[1]}') for name in FORMABLE_MAPS)+' } }\n')
 
 
+@timed_often
 def capture_guis():
     return CAPTURE_GUIS+'\n'.join(group.effects() for group in groups())+'\n'
 
 
+@timed_often
 def capture_widgets():
     return '\n'.join(group.widget() for group in groups())+'\n'+FORMABLE_WIDGET+BORROW_WIDGET+RELEASE_WIDGET
 
 
+@timed_often
 def plain(text):
     return ' '.join(re.sub(r'[\x00-\x1f]',' ',re.sub(r'\x15!|\x15(?:tooltip:\S+|\w+;?) |\b(?:[a-z][a-z0-9_]*|[A-Z]{3}\d+)! ?','',text)).split())

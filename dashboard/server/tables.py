@@ -14,6 +14,7 @@ def last_seq(run_id):
     return db.value('select max(seq) from snapshot where run_id=%s',(run_id,))
 
 
+@db.timed
 def keyless(kind):
     return [t for t in owned_tables(kind) if not t.keys and t.kind!='sample' and t.name!=kind+'_history']
 
@@ -64,10 +65,12 @@ def entity_grid(run_id,kind,seq,gone,filters,sort,desc,offset,limit):
     return grid(specs,source,{'run':run_id,'seq':seq},filters,sort,desc,offset,limit,run_id,[kind])
 
 
+@db.timed
 def naming_params(kind):
     return sorted({(action,p.name) for action in [*BY_NAME,*LOOP_PARAMS] for p in param_specs(action) if entity_of(p.kind)==kind})
 
 
+@db.timed
 def references(kind):
     return [(t,c) for t in TABLES for c in t.keys+t.columns if c.entity==kind]
 
@@ -94,6 +97,7 @@ NAMED=('exists (select 1 from loop_action_param q where q.run_id=l.run_id and q.
        'and (a.name,q.name) in (select unnest(%(actions)s::text[]),unnest(%(params)s::text[])))')
 
 
+@db.timed
 def naming(kind,ident):
     names=naming_params(kind)
     return {'id':ident,'actions':[a for a,_ in names],'params':[p for _,p in names]}

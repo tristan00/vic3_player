@@ -1,3 +1,4 @@
+from functools import cache
 import re
 import sys
 import unittest
@@ -10,6 +11,18 @@ from interface.script import decisions, production_methods
 from interface.common import DEFAULT_GAME
 
 GAME = DEFAULT_GAME / 'game'
+
+
+@cache
+def generated():
+    from interface.recording.capture import capture_body
+    return capture_body(DEFAULT_GAME, 'XAA')
+
+
+@cache
+def event_widget():
+    from interface.runner.control import event_capture_widget
+    return event_capture_widget(DEFAULT_GAME)
 
 
 class StartupTests(unittest.TestCase):
@@ -103,8 +116,7 @@ class GeneratedCaptureTests(unittest.TestCase):
     def setUp(self):
         if not GAME.is_dir():
             self.skipTest('game install not present')
-        from interface.recording.capture import capture_body
-        self.body = capture_body(DEFAULT_GAME, 'XAA')
+        self.body = generated()
 
     def test_generated_script_has_balanced_braces_and_quotes(self):
         self.assertEqual(self.body.count('{'), self.body.count('}'))
@@ -155,8 +167,7 @@ class MetricGroupTests(unittest.TestCase):
 
 class CaptureBodyShapeTests(unittest.TestCase):
     def body(self):
-        from interface.recording.capture import capture_body
-        return capture_body(Path('D:/SteamLibrary/steamapps/common/Victoria 3'), 'XAA')
+        return generated()
 
     def test_the_capture_carries_the_request_nonce(self):
         self.assertIn('set_variable = { name = cap_seq value = var:interface_capture_seq }', self.body())
@@ -262,8 +273,7 @@ class AbsentReferenceTests(unittest.TestCase):
 
 class EventCaptureWidgetTests(unittest.TestCase):
     def widget(self):
-        from interface.runner.control import event_capture_widget
-        return event_capture_widget(DEFAULT_GAME)
+        return event_widget()
 
     def test_every_datamodel_uses_an_accessor_the_shipped_gui_also_uses(self):
         if not GAME.is_dir():

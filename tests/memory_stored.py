@@ -24,6 +24,9 @@ class Memory(Stored):
         names=layout.keys+['seq']+layout.data
         return names,[tuple(row.get(name) for name in names) for row in self.given.get(stored,[])]
 
+    def load(self):
+        pass
+
     def adjacency(self):
         return self.given_definitions.get('adjacency',[])
 

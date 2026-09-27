@@ -1,10 +1,55 @@
 # Timing
 
-`interface/timing.py` is the only timing tool in the project. Every duration that is logged, stored or reported comes from a span. It measures with `time.perf_counter_ns`, logs each call on exit, aggregates per span in memory, and the store writes the aggregates to Postgres for every run.
+`interface/timing.py` is the only timing tool in the project. Every duration that is logged, stored or reported comes from a span. A span measures with `time.perf_counter_ns`, logs on exit, and is aggregated per name in memory. The store writes the aggregates to Postgres for every run.
 
-Clock reads that remain elsewhere are deadlines and pacing, such as a timeout or the gap between two actions. None of them produces a reported duration.
+What the measurements have been used to speed up is in `loop_speed.md`.
 
-What the measurements have been used to speed up, with before and after numbers, is in `loop_speed.md`.
+## Coverage
+
+Every function in `interface`, `loop`, `advisors` and `dashboard/server` is timed, or it is listed with a reason. `tests/test_timing_coverage.py` enforces this. A new function without a decorator fails the suite until it is decorated or listed in `tests/timing_exempt.json`.
+
+| state | functions |
+| --- | --- |
+| timed by a decorator | 904 |
+| listed by name, inside a timed caller | 67 |
+| in a file listed as a whole | 87 |
+
+Reasons a function may be listed:
+
+| reason | meaning |
+| --- | --- |
+| hot | called more than 2000 times per snapshot or pause, or more than 20000 times per run for setup work; a span costs more than the call |
+| loop | runs for the life of its thread, process or run, so its span would never close in time to be stored |
+| timer | part of the timing tool or the watchdog stamp |
+| monitor | the GPU guard, supervisor, watcher and launchers; they belong to no run |
+| declaration | runs while its module is imported, to declare tables and actions |
+| tool | the schema generator, run by hand |
+
+Four kinds of function need no listing, because something else times them:
+
+| kind | timed by |
+| --- | --- |
+| a function defined inside another | the enclosing function |
+| a generator | the function that consumes it; decorating one raises `TypeError` at import |
+| a method such as `__getitem__` | the caller; `__init__` is timed |
+| a dashboard route | the request span, named by method and route |
+
+Call counts behind the `hot` list were measured, not guessed. Offered actions were profiled on 13 stored snapshots, including wartime and late game. The memory reader was profiled on the running game with read-only access. World generation and picker training were each profiled once.
+
+## Waits
+
+Time spent waiting on the game has its own spans, so it no longer appears as unexplained self time.
+
+| span | what it waits for |
+| --- | --- |
+| `interface.actions.execute.Executor.pace` | the fixed gap before an action may start |
+| `interface.actions.execute.Executor.prime` | the fixed 100 ms between writing parameters and firing |
+| `interface.actions.execute.Executor.answer` | the game logging the result of the action |
+| `interface.actions.execute.Executor.abort` | the game acknowledging an abort |
+| `interface.runner.memory.Reader.captured` | the game finishing its capture script |
+| `loop.run.Loop.days` | the game running the requested days |
+| `loop.run.settle` | the date holding still after a pause |
+| `loop.run.running` | the probe that checks whether the game is running |
 
 ## Timing a function
 
@@ -25,14 +70,10 @@ def run_actions(run_id): ...
 | decorator | logs at | stamps watchdog progress | use for |
 | --- | --- | --- | --- |
 | `timed` | INFO | yes | work that runs a few times per turn or less |
-| `timed_often` | DEBUG | no | work that runs many times per snapshot |
+| `timed_often` | DEBUG | no | everything else |
 | `db.timed` | INFO | no | the dashboard |
 
-All three record the same measurements. `timed_often` exists so that a call made hundreds of times per snapshot is stored without filling the log.
-
-A decorator goes directly above `def`, below `@staticmethod`, `@property` and `@cache`. Below a cache it times only the misses.
-
-Decorating a generator or a coroutine raises `TypeError` at import. Timing that call would measure only the creation of the generator, so time the caller instead.
+All three record the same measurements. A decorator goes directly above `def`, below `@staticmethod`, `@property` and `@cache`. Below a cache it times only the misses.
 
 ## Timing a block
 
@@ -45,9 +86,19 @@ with span('advisors.pickers.CatBoostPicker.fit','loop'):
 
 The second argument is the logger name. A third sets the log level.
 
+## Cached values
+
+`Stored.memo` and the per-run cache in `Shared` open a span only when they compute. The span is named after the function that computes, such as `interface.options.available.state_regions.<locals>.compute`. A cache hit costs no span.
+
+## Cost of a span
+
+A span costs 0.8 microseconds, down from 1.2. The recorder now updates one set of statistics per call and folds it into the run totals when the interval is drained.
+
+One stored snapshot opens about 1500 spans, which is about 1.2 ms. One pause opens about 25000 spans in offered actions, which is about 20 ms.
+
 ## Reading a duration in code
 
-A span reports `ms` and `seconds`. While it is open they are the time elapsed so far, after it closes they are its duration.
+A span reports `ms` and `seconds`. While it is open they are the time elapsed so far. After it closes they are its duration.
 
 ```python
 from interface.timing import current
@@ -55,13 +106,13 @@ from interface.timing import current
 entry['ms']=round(current().ms)
 ```
 
-`current()` is the innermost open span, which inside a decorated function is that function. Values stored in the database come from here: `snapshot.read_ms`, `loop_action.ms`, `pick_model.seconds` and `smac_proposal.seconds`.
+`current()` is the innermost open span. Values stored in the database come from here: `snapshot.read_ms`, `loop_action.ms`, `pick_model.seconds` and `smac_proposal.seconds`.
 
 ## Span names
 
 A decorated function is named by its file path under the project root and its qualified name: `interface.recording.store.Store.write`. The name is the same whether the module was imported, run with `-m`, or loaded in a spawned child.
 
-Dashboard requests are named by method and route template: `GET /api/runs/{run_id}/actions`. An API path that matches no route is `GET /api/{path:path}`.
+Dashboard requests are named by method and route template: `GET /api/runs/{run_id}/actions`.
 
 ## Log lines
 
@@ -81,25 +132,21 @@ A call that leaves by raising is logged as FAILED with the exception type and co
 | total_ms | wall time summed over calls |
 | self_ms | total_ms minus the time of spans opened inside, on the same thread |
 | min_ms, max_ms | exact |
-| p50_ms, p95_ms, p99_ms | from a log-scale histogram, 8 buckets per doubling; at most 9 % above the exact value, never outside min and max |
+| p50_ms, p95_ms, p99_ms | from a log-scale histogram, 8 buckets per doubling; at most 9 % above the exact value |
 
 Memory per span is bounded by the histogram, so a process can run indefinitely.
 
-A large `self_ms` means time the span spent on work that is not itself a span. For `Loop.run_days`, `GameInterface.ready` and `Executor.run` that is waiting on the game.
-
 ## Work on other threads
-
-Three pieces of setup run on worker threads of the loop process. Their spans are recorded directly, like any other.
 
 | work | thread | the span that waits for it |
 | --- | --- | --- |
 | world generation | one worker inside `Fresh.take` | `loop.run.Fresh.take` |
 | picker training | one worker started by `session` | `loop.run.session` |
-| statistics refresh after the first snapshot | eight workers inside `Store.analyze`, each an `analyze_batch` span | `interface.recording.store.Store.analyze` |
+| statistics refresh after the first snapshot | eight workers, each an `analyze_batch` span | `interface.recording.store.Store.analyze` |
+| table reads for offered actions | eight workers, each read a `Shared.fetch` span | `interface.options.stored.Stored.load` |
+| the debug log tail | one thread for the life of the game | none |
 
-A span on a worker thread has no parent, so its time is not subtracted from the span that waits. The waiting span shows the wait as `self_ms`.
-
-Spans that overlap in time add up to more than the wall clock. Picker training and world generation run together, so the first interval of a run sums to more than its length. The wall time of setup is `min(snapshot.taken_at) - run.started_at` plus the time before the run row opens, which the log shows.
+A span on a worker thread has no parent, so its time is not subtracted from the span that waits. Spans that overlap in time add up to more than the wall clock.
 
 ## Other processes
 
@@ -108,46 +155,45 @@ One recorder per run holds everything. Spans measured in another process are sen
 | process | how its spans arrive |
 | --- | --- |
 | heartbeat | sends what it measured every second over a queue; the store merges it before each write |
-| world pool worker | returns its spans with the finished world; merged when the world is taken |
-
-A pooled world may have been built while an earlier run was playing. Its spans belong to the run that takes it.
+| world pool worker | returns its spans with the finished world |
 
 ## Stored tables
 
 Both tables are in `schema_meta.sql`.
 
-`run_timing (run_id, span, ...)` holds the whole run so far. It is rewritten inside every snapshot transaction and once more when the run ends, so a crashed or stalled run keeps everything up to its last snapshot.
+`run_timing (run_id, span, ...)` holds the whole run so far. It is rewritten inside every snapshot transaction and once more when the run ends.
 
-`snapshot_timing (run_id, seq, span, calls, errors, total_ms, self_ms, max_ms)` holds the calls that finished since the previous snapshot was written. The write of snapshot `seq` is still open when its rows are stored, so it appears under `seq + 1`. Calls that finish after the last snapshot appear only in `run_timing`.
+`snapshot_timing (run_id, seq, span, calls, errors, total_ms, self_ms, max_ms)` holds the calls that finished since the previous snapshot was written. The write of snapshot `seq` is still open when its rows are stored, so it appears under `seq + 1`.
 
-The recorder is reset at the start of each session, so the first interval of a run holds world generation, picker training and the game launch.
+Full coverage stores several hundred rows per snapshot where the earlier coverage stored about 44.
 
-Two spans are still open at the final write and are not stored: `loop.run.session` and `loop.run.Loop.run`. Their duration is `run.ended_at - run.started_at`, and both are logged when they close.
+Three spans are still open at the final write and are not stored: `loop.run.session`, `loop.run.Loop.run` and the function they call, `Loop.play`, which is listed as a loop.
 
 ## Reading it
 
 Dashboard, run page, timing tab: both tables for that run.
 
-Dashboard, schema page, dashboard timing: the dashboard process itself, per route, per function and per query call, since it started. Same data at `/api/timing`. Every API response also carries a `Server-Timing` header with its six slowest spans.
+Dashboard, schema page, dashboard timing: the dashboard process itself. Same data at `/api/timing`.
 
 ```sql
 select span, calls, total_ms, self_ms, p95_ms, max_ms
-from run_timing where run_id = 242 order by self_ms desc limit 20;
+from run_timing where run_id = 270 order by self_ms desc limit 20;
 
 select seq, total_ms / calls as mean_ms, max_ms
 from snapshot_timing
-where run_id = 242 and span = 'interface.recording.store.Store.write'
+where run_id = 270 and span = 'interface.recording.store.Store.write'
 order by seq;
-
-select span, sum(total_ms) / sum(calls) as mean_ms, max(p99_ms) as worst_p99_ms
-from run_timing group by span order by 2 desc limit 20;
 ```
 
-## Outside the run
+## Measuring without the game
 
-Three monitor processes are not timed: the GPU guard, the supervisor and the watcher. They run apart from the loop, belong to no run, and only poll and sleep.
+Three paths can be replayed offline, which is how the speedups in `loop_speed.md` were found and proven.
 
-Raw memory reads are not spans. `Reader.read` and `Reader.array` run thousands of times per snapshot, and a span around each would cost more than the read. The functions that call them are spans: `Reader.table`, `Reader.snapshot`, `Reader.holder`, `Reader.holders`.
+| path | input |
+| --- | --- |
+| offered actions | any stored snapshot, read from the database |
+| row building | a capture read from the running game with read-only access |
+| the snapshot write | the same capture, written to the test database |
 
 ## Changing the schema
 

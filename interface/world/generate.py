@@ -12,7 +12,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
 from scipy.spatial import cKDTree
 
-from ..common import DEFAULT_DATA, DEFAULT_GAME, timed, write_json, write_script
+from ..common import DEFAULT_DATA, DEFAULT_GAME, timed, write_json, write_script, timed_often
 from ..script import clean, read, scalar
 from .vanilla import boxes, rasters, textures, vanilla
 from .nations import nations, word
@@ -29,6 +29,7 @@ LAND,OCEAN,LAKE=1,2,3
 PLAIN={'map_data/province_terrains.txt','map_data/default.map'}
 
 
+@timed_often
 def _noise(nrng,shape,sigmas):
     total=np.zeros(shape)
     for sigma in sigmas:
@@ -38,14 +39,17 @@ def _noise(nrng,shape,sigmas):
     return total/total.std()
 
 
+@timed_often
 def _morton(x,y):
     return sum((x>>bit&1)<<2*bit|(y>>bit&1)<<2*bit+1 for bit in range(16))
 
 
+@timed_often
 def _spline_safe(cells):
     return all(_morton(x,y)<cells*cells for x in range(cells) for y in range((cells+1)//2))
 
 
+@timed_often
 def _size(rng,provinces):
     fraction=rng.uniform(.35,.55)
     cells=max(4,math.ceil(math.sqrt(provinces*PROVINCE_PIXELS/fraction/2)/64))
@@ -78,6 +82,7 @@ def _domains(nrng,width,height,fraction,landmasses):
     return domain
 
 
+@timed_often
 def _seeds(points,count,nrng,density):
     seeds=points[nrng.choice(len(points),count,replace=False,p=density/density.sum())].astype(float)
     for _ in range(3):
@@ -88,6 +93,7 @@ def _seeds(points,count,nrng,density):
     return seeds
 
 
+@timed_often
 def _split(counts,sizes,every=True):
     order=np.argsort(sizes)[::-1]
     result=np.zeros(len(sizes),dtype=int)
@@ -143,6 +149,7 @@ def _cells(domain,land_count,sea_count,nrng):
 _SHIFTS=((-1,0),(1,0),(0,-1),(0,1))
 
 
+@timed_often
 def _contiguous(cells,domain):
     while True:
         stray=np.zeros(cells.shape,dtype=bool)
@@ -169,6 +176,7 @@ def _contiguous(cells,domain):
                 ys,xs=ys[left],xs[left]
 
 
+@timed_often
 def _graph(cells):
     pairs=[]
     for first,second in ((cells[:,:-1],cells[:,1:]),(cells[:-1],cells[1:])):
@@ -178,6 +186,7 @@ def _graph(cells):
     return {(int(a),int(b)):int(n) for (a,b),n in zip(edges,counts)}
 
 
+@timed_often
 def _components(nodes,neighbours):
     seen={};components=[]
     for start in nodes:
@@ -193,6 +202,7 @@ def _components(nodes,neighbours):
     return components
 
 
+@timed_often
 def _grow(nodes,neighbours,centers,count,weights,rng,every=True):
     components=sorted(_components(nodes,neighbours),key=len,reverse=True)
     seeds=[]
@@ -312,6 +322,7 @@ def _graphics(mod,game,land,geography):
     write_script(mod/'gfx/map/spline_network/game_road_data.txt','state_region_road_strips = { }\n')
 
 
+@timed_often
 def _geographic_regions(game,states,regions):
     members={}
     for state,region in regions.items():
@@ -328,6 +339,7 @@ TRIGGER_TAGS=r'is_subject_of|is_direct_subject_of|this'
 ARGUMENTS={'value','placement','set_company_state_region','supply_hub','move_pop','target_state','state','hq_region','strategic_region'}
 ARGUMENT_BLOCKS={'combat_unit','ship','set_variable','start_national_awakening','add_involvement'}
 BARE_STATE=r'owns_entire_state_region|has_state_in_state_region|country_or_subject_owns_entire_state_region|owns_treaty_port_in'
+@timed_often
 def _enclosing(text,position):
     depth=0
     for i in range(position-1,-1,-1):
@@ -392,6 +404,7 @@ def _rewrites(game,states,strategic,regions,tags):
     return files
 
 
+@timed_often
 def _detach(rng,ownership,capitals,neighbours,coastal,count):
     def connected(members):
         members=set(members);start=next(iter(members));seen={start};stack=[start]
@@ -414,12 +427,14 @@ def _detach(rng,ownership,capitals,neighbours,coastal,count):
         ownership[state]=receiver
 
 
+@timed_often
 def _latitudes(game,templates):
     found=boxes(game)
     height=rasters(game)['provinces'].shape[0]
     return [np.mean([(found[p][0].start+found[p][0].stop)/2/height for p in t['provinces']]) for t in templates]
 
 
+@timed_often
 def _templates(rng,states,templates,latitudes,height):
     used=set()
     for state in sorted(states,key=lambda s:s['center'][1]):
@@ -432,6 +447,7 @@ def _templates(rng,states,templates,latitudes,height):
         state['source']=templates[choice]
 
 
+@timed_often
 def _locator(cells,province,kind,coast,taken,rng):
     inside=cells==province
     py,px=np.nonzero(inside)
@@ -443,6 +459,7 @@ def _locator(cells,province,kind,coast,taken,rng):
     return int(tx[best]),int(ty[best])
 
 
+@timed_often
 def _path(crop,start,stop,box,factor,spacing):
     (y0,y1),(x0,x1)=box
     h,w=-(-crop.shape[0]//factor),-(-crop.shape[1]//factor)
@@ -470,6 +487,7 @@ def _path(crop,start,stop,box,factor,spacing):
     return [tuple(start)]+middle+[tuple(stop)]
 
 
+@timed_often
 def _splnet(anchors,strips):
     H=lambda *v:struct.pack(f'<{len(v)}H',*v)
     u=lambda v:H(0x14)+struct.pack('<I',v)

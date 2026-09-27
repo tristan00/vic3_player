@@ -1,0 +1,113 @@
+{
+ "advisors/features.py": {
+  "Samples.at": "hot",
+  "Versions.at": "hot",
+  "Versions.live": "hot",
+  "rank": "hot",
+  "resolve": "hot",
+  "slot": "hot"
+ },
+ "advisors/pickers.py": {
+  "value_at": "hot"
+ },
+ "advisors/random_smac_weighting.py": {
+  "discount": "hot",
+  "peak": "hot"
+ },
+ "dashboard/server/__main__.py": "monitor",
+ "dashboard/server/grid.py": {
+  "cell": "hot"
+ },
+ "interface/actions/catalogue.py": "declaration",
+ "interface/common.py": {
+  "progress": "timer",
+  "progress_age": "timer",
+  "read_progress": "timer",
+  "slot": "hot"
+ },
+ "interface/options/available.py": {
+  "definition": "hot",
+  "inherited": "hot"
+ },
+ "interface/options/stored.py": {
+  "Stored.definitions": "hot",
+  "Stored.map": "hot",
+  "Stored.memo": "hot",
+  "Stored.rows": "hot",
+  "compute_name": "hot",
+  "memoized": "hot"
+ },
+ "interface/options/triggers.py": {
+  "Scope.__init__": "hot",
+  "Scope.country": "hot",
+  "Scope.to": "hot",
+  "both": "hot",
+  "country_test": "hot",
+  "evaluate": "hot",
+  "overlords": "hot",
+  "scripted": "hot",
+  "step": "hot",
+  "subject_pairs": "hot",
+  "target": "hot",
+  "test": "hot"
+ },
+ "interface/recording/capture.py": {
+  "listed": "hot",
+  "mapped": "hot",
+  "on_root": "hot"
+ },
+ "interface/recording/emit.py": "tool",
+ "interface/recording/record.py": {
+  "flag": "hot",
+  "ident": "hot",
+  "number": "hot",
+  "text": "hot"
+ },
+ "interface/recording/spec.py": "declaration",
+ "interface/recording/store.py": {
+  "heartbeat": "loop",
+  "identity": "hot"
+ },
+ "interface/recording/tables.py": {
+  "Context.add": "hot",
+  "Context.goods_name": "hot",
+  "Context.ident": "hot",
+  "Context.label": "hot",
+  "Context.labels": "hot",
+  "Context.order": "hot",
+  "Tracked.get": "hot",
+  "flag": "hot",
+  "metric_value": "hot",
+  "movement_modifiers": "hot",
+  "ownership_owner": "hot",
+  "same": "hot"
+ },
+ "interface/runner/guard.py": "monitor",
+ "interface/runner/memory.py": {
+  "Reader.array": "hot",
+  "Reader.is_object": "hot",
+  "Reader.item": "hot",
+  "Reader.read": "hot",
+  "Reader.token": "hot",
+  "Reader.tokens": "hot",
+  "Reader.word": "hot"
+ },
+ "interface/runner/tail.py": {
+  "LogTail.run": "loop"
+ },
+ "interface/script.py": {
+  "body": "hot",
+  "scalar": "hot"
+ },
+ "interface/timing.py": "timer",
+ "loop/launch.py": "monitor",
+ "loop/run.py": {
+  "Loop.play": "loop",
+  "Watchdog.watch": "loop",
+  "build_apart": "timer",
+  "main": "loop",
+  "targets": "hot"
+ },
+ "loop/supervise.py": "monitor",
+ "loop/watch.py": "monitor"
+}

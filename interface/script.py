@@ -95,6 +95,7 @@ METHOD_REQUIREMENTS=('unlocking_technologies','unlocking_laws','disallowing_laws
                      'required_input_goods')
 
 
+@timed_often
 def method_value(name,modifier,values):
     if len(values)!=1:
         raise RuntimeError(f'{name}.{modifier} holds {values}, not one value')
@@ -106,6 +107,7 @@ def method_value(name,modifier,values):
     return float(value)
 
 
+@timed_often
 def method_effects(game,mods=()):
     goods,employment,modifiers,requirements,ratios=[],[],[],[],[]
     for name,entry in production_methods(game,mods):
@@ -179,6 +181,7 @@ def alerts(game,mods=()):
             yield name,scalar(text,'script_context'),body(inner['valid'])
 
 
+@timed_often
 def building_methods(game,mods=()):
     groups={name:dict(fields(body(text))).get('production_methods',[]) for name,text in read(game,'common/production_method_groups',mods)}
     return [(building,group,method) for building,text in read(game,'common/buildings',mods)
@@ -245,6 +248,7 @@ BLOCK_FIELDS={
 }
 
 
+@timed_often
 def definitions(game,mods=()):
     return ([(folder,name,field,value.strip('"')) for folder,wanted in DEFINITION_FIELDS.items() for name,text in read(game,folder,mods)
              for field,values in fields(body(text)) if field in wanted for value in values]
@@ -280,11 +284,13 @@ def definitions(game,mods=()):
               if re.search(r'selectable_in_lens\s*=\s*\{\s*always\s*=\s*no\s*\}',text)])
 
 
+@timed_often
 def event_namespaces(game,mods=()):
     return list(dict.fromkeys(key.rsplit('.',1)[0] for path in script_files(game,'events',mods)
                               for key,_ in blocks(clean(path)) if re.fullmatch(r'[\w-]+\.\d+',key)))
 
 
+@timed_often
 def keys(game,folder,mods=()):
     return list(dict.fromkeys(key for key,_ in read(game,folder,mods)))
 

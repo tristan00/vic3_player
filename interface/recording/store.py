@@ -41,6 +41,7 @@ def install(connection):
 
 
 class Layout:
+    @timed_often
     def __init__(self,table):
         self.table=table
         self.name=table.name
@@ -55,6 +56,10 @@ class Layout:
         self.columns=self.keys+(['n','date'] if self.kind=='sample' else [])+self.data
         head=['run_id',*self.keys]+(['n'] if self.kind=='sample' else [])+['seq']
         self.names=head+(['date'] if self.kind=='sample' else [])+(['present'] if self.versioned else [])+self.data
+        offset=len(self.key_columns)+(2 if self.kind=='sample' else 0)
+        self.length=offset+len(table.columns)
+        placed=list(enumerate(self.key_columns))+[(offset+position,column) for position,column in enumerate(table.columns)]
+        self.checked=[(index,column) for index,column in placed if column is None or column.sentinels or column.entity or column.vocabulary in CLOSED]
 
 
 class Store:
@@ -76,11 +81,13 @@ class Store:
         self.methods=None
         self.dlc=None
         self.checks=self.validation()
+        self.connection.prepared_max=len(self.checks)
         self.run_id=None
         self.ruleset_id=None
         self.world_id=None
         self.session=None
 
+    @timed_often
     def enum_names(self):
         return sorted({column.enum for table in TABLES for column in table.keys+table.columns if column.enum})
 
@@ -89,20 +96,18 @@ class Store:
         rows=self.connection.execute("""
             select c.conrelid::regclass::text, c.confrelid::regclass::text,
                    array(select a.attname from unnest(c.conkey) with ordinality k(n,i) join pg_attribute a on a.attrelid=c.conrelid and a.attnum=k.n order by k.i),
+                   array(select format_type(a.atttypid,a.atttypmod) from unnest(c.conkey) with ordinality k(n,i) join pg_attribute a on a.attrelid=c.conrelid and a.attnum=k.n order by k.i),
                    array(select a.attname from unnest(c.confkey) with ordinality k(n,i) join pg_attribute a on a.attrelid=c.confrelid and a.attnum=k.n order by k.i)
             from pg_constraint c where c.connamespace='public'::regnamespace and c.contype='f'""").fetchall()
         checks=[]
-        for table,target,columns,keys in rows:
-            if table in self.layouts:
-                scope='t.run_id = %(run)s and t.seq = %(seq)s'
-            elif table in ENTITIES:
-                scope='t.run_id = %(run)s and t.first_seq = %(seq)s'
-            else:
+        for table,target,columns,kinds,keys in rows:
+            if table not in self.layouts and table not in ENTITIES:
                 continue
-            present=' and '.join(f't.{column} is not null' for column in columns)
-            match=' and '.join(f'r.{key} = t.{column}' for column,key in zip(columns,keys))
-            checks.append((table,f'{table}({",".join(columns)}) -> {target}',
-                           f'select exists (select 1 from {table} t where {scope} and {present} and not exists (select 1 from {target} r where {match}))'))
+            given=','.join(f'%s::{kind}[]' for kind in kinds)
+            match=' and '.join(f'r.{key} = v.c{position}' for position,key in enumerate(keys))
+            checks.append((table,f'{table}({",".join(columns)}) -> {target}',columns,
+                           f'select exists (select 1 from unnest({given}) v({",".join(f"c{position}" for position in range(len(keys)))}) '
+                           f'where not exists (select 1 from {target} r where {match}))'))
         return checks
 
     @timed_often
@@ -283,6 +288,7 @@ class Store:
                   [(run_id,*row) for row in proposal['candidate_rows']])
         self.copy(cursor,'smac_importance',('run_id','dimension','importance'),[(run_id,name,value) for name,value in proposal['importance']])
 
+    @timed_often
     def live(self,rows):
         live={}
         for entity in ENTITIES:
@@ -293,15 +299,14 @@ class Store:
             live[entity]=slots
         return live
 
+    @timed_often
     def resolve(self,layout,rows,live,referenced):
-        offset=len(layout.key_columns)+(2 if layout.kind=='sample' else 0)
-        fields=list(enumerate(layout.key_columns))+[(offset+i,c) for i,c in enumerate(layout.table.columns)]
         out=[]
         for row in rows:
-            if len(row)!=offset+len(layout.table.columns):
-                raise RuntimeError(f'{layout.name} row has {len(row)} values, not {offset+len(layout.table.columns)}')
+            if len(row)!=layout.length:
+                raise RuntimeError(f'{layout.name} row has {len(row)} values, not {layout.length}')
             values=list(row)
-            for index,column in fields:
+            for index,column in layout.checked:
                 if column is None:
                     values[index]=identity(live,layout.owner,values[index],layout.name,layout.owner)
                     continue
@@ -338,6 +343,7 @@ class Store:
                 self.codes(column.enum,[row[index] for row in converted])
         return converted
 
+    @timed_often
     def versions(self,layout,rows,seq,present):
         width=len(layout.key_columns)
         current={}
@@ -363,6 +369,7 @@ class Store:
         gone=[(*key,False,*[None]*len(layout.data)) for key in previous if key not in current]
         return changed+gone,current
 
+    @timed_often
     def fresh_samples(self,layout,rows):
         known=self.samples.setdefault(layout.name,{})
         width=layout.width
@@ -377,6 +384,7 @@ class Store:
                 raise RuntimeError(f'{layout.name} sample {key} changed from {seen} to {value}')
         return fresh
 
+    @timed_often
     def check_fixed(self,layout,rows):
         columns=FIXED.get(layout.name)
         if columns is None:
@@ -432,28 +440,30 @@ class Store:
                             meta['ui_interaction_open'],meta['ui_map_list_open']))
             cursor.execute('set local session_replication_role = replica')
             cursor.execute('set local enable_nestloop = off')
+            written={}
             for entity,idents in anchors.items():
                 if entity=='province':
-                    self.copy(cursor,'province',('run_id','province','first_seq','world_id','color'),
-                              [(self.run_id,ident,seq,self.world_id,colors[ident]) for ident in idents])
+                    written[entity]=(('run_id','province','first_seq','world_id','color'),[(self.run_id,ident,seq,self.world_id,colors[ident]) for ident in idents])
                 else:
-                    self.copy(cursor,entity,('run_id',entity,'first_seq'),[(self.run_id,ident,seq) for ident in idents])
+                    written[entity]=(('run_id',entity,'first_seq'),[(self.run_id,ident,seq) for ident in idents])
             for name,(rows,_) in staged.items():
-                progress(f'copy {name}')
+                progress(f'convert {name}')
                 layout=self.layouts[name]
                 stored=self.stored(layout,rows)
                 if layout.kind=='sample':
-                    self.copy(cursor,name,layout.names,[(self.run_id,*row) for row in stored])
+                    written[name]=(layout.names,[(self.run_id,*row) for row in stored])
                 else:
                     width=len(layout.keys)
-                    self.copy(cursor,name,layout.names,[(self.run_id,*row[:width],seq,*row[width:]) for row in stored])
+                    written[name]=(layout.names,[(self.run_id,*row[:width],seq,*row[width:]) for row in stored])
+            for name,(columns,rows) in written.items():
+                self.copy(cursor,name,columns,rows)
             self.record_timing(cursor,seq)
-            self.validate(cursor,seq,{entity for entity,idents in anchors.items() if idents}|{name for name,(rows,_) in staged.items() if rows})
+            self.validate(cursor,seq,written)
             if opening:
                 cursor.execute('update run set heartbeat_at=clock_timestamp(),progress_at=clock_timestamp() where run_id=%s',(self.run_id,))
         if opening:
             self.start_heartbeat()
-            self.analyze([entity for entity,idents in anchors.items() if idents]+[name for name,(rows,_) in staged.items() if rows])
+            self.analyze([name for name,(_,rows) in written.items() if rows])
         for entity,idents in anchors.items():
             self.anchored[entity].update(idents)
         for name,(_,current) in staged.items():
@@ -470,6 +480,7 @@ class Store:
         if seq is not None:
             self.copy(cursor,'snapshot_timing',('run_id','seq',*INTERVAL_COLUMNS),[(self.run_id,seq,*row) for row in RECORDER.drain()])
 
+    @timed_often
     def absorb(self):
         while True:
             try:
@@ -491,13 +502,21 @@ class Store:
 
     @timed
     def validate(self,cursor,seq,written):
-        broken=[]
-        for table,label,sql in self.checks:
-            if table not in written:
-                continue
-            progress(f'validate {label}')
-            if cursor.execute(sql,{'run':self.run_id,'seq':seq}).fetchone()[0]:
-                broken.append(label)
+        asked=[]
+        turned={}
+        with self.connection.pipeline():
+            for table,label,columns,sql in self.checks:
+                names,rows=written.get(table,((),()))
+                if not rows:
+                    continue
+                if table not in turned:
+                    turned[table]=dict(zip(names,zip(*rows)))
+                values=[value for value in set(zip(*(turned[table][column] for column in columns))) if None not in value]
+                if not values:
+                    continue
+                progress(f'validate {label}')
+                asked.append((label,self.connection.execute(sql,[list(column) for column in zip(*values)],prepare=True)))
+        broken=[label for label,answer in asked if answer.fetchone()[0]]
         if broken:
             raise RuntimeError(f'Snapshot {seq} breaks foreign keys: {broken[:5]}')
 
@@ -527,6 +546,7 @@ class Store:
                       [(self.run_id,entry['seq'],action,name,value if kinds[name]=='integer' else None,None if kinds[name]=='integer' else str(value))
                        for name,value in entry['params'].items()])
 
+    @timed_often
     def start_heartbeat(self):
         self.beat_run.value=self.run_id
 
@@ -596,6 +616,7 @@ def heartbeat(dsn,run,version,at,step,stop,parent,timings):
         timings.put(RECORDER.take())
 
 
+@timed_often
 def enumerate_rows(run_id,values):
     return [(run_id,position,value) for position,value in enumerate(values)]
 

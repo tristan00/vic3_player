@@ -1,7 +1,7 @@
 import bisect
 
 from interface.actions.catalogue import BY_NAME
-from interface.common import DEFAULT_GAME, timed
+from interface.common import DEFAULT_GAME, timed, timed_often
 from interface.recording.spec import TABLE
 from interface.script import read, scalar
 
@@ -44,19 +44,23 @@ def rank(kind):
     return 0
 
 
+@timed_often
 def laws(active):
     current={LAW_GROUP[law_type]:law_type for law_type in active}
     return [current.get(group,NONE) for group in LAW_GROUPS]
 
 
+@timed_often
 def institutions(levels):
     return [float(levels.get(kind,0)) for kind in INSTITUTION_TYPES]
 
 
+@timed_often
 def prices(found):
     return [float(found[goods]) if goods in found else float('nan') for goods in GOODS]
 
 
+@timed_often
 def majority(rows):
     best={}
     for world,region,kind,area in rows:
@@ -71,6 +75,7 @@ def interest_line(connection):
 
 
 class LiveLookup:
+    @timed_often
     def __init__(self,snapshot):
         self.player=snapshot.player
         self.__dict__.update(snapshot.memo('feature_lookups',lambda:self.load(snapshot)))
@@ -104,18 +109,23 @@ class LiveLookup:
                            politics['power_delta_bureaucracy'],float('nan') if sol is None else sol,len(queue),sum(queue),
                            float('nan') if capacity is None else capacity]}
 
+    @timed_often
     def state(self,state):
         return self.states.get(state,(None,None))
 
+    @timed_often
     def building(self,ident):
         return self.buildings.get(ident)
 
+    @timed_often
     def typed(self,kind,ident):
         return self.types[kind].get(ident)
 
+    @timed_often
     def character(self,ident):
         return self.characters.get(ident)
 
+    @timed_often
     def country(self,ident):
         return self.countries.get(ident)
 
@@ -190,11 +200,13 @@ class History:
         self.capacity=load('country_construction_report',['country'],['base_construction_speed'])
         self.institution_rows=load('institution_history',['institution'],['institution_type','country','investment'])
 
+    @timed_often
     def at(self,run,seq):
         return HistoryLookup(self,run,seq)
 
 
 class HistoryLookup:
+    @timed_often
     def __init__(self,history,run,seq):
         self.h=history
         self.run=run
@@ -203,6 +215,7 @@ class HistoryLookup:
         self.terrain=history.terrain[run]
 
     @property
+    @timed_often
     def numbers(self):
         treasury=self.h.treasury.at(self.run,self.seq)
         population=self.h.population.at(self.run,self.seq)
@@ -217,34 +230,42 @@ class HistoryLookup:
                 len(queue),sum(queue),float('nan') if capacity is None else capacity[0]]
 
     @property
+    @timed_often
     def institutions(self):
         return institutions({kind:level for kind,country,level in self.h.institution_rows.live(self.run,self.seq) if country==self.player})
 
     @property
+    @timed_often
     def laws(self):
         return laws(law_type for law_type,country,active in self.h.law_rows.live(self.run,self.seq) if country==self.player and active)
 
     @property
+    @timed_often
     def prices(self):
         market=self.h.markets.at(self.run,(self.player,),self.seq)
         return prices({goods:found[0] for market_id,goods in self.h.goods.by_run.get(self.run,[]) if market and market_id==market[0]
                        and (found:=self.h.goods.at(self.run,(market_id,goods),self.seq)) is not None})
 
+    @timed_often
     def state(self,state):
         return self.h.states.at(self.run,(state,),self.seq) or (None,None)
 
+    @timed_often
     def building(self,ident):
         found=self.h.buildings.at(self.run,(ident,),self.seq)
         return found[0] if found else None
 
+    @timed_often
     def typed(self,kind,ident):
         found=self.h.types[kind].at(self.run,(ident,),self.seq)
         return found[0] if found else None
 
+    @timed_often
     def character(self,ident):
         found=self.h.characters.at(self.run,(ident,),self.seq)
         return found[0] if found else None
 
+    @timed_often
     def country(self,ident):
         found=self.h.countries.at(self.run,(ident,),self.seq)
         return found[0] if found else None
@@ -276,6 +297,7 @@ def slot(action,params,lookup):
     return [action]+values+[NONE]*(PARAMS-len(values))
 
 
+@timed_often
 def categories(batch,lookup):
     slots=[value for action,params in batch[:SLOTS] for value in slot(action,params,lookup)]
     return slots+[NONE]*(len(CATEGORIES)-len(slots))

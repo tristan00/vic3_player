@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
-from ..common import timed
+from ..common import timed, timed_often
 from ..script import blocks, body, clean, entries, keys, read, scalar, script_files
 
 
@@ -32,10 +32,12 @@ MILITARY={'building_barrack':'barracks','building_naval_administration':'naval'}
 POLICIES={'set_institution_investment_level','set_import_tariff_level','set_export_tariff_level'}
 
 
+@timed_often
 def _foreign(value):
     return re.search(FOREIGN+r'(?!\s*\?=)',value) or 'journal_entry' in value or 'can_form_nation' in value
 
 
+@timed_often
 def _templates(game):
     templates=[]
     for key,value in read(game,'map_data/state_regions'):
@@ -53,6 +55,7 @@ def _templates(game):
     return templates
 
 
+@timed_often
 def _profiles(game):
     types={tag:scalar(value,'country_type') for tag,value in read(game,'common/country_definitions')}
     population={key:value for _,key,value in entries(game,'common/history/population')}
@@ -103,6 +106,7 @@ def _economy(game,bands):
     return states,allowed,{name:sorted(counts.items()) for name,counts in owners.items()}
 
 
+@timed_often
 def _cultures(game):
     cultures=[]
     for key,value in read(game,'common/cultures'):
@@ -189,6 +193,7 @@ def _characters(game):
     return {'rulers':dict(rulers),'casts':dict(casts),'elective_laws':elective}
 
 
+@timed_often
 def _ai(game):
     kinds={key:scalar(value,'type') for key,value in read(game,'common/ai_strategies')}
     text='\n'.join(value for _,_,value in entries(game,'common/history/ai'))
@@ -230,6 +235,7 @@ def _trade(game,bands):
     return [dict(r,tag=tag,tier=tiers[tag],centers=sorted(r['centers'],reverse=True)) for tag,r in found.items() if tag in bands]
 
 
+@timed_often
 def _armies(game,groups):
     caps={key:int(found[1]) for key,value in read(game,'common/laws') if (found:=re.search(r'state_building_barrack_max_level_add\s*=\s*(\d+)',value))}
     politics={key.removeprefix('effect_starting_politics_'):next(law for law in re.findall(r'law_type:(\w+)',value) if law in caps)
@@ -237,6 +243,7 @@ def _armies(game,groups):
     return {'barracks_cap':caps,'politics_army':politics,'politics_laws':_politics_laws(game,groups)}
 
 
+@timed_often
 def _politics_laws(game,groups):
     defaults={}
     for key,value in read(game,'common/scripted_effects'):
@@ -247,6 +254,7 @@ def _politics_laws(game,groups):
     return defaults
 
 
+@timed_often
 def _relations(game):
     text=lambda folder:'\n'.join(clean(path) for path in script_files(game,'common/history/'+folder))
     counts=collections.Counter(re.findall(r'\bcountry\s*=\s*c:(\w+)',text('states')))
@@ -279,6 +287,7 @@ def _relations(game):
             'blocs':blocs}
 
 
+@timed_often
 def _law_rules(game):
     listed=lambda value,key:set(re.findall(r'\w+',body(dict(blocks(body(value))).get(key,'{}'))))
     techs={key:(scalar(value,'era'),listed(value,'unlocking_technologies')) for key,value in read(game,'common/technology/technologies')}
@@ -293,11 +302,13 @@ def _law_rules(game):
     return {'law_rules':laws,'tier_techs':tiers,'building_techs':buildings,'tech_requires':{tech:needs for tech,(_,needs) in techs.items()}}
 
 
+@timed_often
 def _companies(game):
     return {key:re.findall(r'building_\w+',body(dict(blocks(body(value)))['building_types']))
             for key,value in read(game,'common/company_types') if re.search(r'flavored_company\s*=\s*no',value)}
 
 
+@timed_often
 def _natives(game):
     types={tag:scalar(value,'country_type') for tag,value in read(game,'common/country_definitions')}
     owners=set()
@@ -310,6 +321,7 @@ def _natives(game):
     return {'natives':natives,'native_share':counted.count('decentralized')/len(counted)}
 
 
+@timed_often
 def _rates(game):
     states=history=0
     for _,_,value in entries(game,'common/history/states'):
@@ -324,6 +336,7 @@ def _crossings(game):
     return sum(1 for line in (game/'map_data/adjacencies.csv').read_text(encoding='utf-8-sig').splitlines() if line.split(';')[2:3]==['sea'])
 
 
+@timed_often
 def _straits(game):
     crossings=_crossings(game)
     natural=sum(len(re.findall(r'type\s*=\s*natural',clean(path))) for path in script_files(game,'common/strait_definitions'))

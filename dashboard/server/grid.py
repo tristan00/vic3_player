@@ -24,6 +24,7 @@ class Spec:
     hidden:bool=False
 
 
+@db.timed
 def recorded(column,prefix,group=None,name=None):
     source=f'{prefix}.{column.name}'
     label=column.name
@@ -43,6 +44,7 @@ def recorded(column,prefix,group=None,name=None):
     return Spec(name,'text',source,group=group,label=label)
 
 
+@db.timed
 def parse_filters(raw):
     out=[]
     for item in raw or []:
@@ -53,6 +55,7 @@ def parse_filters(raw):
     return out
 
 
+@db.timed
 def typed(spec,value):
     if value=='∅':
         return None
@@ -65,6 +68,7 @@ def typed(spec,value):
     return value
 
 
+@db.timed
 def where_clause(specs,filters):
     index={s.name:i for i,s in enumerate(specs)}
     clauses,params=[],{}
@@ -98,11 +102,13 @@ def grid(specs,source,params,filters=(),sort=None,desc=False,offset=0,limit=100,
                 rows=[[row[i] for i in shown] for row in cells(specs,[[f[f'c{i}'] for i in range(len(specs))] for f in found],run_id)],total=total,offset=offset,run=run_id)
 
 
+@db.timed
 def rows_source(types,rows):
     arrays=','.join(f'%(u{i})s::{kind}[]' for i,kind in enumerate(types))
     return f'from unnest({arrays}) as t({",".join(f"v{i}" for i in range(len(types)))})',{f'u{i}':[row[i] for row in rows] for i in range(len(types))}
 
 
+@db.timed
 def cells(specs,rows,run_id):
     wanted=defaultdict(set)
     for row in rows:

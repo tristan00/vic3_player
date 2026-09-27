@@ -3,7 +3,7 @@ import re
 from functools import lru_cache
 
 from ..actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, ACTIONS, LEVELS, TOLL_LEVELS
-from ..common import progress, timed
+from ..common import progress, timed, timed_often
 from ..recording.spec import METRIC_COLUMNS
 from ..runner.memory import MONTH_STARTS
 
@@ -13,6 +13,7 @@ from .triggers import play_sides, play_enemies, indirect_overlords, stance, coas
 SLOT=0xFFFFFF
 
 
+@timed_often
 def product(**domains):
     combos=[{}]
     for name,values in domains.items():
@@ -20,6 +21,7 @@ def product(**domains):
     return combos
 
 
+@timed_often
 def building_ids(s):
     return [ident for ident,_,_ in s.buildings()]
 
@@ -27,6 +29,7 @@ def building_ids(s):
 CONSTRUCTION={'building_construction_sector'}
 
 
+@timed_often
 def market_owner(s):
     market=s.map('country','country,market').get(s.player)
     return s.map('market','market,owner').get(market)==s.player
@@ -40,6 +43,7 @@ GRACE_HOURS=7*24
 COOLDOWN_MONTHS=3
 
 
+@timed_often
 def calendar(hours):
     days=hours//24
     year,day=divmod(days,365)
@@ -47,6 +51,7 @@ def calendar(hours):
     return year,month,day-MONTH_STARTS[month-1]
 
 
+@timed_often
 def months_later(hours,months):
     year,month,day=calendar(hours)
     month+=months
@@ -54,23 +59,28 @@ def months_later(hours,months):
     return (year*365+MONTH_STARTS[month-1]+day)*24
 
 
+@timed_often
 def now(s):
     return s.hours
 
 
+@timed_often
 def tariffs(s,direction,column):
     return s.map('player_tariff','goods,'+column,direction=direction)
 
 
+@timed_often
 def tariff_open(s,direction,goods):
     changed=tariffs(s,direction,'last_change').get(goods)
     return changed is None or now(s)-changed<GRACE_HOURS or now(s)>months_later(changed,COOLDOWN_MONTHS)
 
 
+@timed_often
 def law_modifier(s,key):
     return modifier_total(s,'common/laws',active_laws(s),key)
 
 
+@timed_often
 def modifier_total(s,folder,names,key):
     total=0
     for name in names:
@@ -80,6 +90,7 @@ def modifier_total(s,folder,names,key):
     return total
 
 
+@timed_often
 def institution_max(s,institution):
     acquired,_,_,_=technologies(s)
     key='country_'+institution+'_max_investment_add'
@@ -89,6 +100,7 @@ def institution_max(s,institution):
 MIN_INSTITUTION=1
 
 
+@timed_often
 def institution_levels(s):
     kinds=s.map('institution','institution,institution_type',country=s.player)
     cost=metric(s,'GetInstitutionInvestmentBureaucracyCost')
@@ -98,14 +110,17 @@ def institution_levels(s):
             and (level<=current or spare>=cost*(level-current))]
 
 
+@timed_often
 def trade_level(s,direction,goods):
     return tariffs(s,direction,'level').get(goods,DEFAULT_TARIFF)
 
 
+@timed_often
 def traded(s):
     return [goods for goods in s.keys('goods') if definition(s,'common/goods',goods,'local')!=['yes'] and definition(s,'common/goods',goods,'tradeable')!=['no']]
 
 
+@timed_often
 def trade_levels(s,direction,kind):
     if not market_owner(s):
         return []
@@ -115,18 +130,22 @@ def trade_levels(s,direction,kind):
 
 
 @lru_cache(maxsize=None)
+@timed_often
 def parsed(text):
     return parse(text)
 
 
+@timed_often
 def passes(s,folder,name,fields,scope):
     return all(evaluate(parsed(text),scope) is not False for field in fields for text in definition(s,folder,name,field))
 
 
+@timed_often
 def decidable(s,name):
     return passes(s,'common/decisions',name,('possible',),country_scope(s))
 
 
+@timed_often
 def state_regions(s):
     def compute():
         regions={state:region for region,fields in s.definitions('common/strategic_regions').items() for state in fields.get('states',())}
@@ -138,54 +157,65 @@ ARMY_FLAGS=15
 NAME_CHARACTERS=30
 
 
+@timed_often
 def interests(s):
     return {region for region, in s.rows('interest','strategic_region',country=s.player)}
 
 
+@timed_often
 def marker_required(s,play):
     return next(iter(definition(s,'common/diplomatic_plays',play,'requires_interest_marker')),'yes')!='no'
 
 
+@timed_often
 def engaged(s):
     return {region for region,involvement in s.rows('interest','strategic_region,involvement',country=s.player) if involvement>=ENGAGED}
 
 
+@timed_often
 def truce(s,country):
     sides={country}|{first for first,second in subject_pairs(s) if second==country}
     return bool(sides&truced(s))
 
 
+@timed_often
 def truced(s):
     return s.memo('truced',lambda:{country for country,own,theirs in s.rows('player_relation','country,player_truce,country_truce')
                                    if any(truce is not None and truce>now(s) for truce in (own,theirs))})
 
 
+@timed_often
 def reachable_state(s,state):
     owner=s.map('state','state,country').get(state)
     return (not busy(s) and not truce(s,owner) and owner not in opposed(s) and owner not in defensive_partners(s)
             and not s.map('country','country,in_civil_war').get(owner) and plays_permitted(s,owner,state_regions(s).get(state),state))
 
 
+@timed_often
 def reachable_country(s,country):
     capital=s.map('country','country,capital').get(country)
     return (not busy(s) and not truce(s,country) and country not in decentralized(s) and country not in guaranteed(s) and country not in defensive_partners(s)
             and not in_play(s,country) and not s.map('country','country,in_civil_war').get(country) and capital is not None and plays_permitted(s,country,state_regions(s).get(capital)))
 
 
+@timed_often
 def opposed(s):
     sides=play_sides(s)
     return {country for (play,side),members in sides.items() if s.player in sides.get((play,1-side),set()) for country in members}
 
 
+@timed_often
 def regions_in_play(s):
     return s.memo('regions_in_play',lambda:{region for region,war in s.rows('diplomatic_play','strategic_region,war') if war is None})
 
 
+@timed_often
 def country_regions(s,country):
     regions=state_regions(s)
     return {regions.get(state) for state, in s.rows('state','state',country=country)}
 
 
+@timed_often
 def plays_permitted(s,country,region,state=None):
     saved={'target_country':('country',country),'region':('strategic_region',region)}
     if state is not None:
@@ -193,11 +223,13 @@ def plays_permitted(s,country,region,state=None):
     return passes(s,'common/scripted_rules','can_start_diplomatic_plays_against',('body',),country_scope(s,**saved))
 
 
+@timed_often
 def guaranteed(s):
     return s.memo('guaranteed',lambda:{target for kind,target in s.rows('treaty_article','treaty_article_type,target_country',source_country=s.player)
                                       if kind=='guarantee_independence'})
 
 
+@timed_often
 def defensive_partners(s):
     def compute():
         sides={treaty:(first,second) for treaty,first,second in s.rows('treaty','treaty,first_country,second_country')}
@@ -206,22 +238,27 @@ def defensive_partners(s):
     return s.memo('defensive_partners',compute)
 
 
+@timed_often
 def decentralized(s):
     return s.memo('decentralized',lambda:{country for country, in s.rows('country','country',country_type='decentralized')})
 
 
+@timed_often
 def rank_of(s,country):
     return s.map('country','country,country_rank').get(country)
 
 
+@timed_often
 def type_of(s,country):
     return s.map('country','country,country_type').get(country)
 
 
+@timed_often
 def rank_value(s,country):
     return float(next(iter(definition(s,'common/country_ranks',rank_of(s,country),'rank_value')),-1))
 
 
+@timed_often
 def subject_fits(s,subject_type,country):
     field=lambda name:definition(s,'common/subject_types',subject_type,name)
     return ((not field('valid_overlord_country_types') or type_of(s,s.player) in field('valid_overlord_country_types'))
@@ -238,38 +275,46 @@ UNSELECTABLE_GOALS={'liberate_country','unification','unification_leadership'}
 INDEPENDENCE_LIBERTY=90
 
 
+@timed_often
 def own_subject_pacts(s):
     return [(action,value) for action,value in s.rows('pact','pact_type,liberty_desire',second_country=s.player)
             if definition(s,'common/diplomatic_actions',action,'subject_pact')]
 
 
+@timed_often
 def liberty_desire(s):
     return next((value for _,value in own_subject_pacts(s)),0)
 
 
+@timed_often
 def claims(s):
     return {region for region, in s.rows('country_claim','state_region',country=s.player)}
 
 
+@timed_often
 def owns_here(s,country):
     mine=set(building_ids(s))
     return any(owner==country and building in mine for building,owner in s.rows('building_ownership','building,owner_country',owner_kind='country'))
 
 
+@timed_often
 def own_subject_type(s):
     return next((next(iter(definition(s,'common/diplomatic_actions',action,'subject_type')),None) for action,_ in own_subject_pacts(s)),None)
 
 
+@timed_often
 def subject_type_of(s,country):
     return next((next(iter(definition(s,'common/diplomatic_actions',action,'subject_type')),None) for action, in s.rows('pact','pact_type',second_country=country)
                  if definition(s,'common/diplomatic_actions',action,'subject_pact')),None)
 
 
+@timed_often
 def subject_permits(s,field):
     kind=own_subject_type(s)
     return kind is None or definition(s,'common/subject_types',kind,field)!=['no']
 
 
+@timed_often
 def play_allowed(s,play,**saved):
     scope=country_scope(s,**saved)
     target=saved.get('target_country',(None,None))[1]
@@ -320,10 +365,12 @@ def recently_disbanded(s):
     return s.memo('recently_disbanded',compute)
 
 
+@timed_often
 def held_companies(s):
     return {kind for kind, in s.rows('company','company_type',country=s.player)}
 
 
+@timed_often
 def companies(s):
     if metric(s,'GetNumCompanies')>=metric(s,'GetMaxNumCompanies'):
         return []
@@ -343,10 +390,12 @@ def companies(s):
 COMPANY_MIN_LEVELS=5
 
 
+@timed_often
 def located_buildings(s):
     return s.memo('located_buildings',lambda:{ident:(kind,state) for ident,kind,state in s.rows('building','building,building_type,state')})
 
 
+@timed_often
 def company_levels(s,kinds):
     def compute():
         mine=set(s.states())
@@ -368,10 +417,12 @@ def company_levels(s,kinds):
     return max(totals.values(),default=0)
 
 
+@timed_often
 def sectors(s):
     return [ident for ident,kind,_ in s.buildings() if kind in CONSTRUCTION]
 
 
+@timed_often
 def crew_max(s,version):
     kind=s.map('ship_template_version','ship_template_version,ship_type').get(version)
     parts=[('common/ship_types',kind)]+[('common/ship_modifications',mod) for _,mod in s.rows('ship_template_version_modification','position,ship_modification',ship_template_version=version)]
@@ -379,35 +430,42 @@ def crew_max(s,version):
                for found in re.findall(r'ship_crew_max_add\s*=\s*(-?[\d.]+)',text))
 
 
+@timed_often
 def uncrewed_fleets(s):
     crew=s.grouped('ship_crew','ship,crew')
     minimum=float(definition(s,'common/defines','NMilitary|MINIMUM_SHIP_CREW_PERCENTAGE_TO_DEPLOY','value')[0])
     return {fleet for ship,fleet,version in s.rows('ship','ship,fleet,version') if sum(crew.get(ship,[]))<=minimum*crew_max(s,version)}
 
 
+@timed_often
 def mission_types(s,fleet):
     missions=s.map('naval_mission','naval_mission,naval_mission_type')
     current=missions.get(s.map('formation_status','formation,naval_mission').get(fleet))
     return [kind for kind in s.keys('naval_mission_type') if kind!=current and passes(s,'common/naval_mission_types',kind,('potential',),country_scope(s))]
 
 
+@timed_often
 def ship_queues(s):
     return {ident for ident, in s.rows('ship_queue','ship_queue',country=s.player)}
 
 
+@timed_often
 def ship_items(s):
     queues=ship_queues(s)
     return sorted(index for index,queue in s.rows('ship_construction','list_index,queue') if queue in queues)
 
 
+@timed_often
 def ship_paused(s):
     return bool(metric(s,'IsShipConstructionPaused'))
 
 
+@timed_often
 def construction_paused(s):
     return bool(metric(s,'IsConstructionPaused'))
 
 
+@timed_often
 def my_ships(s):
     queues=ship_queues(s)
     return [kind for kind,queue in s.rows('ship_construction','ship_type,queue') if queue in queues]
@@ -416,6 +474,7 @@ def my_ships(s):
 COMPANY_OWNERS={'company','company_regional_headquarter'}
 
 
+@timed_often
 def private_levels(s):
     kinds={ident:kind for ident,kind,_ in s.buildings()}
     buildable=building_kinds(s,buildable=True)
@@ -432,6 +491,7 @@ NATIONALIZATION_PER_POINT=500
 MIN_CONSTRUCTION_POINTS=100
 
 
+@timed_often
 def nationalization_cost(s,building):
     kind=dict((ident,kind) for ident,kind,_ in s.buildings()).get(building)
     points=[float(value) for name in definition(s,'common/buildings',kind,'required_construction')
@@ -439,16 +499,19 @@ def nationalization_cost(s,building):
     return NATIONALIZATION_PER_POINT*max(points+[MIN_CONSTRUCTION_POINTS])
 
 
+@timed_often
 def government_owned(s):
     mine=set(building_ids(s))
     return {building for building,owner,count in s.rows('building_ownership','building,owner_country,levels',owner_kind='country')
             if building in mine and owner==s.player and count}
 
 
+@timed_often
 def switchable(s):
     return {method for method, in s.rows('player_production_method_available','production_method')}
 
 
+@timed_often
 def monopolies(s):
     return {kind for kind, in s.rows('player_monopoly','building_type')}
 
@@ -457,6 +520,7 @@ def definition(s,folder,name,field):
     return s.definitions(folder).get(name,{}).get(field,[])
 
 
+@timed_often
 def building_kinds(s,**required):
     return {name for name,fields in s.definitions('common/buildings').items()
             if all((fields.get(field,['yes'])[0]!='no')==wanted for field,wanted in required.items())}
@@ -471,11 +535,13 @@ def inherited(s,kind,field):
     return values
 
 
+@timed_often
 def private_kinds(s):
     monopolized=monopolies(s)
     return {kind for kind in building_kinds(s,buildable=True) if inherited(s,kind,'is_government_funded')!=['yes'] and kind not in monopolized}
 
 
+@timed_often
 def monopolizable(s):
     held=monopolies(s)
     return sorted(kind for kind in building_kinds(s,buildable=True) if definition(s,'common/buildings',kind,'unique')!=['yes']
@@ -486,19 +552,23 @@ MONOPOLY_COST=100
 MAX_MONOPOLIES=5
 
 
+@timed_often
 def arable_kinds(s):
     return s.memo('arable_kinds',lambda:{kind for fields in s.definitions('map_data/state_regions').values() for kind in fields.get('arable_resources',())})
 
 
+@timed_often
 def free_arable(s,state):
     table,column=METRIC_COLUMNS['state','GetNumFreeArableLand']
     return need(s.map(table,'state,'+column).get(state),f'{column} of state {state}')
 
 
+@timed_often
 def owned_of(s,kinds):
     return [ident for ident,kind,_ in s.buildings() if kind in kinds]
 
 
+@timed_often
 def ownership_classes(s):
     def compute():
         mine=set(s.states())
@@ -517,12 +587,14 @@ def ownership_classes(s):
     return s.memo('ownership_classes',compute)
 
 
+@timed_often
 def bulk_subset(s,building_type,state,ownership):
     classes=ownership_classes(s)
     return [ident for ident,kind,_ in s.buildings() if kind==building_type and (state is None or s.map('building','building,state').get(ident)==state)
             and (ownership=='any' or ownership in classes.get(ident,()))]
 
 
+@timed_often
 def subset_options(s,kinds,wanted):
     classes=ownership_classes(s)
     located=s.map('building','building,state')
@@ -535,6 +607,7 @@ def subset_options(s,kinds,wanted):
             for (kind,state,ownership),members in sorted(groups.items(),key=str) if all(members)]
 
 
+@timed_often
 def nationalizable_subsets(s):
     levels=private_levels(s)
     classes=ownership_classes(s)
@@ -550,14 +623,17 @@ def nationalizable_subsets(s):
             for (kind,state,ownership),cost in sorted(costs.items(),key=str) if cost<=cash]
 
 
+@timed_often
 def law_flag(s,modifier):
     return modifier_flag(s,s.player,modifier)
 
 
+@timed_often
 def privatizable(s,ident):
     return bool(setting(s,ident,'privatizable')) and not privatization_requested(s,ident)
 
 
+@timed_often
 def revolution_brewing(s):
     return bool(s.rows('civil_war','civil_war',origin_country=s.player))
 
@@ -565,10 +641,12 @@ def revolution_brewing(s):
 PRIVATIZATION_REQUESTED=1
 
 
+@timed_often
 def privatization_requested(s,ident):
     return bool((s.map('building','building,privatization_requested').get(ident) or 0)&PRIVATIZATION_REQUESTED)
 
 
+@timed_often
 def active_laws(s):
     return {kind for kind, in s.rows('law','law_type',country=s.player,active=True)}
 
@@ -579,11 +657,13 @@ BLOC_INFLUENCE=500
 ENACTMENT_COOLDOWN_HOURS=730*24
 
 
+@timed_often
 def enacting_laws(s):
     mine=set(s.mine('law'))
     return [ident for ident,started in s.rows('law_private','law,enactment_start_date') if ident in mine and started is not None and started!=NO_DATE]
 
 
+@timed_often
 def enacting(s):
     return bool(enacting_laws(s))
 
@@ -592,23 +672,28 @@ MIN_AMENABILITY=25
 MARGINALIZED=2
 
 
+@timed_often
 def group_ideologies(s):
     return s.grouped('interest_group_ideology','interest_group,ideology')
 
 
+@timed_often
 def current_law(s,law):
     group=next(iter(definition(s,'common/laws',law,'group')),None)
     return next((name for name in active_laws(s) if definition(s,'common/laws',name,'group')==[group]),None)
 
 
+@timed_often
 def endorses(s,ideologies,law):
     return stance(s,ideologies,law)>stance(s,ideologies,current_law(s,law))
 
 
+@timed_often
 def governing(s):
     return [ident for ident, in s.rows('interest_group','interest_group',country=s.player,in_government=True)]
 
 
+@timed_often
 def opposed_in_government(s,law):
     ideologies=group_ideologies(s)
     clouts=s.map('interest_group_stats','interest_group,clout')
@@ -617,6 +702,7 @@ def opposed_in_government(s,law):
     return law is not None and bool(opposing) and sum(opposing)>=sum(clout for value,clout in stances if value>0)
 
 
+@timed_often
 def endorsed(s,law):
     ideologies=group_ideologies(s)
     backers=[ideologies.get(ident,[]) for ident in governing(s)]
@@ -624,6 +710,7 @@ def endorsed(s,law):
     return any(endorses(s,values,law) for values in backers+[ruler])
 
 
+@timed_often
 def attached_amendments(s):
     def compute():
         active=set(s.mine('law'))&{ident for ident, in s.rows('law','law',active=True)}
@@ -634,11 +721,13 @@ def attached_amendments(s):
 REPEAL_COOLDOWN_MONTHS=120
 
 
+@timed_often
 def repealable(s):
     return {ident for ident,timeout,expiry in s.rows('amendment','amendment,timeout,timeout_date') if ident in attached_amendments(s)
             and (expiry is None or now(s)>=months_later(expiry,REPEAL_COOLDOWN_MONTHS-timeout))}
 
 
+@timed_often
 def negotiable(s):
     laws=s.map('law','law,law_type',country=s.player)
     enacting_law=next((laws[ident] for ident in enacting_laws(s)),None)
@@ -656,6 +745,7 @@ def negotiable(s):
 ILLEGITIMATE=25
 
 
+@timed_often
 def enactable(s):
     if enacting(s) or metric(s,'GetGovernmentLegitimacy')<=ILLEGITIMATE:
         return []
@@ -678,6 +768,7 @@ def enactable(s):
     return rows
 
 
+@timed_often
 def law_possible(s,country,law):
     fields=s.definitions('common/laws').get(law,{})
     held=trigger_laws(s,country)
@@ -688,6 +779,7 @@ def law_possible(s,country,law):
             and all(passes(s,'common/law_groups',group,('change_allowed_trigger',),country_scope(s,country)) for group in fields.get('group',())))
 
 
+@timed_often
 def imposable(s):
     pending={owner for owner,imposer in s.rows('law','country,imposer') if imposer is not None}
     cooling={owner for owner, in s.rows('country_timed_modifier','country',modifier='impose_law_cooldown')}
@@ -697,14 +789,17 @@ def imposable(s):
                                                    for text in definition(s,'common/laws',kind,'can_impose') or ['can_impose_law_default = yes'])]
 
 
+@timed_often
 def issued_decrees(s):
     return set(s.rows('player_active_decree','state,decree_type'))
 
 
+@timed_often
 def valid_decrees(s):
     return set(s.rows('state_decree_valid','state,decree_type'))
 
 
+@timed_often
 def decrees(s):
     acquired,_,_,_=technologies(s)
     active=active_laws(s)
@@ -718,11 +813,13 @@ def decrees(s):
             and passes(s,'common/decrees',name,('country_trigger',),country_scope(s))]
 
 
+@timed_often
 def unit_types_unlocked(s):
     acquired,_,_,_=technologies(s)
     return [name for name in s.keys('combat_unit_type') if set(definition(s,'common/combat_unit_types',name,'unlocking_technologies'))<=acquired]
 
 
+@timed_often
 def switch_methods(s):
     methods={}
     for kind,_,method in s.methods:
@@ -733,6 +830,7 @@ def switch_methods(s):
             for method in methods.get(kind,()) if method in allowed and method not in active.get(ident,())]
 
 
+@timed_often
 def bulk_methods(s):
     classes=ownership_classes(s)
     located=s.map('building','building,state')
@@ -743,14 +841,17 @@ def bulk_methods(s):
             for kind,state,ownership,method in sorted(groups,key=str)]
 
 
+@timed_often
 def unit_goods(s,folder,kind):
     return {goods for block in definition(s,folder,kind,'upkeep_modifier') for goods in re.findall(r'goods_input_(\w+)_add',block)}
 
 
+@timed_often
 def state_supply(s):
     return {state:set(goods) for state,goods in s.grouped('state_goods_supply','state,goods').items()}
 
 
+@timed_often
 def barracks_cap(s):
     acquired,_,_,_=technologies(s)
     blocks=[text for law in active_laws(s) for text in definition(s,'common/laws',law,'modifier')]
@@ -758,6 +859,7 @@ def barracks_cap(s):
     return sum(float(value) for text in blocks for value in re.findall(r'state_building_barrack_max_level_add\s*=\s*(-?[\d.]+)',text))
 
 
+@timed_often
 def recruit(s):
     supplies=state_supply(s)
     located=s.map('building','building,state')
@@ -770,28 +872,34 @@ def recruit(s):
             for formation in s.formations('army')]
 
 
+@timed_often
 def conscription_states(s):
     located=s.map('building','building,state')
     return sorted({located[ident] for ident,kind,levels in s.buildings() if kind=='building_conscription_center' and levels})
 
 
+@timed_often
 def subjects(s):
     return {second for first,second in subject_pairs(s) if first==s.player}
 
 
+@timed_often
 def power_bloc_members(s):
     blocs={ident:bloc for ident,bloc in s.rows('country','country,power_bloc') if bloc is not None}
     return sorted(ident for ident,bloc in blocs.items() if s.player in blocs and bloc==blocs[s.player] and ident!=s.player)
 
 
+@timed_often
 def research(s):
     return set(s.mine('country_research'))
 
 
+@timed_often
 def technologies(s):
     return s.memo('player_technologies',lambda:compute_technologies(s))
 
 
+@timed_often
 def compute_technologies(s):
     rows=research(s)
     acquired={kind for owner,kind in s.rows('country_research_acquired','country_research,technology') if owner in rows}
@@ -801,20 +909,24 @@ def compute_technologies(s):
     return acquired,queued,current,requires
 
 
+@timed_often
 def researchable(s):
     acquired,queued,current,requires=technologies(s)
     return [name for name in s.keys('technology') if name not in acquired|queued|current and requires.get(name,set())<=acquired and researchable_kind(s,name)]
 
 
+@timed_often
 def queueable(s):
     acquired,queued,current,_=technologies(s)
     return [name for name in s.keys('technology') if name not in acquired|queued|current and researchable_kind(s,name)]
 
 
+@timed_often
 def researchable_kind(s,name):
     return definition(s,'common/technology/technologies',name,'can_research')!=['no']
 
 
+@timed_often
 def buildable(s):
     acquired,_,_,_=technologies(s)
     capped={kind for kind, in s.rows('state_region_resource','building_type')}
@@ -837,44 +949,53 @@ def buildable(s):
     return combos
 
 
+@timed_often
 def construction_queue(s):
     return [(state,kind) for _,state,kind in sorted(s.rows('player_construction_queue_item','position,state,building_type',private=False))]
 
 
+@timed_often
 def queue_items(s,skip_first,skip_last):
     pairs=construction_queue(s)
     return [{'state':state,'building_type':kind} for state,kind in pairs[skip_first:len(pairs)-skip_last] if pairs.count((state,kind))==1]
 
 
+@timed_often
 def queued_buildings(s):
     pending=set(construction_queue(s))
     owned=set(s.states())
     return [ident for ident,kind,state in s.rows('building','building,building_type,state') if state in owned and (state,kind) in pending]
 
 
+@timed_often
 def subsidized(s,flag):
     owned=set(s.states())
     return [ident for ident,state,value in s.rows('building','building,state,subsidized') if state in owned and value==flag]
 
 
+@timed_often
 def settled(s,formations):
     places={ident:(current,target) for ident,current,target in s.rows('formation_status','formation,current_location,target_location')}
     return [formation for formation in formations if formation in places and places[formation][0]==places[formation][1]]
 
 
+@timed_often
 def war_fronts(s):
     wars=set(s.wars())
     return sorted({front for front,war in s.rows('front_side','front,war') if war in wars})
 
 
+@timed_often
 def deployable(s):
     return {formation for formation, in s.rows('formation_report','formation',deployable=True)}
 
 
+@timed_often
 def idle_armies(s):
     return [f for f in settled(s,armies(s,False)) if not demobilizing(s,f)]
 
 
+@timed_often
 def mobilization_options(s,formation):
     acquired,_,_,_=technologies(s)
     principles=bloc_principles(s)
@@ -886,32 +1007,39 @@ def mobilization_options(s,formation):
             and (name not in active or passes(s,'common/mobilization_options',name,('can_be_turned_off',),Scope(s,'formation',formation)))]
 
 
+@timed_often
 def formation_setting(s,formation,column):
     return s.map('formation_private','formation,'+column).get(formation)
 
 
+@timed_often
 def formation_report(s,formation,column):
     return s.map('formation_report','formation,'+column).get(formation)
 
 
+@timed_often
 def demobilizing(s,formation):
     return (any(owner==formation and progress for owner,progress in s.rows('combat_unit','formation,mobilization'))
             or bool(formation_report(s,formation,'demobilizing')))
 
 
+@timed_often
 def armies(s,mobilized):
     manned=set(s.formations('army'))
     return [ident for ident,value in s.rows('formation_status','formation,mobilized') if ident in manned and value==mobilized]
 
 
+@timed_often
 def selected_units(s,formation):
     return dict(s.rows('formation_selected_unit_type','combat_unit_group,combat_unit_type',formation=formation))
 
 
+@timed_often
 def unit_group(s,kind):
     return next(iter(definition(s,'common/combat_unit_types',kind,'group')),None)
 
 
+@timed_often
 def upgradable(s,military_formation,combat_unit_type):
     selected=selected_units(s,military_formation).get(unit_group(s,combat_unit_type))
     pending={kind for kind, in s.rows('formation_upgrade_unit_type','combat_unit_type',formation=military_formation)}
@@ -924,24 +1052,29 @@ def upgradable(s,military_formation,combat_unit_type):
                for building,kind in s.rows('combat_unit','building,combat_unit_type',formation=military_formation) if kind==combat_unit_type)
 
 
+@timed_often
 def changing(s):
     current=s.map('institution','institution,investment')
     return {ident:target for ident,target in s.rows('institution_private','institution,target_investment') if target and target!=current.get(ident)}
 
 
+@timed_often
 def hq_regions(s):
     mine=set(s.mine('hq'))
     return {ident:(kind,region) for ident,kind,region in s.rows('hq_private','hq,hq_type,hq_region') if ident in mine and kind is not None}
 
 
+@timed_often
 def home_of(s,formation):
     return formation_setting(s,formation,'home_hq')
 
 
+@timed_often
 def at_home(s,formation):
     return state_regions(s).get(located(s,formation))==hq_regions(s).get(home_of(s,formation),(None,None))[1]
 
 
+@timed_often
 def march_components(s):
     def compute():
         allowed={s.player}|subjects(s)|overlords(s,s.player)
@@ -966,24 +1099,29 @@ def march_components(s):
 TRANSFER_MINIMUM=4
 
 
+@timed_often
 def reaches(s,formation,region):
     components=march_components(s)
     here=components.get(located(s,formation),set())
     return any(components[state]&here for state,strategic in state_regions(s).items() if strategic==region and state in components)
 
 
+@timed_often
 def located(s,formation):
     return s.map('formation_status','formation,current_location').get(formation)
 
 
+@timed_often
 def home_region(s,formation):
     return hq_regions(s).get(home_of(s,formation),(None,None))[1]
 
 
+@timed_often
 def travelling(s,formation):
     return bool(formation_setting(s,formation,'travel_distance'))
 
 
+@timed_often
 def rehome(s):
     regions=hq_regions(s)
     kinds=s.map('formation','formation,formation_type',country=s.player)
@@ -992,22 +1130,26 @@ def rehome(s):
             and (kind!=0 or reaches(s,formation,region))]
 
 
+@timed_often
 def conscript_types(s,formation):
     kinds={ident:kind for ident,(kind,_) in located_buildings(s).items()}
     return sorted({unit for unit,building in s.rows('combat_unit','combat_unit_type,building',formation=formation)
                    if kinds.get(building)=='building_conscription_center'})
 
 
+@timed_often
 def regular_types(s,formation):
     kinds={ident:kind for ident,(kind,_) in located_buildings(s).items()}
     return sorted({unit for unit,building in s.rows('combat_unit','combat_unit_type,building',formation=formation)
                    if kinds.get(building)!='building_conscription_center'})
 
 
+@timed_often
 def formation_units(s,formations):
     return [{'military_formation':formation,'combat_unit_type':kind} for formation in formations for kind in regular_types(s,formation)]
 
 
+@timed_often
 def country_metric(s,country,name):
     table,column=METRIC_COLUMNS['country',name]
     if table.startswith('player_'):
@@ -1015,24 +1157,29 @@ def country_metric(s,country,name):
     return s.map(table,'country,'+column).get(country)
 
 
+@timed_often
 def metric(s,name):
     return need(country_metric(s,s.player,name),f'{name} of the player')
 
 
+@timed_often
 def need(value,what):
     if value is None:
         raise RuntimeError(f'{what} is not captured')
     return value
 
 
+@timed_often
 def authority(s):
     return metric(s,"GetPowerDelta('authority')")
 
 
+@timed_often
 def in_default(s):
     return bool(metric(s,'InDefault'))
 
 
+@timed_often
 def money(s):
     return need(player_value(s,'player_treasury','money'),'player money')
 
@@ -1041,6 +1188,7 @@ STRAIT_COOLDOWN_MONTHS=6
 STRAIT_SIDES=('first','second')
 
 
+@timed_often
 def strait_sides(s):
     mine=set(s.states())-{state for state,controller in s.rows('occupation','state,controller') if controller!=s.player}
     sides=[]
@@ -1050,24 +1198,29 @@ def strait_sides(s):
     return sides
 
 
+@timed_often
 def strait_value(s,strait,column):
     return s.map('strait',f'strait,{column}').get(strait)
 
 
+@timed_often
 def strait_settable(s,strait,column):
     changed=strait_value(s,strait,column)
     return changed is None or now(s)>=months_later(changed,STRAIT_COOLDOWN_MONTHS)
 
 
+@timed_often
 def strait_requires(s,strait,field):
     return definition(s,'common/strait_definitions',strait_value(s,strait,'strait_definition'),field)==['yes']
 
 
+@timed_often
 def full_strait_control(s,strait):
     mine=set(s.states())
     return all(state in mine for first,second in s.rows('strait_endpoint','first_state,second_state',strait=strait) for state in (first,second))
 
 
+@timed_often
 def strait_tolls(s):
     if not player_value(s,'player_policy','can_toll_straits'):
         return []
@@ -1076,6 +1229,7 @@ def strait_tolls(s):
             for index,level in enumerate(TOLL_LEVELS) if strait_value(s,strait,f'{side}_toll_rate')!=index]
 
 
+@timed_often
 def strait_accesses(s):
     closing=player_value(s,'player_policy','can_close_straits')
     blocks={'Closed':'total_block_requires_full_control','NoMilitary':'military_block_requires_full_control'}
@@ -1084,11 +1238,13 @@ def strait_accesses(s):
             and (status=='Open' or closing and (full_strait_control(s,strait) or not strait_requires(s,strait,blocks[status])))]
 
 
+@timed_often
 def strait_permissions(s):
     return [{'strait':strait,'state':state,'allowed':allowed} for strait,side,state in strait_sides(s) if strait_value(s,strait,f'{side}_access_status')
             for index,allowed in enumerate(ACCESS_PERMISSIONS,1) if strait_value(s,strait,f'{side}_access_permissions')!=index]
 
 
+@timed_often
 def player_value(s,table,column):
     rows=s.rows(table,column)
     return rows[0][0] if rows else None
@@ -1098,6 +1254,7 @@ FASTEST_SPEED='4'
 DEFAULT_TAX_COST=100
 
 
+@timed_often
 def pop_needed(s):
     def compute():
         states=set(s.states())
@@ -1108,12 +1265,14 @@ def pop_needed(s):
     return s.memo('pop_needed',compute)
 
 
+@timed_often
 def taxable(s):
     taxed={goods for goods, in s.rows('player_taxed_goods','goods')}
     return [goods for goods in s.keys('goods') if goods in taxed or (goods in pop_needed(s)
             and authority(s)>=float(next(iter(definition(s,'common/goods',goods,'consumption_tax_cost')),DEFAULT_TAX_COST)))]
 
 
+@timed_often
 def movements(s,status):
     return [ident for ident,managed in s.rows('political_movement','political_movement,managed_status',country=s.player)
             if managed==status or (managed is None and authority(s)>=MOVEMENT_COST)]
@@ -1123,40 +1282,48 @@ MOVEMENT_COST=200
 SUPPRESSED,PROMOTED=1,2
 
 
+@timed_often
 def other_levels(s,column):
     current=player_value(s,'player_policy',column)
     return [level for index,level in enumerate(LEVELS) if index!=current]
 
 
+@timed_often
 def promotable(s,character):
     rank=definition(s,'common/commander_ranks',s.map('character','character,rank').get(character),'rank_value')
     return bool(rank) and float(rank[0])<float(definition(s,'common/defines','NCharacters|HIGHEST_PROMOTION_RANK','value')[0])
 
 
+@timed_often
 def assigned(s,character):
     return s.map('character_status','character,has_formation').get(character) is True
 
 
+@timed_often
 def idle_room(s,character):
     kind='Admirals' if 'character_role_admiral' in s.characters_roles(character) else 'Generals'
     return metric(s,f'GetNumUnassigned{kind}')<metric(s,f'GetMaxUnassigned{kind}')
 
 
+@timed_often
 def fits(s,character,formation):
     army=s.map('formation','formation,formation_type',country=s.player).get(formation)==0
     return ('character_role_general' if army else 'character_role_admiral') in s.characters_roles(character)
 
 
+@timed_often
 def leaders(s,formation):
     return [ident for ident, in s.rows('character','character',country=s.player,formation=formation)]
 
 
+@timed_often
 def commanders_where(s,test):
     pool=set(recruitable(s))
     rows={ident:(formation,ident in pool) for ident,formation in s.rows('character','character,formation',country=s.player)}
     return [ident for ident in s.commanders() if ident in rows and test(*rows[ident])]
 
 
+@timed_often
 def involved(s):
     sides={ident:(initiator,target) for ident,initiator,target in s.rows('diplomatic_play','diplomatic_play,initiator,target')}
     interested={ident for ident, in s.rows('diplomatic_play_country','diplomatic_play',country=s.player,role='interested')}
@@ -1166,38 +1333,46 @@ def involved(s):
 OPENING_PHASE_END=21
 
 
+@timed_often
 def at_war_plays(s):
     return {play for play,war,level in s.rows('diplomatic_play','diplomatic_play,war,escalation') if war is not None or level>=100}
 
 
+@timed_often
 def play_of_war(s,war):
     return next((ident for ident, in s.rows('diplomatic_play','diplomatic_play',war=war)),None)
 
 
+@timed_often
 def war_of_play(s,play):
     linked=s.map('diplomatic_play','diplomatic_play,war').get(play)
     return next((war for war, in s.rows('war','war') if war==linked),None)
 
 
+@timed_often
 def negotiable_war(s,war):
     kind=next((kind for kind, in s.rows('diplomatic_play','diplomatic_play_type',war=war)),None)
     return next(iter(definition(s,'common/diplomatic_plays',kind,'allow_negotiated_peace')),'yes')!='no'
 
 
+@timed_often
 def war_leader(s,war):
     return any(s.player in (initiator,target) for initiator,target in s.rows('diplomatic_play','initiator,target',war=war))
 
 
+@timed_often
 def war_countries(s,war):
     play=s.map('war','war,diplomatic_play').get(war)
     return {country for country, in s.rows('war_participant','country',diplomatic_play=play)}
 
 
+@timed_often
 def has_say(s,war):
     play=play_of_war(s,war)
     return not overlords(s,s.player) and any(owner==play and s.player in (holder,target) for owner,holder,target in live_goals(s,'holder,target_country'))
 
 
+@timed_often
 def escalated(s):
     return {play for play,escalation in s.rows('diplomatic_play','diplomatic_play,escalation') if escalation>=OPENING_PHASE_END}
 
@@ -1205,6 +1380,7 @@ def escalated(s):
 COUNTDOWN=80
 
 
+@timed_often
 def escalation(s,play):
     return s.map('diplomatic_play','diplomatic_play,escalation').get(play,0)
 
@@ -1212,6 +1388,7 @@ def escalation(s,play):
 SIDES=('initiator','target')
 
 
+@timed_often
 def play_members(s):
     def compute():
         members={}
@@ -1222,6 +1399,7 @@ def play_members(s):
     return s.memo('play_members',compute)
 
 
+@timed_often
 def committed(s,play):
     return {side for side in range(2) if s.player in play_members(s).get((play,side),set())}
 
@@ -1229,6 +1407,7 @@ def committed(s,play):
 HOSTILE=-80
 
 
+@timed_often
 def side_open(s,play,side):
     leaders=involved(s)[0].get(play,())
     mine=overlords(s,s.player)
@@ -1237,6 +1416,7 @@ def side_open(s,play,side):
             and not truce(s,leaders[1-side]) and leaders[side] not in war_enemies(s))
 
 
+@timed_often
 def war_enemies(s):
     def compute():
         sides={}
@@ -1250,59 +1430,72 @@ def war_enemies(s):
     return s.memo('war_enemies',compute)
 
 
+@timed_often
 def interested_plays(s):
     sides,interested=involved(s)
     return sorted(ident for ident in interested if s.player not in sides.get(ident,()) and ident not in at_war_plays(s))
 
 
+@timed_often
 def third_party(s,start=OPENING_PHASE_END):
     return [play for play in interested_plays(s) if start<=escalation(s,play)<COUNTDOWN]
 
 
+@timed_often
 def opening(s):
     return [play for play in interested_plays(s) if escalation(s,play)<OPENING_PHASE_END]
 
 
+@timed_often
 def leaning(s,side):
     return s.memo(('leaning',side),lambda:{play for play, in s.rows('diplomatic_play_country','diplomatic_play',country=s.player,role=side+'_ally')})
 
 
+@timed_often
 def principal(s):
     sides,_=involved(s)
     ends=s.map('diplomatic_play','diplomatic_play,end_date')
     return sorted(ident for ident,pair in sides.items() if s.player in pair and ends.get(ident) is None)
 
 
+@timed_often
 def backable(s):
     return [play for play in principal(s) if play in escalated(s) and play not in at_war_plays(s)]
 
 
+@timed_often
 def busy(s):
     return any(play not in at_war_plays(s) for play in principal(s))
 
 
+@timed_often
 def colonies(s):
     mine=set(s.states())
     return [ident for ident,province in s.rows('state_status','state,next_colony_province') if ident in mine and province is not None]
 
 
+@timed_often
 def in_play(s,country):
     return any(country in members for members in play_sides(s).values())
 
 
+@timed_often
 def play_opposed(s,country):
     return bool(play_enemies(s,s.player)&({country}|overlords(s,country)|indirect_overlords(s,country)))
 
 
+@timed_often
 def incorporation(s):
     return s.map('state_status','state,incorporation')
 
 
+@timed_often
 def abandonable(s):
     progress=incorporation(s)
     return [] if in_play(s,s.player) else [state for state in colonies(s) if progress.get(state)!=1]
 
 
+@timed_often
 def colonizable(s):
     rows=s.rows('state','state,state_region,country')
     located=s.map('state','state,state_region')
@@ -1315,12 +1508,14 @@ def colonizable(s):
                    and (not frontier or state in capital_frontier(s))}.values())
 
 
+@timed_often
 def barred_regions(s):
     acquired,*_=technologies(s)
     required={trait:set(fields.get('required_techs_for_colonization',())) for trait,fields in s.definitions('common/state_traits').items()}
     return {region for region,trait in s.rows('state_region_trait','state_region,state_trait') if required.get(trait,set())-acquired}
 
 
+@timed_often
 def capital_frontier(s):
     def compute():
         components=march_components(s)
@@ -1336,6 +1531,7 @@ def capital_frontier(s):
 
 
 
+@timed_often
 def charter_toggles(s):
     unlocks=s.map('charter_private','charter,unlock')
     granted={(company,kind):unlocks.get(charter) for charter,company,kind in s.rows('charter','charter,company,company_charter_type')}
@@ -1343,17 +1539,20 @@ def charter_toggles(s):
             if (company,charter) not in granted or granted[company,charter] is not None and now(s)>=granted[company,charter]]
 
 
+@timed_often
 def shown_buttons(s,entry):
     shown=set(s.rows('player_journal_button','journal_entry_type,scripted_button'))
     return [button for button in definition(s,'common/journal_entries',entry,'scripted_button') if (entry,button) in shown]
 
 
+@timed_often
 def journal_button(s,ident,index):
     entry=s.map('journal_entry','journal_entry,journal_entry_type').get(ident)
     visible=shown_buttons(s,entry)
     return (entry,visible[index]) if index<len(visible) else None
 
 
+@timed_often
 def journal_buttons(s):
     combos=[]
     involved={entry for entry, in s.rows('journal_entry_involved_country','journal_entry',country=s.player)}
@@ -1367,11 +1566,13 @@ def journal_buttons(s):
     return combos
 
 
+@timed_often
 def play_types(s,target):
     return [name for name in s.keys('diplomatic_play_type') if not definition(s,'common/diplomatic_plays',name,'never_selectable')
             and any(definition(s,'common/war_goal_types',goal,'target_type')==[target] for goal in definition(s,'common/diplomatic_plays',name,'war_goal'))]
 
 
+@timed_often
 def war_goals(s):
     sides,_=involved(s)
     return [{'diplomatic_play':play,'war_goal_type':kind,'country':target} for play,kind,target,holder,creator,status in live_goals(s,'war_goal_type,target_country,holder,creator,status')
@@ -1382,6 +1583,7 @@ UNMODELED_GOAL_SETTINGS={'validate_conflicts_annex_country','country_creation','
                          'targets_enemy_subject','has_other_stakeholder'}
 
 
+@timed_often
 def goal_targets(s,play,kind):
     target_type=definition(s,'common/war_goal_types',kind,'target_type')
     settings=set(definition(s,'common/war_goal_types',kind,'settings'))
@@ -1426,50 +1628,60 @@ def goal_targets(s,play,kind):
     return {target for target in targets if goal_valid(s,kind,target_country=('country',target))}
 
 
+@timed_often
 def goal_valid(s,kind,**saved):
     return passes(s,'common/war_goal_types',kind,('valid',),country_scope(s,**saved))
 
 
+@timed_often
 def live_goals(s,columns):
     plays=set(s.plays())
     return [row for row in s.rows('war_goal','diplomatic_play,'+columns) if row[0] in plays]
 
 
+@timed_often
 def setting(s,building,column):
     return s.map('building_private',f'building,{column}').get(building)
 
 
+@timed_often
 def ship_types(s):
     acquired,_,_,_=technologies(s)
     return [name for name in s.keys('ship_type') if set(definition(s,'common/ship_types',name,'unlocking_technologies'))<=acquired
             and definition(s,'common/ship_types',name,'ship_group')!=['ship_group_supply_ships']]
 
 
+@timed_often
 def ship_slots(s,kind):
     slots=[(slot,mods.split()) for block in definition(s,'common/ship_types',kind,'modifications') for slot,mods in re.findall(r'(\w+) = \{([^}]*)\}',block)]
     return [(slot,mods) for slot,mods in slots if definition(s,'common/ship_modification_slots',slot,'utility')!=['yes']]
 
 
+@timed_often
 def latest_design(s,template):
     versions=sorted(s.rows('ship_template_version_list','position,ship_template_version',ship_template=template))
     return tuple(mod for _,mod in sorted(s.rows('ship_template_version_modification','position,ship_modification',ship_template_version=versions[-1][1]))) if versions else ()
 
 
+@timed_often
 def designed(s,kind):
     return {latest_design(s,template) for template,owner,ship_type in s.rows('ship_template','ship_template,country,ship_type') if owner==s.player and ship_type==kind}
 
 
+@timed_often
 def unlocked_modifications(s,kind):
     acquired,_,_,_=technologies(s)
     return [mod for _,mods in ship_slots(s,kind) for mod in mods
             if not definition(s,'common/ship_modifications',mod,'unlocking_technologies') or set(definition(s,'common/ship_modifications',mod,'unlocking_technologies'))&acquired]
 
 
+@timed_often
 def ship_designs(s):
     return [{'ship_type':kind,'ship_modification':mod} for kind in ship_types(s) for mod in unlocked_modifications(s,kind)
             if not any(mod in design for design in designed(s,kind))]
 
 
+@timed_often
 def cancellable_types(s):
     flags=s.map('ship_template_private','ship_template,flags')
     base=s.map('ship_template_private','ship_template,base')
@@ -1481,6 +1693,7 @@ def cancellable_types(s):
     return {versions[version] for version,queue in s.rows('ship_construction','version,queue') if queue in queues and version in versions}
 
 
+@timed_often
 def templates_in_construction(s):
     building={version for version, in s.rows('ship_construction','version')}
     return {template for template,version in s.rows('ship_template_version_list','ship_template,ship_template_version') if version in building}
@@ -1489,6 +1702,7 @@ def templates_in_construction(s):
 TEMPLATE_DELETING=4
 
 
+@timed_often
 def own_templates(s):
     base=s.map('ship_template_private','ship_template,base')
     flags=s.map('ship_template_private','ship_template,flags')
@@ -1498,17 +1712,20 @@ def own_templates(s):
     return {(kind,index):template for kind in {item[0] for item in mine} for index,(*_,template) in enumerate(item for item in mine if item[0]==kind)}
 
 
+@timed_often
 def non_default_templates(s):
     flags=s.map('ship_template_private','ship_template,flags')
     return {key for key,template in own_templates(s).items() if not flags.get(template,0)&1}
 
 
+@timed_often
 def fleet_templates(s):
     assigned=set(s.rows('ship_template_fleet','ship_template,fleet'))
     return [{'ship_type':kind,'index':index,'military_formation':fleet} for (kind,index),template in sorted(own_templates(s).items())
             for fleet in s.formations('fleet') if (template,fleet) not in assigned]
 
 
+@timed_often
 def retrofit_fleets(s,retrofitting):
     return [f for f in s.formations('fleet') if formation_report(s,f,'retrofitting')==retrofitting and (retrofitting or formation_report(s,f,'retrofittable'))]
 
@@ -1516,10 +1733,12 @@ def retrofit_fleets(s,retrofitting):
 JOIN_LEVERAGE=200
 
 
+@timed_often
 def bloc_leaders(s):
     return {country for country, in s.rows('country','country',bloc_leader=True)}
 
 
+@timed_often
 def below_leader(s,bloc):
     leader=next((c for c in bloc_leaders(s) if bloc in power_bloc_of(s,c)),None)
     return leader is not None and need(country_metric(s,s.player,'GetPrestige'),'player prestige')<need(country_metric(s,leader,'GetPrestige'),f'prestige of {leader}') or (
@@ -1529,6 +1748,7 @@ def below_leader(s,bloc):
 BLOC_MEMBERSHIP_MONTHS=6
 
 
+@timed_often
 def may_leave(s):
     bloc=next(iter(power_bloc_of(s,s.player)))
     identity=s.map('power_bloc','power_bloc,power_bloc_identity').get(bloc)
@@ -1537,80 +1757,98 @@ def may_leave(s):
             and passes(s,'common/power_bloc_identities',identity,('can_leave',),country_scope(s)))
 
 
+@timed_often
 def bloc_leader(s):
     return s.player in bloc_leaders(s)
 
 
+@timed_often
 def may_found_bloc(s):
     return (not power_bloc_of(s,s.player) and not overlords(s,s.player) and s.player not in decentralized(s) and not revolution_brewing(s)
             and 'law_isolationism' not in active_laws(s) and metric(s,"GetPowerDelta('influence')")>=BLOC_INFLUENCE
             and rank_value(s,s.player)>=float(next(iter(definition(s,'common/country_ranks','unrecognized_major_power','rank_value')),99)))
 
 
+@timed_often
 def power_bloc_of(s,country):
     bloc=s.map('country','country,power_bloc').get(country)
     return set() if bloc is None else {bloc}
 
 
+@timed_often
 def insurrectionary(s):
     uprisings={movement for movement, in s.rows('civil_war','political_movement',origin_country=s.player)}
     return {group for group,movement in s.rows('interest_group_movement_support','interest_group,political_movement') if movement in uprisings}
 
 
+@timed_often
 def governing_count(s):
     return len(governing(s))
 
 
+@timed_often
 def principle_allowed(s,principle):
     return passes(s,'common/power_bloc_principles',principle,('visible','possible'),country_scope(s))
 
 
+@timed_often
 def bloc_principles(s):
     return {kind for bloc,kind in s.rows('power_bloc_adopted_principle','power_bloc,power_bloc_principle') if bloc in player_blocs(s)}
 
 
+@timed_often
 def bloc_identity(s):
     return next((kind for bloc,kind in s.rows('power_bloc','power_bloc,power_bloc_identity') if bloc in player_blocs(s)),None)
 
 
+@timed_often
 def mandates(s):
     return bool(player_value(s,'player_policy','has_bloc_mandates'))
 
 
+@timed_often
 def player_blocs(s):
     return power_bloc_of(s,s.player)
 
 
+@timed_often
 def pressed_in(s,war):
     play=play_of_war(s,war)
     return any(flag for owner,holder,flag in live_goals(s,'holder,pressed') if owner==play and holder==s.player)
 
 
+@timed_often
 def revolution_against_player(s,war):
     return any(kind=='dp_revolution' and target==s.player for kind,target in s.rows('diplomatic_play','diplomatic_play_type,target',war=war))
 
 
+@timed_often
 def peace_open(s,war):
     date=s.map('war','war,peace_date').get(war)
     return date is None or now(s)>=date
 
 
+@timed_often
 def proposer(s,war):
     return s.map('war','war,peace_proposer').get(war)
 
 
+@timed_often
 def proposers(s,kind):
     return sorted({country for country, in s.rows('player_proposal','country',kind=kind)})
 
 
+@timed_often
 def recruitable(s):
     return [ident for ident, in s.rows('character_private','character',recruitable=True)]
 
 
+@timed_often
 def cooling(s):
     return {kind for kind,until in s.rows('player_interaction_cooldown','character_interaction,until') if until>now(s)}
 
 
+@timed_often
 def action_group_allows(s,action,country):
     groups=set(definition(s,'common/diplomatic_actions',action,'groups'))
     if 'overlord' in groups and country not in subjects(s):
@@ -1625,15 +1863,18 @@ def action_group_allows(s,action,country):
 AMICABLE,CORDIAL,COLD=50,20,-50
 
 
+@timed_often
 def relations(s,country):
     return s.map('player_relation','country,relations').get(country,0)
 
 
+@timed_often
 def pact_between(s,action,country):
     pacts=s.memo('pacts',lambda:set(s.rows('pact','first_country,second_country,pact_type')))
     return (s.player,country,action) in pacts or any((country,s.player,reverse) in pacts for reverse in definition(s,'common/diplomatic_actions',action,'reverse_pact'))
 
 
+@timed_often
 def rank_ladder(s,country):
     recognized=lambda c:type_of(s,c)=='recognized'
     ladder=sorted((r for r in s.definitions('common/country_ranks') if r!='decentralized_power' and r.startswith('unrecognized')!=recognized(country)),
@@ -1641,6 +1882,7 @@ def rank_ladder(s,country):
     return ladder.index(rank_of(s,country)) if rank_of(s,country) in ladder else None
 
 
+@timed_often
 def shared_interest(s,country):
     regions={}
     for owner,region,involvement in s.rows('interest','country,strategic_region,involvement'):
@@ -1649,6 +1891,7 @@ def shared_interest(s,country):
     return bool(regions.get(s.player,set())&regions.get(country,set()))
 
 
+@timed_often
 def rivalry_allowed(s,country):
     if not shared_interest(s,country) or not autonomous(s,s.player) or not autonomous(s,country):
         return False
@@ -1669,14 +1912,17 @@ DIPLOMATIC={'da_knowledge_sharing':lambda s,c:len(technologies(s)[0])>len(tech_o
             'da_support_regime':lambda s,c:country_metric(s,c,'GetGovernmentLegitimacy') is not None and country_metric(s,c,'GetGovernmentLegitimacy')<75}
 
 
+@timed_often
 def diplomatic_options(s):
     return s.rows('player_diplomatic_option','target_country,action_type,possible')
 
 
+@timed_often
 def diplomatic_shown(s):
     return s.memo('diplomatic_shown',lambda:{(country,action) for country,action,_ in diplomatic_options(s)})
 
 
+@timed_often
 def diplomatic_possible(s):
     return s.memo('diplomatic_possible',lambda:{(country,action) for country,action,possible in diplomatic_options(s) if possible})
 
@@ -1685,6 +1931,7 @@ INFAMY_PACT_COST=((100,1.0),(50,.5),(25,.25))
 LOBBY_PACT_COST_MAX=.5
 
 
+@timed_often
 def pact_cost_multiplier(s,country,action):
     infamy=s.map('country_diplomacy','country,infamy').get(s.player) or 0
     clout=s.map('interest_group_stats','interest_group,clout')
@@ -1698,6 +1945,7 @@ def pact_cost_multiplier(s,country,action):
             +max(-LOBBY_PACT_COST_MAX,min(LOBBY_PACT_COST_MAX,lobbied)))
 
 
+@timed_often
 def diplomatic_allowed(s,country,action):
     return (set(definition(s,'common/diplomatic_actions',action,'unlocking_technologies'))<=technologies(s)[0]
             and (country,action) in diplomatic_possible(s)
@@ -1707,31 +1955,37 @@ def diplomatic_allowed(s,country,action):
             and DIPLOMATIC.get(action,lambda s,c:True)(s,country))
 
 
+@timed_often
 def obligations(s):
     return set(s.rows('player_obligation','country,direction'))
 
 
+@timed_often
 def tech_of(s,country):
     rows={ident for ident, in s.rows('country_research','country_research',country=country)}
     return {kind for owner,kind in s.rows('country_research_acquired','country_research,technology') if owner in rows}
 
 
+@timed_often
 def event_options(s):
     kinds=s.map('event','event,event_type')
     return [{'event':kinds[event],'option':visible} for event,enabled,visible in s.rows('event_option','event,enabled,visible_position')
             if visible is not None and enabled]
 
 
+@timed_often
 def remove_companies(s):
     owning={company for company, in s.rows('company_owned_country','company')}
     return [kind for ident,kind,established in s.rows('company','company,company_type,established',country=s.player)
             if ident not in owning and established is not None and now(s)>=months_later(established,COMPANY_LOCK_MONTHS)]
 
 
+@timed_often
 def invasions(s):
     return s.rows('invasion','front,ended',invaded=s.player)
 
 
+@timed_often
 def enforced_on_player(s):
     return set(s.rows('player_treaty_enforced','first_country,second_country'))
 
@@ -1971,6 +2225,7 @@ RULES={
 
 @timed
 def available(snapshot):
+    snapshot.load()
     offered={}
     for action in ACTIONS:
         progress(f'available {action.name}')

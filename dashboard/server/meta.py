@@ -72,6 +72,7 @@ POLICY_GROUPS={'config':['objective_gdp','objective_population','objective_sol',
 INITIALIZER=Spec('initializer','text','(select a.name from run_advisor ra join advisor a using (advisor) where ra.run_id=t.run_id and ra.position=0)',group='initializer')
 
 
+@db.timed
 def grouped(groups):
     by_name={s.name:s for s in specs('run')}
     by_name['player_country']=Spec('player_country','ref','t.player_country',entity='country')

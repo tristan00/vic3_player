@@ -1,6 +1,6 @@
 import re
 
-from ..common import timed
+from ..common import timed, timed_often
 from ..script import event_namespaces, keys
 from .catalogue import ACTIONS, EVENT_WINDOW, KEYS, PROPOSALS, SHIP_PAGE, SHIP_PAGES, TRANSPORT_PLANNER, TYPES
 
@@ -15,24 +15,29 @@ VARIABLES=('interface_action','interface_mode','interface_seq','interface_key','
 KEY="GetVariableSystem.Get('interface_key')"
 
 
+@timed_often
 def equal(name,value):
     return f"EqualTo_CFixedPoint({VAR.format(name)}.GetValue, '(CFixedPoint){value}')"
 
 
+@timed_often
 def number(name):
     return f"FixedPointToInt({VAR.format(name)}.GetValue)"
 
 
+@timed_often
 def conjunction(*conditions):
     conditions=[c for c in conditions if c]
     return conditions[0] if len(conditions)==1 else f'And({conditions[0]}, {conjunction(*conditions[1:])})'
 
 
+@timed_often
 def split(param):
     name,_,kind=param.partition(':')
     return name,kind or (name if name in TYPES or name in KEYS else None)
 
 
+@timed_often
 def bindings(action):
     values={};slot=0
     for param in action.params:
@@ -54,16 +59,19 @@ def bindings(action):
     return values
 
 
+@timed_often
 def fill(text,values):
     for name,value in values.items():
         text=text.replace('{'+name+'}',value)
     return text
 
 
+@timed_often
 def needs_key(action):
     return any(split(param)[1] in {*KEYS,'event'} for param in action.params)
 
 
+@timed_often
 def variants(action):
     values=bindings(action)
     choice=next((split(p)[0] for p in action.params if split(p)[1]=='choice'),None)
@@ -72,6 +80,7 @@ def variants(action):
     return [(index,{**values,choice:value}) for index,value in enumerate(action.choices)]
 
 
+@timed_often
 def result(command,valid,why=''):
     check=valid or f'IsValid({command})'
     desc=chr(39)*2 if valid else f"Concatenate(GetDesc({command}), {why})" if why else f'GetDesc({command})'
@@ -87,10 +96,12 @@ FIRED=f"ToString_int32({number('interface_seq')})"
 UNFIRED=f"Not(EqualTo_string(GetVariableSystem.Get('interface_fired'), {FIRED}))"
 
 
+@timed_often
 def after(event):
     return [call for call in AFTER if not event or call!='PopupManager.ClosePopups']
 
 
+@timed_often
 def states(code,action,chain,index,values):
     command=fill(action.command,values)
     valid=fill(action.valid,values) if action.valid else ''
@@ -125,6 +136,7 @@ def states(code,action,chain,index,values):
     return out
 
 
+@timed_often
 def wrap(code,action,chain,values,inner):
     if not chain and not action.context:
         return inner
@@ -138,6 +150,7 @@ def wrap(code,action,chain,values,inner):
             +'widget = { size = { 0 0 }'+(f' datacontext = "[{context}]"' if context else '')+f'\n{inner}\n}}\n}}')
 
 
+@timed_often
 def start_widgets():
     widgets=[]
     for code,action in enumerate(ACTIONS,1):
@@ -160,14 +173,17 @@ def start_widgets():
 STAGE=0.15
 
 
+@timed_often
 def listed(chain):
     return tuple((datamodel,condition) for datamodel,condition in chain if datamodel)
 
 
+@timed_often
 def stage_flag(number):
     return f'interface_stage{number}'
 
 
+@timed_often
 def armed_flag(number):
     return f'interface_armed{number}'
 
@@ -180,6 +196,7 @@ STAGE_TIMERS=' '.join(f'state = {{ name = interface_stage_timer_{number} trigger
                       for number in range(MAX_STAGES))
 
 
+@timed_often
 def stage_widget(code,action,index,values,number,chain,calls):
     gate=stage_flag(number-1) if number else 'interface_map_go'
     base=conjunction(equal('interface_action',code),equal('interface_choice',index) if index is not None else '',f"GetVariableSystem.Exists('{gate}')",
@@ -191,6 +208,7 @@ def stage_widget(code,action,index,values,number,chain,calls):
     return wrap(code,action,listed(chain),values,'widget = { size = { 0 0 }\n'+'\n'.join(states)+'\n}')
 
 
+@timed_often
 def action_widgets(windowed):
     widgets=[]
     for code,action in enumerate(ACTIONS,1):
@@ -210,10 +228,12 @@ def action_widgets(windowed):
     return widgets
 
 
+@timed_often
 def key_table(game_dir,mods):
     return {**{kind:keys(game_dir,folder,mods) for kind,folder in KEYS.items()},'event_namespace':event_namespaces(game_dir,mods)}
 
 
+@timed_often
 def key_widgets(table):
     widgets=[];offset=0
     for kind,names in table.items():
@@ -224,6 +244,7 @@ def key_widgets(table):
     return widgets
 
 
+@timed_often
 def key_codes(table):
     codes={};offset=0
     for kind,names in table.items():
@@ -237,6 +258,7 @@ CONFIRM_ANSWERS=(('onclick = "[PopupManager.AnswerYes(ConfirmationWindow.Self)]"
                  ('onclick = "[PopupManager.CloseMessage(PlayerMessageItem.AccessSelf)]"','PopupManager.CloseMessage(PlayerMessageItem.AccessSelf)'))
 
 
+@timed_often
 def confirm_answer(call):
     return f'state = {{ name = interface_confirm_answer trigger_on_create = yes duration = 0.02 on_finish = "[{call}]" }}'
 
@@ -262,6 +284,7 @@ NO_FLEET=(f'state = {{ name = interface_transport_timeout trigger_when = "[{TRAN
 TRANSPORT_WIDGET='widget = { size = { 0 0 }\n'+PICK_FLEET+'\n'+START_TRANSPORT+'\n'+NO_FLEET+'\n}'
 
 
+@timed_often
 def ship_navigation():
     codes=[equal('interface_action',code) for code,action in enumerate(ACTIONS,1) if action.name.endswith('_ship_item')]
     shipping=codes[-1]
@@ -277,6 +300,7 @@ def ship_navigation():
     return 'widget = { size = { 0 0 } '+' '.join(states)+' }'
 
 
+@timed_often
 def deferred_state(kind,event):
     calls=[*after(event),"GetVariableSystem.Clear('interface_clean')",SCRIPTED.format('interface_action_done')]
     return (f"state = {{ name = interface_clean_{kind} trigger_when = \"[And(EqualTo_string(GetVariableSystem.Get('interface_clean'), '{kind}'), Not({TRANSPORTING}))]\" duration = {CLEAN_DELAY} "
@@ -346,6 +370,7 @@ DISMISS=re.compile(r'onclick = "\[((?:PopupManager\.(?:Close|Hide)\w*|\w+\.Close
 NON_VOID_CLOSERS={'PopupManager.HideRecruitGeneral','PopupManager.HideRecruitAdmiral','PopupManager.HidePowerBlocPrincipleSelectionWindow','PopupManager.HideProposal(Proposal.AccessSelf)'}
 
 
+@timed_often
 def probe(label,closer):
     close=(f' state = {{ name = interface_close trigger_when = "[And(GetVariableSystem.Exists(\'interface_clean\'), Not({TRANSPORTING}))]" on_start = "[{closer}]" }}'
            if closer and closer not in NON_VOID_CLOSERS else '')
@@ -353,10 +378,12 @@ def probe(label,closer):
             f'on_start = "[GetScriptedGui(\'cap_open\').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).AddScope(\'name\',MakeScopeFlag(\'{label}\')).End)]" }}'+close+' }')
 
 
+@timed_often
 def masked(text):
     return MASK.sub(lambda m:' '*len(m[0]) if m[0][0]=='#' else m[0],text)
 
 
+@timed_often
 def block_end(text,opener):
     depth=0
     for m in re.finditer(r'"(?:\\.|[^"\\])*"|[{}]',text[opener:]):
@@ -381,6 +408,7 @@ def type_closers(root):
     return closers
 
 
+@timed_often
 def top_blocks(text,closers):
     text=masked(text)
     depth=0;found=[];current=None

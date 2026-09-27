@@ -21,7 +21,7 @@ from interface.recording.store import Store
 from interface.timing import RECORDER, current, span
 from interface.world.generate import MAP
 from interface.options import available
-from interface.options.stored import Stored
+from interface.options.stored import Shared, Stored
 
 LOG=logging.getLogger('loop')
 
@@ -90,11 +90,13 @@ def targets(name,params,links={}):
     return (objects or {('group',GROUP[name])})|{('shared',slot) for slot,names in SLOTS.items() if name in names}
 
 
+@timed_often
 def game_hours(snapshot):
     return snapshot.hours
 
 
 class Drawer:
+    @timed_often
     def __init__(self,advisor,options,snapshot,links,touched):
         self.advisor=advisor
         self.seq=snapshot.seq
@@ -115,6 +117,7 @@ class Drawer:
                 for item in found:
                     self.index.setdefault(item,[]).append((action,position))
 
+    @timed_often
     def draw(self,rng):
         alive=[[True]*len(combos) for combos in self.combos]
         count=[len(combos) for combos in self.combos]
@@ -156,25 +159,31 @@ class Loop:
         self.process=game.reader().process
         self.watching=self.process.watch(self.crashed)
         self.store.begin_run(started_at=datetime.now(timezone.utc),advisors=[advisor.name for advisor in advisors],**run)
+        self.shared=None
         self.counts={}
         self.misses=0
         self.dirty=0
         self.turn=0
         self.seq=0
 
+    @timed_often
     def entry(self,source,name,params,snapshot):
         self.seq+=1
         return {'turn':self.turn,'seq':self.seq,'advisor':source,'action':name,'params':params,'snapshot':snapshot.seq}
 
+    @timed_often
     def note(self,entry,after=None):
         self.counts[entry['status']]=self.counts.get(entry['status'],0)+1
         self.store.log_action(entry,after.seq if after else None)
         if entry['status']!='done':
             LOG.warning('%s %s %s %s',entry['status'],entry['action'],entry['params'],entry.get('detail',''))
 
+    @timed_often
     def snapshot(self,phase):
         try:
-            return Stored(self.store.connection,*record(self.game,self.store,phase))
+            taken=record(self.game,self.store,phase)
+            self.shared=self.shared or Shared(self.store.connection)
+            return Stored(self.store.connection,*taken,self.shared)
         except RuntimeError as error:
             if 'no longer owns any state' in str(error):
                 raise Defeated() from error
@@ -247,12 +256,14 @@ class Loop:
             self.note({**entry,'status':'done'},after)
         return after
 
+    @timed_often
     def open_ui(self,snapshot):
         meta=snapshot.meta
         left=sorted({name for name in ('panel','interaction','map_list') if meta[f'ui_{name}_open']}|{window for window, in snapshot.rows('ui_open_window','ui_window')})
         self.dirty=self.dirty+1 if left else 0
         return left
 
+    @timed_often
     def stuck(self,left):
         if self.dirty>=STUCK_SNAPSHOTS:
             LOG.error('%s stayed open for %s snapshots in a row; ending the round',"+".join(left),self.dirty)
@@ -268,21 +279,7 @@ class Loop:
         if self.turn==1:
             self.perform('loop','set_speed',{'speed':FASTEST},snapshot,pending)
         self.perform('loop','unpause',{},snapshot,pending,raced='running')
-        hours=reader.date()[0]
-        moved=time.monotonic()
-        longest_gap=0
-        while reader.date()[0]<target:
-            if dead(reader):
-                raise Defeated()
-            if reader.date()[0]!=hours:
-                longest_gap=max(longest_gap,time.monotonic()-moved)
-                hours,moved=reader.date()[0],time.monotonic()
-            elif time.monotonic()-moved>TICK_LIMIT:
-                reader.check()
-                raise RuntimeError(f'The game date stopped at {reader.date()[1]} for {TICK_LIMIT} s after unpausing; '
-                                   f'the longest earlier gap between ticks was {longest_gap*1000:.0f} ms')
-            progress('run_days')
-            time.sleep(.02)
+        longest_gap=self.days(reader,target)
         paused=[]
         if running(reader):
             self.perform('loop','pause',{},snapshot,paused,raced='paused')
@@ -301,6 +298,25 @@ class Loop:
         self.note({**entry,'ms':round(current().ms),'status':'done',
                    'detail':f'{(game_hours(after)-target)/HOURS_PER_DAY:+.1f} days past the target, longest tick gap {longest_gap*1000:.0f} ms'},after)
         return after
+
+    @timed
+    def days(self,reader,target):
+        hours=reader.date()[0]
+        moved=time.monotonic()
+        longest_gap=0
+        while reader.date()[0]<target:
+            if dead(reader):
+                raise Defeated()
+            if reader.date()[0]!=hours:
+                longest_gap=max(longest_gap,time.monotonic()-moved)
+                hours,moved=reader.date()[0],time.monotonic()
+            elif time.monotonic()-moved>TICK_LIMIT:
+                reader.check()
+                raise RuntimeError(f'The game date stopped at {reader.date()[1]} for {TICK_LIMIT} s after unpausing; '
+                                   f'the longest earlier gap between ticks was {longest_gap*1000:.0f} ms')
+            progress('run_days')
+            time.sleep(.02)
+        return longest_gap
 
     @timed
     def crashed(self):
@@ -323,13 +339,17 @@ class Loop:
         except Exception:
             LOG.exception('The game exit time could not be written to the run row')
 
+    @timed_often
     def exit_time(self):
         return self.process.exit_time() if self.process.exits_within(EXIT_GRACE_MS) else None
 
+    @timed_often
     def end(self,reason,detail=None,game_exited_at=None):
         self.watching.set()
         self.counts['end']=reason
         self.store.end_run(reason,detail,game_exited_at)
+        if self.shared is not None:
+            self.shared.close()
         return self.counts
 
     @timed
@@ -375,11 +395,13 @@ class Loop:
             snapshot=self.run_days(snapshot)
 
 
+@timed_often
 def at_debt_cap(snapshot):
     rows=snapshot.rows('player_treasury','principal,credit')
     return bool(rows) and rows[0][0]>0 and rows[0][0]>=rows[0][1]
 
 
+@timed_often
 def build(seed,countries,states,tech,pop):
     return generate(seed,countries,states,tech,pop)
 
@@ -389,12 +411,14 @@ def build_apart(seed,countries,states,tech,pop):
     return world,RECORDER.take()
 
 
+@timed_often
 def log_timings():
     logging.basicConfig(level=logging.WARNING,format='%(asctime)s %(message)s')
     logging.getLogger('interface').setLevel(logging.INFO)
     logging.getLogger('loop').setLevel(logging.INFO)
 
 
+@timed_often
 def world_size(rng,levels):
     states=rng.randint(*MAP['states'])
     tech,pop=levels
@@ -404,12 +428,14 @@ def world_size(rng,levels):
 
 
 class WorldPool:
+    @timed_often
     def __init__(self,rng,workers,levels):
         self.rng=rng
         self.levels=levels
         self.executor=ProcessPoolExecutor(workers,initializer=log_timings)
         self.pending={self.submit() for _ in range(workers)}
 
+    @timed_often
     def submit(self):
         return self.executor.submit(build_apart,*world_size(self.rng,self.levels))
 
@@ -430,10 +456,12 @@ STALLED_EXIT=3
 
 
 class Watchdog:
+    @timed_often
     def __init__(self,game):
         self.game=game
         self.store=None
 
+    @timed_often
     def start(self):
         threading.Thread(target=self.watch,daemon=True,name='watchdog').start()
 
@@ -498,6 +526,7 @@ def running(reader):
 
 
 class Fresh:
+    @timed_often
     def __init__(self,rng,levels):
         self.rng=rng
         self.levels=levels
@@ -512,9 +541,11 @@ class Fresh:
 
 
 class Vanilla:
+    @timed_often
     def __init__(self,rng):
         self.rng=rng
 
+    @timed_often
     def take(self):
         return None
 
@@ -561,6 +592,7 @@ def session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,seconds):
     return counts
 
 
+@timed_often
 def run_record(arguments,kind,world,tag,seed,generated,advisor,picker,candidates,objective):
     return {'kind':kind,'world':world,'tag':tag,'cli_seed':arguments.seed,'run_seed':seed,
             'years':arguments.years,'minutes':arguments.minutes,'profile':arguments.profile,'pool':arguments.pool,'runs_requested':arguments.runs,

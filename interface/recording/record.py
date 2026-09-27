@@ -11,7 +11,7 @@ import time
 import numpy as np
 
 from ..actions.catalogue import action_folders
-from ..common import DEFAULT_DATA, slot, timed
+from ..common import DEFAULT_DATA, slot, timed, timed_often
 from ..runner.memory import LAYOUT, MONTH_STARTS
 from ..timing import span
 from ..script import alerts, blocks, body, building_methods, decisions, definitions, event_options, keys, method_effects, production_methods, read, scalar
@@ -39,6 +39,7 @@ BUDGET_LINES={('income',1):'income_taxes',('income',2):'poll_taxes',('income',7)
 
 
 class Capture:
+    @timed_often
     def __init__(self,tables,name,player,goods,windows):
         self.tables=tables
         self.name=name
@@ -47,6 +48,7 @@ class Capture:
         self.windows=windows
 
 
+@timed_often
 def put(tables,name,columns,rows):
     names=[column for column,_ in columns]
     tables[name]={column:[row[index] for row in rows] for index,column in enumerate(names)}
@@ -100,6 +102,7 @@ def record(game,store,phase):
     return store.run_id,seq
 
 
+@timed_often
 def snapshot_meta(tables,label):
     state=tables.pop('game_state')
     control=tables.pop('time_control')
@@ -120,10 +123,12 @@ def snapshot_meta(tables,label):
     return constants,meta,windows['name']
 
 
+@timed_often
 def rule_settings(root,mods):
     return list(dict.fromkeys(setting for _,text in read(root,'common/game_rules',mods) for setting,_ in blocks(body(text))))
 
 
+@timed_often
 def message_groups(root,mods):
     return list(dict.fromkeys(group for _,text in read(root,'common/messages',mods) if (group:=scalar(text,'group'))))
 
@@ -186,27 +191,34 @@ def register(game,session,world,store):
 
 
 class Held:
+    @timed_often
     def __init__(self,held,nonce,picks):
         self.variables,self.lists,self.maps=held['variables'],held['lists'],held['maps']
         self.picks=picks
         if self.variables.get('cap_seq')!=('value',nonce):
             raise RuntimeError(f'The capture holder carries request {self.variables.get("cap_seq")}, not {nonce}')
 
+    @timed_often
     def listed(self,name):
         return self.lists.get(name,[])
 
+    @timed_often
     def prefixed(self,prefix):
         return {name[len(prefix):]:items for name,items in self.lists.items() if name.startswith(prefix)}
 
+    @timed_often
     def flags(self,name):
         return [text(item) for item in self.listed(name)]
 
+    @timed_often
     def objects(self,name):
         return [ident(item) for item in self.listed(name)]
 
+    @timed_often
     def mapped(self,name):
         return self.maps.get(name,{})
 
+    @timed_often
     def column(self,name):
         if name in self.maps:
             return self.maps[name]
@@ -215,6 +227,7 @@ class Held:
             raise RuntimeError(f'The integer parts of {name} cover different objects')
         return {key:('value',float(sum(int(text(part[key]))*PART**index for index,part in enumerate(parts)))) for key in (parts[0] if parts else {})}
 
+    @timed_often
     def fields(self,name,objects,fields):
         values={field:self.column(f'cap_{name}_{field}') for field in fields}
         rows=[]
@@ -251,6 +264,7 @@ def ident(item):
 MONTH_NAMES=('January','February','March','April','May','June','July','August','September','October','November','December')
 
 
+@timed_often
 def game_hours(text):
     month,day,year=re.fullmatch(r'\s*(\w+) (\d+), (\d+)\s*',text).groups()
     return ((int(year)+5000)*365+MONTH_STARTS[MONTH_NAMES.index(month)]+int(day)-1)*24
@@ -406,6 +420,7 @@ def _scripted(tables,snapshot,held,tags,label,player,living,world,maps):
     return colors
 
 
+@timed_often
 def _counted(held,maps,counter):
     count=int(number(held.variables[counter]))
     keys=[('value',float(index)) for index in range(1,count+1)]
@@ -416,6 +431,7 @@ def _counted(held,maps,counter):
     return [tuple(column[key] for column in columns) for key in keys]
 
 
+@timed_often
 def _messages(held):
     rows=[(text(date),text(kind),plain(text(name)),plain(text(description))) for date,kind,name,description in _counted(held,MESSAGE_MAPS,'cap_message_count')]
     period=next(p for p in range(1,len(rows)+1) if len(rows)%p==0 and rows==rows[:p]*(len(rows)//p)) if rows else 0

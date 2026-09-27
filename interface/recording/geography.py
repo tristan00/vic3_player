@@ -7,14 +7,16 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from ..common import progress, timed
+from ..common import progress, timed, timed_often
 from ..script import read
 
 
+@timed_often
 def label(color):
     return f'x{int(color):06X}'
 
 
+@timed_often
 def normal(color):
     return 'x'+color[1:].upper()
 
@@ -24,6 +26,7 @@ def assets(root):
     return {entry.relative_to(root).as_posix():entry.read_bytes() for entry in sorted(root.rglob('*')) if entry.is_file()}
 
 
+@timed_often
 def identity(files,manifest=b''):
     hashes={name:hashlib.sha256(data).hexdigest() for name,data in files.items()}
     return hashlib.sha256(manifest+json.dumps(hashes,sort_keys=True,separators=(',',':')).encode('utf8')).hexdigest()
@@ -39,6 +42,7 @@ def mini_world(path):
     return identity(files,raw),files,regions,{**files,'manifest.json':raw}
 
 
+@timed_often
 def vanilla_world(game):
     files=assets(Path(game)/'map_data')
     regions={}

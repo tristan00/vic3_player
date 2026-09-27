@@ -12,6 +12,7 @@ NAMES={}
 LAYOUTS={name:Layout(table) for name,table in TABLE.items()}
 
 
+@db.timed
 def game_date(hours):
     if hours is None:
         return None
@@ -19,6 +20,7 @@ def game_date(hours):
     return GameDate(hours=hours,text=text[:-2] if text.endswith('.0') else text)
 
 
+@db.timed
 def kind_of(column):
     if column.entity:
         return 'ref'
@@ -35,11 +37,13 @@ def kind_of(column):
     return 'text'
 
 
+@db.timed
 def key_columns(table):
     owner=[] if table.owner is None else [Col(table.owner,I4,entity=table.owner)]
     return owner+list(table.keys)
 
 
+@db.timed
 def label_columns(kind):
     if kind in LABELS:
         return LABELS[kind]
@@ -47,6 +51,7 @@ def label_columns(kind):
     return tuple(column.name for column in table.columns if column.vocabulary)[:1]
 
 
+@db.timed
 def vocab_column(kind,name):
     return next(column for column in TABLE[kind+'_history'].columns if column.name==name)
 
@@ -84,5 +89,6 @@ def labels(run_id,kind,ids):
     return out
 
 
+@db.timed
 def owned_tables(kind):
     return [table for table in TABLE.values() if table.owner==kind]

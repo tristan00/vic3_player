@@ -3,9 +3,12 @@ from functools import wraps
 import inspect
 import logging
 import math
+from math import log2
 from pathlib import Path
 import threading
+from threading import get_ident
 import time
+from time import perf_counter_ns
 
 ROOT=Path(__file__).resolve().parents[1]
 RESOLUTION=8
@@ -35,13 +38,17 @@ class Stats:
 
     def add(self,ns,own,failed):
         self.calls+=1
-        self.errors+=failed
+        if failed:
+            self.errors+=1
         self.total+=ns
         self.own+=own
-        self.low=ns if self.low is None else min(self.low,ns)
-        self.high=max(self.high,ns)
-        bucket=int(math.log2(max(ns,1))*RESOLUTION)
-        self.buckets[bucket]=self.buckets.get(bucket,0)+1
+        if self.low is None or ns<self.low:
+            self.low=ns
+        if ns>self.high:
+            self.high=ns
+        bucket=int(log2(ns)*RESOLUTION) if ns>1 else 0
+        buckets=self.buckets
+        buckets[bucket]=buckets.get(bucket,0)+1
 
     def merge(self,other):
         self.calls+=other.calls
@@ -75,31 +82,38 @@ class Recorder:
 
     def add(self,name,ns,own,failed):
         with self.lock:
-            for kept in (self.whole,self.interval):
-                if name not in kept:
-                    kept[name]=Stats()
-                kept[name].add(ns,own,failed)
+            stats=self.interval.get(name)
+            if stats is None:
+                stats=self.interval[name]=Stats()
+            stats.add(ns,own,failed)
 
     def merge(self,taken):
         with self.lock:
-            for kept in (self.whole,self.interval):
-                for name,stats in taken.items():
-                    if name not in kept:
-                        kept[name]=Stats()
-                    kept[name].merge(stats)
+            fold(self.interval,taken)
 
     def take(self):
         with self.lock:
             taken,self.interval=self.interval,{}
+            fold(self.whole,taken)
         return taken
 
     def totals(self):
         with self.lock:
-            return [(name,s.calls,s.errors,ms(s.total),ms(s.own),ms(s.low),ms(s.high),*(ms(s.quantile(share)) for share in QUANTILES))
-                    for name,s in sorted(self.whole.items())]
+            both={}
+            fold(both,self.whole)
+            fold(both,self.interval)
+        return [(name,s.calls,s.errors,ms(s.total),ms(s.own),ms(s.low),ms(s.high),*(ms(s.quantile(share)) for share in QUANTILES))
+                for name,s in sorted(both.items())]
 
     def drain(self):
         return [(name,s.calls,s.errors,ms(s.total),ms(s.own),ms(s.high)) for name,s in sorted(self.take().items())]
+
+
+def fold(kept,taken):
+    for name,stats in taken.items():
+        if name not in kept:
+            kept[name]=Stats()
+        kept[name].merge(stats)
 
 
 RECORDER=Recorder()
@@ -114,31 +128,34 @@ class Span:
         self.level=level
 
     def __enter__(self):
-        self.thread=threading.get_ident()
+        self.thread=get_ident()
         self.children=0
         self.ns=None
         self.parent=OPEN.get()
         self.token=OPEN.set(self)
-        self.started=time.perf_counter_ns()
+        self.started=perf_counter_ns()
         return self
 
     def __exit__(self,kind,error,traceback):
-        self.ns=time.perf_counter_ns()-self.started
+        ns=self.ns=perf_counter_ns()-self.started
         OPEN.reset(self.token)
-        if self.parent is not None and self.parent.thread==self.thread:
-            self.parent.children+=self.ns
-        RECORDER.add(self.name,self.ns,self.ns-self.children,kind is not None)
+        parent=self.parent
+        if parent is not None and parent.thread==self.thread:
+            parent.children+=ns
+        RECORDER.add(self.name,ns,ns-self.children,kind is not None)
         trace=TRACE.get()
         if trace is not None:
-            trace.append((self.name,ms(self.ns)))
-        if kind is None:
-            self.log.log(self.level,'%s %.1fms',self.name,ms(self.ns))
-        else:
-            self.log.log(self.level,'%s FAILED %s %.1fms',self.name,kind.__name__,ms(self.ns))
+            trace.append((self.name,ms(ns)))
+        log=self.log
+        if log.isEnabledFor(self.level):
+            if kind is None:
+                log.log(self.level,'%s %.1fms',self.name,ms(ns))
+            else:
+                log.log(self.level,'%s FAILED %s %.1fms',self.name,kind.__name__,ms(ns))
 
     @property
     def ms(self):
-        return ms(time.perf_counter_ns()-self.started if self.ns is None else self.ns)
+        return ms(perf_counter_ns()-self.started if self.ns is None else self.ns)
 
     @property
     def seconds(self):
@@ -168,8 +185,15 @@ def timer(log,stamp=None,level=logging.INFO):
         if stamp is None:
             @wraps(function)
             def call(*args,**kwargs):
-                with Span(name,logger,level):
-                    return function(*args,**kwargs)
+                timing=Span(name,logger,level)
+                timing.__enter__()
+                try:
+                    result=function(*args,**kwargs)
+                except BaseException as error:
+                    timing.__exit__(type(error),error,None)
+                    raise
+                timing.__exit__(None,None,None)
+                return result
             return call
         label=function.__qualname__
         done=f'{label} done'

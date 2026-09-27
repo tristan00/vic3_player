@@ -42,6 +42,7 @@ WATCH_INTERVAL=.05
 
 
 class Process:
+    @timed_often
     def __init__(self,pid):
         self.pid=pid
         self.handle=kernel.OpenProcess(PROCESS_ACCESS,False,pid)
@@ -55,19 +56,24 @@ class Process:
             raise OSError(f'process {pid} has not loaded its executable yet')
         self.base=modules[0]
 
+    @timed_often
     def exited(self):
         return kernel.WaitForSingleObject(self.handle,0)==WAIT_OBJECT_0
 
+    @timed_often
     def readable(self):
         data=ctypes.create_string_buffer(8);count=ctypes.c_size_t()
         return bool(kernel.ReadProcessMemory(self.handle,self.base,data,8,ctypes.byref(count)))
 
+    @timed_often
     def gone(self):
         return self.exited() or not self.readable()
 
+    @timed_often
     def exits_within(self,milliseconds):
         return kernel.WaitForSingleObject(self.handle,milliseconds)==WAIT_OBJECT_0
 
+    @timed_often
     def exit_time(self):
         times=[wintypes.FILETIME() for _ in range(4)]
         if not kernel.GetProcessTimes(self.handle,*(ctypes.byref(t) for t in times)):
@@ -75,10 +81,12 @@ class Process:
         exit_=(times[1].dwHighDateTime<<32)|times[1].dwLowDateTime
         return datetime.fromtimestamp(exit_/10**7-FILETIME_EPOCH_SECONDS,timezone.utc)
 
+    @timed_often
     def check(self):
         if self.gone():
             raise GameCrashed(f'The game process {self.pid} is '+('exited' if self.exited() else 'shutting down, its memory is unreadable'))
 
+    @timed_often
     def watch(self,alert):
         stopped=threading.Event()
         def wait():
@@ -89,11 +97,13 @@ class Process:
         threading.Thread(target=wait,daemon=True,name='game-watch').start()
         return stopped
 
+    @timed_often
     def close(self):
         self._close()
         self.handle=None
 
 
+@timed_often
 def outputs(name,spec):
     names=[name]
     for group in ('vectors','nested_vectors','arrays','column_arrays','column_vectors','column_goods','vector_goods','goods_arrays'):
@@ -104,6 +114,7 @@ def outputs(name,spec):
     return names
 
 
+@timed_often
 def visible_columns():
     visible={}
     pending=[name for name,spec in VISIBILITY.tables.items() if spec['disposition']!='drop']
@@ -119,6 +130,7 @@ def visible_columns():
 
 
 class Reader:
+    @timed_often
     def __init__(self,pid,game_dir=DEFAULT_GAME,mods=()):
         self.pid=pid
         self.process=Process(pid)
@@ -147,10 +159,12 @@ class Reader:
             if self.word(database)-self.base!=vtable:
                 raise RuntimeError(f'Unsupported game build: {table} database signature differs from layout {LAYOUT["version"]}')
 
+    @timed_often
     def close(self):
         self.process.close()
         self.handle=None
 
+    @timed_often
     def check(self):
         self.process.check()
 
@@ -243,9 +257,15 @@ class Reader:
             raise RuntimeError(f'The running control mod lacks variables {sorted(set(names)-set(found))}; restart the campaign with the current control mod')
         return found
 
+    def token(self,value):
+        code=self.keys.get(('token',value&0xFFFFFFFF))
+        if code is None:
+            code=int(self.tokens(np.array([value],dtype=np.int64))[0])
+        return self.names[code-1][1]
+
     def item(self,kind,value):
         if kind==3:
-            return ('flag',self.names[int(self.tokens(np.array([value],dtype=np.int64))[0])-1][1])
+            return ('flag',self.token(value))
         if kind==1:
             return ('value',value/SCALE)
         return (int(kind),int(value)&0xffffff)
@@ -263,9 +283,10 @@ class Reader:
             held[country]=self.held_at(int(addresses[np.nonzero(slots==country)[0][0]]))
         return held
 
+    @timed_often
     def held_at(self,address):
         spec=self.tables['country']
-        name=lambda code:self.names[int(self.tokens(np.array([code],dtype=np.int64))[0])-1][1]
+        name=self.token
         store=self.word(address+spec['vectors']['country_variable'][4])
         if not store:
             return {'variables':{},'lists':{},'maps':{}}
@@ -307,6 +328,7 @@ class Reader:
             maps[name(code)]=entries
         return {'variables':variables,'lists':lists,'maps':maps}
 
+    @timed_often
     def control_targets(self):
         return {name:address+24 for name,address in self.variables(CONTROL_VARIABLES).items()}
 
@@ -333,7 +355,10 @@ class Reader:
         targets=self.control_targets()
         self.write([(targets[name],struct.pack('<q',value)) for name,value in
                     (('interface_capture_seq',nonce*SCALE),('interface_capture_done',0),('interface_capture',200000 if save else 100000))])
-        deadline=time.monotonic()+timeout
+        self.captured(targets,time.monotonic()+timeout)
+
+    @timed_often
+    def captured(self,targets,deadline):
         while self.word(targets['interface_capture_done'])!=200000 or self.word(targets['interface_capture'])!=0:
             progress('request_capture')
             if time.monotonic()>deadline:
@@ -341,6 +366,7 @@ class Reader:
             time.sleep(.002)
             targets=self.control_targets()
 
+    @timed_often
     def gather(self,addresses,size):
         size=(size+7)&~7
         result=np.zeros((len(addresses),size//8),dtype='<i8')
@@ -363,6 +389,7 @@ class Reader:
             result[order[run]]=data[index]
         return result
 
+    @timed_often
     def objects(self,rva):
         database=self.word(self.base+rva)
         table,capacity=struct.unpack('<QI',self.read(database+0x20,12))
@@ -370,6 +397,7 @@ class Reader:
         slots=np.nonzero(entries)[0]
         return database,slots.astype(np.int32),entries[slots].astype(np.int64)
 
+    @timed_often
     def string(self,address):
         raw=self.read(address,32)
         size,capacity=struct.unpack_from('<QQ',raw,16)
@@ -377,6 +405,7 @@ class Reader:
             raise OSError(f'No string at {address:#x}')
         return (self.read(struct.unpack_from('<Q',raw)[0],size) if capacity>=16 else raw[:size]).decode('utf-8','replace')
 
+    @timed_often
     def codes(self,kind,pointers,inner=0x18):
         if kind in LAYOUT.get('key_sentinels',{}):
             pointers=np.where(pointers==self.word(self.base+LAYOUT['key_sentinels'][kind]),0,pointers)
@@ -403,6 +432,7 @@ class Reader:
         lookup=np.array([self.keys['token',t] for t in unique.tolist()],dtype=np.int32)
         return lookup[np.searchsorted(unique,values)]
 
+    @timed_often
     def member(self,child,column,kind,values):
         if kind=='q':
             return values/100000
@@ -426,6 +456,7 @@ class Reader:
             return self.codes('string',values,0)
         return self.tokens(values) if kind=='token' else self.codes(kind,values)
 
+    @timed_often
     def scope_codes(self,kinds,values):
         result=np.zeros(len(values),dtype=np.int32)
         for kind,codes in self.scope_definition_codes.items():
@@ -436,6 +467,7 @@ class Reader:
             result[chosen]=codes[indexes]
         return result
 
+    @timed_often
     def column(self,database,offset,stride,slots):
         if not len(slots):
             return np.empty((0,stride//4),dtype='<i4')
@@ -451,6 +483,7 @@ class Reader:
             result[chosen]=data[positions-first]
         return result
 
+    @timed_often
     def columns(self,name,spec,database,slots,arrays=None,skip=()):
         arrays={} if arrays is None else arrays
         result={}
@@ -482,6 +515,7 @@ class Reader:
                 result[column]=self.member(name,column,kind,wide)
         return result
 
+    @timed_often
     def vector(self,child,slots,words,offset,count_offset,stride,members,hop=None,used=None,deref=None,flag_offset=4):
         heads=words if hop is None else self.gather(words[:,hop//8],count_offset+8)
         counts=heads.view('<i4')
@@ -539,6 +573,7 @@ class Reader:
             rows[column]=self.member(child,column,kind,values)
         return rows
 
+    @timed_often
     def pop_needs(self,slots,words,offset):
         groups=self.vector('',slots,words,offset,offset+0xc,40,{'group':['w',8],'needs':['w',0x10],'counts':['w',0x18]},None,8)
         index=np.arange(len(groups['id']),dtype=np.int32)
@@ -551,6 +586,7 @@ class Reader:
         return {'id':groups['id'][need],'need_group':self.codes('need_group',groups['group'][need]),'need':needs['ord'][weights['id']],
                 'goods_type':weights['goods_type'],'weight':weights['weight']}
 
+    @timed_often
     def market_goods(self,spec,slots,words):
         count=len(self.goods_codes)
         rows={'id':np.repeat(slots,count),'goods':np.tile(self.goods_codes,len(slots))}
@@ -747,6 +783,7 @@ class Reader:
             children['market_goods']=self.market_goods(spec,slots,words)
         return result,children
 
+    @timed_often
     def date(self):
         rva,offset=LAYOUT['date']
         hours=struct.unpack('<i',self.read(self.word(self.base+rva)+offset,4))[0]
@@ -755,10 +792,12 @@ class Reader:
         month=next(m for m in range(12,0,-1) if day>=MONTH_STARTS[m-1])
         return hours,f'{year-5000}.{month}.{day-MONTH_STARTS[month-1]+1}.{hour}'
 
+    @timed_often
     def player(self):
         rows,_=self.table('player')
         return int(rows['country'][0])&0xffffff
 
+    @timed_often
     def alive(self):
         try:
             rows,_=self.table('state',{'state':set(self.tables['state']['fields'])-{'country'}})
@@ -768,6 +807,7 @@ class Reader:
             raise
         return self.player() in {int(country)&0xffffff for country in rows['country'].tolist()}
 
+    @timed_often
     def _decode(self,roots,visible=None):
         result={}
         for name in roots:
@@ -780,6 +820,7 @@ class Reader:
     def decode(self):
         return self._decode(self.tables)
 
+    @timed_often
     def needed_roots(self):
         return [root for root,spec in self.tables.items() if set(outputs(root,spec))&set(self.visible)]
 

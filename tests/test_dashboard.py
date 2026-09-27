@@ -7,9 +7,9 @@ from fastapi.testclient import TestClient
 from advisors.pickers import PARAMS
 from dashboard.server import actions, changes, db, meta, policy, runs, tables
 from dashboard.server.app import app
-from interface.recording.store import Store, install
+from interface.recording.store import Store
 from interface.timing import RECORDER
-from tests.test_store import DSN, EFFECTS, ENUMS, LAW, MEMBERS, PLAYER, RUN, STEPS, built
+from tests.test_store import DSN, EFFECTS, ENUMS, LAW, MEMBERS, PLAYER, RUN, STEPS, built, clean
 
 AT=datetime(2026,9,23,tzinfo=timezone.utc)
 PROPOSAL={'reward':'composite','method':'expected_improvement','observations':12,'best_reward':4.5,'predicted_reward':5.0,'uncertainty':.5,'expected_improvement':.7,
@@ -34,7 +34,7 @@ class DashboardTests(unittest.TestCase):
             connection=psycopg.connect(DSN,autocommit=True)
         except psycopg.OperationalError as error:
             raise unittest.SkipTest(f'test database unavailable: {error}')
-        install(connection)
+        clean(connection)
         connection.close()
         RECORDER.reset()
         from interface.recording.spec import VOCABULARIES

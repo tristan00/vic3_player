@@ -68,37 +68,44 @@ class Page:
     offset:int
     limit:int
 
+    @db.timed
     def args(self):
         return self.filters,self.sort,self.desc,self.offset,self.limit
 
 
+@db.timed
 def page(f:list[str]=Query([]),sort:str|None=None,desc:bool=False,offset:int=Query(0,ge=0),limit:int=Query(100,ge=1,le=1000))->Page:
     return Page(parse_filters(f),sort,desc,offset,limit)
 
 
+@db.timed
 def found(value,what):
     if value is None:
         raise HTTPException(404,f'no {what}')
     return value
 
 
+@db.timed
 def entity_kind(kind):
     if kind not in ENTITIES:
         raise HTTPException(404,f'no entity kind {kind}')
     return kind
 
 
+@db.timed
 def table_name(table):
     if table not in TABLE:
         raise HTTPException(404,f'no table {table}')
     return table
 
 
+@db.timed
 def at(grid,run_id,seq):
     grid.seq,grid.last_seq,grid.game_date=tables.snapshot_at(run_id,seq)
     return grid
 
 
+@db.timed
 def resolved(run_id,seq):
     chosen,_,_=tables.snapshot_at(run_id,seq)
     return found(chosen,f'snapshot in run {run_id}')
@@ -291,6 +298,7 @@ async def events(request:Request):
 
 
 @app.api_route('/api/{path:path}',methods=['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS'],include_in_schema=False)
+@db.timed
 def no_route(path:str):
     raise HTTPException(404,f'no route /api/{path}')
 

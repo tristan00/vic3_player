@@ -32,6 +32,7 @@ def shared_read(path,offset):
         return stream.read()
 
 
+@timed_often
 def rotation(path):
     return int(path.stem.partition('.')[2] or 0)
 
@@ -47,6 +48,7 @@ class LogTail:
         self.store=store
         self.lock=threading.Lock()
         self.buffer=bytearray()
+        self.total=0
         self.lost=0
         self.known=None
         self.offset=0
@@ -57,6 +59,7 @@ class LogTail:
         store.parent.mkdir(parents=True,exist_ok=True)
         store.write_bytes(b'')
 
+    @timed_often
     def files(self):
         found={}
         for path in self.directory.glob('debug*.log'):
@@ -67,9 +70,11 @@ class LogTail:
             found[rotation(path)]=(path,stat.st_ino,stat.st_size)
         return found
 
+    @timed_often
     def rotated(self,files):
         return {ident for index,(_,ident,_) in files.items() if index}
 
+    @timed_often
     def continues(self,path,size):
         return size>=self.offset and shared_read(path,self.offset-len(self.last))[:len(self.last)]==self.last
 
@@ -111,19 +116,23 @@ class LogTail:
                 with open(self.store,'ab') as stream:
                     stream.write(added)
                 self.buffer+=added
+                self.total+=len(added)
                 if len(self.buffer)>WINDOW:
                     cut=self.buffer.find(b'\n',len(self.buffer)-WINDOW)+1
                     del self.buffer[:cut]
 
+    @timed_often
     def scan(self,added):
         for line in added.splitlines():
             stamp=STAMP.match(line)
             if stamp and stamp[1]>=self.since and any(marker in line for marker in FATAL):
                 self.fatal=line.decode('utf-8','replace')
 
+    @timed_often
     def quiet(self):
         return time.monotonic()-self.grown
 
+    @timed_often
     def poll(self):
         try:
             self.step()
@@ -138,6 +147,7 @@ class LogTail:
                 self.died=error
                 return
 
+    @timed_often
     def close(self):
         self.stopped.set()
         if self.thread is not None:
@@ -148,12 +158,22 @@ class LogTail:
         self.thread=threading.Thread(target=self.run,daemon=True,name='debug-log-tail')
         self.thread.start()
 
+    @timed_often
     def text(self):
+        return self.after(0)
+
+    @timed_often
+    def mark(self):
+        self.after(self.total)
+        return self.total
+
+    @timed_often
+    def after(self,mark):
         if self.thread is None:
             self.start()
         if self.died:
             raise RuntimeError('The debug log tail thread stopped') from self.died
         self.poll()
         with self.lock:
-            data=bytes(self.buffer)
+            data=bytes(self.buffer[max(0,len(self.buffer)-(self.total-mark)):])
         return data.decode('utf-8','replace')

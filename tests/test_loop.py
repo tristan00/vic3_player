@@ -185,7 +185,7 @@ class WorldPoolTests(unittest.TestCase):
             world,spans=run.build_apart(1,2,3,.5,1.5)
         self.assertEqual(world,(1,2,3,.5,1.5))
         self.assertEqual({name:stats.calls for name,stats in spans.items()},
-                         {'tests.test_loop.WorldPoolTests.test_a_world_built_apart_returns_the_spans_of_its_own_process.<locals>.generate':1})
+                         {'tests.test_loop.WorldPoolTests.test_a_world_built_apart_returns_the_spans_of_its_own_process.<locals>.generate':1,'loop.run.build':1})
         self.assertEqual(RECORDER.drain(),[])
 
 

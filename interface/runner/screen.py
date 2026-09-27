@@ -3,13 +3,14 @@ from ctypes import wintypes
 
 from PIL import Image
 
-from ..common import timed
+from ..common import timed, timed_often
 
 user32=ctypes.WinDLL('user32',use_last_error=True)
 gdi32=ctypes.WinDLL('gdi32')
 user32.PrintWindow.argtypes=[wintypes.HWND,wintypes.HDC,wintypes.UINT]
 
 
+@timed_often
 def window():
     found=[]
     proc=ctypes.WINFUNCTYPE(wintypes.BOOL,wintypes.HWND,wintypes.LPARAM)

@@ -2,7 +2,7 @@ import collections
 import itertools
 import math
 
-from ..common import timed
+from ..common import timed, timed_often
 
 ONSETS=['b','c','d','f','g','h','j','k','l','m','n','p','r','s','t','v','w','z','br','dr','gr','kr','tr','st','sh','th','ch','vl','sk','pr']
 VOWELS=['a','e','i','o','u','ai','ei','ou','ia','y','ae','io']
@@ -21,6 +21,7 @@ FLAG_COLORS=['red','white','blue','yellow','green','black']
 TIERS=[(1,'principality'),(3,'grand_principality'),(7,'kingdom'),(10**6,'empire')]
 
 
+@timed_often
 def sounds(rng):
     return {'onsets':rng.sample(ONSETS,12),'vowels':rng.sample(VOWELS,6),'codas':rng.sample(CODAS,6),'endings':rng.sample(ENDINGS,3)}
 
@@ -28,6 +29,7 @@ def sounds(rng):
 GENERIC={'onsets':ONSETS,'vowels':VOWELS,'codas':CODAS,'endings':ENDINGS}
 
 
+@timed_often
 def word(rng,used=None,phonology=GENERIC,syllables=(2,3),ending=True):
     while True:
         text=''.join(rng.choice(phonology['onsets'])+rng.choice(phonology['vowels'])+rng.choice(phonology['codas']) for _ in range(rng.randint(*syllables)))
@@ -38,32 +40,39 @@ def word(rng,used=None,phonology=GENERIC,syllables=(2,3),ending=True):
             return text
 
 
+@timed_often
 def _names(rng,phonology,count,used):
     return [word(rng,used,phonology,(1,2),False) for _ in range(count)]
 
 
+@timed_often
 def _rgb(rng):
     return ' '.join(str(rng.randrange(40,230)) for _ in range(3))
 
 
+@timed_often
 def _pick(rng,pool,key):
     return rng.choice(pool)[key]
 
 
+@timed_often
 def _ownership(tag,owner,levels,state):
     if owner=='country':
         return f'country = {{ country = "c:{tag}" levels = {levels} }}'
     return f'building = {{ type = "{owner}" country = "c:{tag}" levels = {levels} region = "{state}" }}'
 
 
+@timed_often
 def _create(tag,kind,levels,owner,state):
     return f'create_building = {{ building = "{kind}" add_ownership = {{ {_ownership(tag,owner,levels,state)} }} reserves = 1 }}'
 
 
+@timed_often
 def _religions(rng,data,count):
     return [{'key':religion['key'],'heritage':religion['heritage']} for religion in rng.sample(data['religions'],count)]
 
 
+@timed_often
 def _cultures(rng,data,count,religions,used,names):
     obsessions=sorted({g for c in data['cultures'] for g in c['obsessions'] if g in data['goods']})
     cultures=[]
@@ -85,6 +94,7 @@ def _cultures(rng,data,count,religions,used,names):
     return cultures
 
 
+@timed_often
 def _tags(count,taken):
     letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     tags=[t for t in ('X'+a+b for a,b in itertools.product(letters,repeat=2)) if t not in taken]
@@ -93,11 +103,13 @@ def _tags(count,taken):
     return tags[:count]
 
 
+@timed_often
 def _permitted(law,laws,rules,techs):
     disallowing,unlocking,needs=rules[law]
     return needs<=techs and (not unlocking or unlocking&set(laws)) and not disallowing&set(laws) and not any(law in rules[other][0] for other in laws)
 
 
+@timed_often
 def _laws(rng,pool,rules,techs):
     laws=[]
     for group in rng.sample(sorted({g for p in pool for g in p['laws']}),len({g for p in pool for g in p['laws']})):
@@ -110,6 +122,7 @@ def _laws(rng,pool,rules,techs):
 FLAGS={'ruler':'ruler = yes','heir':'heir = yes','general':'is_general = yes','admiral':'is_admiral = yes','ig_leader':'ig_leader = yes'}
 
 
+@timed_often
 def _character(rng,tag,index,culture,record,interest_group):
     lists=culture['lists']
     key=f'{tag}_character_{index}'
@@ -122,14 +135,17 @@ def _character(rng,tag,index,culture,record,interest_group):
     return key,text
 
 
+@timed_often
 def _scale(state):
     return state['arable_land']/state['source']['arable_land']
 
 
+@timed_often
 def level(value,low,mean,top):
     return low+2*value*(mean-low) if value<=.5 else mean+(value-.5)*2*(top-mean)
 
 
+@timed_often
 def _techs(rng,base,count,requires):
     techs=set(base)
     while len(techs)<count:
@@ -142,6 +158,7 @@ def _techs(rng,base,count,requires):
     return techs
 
 
+@timed_often
 def _pops(rng,state,culture,candidates,religions,mix,factor):
     total=int(state['source']['population']*_scale(state)*factor)
     shares=[[culture,None,mix['primary']]]+[[other,None,part] for other,part in zip(candidates,mix['others'])]
@@ -157,6 +174,7 @@ def _pops(rng,state,culture,candidates,religions,mix,factor):
     return total,pops,homelands
 
 
+@timed_often
 def _buildings(rng,tag,state,band,capital,overseas,population,center,military,allowed,owners,buildable):
     key=state['key']
     lines=[]
@@ -184,6 +202,7 @@ def _buildings(rng,tag,state,band,capital,overseas,population,center,military,al
     return lines,produced,levels
 
 
+@timed_often
 def _allot(total,weights,cap):
     counts=[0]*len(weights)
     for _ in range(min(total,cap*len(weights))):
@@ -192,12 +211,14 @@ def _allot(total,weights,cap):
     return counts
 
 
+@timed_often
 def _trade_profile(rng,profiles,states,tier):
     matching=[p for p in profiles if p['tier']==tier]
     gap=min(abs(p['states']-states) for p in matching)
     return rng.choice([p for p in matching if abs(p['states']-states)==gap])
 
 
+@timed_often
 def _army(band,units):
     kinds=[['combat_unit_type_line_infantry','combat_unit_type_cannon_artillery','combat_unit_type_hussars'],
            ['combat_unit_type_line_infantry','combat_unit_type_cannon_artillery','combat_unit_type_dragoons'],
@@ -391,6 +412,7 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
     return {'countries':countries,'files':files,'localization':localization}
 
 
+@timed_often
 def _native(rng,data,tag,name,culture,states,capital,others,religions,band,factor,history,color):
     profile=rng.choice(data['natives'])
     history['countries'].append(f'c:{tag} ?= {{ {profile["history"]} }}')
@@ -407,15 +429,18 @@ def _native(rng,data,tag,name,culture,states,capital,others,religions,band,facto
             'armed':False,'army':0,'navy':0,'monarchs':[],'provinces':[p for s in states for p in s['province_codes']]}
 
 
+@timed_often
 def _chance(data,count):
     return count/len(data['trade'])
 
 
+@timed_often
 def _picked(rng,data,count,total,eligible):
     chosen=[x for x in eligible if rng.random()<min(1,_chance(data,count)*total/len(eligible))] if eligible else []
     return rng.sample(chosen,len(chosen))
 
 
+@timed_often
 def _claims(rng,data,regions,state_neighbours,history,natives):
     owner={s['id']:s['country'] for s in regions}
     for state in regions:
@@ -427,6 +452,7 @@ def _claims(rng,data,regions,state_neighbours,history,natives):
 COMPANY_LEVELS=5
 
 
+@timed_often
 def _company_buildings(country,kinds):
     chosen=[]
     for holding in sorted((h for h in country['holdings'] if h[1] in kinds),key=lambda h:(-h[0],h[1],h[2])):
@@ -436,6 +462,7 @@ def _company_buildings(country,kinds):
     return chosen if sum(h[0] for h in chosen)>=COMPANY_LEVELS else []
 
 
+@timed_often
 def _companies(rng,data,countries,history):
     options=lambda country:sorted(((chosen[0][0],company,chosen) for company,kinds in data['companies'].items() if company not in taken
                                    for chosen in [_company_buildings(country,set(kinds))] if chosen),key=lambda o:(-o[0],o[1]))
@@ -450,6 +477,7 @@ def _companies(rng,data,countries,history):
                                         f'set_company_state_region = s:{chosen[0][2]} }} }}')
 
 
+@timed_often
 def _amendments(rng,data,countries,history):
     for country in _picked(rng,data,len(data['amendments']),len(countries),[c for c in countries if any(law in c['laws'] for law,_ in data['amendments'])]):
         options=[text for law,text in data['amendments'] if law in country['laws']]
@@ -457,11 +485,13 @@ def _amendments(rng,data,countries,history):
             history['countries'].append(f'c:{country["tag"]} ?= {{ {rng.choice(options)} }}')
 
 
+@timed_often
 def _partner(rng,size,i,candidates,ratio):
     fits=[j for j in candidates if j!=i and (abs(math.log(ratio))<math.log(1.5) or (size[i]>size[j])==(ratio>1))]
     return min(fits,key=lambda j:(abs(math.log(size[i]/size[j])-math.log(ratio)),rng.random())) if fits else None
 
 
+@timed_often
 def _diplomacy(rng,data,countries,neighbours,history,localization):
     n=len(countries);size=[len(c['states']) for c in countries];tags=[c['tag'] for c in countries]
     natives={i for i,c in enumerate(countries) if c['country_type']=='decentralized'}

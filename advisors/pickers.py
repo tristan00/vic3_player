@@ -5,7 +5,7 @@ import os
 import numpy as np
 from catboost import CatBoostRegressor, Pool
 
-from interface.common import progress, timed
+from interface.common import progress, timed, timed_often
 from interface.timing import current, span
 from .features import CATEGORIES, FEATURES, LAWS, NUMBERS, History, LiveLookup, categories
 from .random_smac_weighting import COMPONENTS, ENDED, HOURS_PER_YEAR, PLAYED, discount, peak, scored_runs, series
@@ -35,19 +35,23 @@ class PickFirst:
 
     trained=None
 
+    @timed_often
     def start_run(self,store,objective):
         pass
 
+    @timed_often
     def pick(self,candidates,snapshot):
         return 0,None
 
 
 class Beat:
+    @timed_often
     def after_iteration(self,info):
         progress('catboost fit')
         return True
 
 
+@timed_often
 def pool(rows,y=None):
     return Pool([list(row) for row in rows],label=y,cat_features=CATEGORICAL,feature_names=FEATURES)
 
@@ -92,6 +96,7 @@ def training_rows(connection,objective):
 class CatBoostPicker:
     name='catboost'
 
+    @timed_often
     def __init__(self):
         self.model=None
         self.trained=None

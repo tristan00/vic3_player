@@ -95,6 +95,7 @@ def _patch_harvest(pid):
 
 
 class GameInterface:
+    @timed_often
     def __init__(self,profile='default',game_dir=DEFAULT_GAME,data_dir=DEFAULT_DATA):
         self.game_dir=Path(game_dir).resolve()
         self.data_dir=Path(data_dir).resolve()
@@ -108,6 +109,7 @@ class GameInterface:
     def session(self):
         return json.loads(self.session_file.read_text(encoding='utf-8'))
 
+    @timed_often
     def process(self):
         if not self.session_file.exists():
             return None
@@ -118,6 +120,7 @@ class GameInterface:
         except psutil.NoSuchProcess:
             return None
 
+    @timed_often
     def _running(self):
         if not self.session_file.exists():
             raise RuntimeError('This profile was never launched')
@@ -146,6 +149,7 @@ class GameInterface:
             write_json(path,current)
         return current
 
+    @timed_often
     def fast_settings(self):
         return self.settings(FAST)
 
@@ -186,11 +190,25 @@ class GameInterface:
                 time.sleep(.1)
         return {'closed':process is not None}
 
+    @timed_often
     def log(self):
+        return self.log_since(0)
+
+    @timed_often
+    def tailing(self):
         if 'tail' not in self.__dict__:
             self.tail=LogTail(self.profile/'logs',self.profile/'debug_store.log',self.since)
-        return self.tail.text()
+        return self.tail
 
+    @timed_often
+    def log_mark(self):
+        return self.tailing().mark()
+
+    @timed_often
+    def log_since(self,mark):
+        return self.tailing().after(mark)
+
+    @timed_often
     def check(self,quiet):
         self._running()
         self.log()
@@ -210,11 +228,13 @@ class GameInterface:
             time.sleep(.2)
         raise TimeoutError(f'Timed out waiting for {text!r}; see {self.profile/"logs"}')
 
+    @timed_often
     def _dispatch(self,actions):
         from .control import widget
         self._running()
         write_script(self.data_dir/'control'/self.profile.name/'gui/interface_ctrl.gui',widget(actions))
 
+    @timed_often
     def _state(self,token):
         lines=self.log().splitlines()
         start=next(i for i,line in enumerate(lines) if 'INTERFACE|state|request='+token in line)
@@ -240,6 +260,7 @@ class GameInterface:
         self._wait('INTERFACE|end|'+token,timeout)
         return self._state(token)
 
+    @timed_often
     def paused(self,timeout=15):
         from .control import STATE
         token=uuid.uuid4().hex
@@ -256,6 +277,7 @@ class GameInterface:
             time.sleep(.5)
         raise RuntimeError('The game did not pause')
 
+    @timed_often
     def reader(self):
         from .memory import Reader
         process=self._running()

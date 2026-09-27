@@ -12,11 +12,13 @@ ACTION_FROM=f'''from loop_action l join action a using (action) join snapshot s 
 join {GROUP_VALUES} on grp.name=a.name'''
 
 
+@db.timed
 def param_specs(action):
     return [ParamSpec(name=name,kind=kind) for name,_,kind in
             ((spec.partition(':') if ':' in spec else (spec,':',spec)) for spec in (LOOP_PARAMS[action] if action in LOOP_PARAMS else BY_NAME[action].params))]
 
 
+@db.timed
 def entity_of(kind):
     kind=ALIASES.get(kind,kind)
     return kind if kind in ENTITIES else None
@@ -38,6 +40,7 @@ def param_columns(matched,params):
     return out
 
 
+@db.timed
 def action_grid(where,params,filters,sort,desc,offset,limit,run_id=None):
     base=([Spec('run','run','l.run_id')] if run_id is None else [])+[
         Spec('n','n','l.n',run=None if run_id else 'run'),Spec('turn','number','l.turn'),Spec('game_date','date','s.game_date'),Spec('action','action','a.name'),
@@ -56,6 +59,7 @@ def run_actions(run_id,filters,sort,desc,offset,limit):
     return action_grid('where l.run_id=%(run)s',{'run':run_id},filters,sort,desc,offset,limit,run_id)
 
 
+@db.timed
 def parse_scope(scope):
     if scope=='all':
         return 'all',None
@@ -65,6 +69,7 @@ def parse_scope(scope):
     return kind,int(value)
 
 
+@db.timed
 def scope_sql(scope):
     kind,value=parse_scope(scope)
     if kind=='all':

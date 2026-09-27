@@ -3,7 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .common import timed
+from .common import timed, timed_often
 
 SLOT = 0xffffff
 
@@ -15,18 +15,22 @@ class Visibility:
         self.tables = data['tables']
         self.verdicts = data['metrics']
 
+    @timed_often
     def _verdict(self, name, scope):
         key = scope + '|' + name
         if key not in self.verdicts:
             raise RuntimeError('no visibility verdict for metric ' + key)
         return self.verdicts[key]
 
+    @timed_often
     def metrics(self, names, scope):
         return [name for name in names if self._verdict(name, scope) in ('ANY', 'DERIVED')]
 
+    @timed_often
     def player_metrics(self, names, scope):
         return [name for name in names if self._verdict(name, scope) == 'OWN']
 
+    @timed_often
     def _owner(self, name, snapshot, player, cache, pending=()):
         if name in cache:
             return cache[name]
@@ -69,6 +73,7 @@ class Visibility:
         cache[name] = owner
         return owner
 
+    @timed_often
     def _keep(self, name, snapshot, player, cache):
         spec = self.tables[name]
         if spec['owner'][0] == 'either':

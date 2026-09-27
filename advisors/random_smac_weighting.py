@@ -58,6 +58,7 @@ def peak(first,last,points):
     return max([carried]+[people for date,people in points if date>window])
 
 
+@timed_often
 def change(first,last,points):
     start_date,start=points[0]
     if start_date!=first:
@@ -65,6 +66,7 @@ def change(first,last,points):
     return peak(first,last,points)/start-1
 
 
+@timed_often
 def scored_runs():
     return {'first':DEBT_CAP_FROM_RUN,'outcomes':list(OUTCOMES),'hours':MIN_YEARS*HOURS_PER_YEAR}
 
@@ -77,6 +79,7 @@ def series(connection,component,runs):
     return points
 
 
+@timed_often
 def draw_objective(rng):
     draws={component:rng.gammavariate(1,1) for component in COMPONENTS}
     total=sum(draws.values())
@@ -87,14 +90,17 @@ def discount(years,alpha):
     return max(MIN_YEARS,years)**alpha
 
 
+@timed_often
 def discounted(changes,alpha):
     return {run:{component:value/discount(years,alpha) for component,value in found.items()} for run,(years,found) in changes.items()}
 
 
+@timed_often
 def scales(values):
     return {component:float(np.std([found[component] for found in values.values()])) for component in COMPONENTS}
 
 
+@timed_often
 def combine(changes,objective):
     weights,alpha=objective
     values=discounted(changes,alpha)
@@ -102,6 +108,7 @@ def combine(changes,objective):
     return {run:sum(weights[component]*found[component]/spread[component] for component in COMPONENTS) for run,found in values.items()}
 
 
+@timed_often
 def breakdown(changes,objective,run):
     weights,alpha=objective
     values=discounted(changes,alpha)
@@ -120,6 +127,7 @@ def outcomes(connection):
             for run_id,first,last in found if all(run_id in points[component] and points[component][run_id][0][1]>0 for component in COMPONENTS)}
 
 
+@timed_often
 def rewards(connection,objective):
     return combine(outcomes(connection),objective)
 
@@ -143,6 +151,7 @@ def predict(forest,points,best):
     return mean,spread,(mean-best)*norm.cdf(z)+spread*norm.pdf(z),norm.cdf(z)
 
 
+@timed_often
 def expected_improvement(forest,points,best):
     return predict(forest,points,best)[2]
 
@@ -165,6 +174,7 @@ def local_search(forest,starts,best,low,high,rng):
 class RandomSmacWeightingAdvisor(RandomAdvisor):
     name='random_smac_weighting'
 
+    @timed_often
     def __init__(self,seed=None,weights=None):
         super().__init__(seed)
         self.excluded={name for name,weight in (weights or {}).items() if weight==0}

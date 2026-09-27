@@ -1,8 +1,9 @@
 from collections import defaultdict
+from operator import itemgetter
 import logging
 from dataclasses import dataclass
 
-from ..common import progress, slot, timed
+from ..common import progress, slot, timed, timed_often
 from .spec import DROPPED_COUNTRY_METRICS,DROPPED_STATE_METRICS,EPOCH_DATE,METRIC_COLUMNS,METRICS_KINDS,TABLE,TABLES
 
 SLOT=0xffffff
@@ -19,6 +20,7 @@ class Built:
 
 
 class Tracked(dict):
+    @timed_often
     def __init__(self,tables):
         super().__init__(tables)
         self.read=set()
@@ -33,6 +35,7 @@ class Tracked(dict):
 
 
 class Context:
+    @timed_often
     def __init__(self,capture,orders):
         self.tables=Tracked(capture.tables)
         self.name=capture.name
@@ -49,16 +52,19 @@ class Context:
     def labels(self,codes):
         return [self.label(code) for code in codes]
 
+    @timed_often
     def table(self,name):
         data=self.tables.get(name)
         return data if data and data.get('id') else None
 
+    @timed_often
     def rows(self,table,*columns):
         data=self.tables.get(table)
         if not data or not data[columns[0]]:
             return []
         return list(zip(*(data[column] for column in columns)))
 
+    @timed_often
     def children(self,table,owner,*columns,sparse=False):
         grouped=defaultdict(list)
         for row in self.rows(table,owner,'ord',*columns):
@@ -89,6 +95,7 @@ class Context:
             raise RuntimeError(f'The script names {entity} {value} but the memory capture holds no such object')
         return self.identities[entity][value&SLOT]
 
+    @timed_often
     def player_rows(self,table,*columns,sparse=False):
         items=self.children(table,'id',*columns,sparse=sparse)
         if set(items)-{self.player}:
@@ -101,6 +108,7 @@ OWNER_BUILDING=1
 OWNING_TYPES={'building_manor_house':'manor_house','building_financial_district':'financial_district'}
 
 
+@timed_often
 def owning_types(company_types):
     return {**OWNING_TYPES,**{f'building_{company}':'company' for company in company_types},
             **{f'building_regional_{company}':'company_regional_headquarter' for company in company_types}}
@@ -137,10 +145,12 @@ def flag(value):
     return bool(value)
 
 
+@timed_often
 def idents(t):
     return dict(zip(t['id'],t['ident']))
 
 
+@timed_often
 def countries(c):
     t=c.table('country')
     if not t:
@@ -199,6 +209,7 @@ def countries(c):
         c.add('country_population_sample',country=owner,n=n,date=date,population=int(population))
 
 
+@timed_often
 def samples(c,owner,trend,ids):
     heads={}
     for i,ord_,channel,date,n in c.rows(f'{owner}_{trend}_channel','id','ord','channel','date','index'):
@@ -227,6 +238,7 @@ PRIVATE_COUNTRY=('heir','tax_level','government_wage_level','military_wage_level
                  'pop_statistics_population_eligible_voters','supply_ships','construction_paused')
 
 
+@timed_often
 def player(c):
     private=c.table('country_private')
     if private:
@@ -342,10 +354,12 @@ def player(c):
             c.add(table,n=n,date=date,**{column:convert(value)})
 
 
+@timed_often
 def straits(c):
     return {power for power, in c.rows('strait_power','power')}
 
 
+@timed_often
 def mandates(c):
     values=[m for m, in c.rows('bloc_mandates','mandates')]
     if len(values)>1:
@@ -353,6 +367,7 @@ def mandates(c):
     return bool(values and values[0])
 
 
+@timed_often
 def metrics(c):
     t=c.table('country')
     ids=idents(t) if t else {}
@@ -383,6 +398,7 @@ def metrics(c):
     check_dropped(c,values,sids,c.rows('state_metric','state','name','value'))
 
 
+@timed_often
 def merge(c,rows):
     for table,owners in rows.items():
         owner=TABLE[table].owner
@@ -394,6 +410,7 @@ def merge(c,rows):
                 c.add(table,**({owner:key} if owner else {}),**columns)
 
 
+@timed_often
 def check_dropped(c,values,sids,state_rows):
     found={}
     for table,rows in c.out.items():
@@ -439,6 +456,7 @@ def metric_value(kind,value):
     return value
 
 
+@timed_often
 def diplomacy(c):
     relation=c.table('relation')
     if relation:
@@ -510,6 +528,7 @@ def diplomacy(c):
             c.add('interest_history',interest=ident,country=country,strategic_region=c.label(region),involvement=involvement)
 
 
+@timed_often
 def states(c):
     t=c.table('state')
     if not t:
@@ -595,6 +614,7 @@ def states(c):
             c.add('state_region_trait',state_region=regions[region],state_trait=c.label(trait))
 
 
+@timed_often
 def region_names(c):
     t=c.tables.get('state_region')
     if not t or not t['id']:
@@ -602,6 +622,7 @@ def region_names(c):
     return {i:c.label(code) for i,code in zip(t['id'],t['state_region_template'])}
 
 
+@timed_often
 def pops(c):
     t=c.table('pop')
     if not t:
@@ -630,6 +651,7 @@ def pops(c):
         raise RuntimeError('Movement pop lists differ from the inverse of pop movement support')
 
 
+@timed_often
 def cultures(c):
     t=c.table('culture')
     if not t:
@@ -651,6 +673,7 @@ def cultures(c):
             c.add('cultural_community_history',cultural_community=ident,culture=culture,state=state,acceptance_delta=delta)
 
 
+@timed_often
 def provinces(c,colors):
     for province,state,controller in c.rows('province_state','province','state','controller_country'):
         c.add('province_history',province=province,state=state,controller=controller)
@@ -662,6 +685,7 @@ BUILDING_FLOW=('balance_subsidies','trade_revenue','input_goods_shortage','tarif
                'produced_supply','income_taxes','cash_reserves','staffing','throughput','salary_rate','dividends','goods_cost','goods_sales','slave_upkeep')
 
 
+@timed_often
 def buildings(c):
     t=c.table('building')
     if t:
@@ -720,6 +744,7 @@ def buildings(c):
             raise RuntimeError(f'Owner or asset entries without an ownership: {sorted(owners)[:3]} {sorted(assets)[:3]}')
 
 
+@timed_often
 def markets(c):
     t=c.table('market')
     if t:
@@ -772,6 +797,7 @@ def markets(c):
                 c.add('world_market_price_sample',goods=goods[channel],n=sample,date=date if sample==n else None,price=value)
 
 
+@timed_often
 def companies(c):
     t=c.table('company')
     if t:
@@ -841,6 +867,7 @@ def companies(c):
                 c.add('country_research_progress',country_research=ids[i],technology=c.label(technology),progress=progress)
 
 
+@timed_often
 def politics(c):
     t=c.table('interest_group')
     if t:
@@ -985,6 +1012,7 @@ def politics(c):
 CHARACTER_KEYS=('religion','first_name','last_name','ideology','order_type','rank')
 
 
+@timed_often
 def characters(c):
     t=c.table('character')
     if not t:
@@ -1021,6 +1049,7 @@ def characters(c):
 FORMATION_PRIVATE=('default_fleet','demobilizing','invading','embarked','docked','recalled')
 
 
+@timed_often
 def military(c):
     t=c.table('combat_unit')
     if t:
@@ -1137,6 +1166,7 @@ BATTLE_SIDES=(('attacker',{'commander':'battle_data_attacker_commander','country
                            'start_morale':'defender_starting_morale','end_morale':'defender_ending_morale'}))
 
 
+@timed_often
 def wars(c):
     t=c.table('war')
     if t:
@@ -1207,6 +1237,7 @@ def wars(c):
             c.add('battle_defender_manpower_sample',battle=battle,n=n,date=date,defender_manpower=int(defender))
 
 
+@timed_often
 def ai(c):
     t=c.table('ai')
     if not t:
@@ -1241,6 +1272,7 @@ def ai(c):
             c.add('country_ai_antagonize_reason',country_ai=ids[i],target_country=target,position=position,reason=c.label(reason),score=score)
 
 
+@timed_often
 def journal(c):
     t=c.table('journal_entry')
     if t:
@@ -1301,16 +1333,30 @@ def journal(c):
 BUILDERS=(countries,player,diplomacy,states,pops,cultures,buildings,markets,companies,politics,characters,military,wars,ai,journal,metrics)
 
 
+@timed_often
 def ordered(table,rows):
     names=[*(([table.owner] if table.owner else [])+[column.name for column in table.keys]),*(['n','date'] if table.kind=='sample' else []),
            *[column.name for column in table.columns]]
+    known=set(names)
+    picks={}
     out=[]
     for row in rows:
-        unknown=set(row)-set(names)
-        if unknown:
-            raise RuntimeError(f'{table.name} rows carry unknown columns {sorted(unknown)}')
-        out.append(tuple(row.get(name) for name in names))
+        shape=tuple(row)
+        pick=picks.get(shape)
+        if pick is None:
+            unknown=set(shape)-known
+            if unknown:
+                raise RuntimeError(f'{table.name} rows carry unknown columns {sorted(unknown)}')
+            pick=picks[shape]=picker(names,shape)
+        out.append(pick(row))
     return out
+
+
+@timed_often
+def picker(names,shape):
+    if len(names)>1 and len(shape)==len(names):
+        return itemgetter(*names)
+    return lambda row:tuple(row.get(name) for name in names)
 
 
 @timed
@@ -1335,6 +1381,7 @@ def build(capture,orders,colors):
     return {table.name:ordered(table,context.out.get(table.name,[])) for table in TABLES}
 
 
+@timed_often
 def fields_match(c):
     construction=[row for row in c.out['country_construction_report'] if row['country']&SLOT==c.player]
     if c.construction_paused is not None and construction and flag(c.construction_paused)!=construction[0]['is_construction_paused']:

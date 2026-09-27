@@ -7,6 +7,7 @@ from .names import key_columns, kind_of
 NAMES=['table','position','table_kind','owner','scope','column','role','kind','target','optional']
 
 
+@db.timed
 def schema_rows():
     rows=[]
     for t in TABLES:

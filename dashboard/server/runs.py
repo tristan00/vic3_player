@@ -49,6 +49,7 @@ def open_runs():
             db.rows(f'select r.run_id,d.name,{STATE} as state {RUN_FROM} where r.ended_at is null order by r.run_id desc')]
 
 
+@db.timed
 def goal(found):
     return {'gdp':found['objective_gdp'],'population':found['objective_population'],'sol':found['objective_sol']},found['objective_alpha']
 
@@ -103,10 +104,12 @@ def run_groups(run_id,filters,sort,desc,offset,limit):
     return grid(specs,source,{'run':run_id},filters,sort or 'actions',True if sort is None else desc,offset,limit,run_id,['group'])
 
 
+@db.timed
 def numeric(column):
     return column.kind in (F,I2,I4,I8) and not column.entity and not column.vocabulary and not column.enum
 
 
+@db.timed
 def series_choices():
     out=[]
     for table in TABLE.values():
@@ -117,6 +120,7 @@ def series_choices():
     return out
 
 
+@db.timed
 def key_filter(table,filters):
     layout=LAYOUTS[table.name]
     columns={c.name:c for c in table.keys}
