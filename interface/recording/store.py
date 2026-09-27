@@ -101,7 +101,7 @@ class Store:
                 continue
             present=' and '.join(f't.{column} is not null' for column in columns)
             match=' and '.join(f'r.{key} = t.{column}' for column,key in zip(columns,keys))
-            checks.append((f'{table}({",".join(columns)}) -> {target}',
+            checks.append((table,f'{table}({",".join(columns)}) -> {target}',
                            f'select exists (select 1 from {table} t where {scope} and {present} and not exists (select 1 from {target} r where {match}))'))
         return checks
 
@@ -449,7 +449,7 @@ class Store:
                     width=len(layout.keys)
                     self.copy(cursor,name,layout.names,[(self.run_id,*row[:width],seq,*row[width:]) for row in stored])
             self.record_timing(cursor,seq)
-            self.validate(cursor,seq)
+            self.validate(cursor,seq,{entity for entity,idents in anchors.items() if idents}|{name for name,(rows,_) in staged.items() if rows})
             if opening:
                 cursor.execute('update run set heartbeat_at=clock_timestamp(),progress_at=clock_timestamp() where run_id=%s',(self.run_id,))
         if opening:
@@ -491,9 +491,11 @@ class Store:
                 connection.execute(f'analyze {table}')
 
     @timed
-    def validate(self,cursor,seq):
+    def validate(self,cursor,seq,written):
         broken=[]
-        for label,sql in self.checks:
+        for table,label,sql in self.checks:
+            if table not in written:
+                continue
             progress(f'validate {label}')
             if cursor.execute(sql,{'run':self.run_id,'seq':seq}).fetchone()[0]:
                 broken.append(label)

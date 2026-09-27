@@ -140,8 +140,7 @@ def _cells(domain,land_count,sea_count,nrng):
     return cells,kinds
 
 
-_SHIFTS=[((slice(1,None),),(slice(None,-1),)),((slice(None,-1),),(slice(1,None),)),
-         ((slice(None),slice(1,None)),(slice(None),slice(None,-1))),((slice(None),slice(None,-1)),(slice(None),slice(1,None)))]
+_SHIFTS=((-1,0),(1,0),(0,-1),(0,1))
 
 
 def _contiguous(cells,domain):
@@ -158,10 +157,16 @@ def _contiguous(cells,domain):
         if not stray.any():
             return
         cells[stray]=0
-        while (cells==0).any():
-            for target,source in _SHIFTS:
-                fill=(cells[target]==0)&(cells[source]>0)&(domain[target]==domain[source])
-                cells[target][fill]=cells[source][fill]
+        ys,xs=np.nonzero(stray)
+        while len(ys):
+            for dy,dx in _SHIFTS:
+                sy,sx=ys+dy,xs+dx
+                inside=(sy>=0)&(sy<cells.shape[0])&(sx>=0)&(sx<cells.shape[1])
+                ty,tx,sy,sx=ys[inside],xs[inside],sy[inside],sx[inside]
+                fill=(cells[sy,sx]>0)&(domain[ty,tx]==domain[sy,sx])
+                cells[ty[fill],tx[fill]]=cells[sy[fill],sx[fill]]
+                left=cells[ys,xs]==0
+                ys,xs=ys[left],xs[left]
 
 
 def _graph(cells):
@@ -281,14 +286,15 @@ def _graphics(mod,game,land,geography):
             Image.fromarray((used*255).astype(np.uint8)).save(mod/folder/source.name)
     mask=Image.fromarray((land*255).astype(np.uint8))
     (mod/'gfx/map/textures').mkdir(parents=True,exist_ok=True)
+    images={}
     for name,ocean,ground in [('flatmap.dds',(87,133,151,255),(209,201,158,255)),
                               ('colormap.dds',(52,91,107,255),Image.fromarray(geography['colormap'])),
                               ('land_mask.dds',(0,0,0,0),(255,255,255,255))]:
-        image=Image.new('RGBA',(width,height),ocean)
-        image.paste(ground,(0,0,width,height),mask)
-        image.save(mod/'gfx/map/textures'/name)
+        images[name]=Image.new('RGBA',(width,height),ocean)
+        images[name].paste(ground,(0,0,width,height),mask)
+        images[name].save(mod/'gfx/map/textures'/name)
     (mod/'gfx/interface/minimap').mkdir(parents=True,exist_ok=True)
-    Image.open(mod/'gfx/map/textures/flatmap.dds').resize((280,132)).save(mod/'gfx/interface/minimap/minimap.dds')
+    images['flatmap.dds'].resize((280,132)).save(mod/'gfx/interface/minimap/minimap.dds')
     Image.new('RGBA',(width,height),(0,0,0,0)).save(mod/'gfx/map/textures/flatmap_overlay.dds')
     for source in list((game/'gfx/map/textures').glob('maptextures*.settings'))+list((game/'dlc').glob('*/gfx/map/textures/maptextures*.settings')):
         text=source.read_text(encoding='utf-8-sig')
@@ -368,16 +374,20 @@ def _rewrites(game,states,strategic,regions,tags):
         original=path.read_text(encoding='utf-8-sig',errors='replace')
         if not re.search(r's:STATE_|sr:region_|\bc:[A-Z0-9]{3}\b',original):
             continue
-        text=clean(path)
-        text=re.sub(r'([\w:.@]+)\s*=\s*s:(STATE_\w+)(?![\w.:])',swap(state_map,'s:'),text)
-        text=re.sub(r'([\w:.@]+)\s*=\s*sr:(region_\w+)(?![\w.:])',swap(region_map,'sr:'),text)
-        text=re.sub(r'\b('+BARE_STATE+r')\s*=\s*(STATE_\w+)(?![\w.:])',swap(state_map,''),text)
-        text=re.sub(r'\b('+TRIGGER_TAGS+r')\s*=\s*c:([A-Z0-9]{3})(?![\w.:])',lambda m:m[0] if m[2] in tags else 'always = no',text)
+        cleaned=text=clean(path)
+        for literal,pattern,replace in (('s:STATE_',r'([\w:.@]+)\s*=\s*s:(STATE_\w+)(?![\w.:])',swap(state_map,'s:')),
+                                        ('sr:region_',r'([\w:.@]+)\s*=\s*sr:(region_\w+)(?![\w.:])',swap(region_map,'sr:')),
+                                        ('STATE_',r'\b('+BARE_STATE+r')\s*=\s*(STATE_\w+)(?![\w.:])',swap(state_map,'')),
+                                        ('c:',r'\b('+TRIGGER_TAGS+r')\s*=\s*c:([A-Z0-9]{3})(?![\w.:])',lambda m:m[0] if m[2] in tags else 'always = no')):
+            if literal in text:
+                text=re.sub(pattern,replace,text)
         text=_absent(text,tags)
-        text=re.sub(r'\bs:(STATE_\w+)\s*=\s*\{',lambda m:f's:{m[1]} ?= {{',text)
-        text=re.sub(r'\bsr:(region_\w+)\s*=\s*\{',lambda m:f'sr:{m[1]} ?= {{',text)
-        text=re.sub(r'\bc:([A-Z0-9]{3})\s*=\s*\{',lambda m:m[0] if m[1] in tags else f'c:{m[1]} ?= {{',text)
-        if text!=clean(path):
+        for literal,pattern,replace in (('s:STATE_',r'\bs:(STATE_\w+)\s*=\s*\{',lambda m:f's:{m[1]} ?= {{'),
+                                        ('sr:region_',r'\bsr:(region_\w+)\s*=\s*\{',lambda m:f'sr:{m[1]} ?= {{'),
+                                        ('c:',r'\bc:([A-Z0-9]{3})\s*=\s*\{',lambda m:m[0] if m[1] in tags else f'c:{m[1]} ?= {{')):
+            if literal in text:
+                text=re.sub(pattern,replace,text)
+        if text!=cleaned:
             files[name]=text
     return files
 
@@ -433,9 +443,8 @@ def _locator(cells,province,kind,coast,taken,rng):
     return int(tx[best]),int(ty[best])
 
 
-def _path(cost,start,stop,box,factor,spacing):
+def _path(crop,start,stop,box,factor,spacing):
     (y0,y1),(x0,x1)=box
-    crop=cost[y0:y1,x0:x1]
     h,w=-(-crop.shape[0]//factor),-(-crop.shape[1]//factor)
     pooled=np.pad(crop,((0,h*factor-crop.shape[0]),(0,w*factor-crop.shape[1])),constant_values=np.inf).reshape(h,factor,w,factor).min((1,3))
     a=((start[1]-y0)//factor,(start[0]-x0)//factor)
@@ -497,20 +506,26 @@ def _network(cells,kinds,points,regions,state_neighbours,seas,borders,height,rng
     for anchor,(x,y) in list(points.items()):
         place(anchor,x,y)
     hubs={s['id']:[a for a in points if a//100==s['id']] for s in regions}
+    def crop(grid,area):
+        (y0,y1),(x0,x1)=area
+        return grid[y0:y1,x0:x1]
+    def cost(provinces,area):
+        return np.where(np.isin(crop(cells,area),provinces),1.,np.where(crop(land,area),4.,30.))
     for state in regions:
-        own=np.where(np.isin(cells,state['provinces']),1.,np.where(land,4.,30.))
+        area=box(state['provinces'])
+        own=cost(state['provinces'],area)
         joined=hubs[state['id']][:1]
         while len(joined)<len(hubs[state['id']]):
             a,b=min(((a,b) for a in joined for b in hubs[state['id']] if b not in joined),key=lambda p:math.dist(points[p[0]],points[p[1]]))
-            link(a,b,own,box(state['provinces']),2,6,int(rng.random()>.39));joined.append(b)
+            link(a,b,own,area,2,6,int(rng.random()>.39));joined.append(b)
     by_id={s['id']:s for s in regions}
     for sid,others in state_neighbours.items():
         for other in others:
             if sid<other:
                 provinces=by_id[sid]['provinces']+by_id[other]['provinces']
-                cost=np.where(np.isin(cells,provinces),1.,np.where(land,4.,30.))
+                area=box(provinces)
                 a,b=min(((a,b) for a in hubs[sid] for b in hubs[other]),key=lambda p:math.dist(points[p[0]],points[p[1]]))
-                link(a,b,cost,box(provinces),2,6,int(rng.random()>.36))
+                link(a,b,cost(provinces,area),area,2,6,int(rng.random()>.36))
     water=np.where(kinds[cells]==OCEAN,1.,np.inf)
     junction={}
     for sea in seas:
@@ -524,13 +539,15 @@ def _network(cells,kinds,points,regions,state_neighbours,seas,borders,height,rng
     sea_of={s['province']:s['id'] for s in seas}
     for p,q in borders:
         if p in sea_of and q in sea_of:
-            link(junction[sea_of[p]],junction[sea_of[q]],water,box([p,q]),4,30,2)
+            area=box([p,q])
+            link(junction[sea_of[p]],junction[sea_of[q]],crop(water,area),area,4,30,2)
     for state in [s for s in regions if s['coastal']]:
         port=points[state['id']*100+3]
         harbor=(NAVAL+state['id'])*100+8
         place(harbor,*port)
         exit_=next(s for s in seas if s['id']==state['naval_exit'])
-        link(harbor,junction[exit_['id']],water,box([exit_['province']],[port]),4,30,3)
+        area=box([exit_['province']],[port])
+        link(harbor,junction[exit_['id']],crop(water,area),area,4,30,3)
     return _splnet(anchors,strips)
 
 

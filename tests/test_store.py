@@ -140,6 +140,19 @@ class StoreTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'did not capture'):
             self.store.write(bad,'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
 
+    def test_validation_checks_exactly_the_tables_a_snapshot_wrote(self):
+        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+        asked=[]
+        checks=self.store.checks
+        self.store.checks=[(table,label,asked.append(table) or sql) for table,label,sql in checks if table in ('law_history','pop_history')]
+        self.assertEqual(set(asked),{'law_history','pop_history'})
+        with self.store.connection.cursor() as cursor:
+            self.store.connection.execute('alter table law_history disable trigger all')
+            cursor.execute('update law_history set law_type=-5 where run_id=%s',(self.store.run_id,))
+            self.store.validate(cursor,0,{'pop_history'})
+            with self.assertRaisesRegex(RuntimeError,'law_history'):
+                self.store.validate(cursor,0,{'law_history'})
+
     def test_names_must_belong_to_the_ruleset(self):
         bad=built(STEPS[0])
         bad.rows['law_history'][0]=(LAW,PLAYER,'law_unknown',0.1,1,None,True,-1)
@@ -154,7 +167,12 @@ class StoreTests(unittest.TestCase):
         self.assertLessEqual({'country','law','law_history','state_history','player_treasury'},analyzed)
         run=self.store.run_id
         self.assertTrue(self.store.beater.is_alive())
-        time.sleep(.6)
+        beats=set()
+        deadline=time.monotonic()+3
+        while len(beats)<4:
+            self.assertLess(time.monotonic(),deadline,f'{len(beats)} heartbeats arrived')
+            beats.add(c.execute('select heartbeat_at from run where run_id=%s',(run,)).fetchone()[0])
+            time.sleep(.02)
         self.assertEqual(c.execute('select count(*) from run_lost').fetchone(),(0,))
         self.assertEqual(c.execute('select count(*) from run_stalled').fetchone(),(0,))
         beat,age,step,longest=c.execute('select now()-heartbeat_at,now()-progress_at,progress_step,longest_step_ms from run where run_id=%s',(run,)).fetchone()
