@@ -6,10 +6,9 @@ from sklearn.ensemble import RandomForestRegressor
 
 from interface.common import timed, timed_often
 from interface.timing import current
-from .random_picker import RandomAdvisor
+from .random_picker import HIGH, LOW, RandomAdvisor
 
 LOG=logging.getLogger('loop')
-LOW,HIGH=-2.,2.
 INITIAL=10
 RANDOM_SHARE=.2
 TREES=50

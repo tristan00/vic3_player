@@ -81,10 +81,17 @@ class DebtCapTests(unittest.TestCase):
 
 
 class RandomAdvisorTests(unittest.TestCase):
-    def test_every_action_weighs_the_same_except_those_switched_off(self):
+    def test_every_weight_is_drawn_over_the_search_range_except_those_switched_off(self):
+        from advisors.random_picker import HIGH, LOW
         advisor=RandomAdvisor(1,{'build':3,'cancel_construction':0})
-        weights=advisor.start_run(None,['build','cancel_construction','research'],None)
-        self.assertEqual(weights,{'build':1,'cancel_construction':0,'research':1})
+        actions=['build','cancel_construction','research']
+        weights=advisor.start_run(None,actions,None)
+        self.assertEqual(weights['cancel_construction'],0)
+        drawn=[advisor.start_run(None,actions,None)[name] for _ in range(200) for name in ('build','research')]
+        self.assertTrue(all(10**LOW<=weight<=10**HIGH for weight in drawn))
+        self.assertEqual(len(set(drawn)),len(drawn))
+        self.assertLess(min(drawn),.1)
+        self.assertGreater(max(drawn),10)
 
 class RandomSmacWeightingTests(unittest.TestCase):
     def test_every_weight_at_one_is_played_before_anything_else(self):

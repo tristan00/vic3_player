@@ -2,6 +2,7 @@ import random
 from interface.common import timed_often
 
 TIME_CONTROL={'pause','unpause','set_speed'}
+LOW,HIGH=-2.,2.
 
 
 class RandomAdvisor:
@@ -16,7 +17,7 @@ class RandomAdvisor:
 
     @timed_often
     def start_run(self,store,actions,objective):
-        self.weights={name:0 if self.base.get(name,1)==0 else 1 for name in actions}
+        self.weights={name:0 if self.base.get(name,1)==0 else 10**self.random.uniform(LOW,HIGH) for name in actions}
         return self.weights
 
     @timed_often
