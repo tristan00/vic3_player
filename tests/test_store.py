@@ -59,7 +59,7 @@ def built(step):
 
 RUN={'kind':'mini','advisors':['random'],'tag':'AAA','world':'w','cli_seed':1,'run_seed':2,'years':1.0,'minutes':1.0,'profile':'actions','pool':0,'runs_requested':3,
      'generated':{'seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5},'weights':{'build':3,'enact_law':2},
-     'param_weights':[('build','building_type','building_x',3)],'picker':'first','candidates':1,'objective':({'gdp':0.0,'population':1.0,'sol':0.0},0.0)}
+     'picker':'first','candidates':1,'objective':({'gdp':0.0,'population':1.0,'sol':0.0},0.0)}
 STEPS=[{'progress':0.1,'second':True,'head':1,'samples':[(1,0.5)]},
        {'progress':0.2,'second':True,'head':2,'samples':[(1,0.5),(2,0.6)]},
        {'progress':0.2,'second':False,'head':2,'samples':[(2,0.6)]}]
@@ -158,6 +158,9 @@ class StoreTests(unittest.TestCase):
         self.assertLess(longest,2000)
         self.store.end_run('time')
         self.assertIsNone(self.store.beater)
+        beats,errors=c.execute("select calls,errors from run_timing where run_id=%s and span='interface.recording.store.heartbeat.beat'",(run,)).fetchone()
+        self.assertGreaterEqual(beats,3)
+        self.assertEqual(errors,0)
         self.assertEqual(c.execute('select end_reason,ended_at is not null from run where run_id=%s',(run,)).fetchone(),('time',True))
 
     def test_a_policy_proposal_is_written_with_the_run(self):
@@ -173,12 +176,13 @@ class StoreTests(unittest.TestCase):
         self.store.end_run('time')
 
     def test_picks_record_every_candidate_with_its_actions_and_the_model_behind_them(self):
-        self.store.pending['pick_model']=(1049,29,4.5)
+        self.store.pending['pick_model']=(1049,29,4.5,{'iterations':100,'depth':6,'learning_rate':.1,'loss_function':'RMSE','random_seed':0,'thread_count':4,'rsm':.8},[('treasury',60.0),('action1.type',40.0)])
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
         self.store.record_pick(0,[['build','research'],['enact_law']],[1.5,-2.0],0)
         c=self.store.connection
         run=self.store.run_id
         self.assertEqual(c.execute('select pauses,runs from pick_model where run_id=%s',(run,)).fetchone(),(1049,29))
+        self.assertEqual(c.execute('select feature,importance from pick_importance where run_id=%s order by 1',(run,)).fetchall(),[('action1.type',40.0),('treasury',60.0)])
         self.assertEqual(c.execute('select candidate,actions,predicted_change,chosen from pick_candidate where run_id=%s order by candidate',(run,)).fetchall(),
                          [(0,2,1.5,True),(1,1,-2.0,False)])
         self.assertEqual(c.execute('select p.candidate,p.position,a.name from pick_candidate_action p join action a using (action) where run_id=%s order by 1,2',(run,)).fetchall(),

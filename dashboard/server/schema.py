@@ -26,6 +26,7 @@ def schema_grid(filters,sort,desc,offset,limit):
     return grid(specs,source,params,filters,sort,desc,offset,limit,None,['table','position'])
 
 
+@db.timed
 def stamp():
     found=db.row('''select max(run_id) as run,count(*) filter (where ended_at is null) as open,max(ended_at) as ended,
                            (select max(seq) from snapshot s where s.run_id=(select max(run_id) from run)) as seq,

@@ -6,59 +6,26 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from advisors import ADVISORS, RandomAdvisor
 
 
-class Queue:
-    player=7
-
-    def __init__(self,*items):
-        self.items=items
-
-    def rows(self,table,columns,**equal):
-        return list(self.items) if (table,columns,equal)==('player_construction_queue_item','construction_left,speed',{'private':False}) else []
-
-
 class AdvisorTests(unittest.TestCase):
     def test_random_advisor_picks_only_offered_combinations(self):
         options={'build':[{'state':1,'building_type':'building_x'}],'research':[],'pause':[{}]}
         advisor=RandomAdvisor(0)
         for _ in range(20):
-            self.assertEqual(advisor.choose(options,Queue()),('build',{'state':1,'building_type':'building_x'}))
+            self.assertEqual(advisor.choose(options),('build',{'state':1,'building_type':'building_x'}))
 
     def test_random_advisor_returns_nothing_when_nothing_is_offered(self):
-        self.assertIsNone(RandomAdvisor(0).choose({'research':[],'unpause':[{}]},Queue()))
+        self.assertIsNone(RandomAdvisor(0).choose({'research':[],'unpause':[{}]}))
 
     def test_a_zero_weight_action_is_never_picked(self):
         options={'build':[{'state':1}],'subsidies_on':[{'building':2}]}
         advisor=RandomAdvisor(0,{'subsidies_on':0})
-        self.assertEqual({advisor.choose(options,Queue())[0] for _ in range(30)},{'build'})
+        self.assertEqual({advisor.choose(options)[0] for _ in range(30)},{'build'})
 
-    def test_a_parameter_weight_shifts_the_combination_picked(self):
+    def test_every_option_of_an_action_is_equally_likely(self):
         options={'build':[{'state':1,'building_type':'building_x'},{'state':1,'building_type':'building_y'}]}
-        advisor=RandomAdvisor(0,param_weights={'build':{'building_type':{'building_y':0}}})
-        self.assertEqual({advisor.choose(options,Queue())[1]['building_type'] for _ in range(30)},{'building_x'})
-        heavy=RandomAdvisor(0,param_weights={'build':{'building_type':{'building_y':3}}})
-        picks=[heavy.choose(options,Queue())[1]['building_type'] for _ in range(4000)]
-        self.assertAlmostEqual(picks.count('building_y')/len(picks),.75,delta=.03)
-
-    def test_a_parameter_weight_scales_the_pick_even_when_it_is_the_only_option(self):
-        options={'give_away':[{'side':'First'}],'research':[{'technology':'x'}]}
-        advisor=RandomAdvisor(0,param_weights={'give_away':{'side':{'First':.01}}})
-        picks=[advisor.choose(options,Queue())[0] for _ in range(4000)]
-        self.assertAlmostEqual(picks.count('give_away')/len(picks),.01/1.01,delta=.006)
-
-    def test_an_action_whose_options_all_weigh_zero_is_never_picked(self):
-        options={'give_away':[{'side':'First'}],'research':[{'technology':'x'}]}
-        advisor=RandomAdvisor(0,param_weights={'give_away':{'side':{'First':0}}})
-        self.assertEqual({advisor.choose(options,Queue())[0] for _ in range(200)},{'research'})
-        self.assertIsNone(advisor.choose({'give_away':[{'side':'First'}]},Queue()))
-        mixed={'give_away':[{'side':'First'},{'side':'Second'}]}
-        self.assertEqual({advisor.choose(mixed,Queue())[1]['side'] for _ in range(200)},{'Second'})
-
-    def test_building_waits_while_the_queue_exceeds_a_year_of_output(self):
-        options={'build':[{'state':1}],'research':[{'technology':'x'}]}
         advisor=RandomAdvisor(0)
-        self.assertEqual({advisor.choose(options,Queue((600.0,10.0),(200.0,0.0)))[0] for _ in range(30)},{'research'})
-        self.assertIn('build',{advisor.choose(options,Queue((400.0,10.0),(100.0,0.0)))[0] for _ in range(30)})
-        self.assertIn('build',{advisor.choose(options,Queue((4000.0,100.0),(1000.0,0.0)))[0] for _ in range(30)})
+        picks=[advisor.choose(options)[1]['building_type'] for _ in range(4000)]
+        self.assertAlmostEqual(picks.count('building_y')/len(picks),.5,delta=.03)
 
     def test_advisors_are_registered_by_name(self):
         self.assertIs(ADVISORS['random'],RandomAdvisor)
@@ -115,10 +82,9 @@ class DebtCapTests(unittest.TestCase):
 
 class RandomAdvisorTests(unittest.TestCase):
     def test_every_action_weighs_the_same_except_those_switched_off(self):
-        advisor=RandomAdvisor(1,{'build':3,'cancel_construction':0},{'build':{'building_type':{'building_x':3}}})
+        advisor=RandomAdvisor(1,{'build':3,'cancel_construction':0})
         weights=advisor.start_run(None,['build','cancel_construction','research'],None)
         self.assertEqual(weights,{'build':1,'cancel_construction':0,'research':1})
-        self.assertEqual(advisor.param_weights,{})
 
 class RandomSmacWeightingTests(unittest.TestCase):
     def test_every_weight_at_one_is_played_before_anything_else(self):
@@ -151,8 +117,8 @@ class RandomSmacWeightingTests(unittest.TestCase):
         self.assertTrue(((x>=LOW)&(x<=HIGH)).all())
         self.assertLess(((x-1)**2).sum(),np.median(((X-1)**2).sum(1)))
 
-    def test_declared_building_weights_are_their_own_dimensions_and_apply_to_the_run(self):
-        from advisors.random_smac_weighting import GDP, GROUPS, HISTORY, HOURS_PER_YEAR, PARAM_WEIGHTS, POPULATION, SOL, WEIGHTS, RandomSmacWeightingAdvisor
+    def test_the_proposal_learns_from_action_weights_alone(self):
+        from advisors.random_smac_weighting import GDP, HISTORY, HOURS_PER_YEAR, POPULATION, SOL, WEIGHTS, RandomSmacWeightingAdvisor
         class Result:
             def __init__(self,rows):
                 self.rows=rows
@@ -162,8 +128,7 @@ class RandomSmacWeightingTests(unittest.TestCase):
             def execute(self,sql,params):
                 return Result({HISTORY:[(1,0,2*HOURS_PER_YEAR),(2,0,2*HOURS_PER_YEAR)],POPULATION:[(1,0,100),(1,HOURS_PER_YEAR,110),(2,0,100),(2,2*HOURS_PER_YEAR,90)],
                                GDP:[(1,0,50),(1,HOURS_PER_YEAR,60),(2,0,50)],SOL:[(1,0,5),(2,0,5),(2,HOURS_PER_YEAR,6)],
-                               WEIGHTS:[(1,'build',3.0),(2,'build',1.5)],
-                               PARAM_WEIGHTS:[(1,'build','building_type','building_construction_sector',3.0)]}[sql])
+                               WEIGHTS:[(1,'build',3.0),(2,'build',1.5)]}[sql])
         class Store:
             connection=Connection()
         advisor=RandomSmacWeightingAdvisor(0)
@@ -171,8 +136,7 @@ class RandomSmacWeightingTests(unittest.TestCase):
         self.assertEqual([(run,round(reward,6)) for run,reward in advisor.proposal['observed']],[(1,2.0),(2,0.0)])
         self.assertEqual(advisor.proposal['reward'],'composite')
         self.assertEqual(set(weights),{'build'})
-        chosen=advisor.param_weights['build']['building_type']
-        self.assertEqual(set(chosen),{kind for members in GROUPS.values() for _,_,kind in members})
+        self.assertEqual([name for name,_ in advisor.proposal['importance']],[])
 
     def test_each_run_draws_weights_that_sum_to_one_and_an_alpha_in_the_unit_range(self):
         import random
@@ -194,10 +158,10 @@ class RandomSmacWeightingTests(unittest.TestCase):
 
     def test_change_is_the_trailing_year_peak_over_the_start(self):
         from advisors.random_smac_weighting import HOURS_PER_YEAR as Y, change
-        self.assertAlmostEqual(change(0,3*Y,[(0,100),(Y,150),(int(1.5*Y),130)]),30.0)
-        self.assertAlmostEqual(change(0,3*Y,[(0,100),(Y,150)]),50.0)
+        self.assertAlmostEqual(change(0,3*Y,[(0,100),(Y,150),(int(1.5*Y),130)]),.3)
+        self.assertAlmostEqual(change(0,3*Y,[(0,100),(Y,150)]),.5)
         self.assertAlmostEqual(change(0,Y//2,[(0,100),(Y//4,80)]),0.0)
-        self.assertAlmostEqual(change(0,Y//2,[(0,100),(Y//4,120)]),20.0)
+        self.assertAlmostEqual(change(0,Y//2,[(0,100),(Y//4,120)]),.2)
         with self.assertRaises(RuntimeError):
             change(0,2*Y,[(5,100)])
 
@@ -205,7 +169,25 @@ class RandomSmacWeightingTests(unittest.TestCase):
         from advisors import RandomSmacWeightingAdvisor
         advisor=RandomSmacWeightingAdvisor(0,{'cancel_construction':0,'build':3})
         self.assertEqual(advisor.excluded,{'cancel_construction'})
-        self.assertEqual(advisor.param_weights,{})
+
+class WorldPoolTests(unittest.TestCase):
+    def test_a_world_built_apart_returns_the_spans_of_its_own_process(self):
+        from unittest import mock
+        from interface.common import timed
+        from interface.timing import RECORDER
+        from loop import run
+
+        @timed
+        def generate(*size):
+            return size
+        RECORDER.reset()
+        with mock.patch.object(run,'generate',generate):
+            world,spans=run.build_apart(1,2,3,.5,1.5)
+        self.assertEqual(world,(1,2,3,.5,1.5))
+        self.assertEqual({name:stats.calls for name,stats in spans.items()},
+                         {'tests.test_loop.WorldPoolTests.test_a_world_built_apart_returns_the_spans_of_its_own_process.<locals>.generate':1})
+        self.assertEqual(RECORDER.drain(),[])
+
 
 class BatchSamplerTests(unittest.TestCase):
     def test_a_batch_never_touches_one_object_twice_and_stops_at_a_pause_ending_action(self):
@@ -282,6 +264,17 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(set(filled[6:]),{'none'})
         self.assertEqual(len(categories([('research',{'technology':'a'})]*20,self.Lookup())),len(CATEGORIES))
 
+    def test_numbers_include_the_construction_queue_and_capacity(self):
+        from types import SimpleNamespace as Space
+        from advisors.features import NUMBERS, HistoryLookup
+        at=lambda value:Space(at=lambda run,key_or_seq,seq=None:value)
+        history=Space(player={1:7},terrain={1:{}},interest=10,treasury=at([100.0,50.0,-3.0]),population=at([10,20,30]),politics=at([4.0]),
+                      budget=at((2.0,)),sol=at((8.0,)),capacity=at((12.0,)),queue=Space(live=lambda run,seq:[(300.0,),(100.0,)]))
+        numbers=HistoryLookup(history,1,5).numbers
+        self.assertEqual(len(numbers),len(NUMBERS))
+        self.assertEqual(dict(zip(NUMBERS,numbers)),{'treasury':100.0,'debt':50.0,'interest':2.0,'balance':-3.0,'population':60,'bureaucracy_available':4.0,
+                                                        'standard_of_living':8.0,'construction_queue_items':2,'construction_queue_left':400.0,'construction_capacity':12.0})
+
     def test_fitting_reports_progress_every_iteration_so_the_stall_watchdog_stays_quiet(self):
         from advisors.pickers import Beat
         from interface.common import progress_age
@@ -299,7 +292,7 @@ class FeatureTests(unittest.TestCase):
                 return np.array([0.1,0.9,0.4])
         from advisors.features import GOODS, INSTITUTION_TYPES, LAW_GROUPS
         class Lookup(self.Lookup):
-            numbers=[1.0,0.0,0.0,0.0,100.0,5.0,20.0]
+            numbers=[1.0,0.0,0.0,0.0,100.0,5.0,20.0,2,300.0,10.0]
             laws=['none']*len(LAW_GROUPS)
             prices=[1.0]*len(GOODS)
             institutions=[0.0]*len(INSTITUTION_TYPES)

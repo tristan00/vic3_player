@@ -4,12 +4,14 @@ import logging
 import multiprocessing
 import os
 from pathlib import Path
+import queue
 import time
 
 import psutil
 import psycopg
 
-from ..common import PROGRESS_AT, PROGRESS_STEP, PROGRESS_VERSION, STALL_LIMIT, progress, read_progress, timed
+from ..common import PROGRESS_AT, PROGRESS_STEP, PROGRESS_VERSION, STALL_LIMIT, progress, read_progress, timed, timed_often
+from ..timing import COLUMNS, INTERVAL_COLUMNS, RECORDER, span
 from .spec import CLOSED,ENTITIES,TABLES,VOCABULARIES
 
 DSN='host=127.0.0.1 port=55433 dbname=vic3 user=postgres'
@@ -20,12 +22,15 @@ FIXED={'pact_history':('first_country','second_country'),'treaty_history':('firs
        'diplomatic_action_history':('first_country','second_country')}
 HEARTBEAT=.1
 SLOW_BEAT=.25
+TIMING_EVERY=1
 
 
+@timed_often
 def digest():
     return hashlib.sha256(SCHEMA.read_bytes()).digest()
 
 
+@timed
 def install(connection):
     connection.execute('drop schema public cascade')
     connection.execute('create schema public')
@@ -51,6 +56,7 @@ class Layout:
 
 
 class Store:
+    @timed
     def __init__(self,dsn=DSN):
         self.dsn=dsn
         self.connection=psycopg.connect(dsn,autocommit=True,prepare_threshold=None)
@@ -76,6 +82,7 @@ class Store:
     def enum_names(self):
         return sorted({column.enum for table in TABLES for column in table.keys+table.columns if column.enum})
 
+    @timed
     def validation(self):
         rows=self.connection.execute("""
             select c.conrelid::regclass::text, c.confrelid::regclass::text,
@@ -96,6 +103,7 @@ class Store:
                            f'select exists (select 1 from {table} t where {scope} and {present} and not exists (select 1 from {target} r where {match}))'))
         return checks
 
+    @timed_often
     def copy(self,cursor,name,columns,rows):
         progress(f'copy {name}')
         if rows:
@@ -103,6 +111,7 @@ class Store:
                 for row in rows:
                     copy.write_row(row)
 
+    @timed_often
     def names(self,vocabulary,names):
         fresh=sorted({name for name in names if name is not None and name not in self.vocabulary[vocabulary]})
         if fresh:
@@ -113,6 +122,7 @@ class Store:
                 (fresh,)).fetchall())
         return [None if name is None else self.vocabulary[vocabulary][name] for name in names]
 
+    @timed_often
     def codes(self,enum,values):
         fresh=sorted({value for value in values if value is not None}-self.enums[enum])
         if fresh:
@@ -165,6 +175,7 @@ class Store:
         self.ruleset_id=ruleset_id
         return ruleset_id
 
+    @timed
     def method_effects(self,cursor,ruleset_id,effects):
         words=self.vocabulary
         self.copy(cursor,'production_method_goods',('ruleset_id','production_method','goods','direction','scaling','amount'),
@@ -202,25 +213,29 @@ class Store:
     def recent_tags(self,count):
         return [name for name, in self.connection.execute('select d.name from run r join country_definition d on d.country_definition=r.tag order by run_id desc limit %s',(count,))]
 
-    def begin_run(self,started_at,kind,advisors,tag,world,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,generated,weights,param_weights,picker,candidates,objective,proposal=None,pick_model=None):
+    @timed
+    def begin_run(self,started_at,kind,advisors,tag,world,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,generated,weights,picker,candidates,objective,proposal=None,pick_model=None):
         lost=self.connection.execute("update run set ended_at=heartbeat_at,end_reason='loop_lost' where ended_at is null returning run_id,heartbeat_at").fetchall()
         for run_id,heartbeat_at in lost:
             LOG.error('RUN %s WAS LOST: its loop last beat at %s UTC',run_id,heartbeat_at)
         self.pending={'started_at':started_at,'kind':kind,'advisors':list(advisors),'tag':tag,'world':world,'cli_seed':cli_seed,'run_seed':run_seed,'years':years,'minutes':minutes,'profile':profile,'pool':pool,
                       'runs_requested':runs_requested,'generated':generated,'weights':dict(weights),
-                      'param_weights':list(param_weights),'picker':picker,'candidates':candidates,'objective':objective,'proposal':proposal,'pick_model':pick_model}
+                      'picker':picker,'candidates':candidates,'objective':objective,'proposal':proposal,'pick_model':pick_model}
         self.run_id=None
         self.constants=None
         self.seq=0
         self.beating=multiprocessing.Event()
         self.beat_run=multiprocessing.Value('i',0,lock=False)
-        self.beater=multiprocessing.Process(target=heartbeat,args=(self.dsn,self.beat_run,PROGRESS_VERSION,PROGRESS_AT,PROGRESS_STEP,self.beating,os.getpid()),daemon=True,name='heartbeat')
+        self.beat_timing=multiprocessing.Queue()
+        self.beater=multiprocessing.Process(target=heartbeat,args=(self.dsn,self.beat_run,PROGRESS_VERSION,PROGRESS_AT,PROGRESS_STEP,self.beating,os.getpid(),self.beat_timing),
+                                            daemon=True,name='heartbeat')
         self.beater.start()
         self.anchored={entity:set() for entity in ENTITIES}
         self.previous={}
         self.samples={}
         self.fixed={}
 
+    @timed
     def open_run(self,cursor,constants):
         pending=self.pending
         tag=self.names('country_definition',[pending['tag']])[0]
@@ -234,14 +249,14 @@ class Store:
                                *[None if pending['generated'] is None else pending['generated'][k] for k in ('seed','countries','states','tech','pop')],pending['picker'],pending['candidates'],pending['objective'][0]['gdp'],pending['objective'][0]['population'],pending['objective'][0]['sol'],pending['objective'][1])).fetchone()[0]
         names=sorted(pending['weights'])
         self.copy(cursor,'run_weight',('run_id','action','weight'),[(run_id,action,pending['weights'][name]) for name,action in zip(names,self.names('action',names))])
-        rows=pending['param_weights']
-        self.copy(cursor,'run_param_weight',('run_id','action','param','value','weight'),
-                  [(run_id,action,param,value,weight) for (_,param,value,weight),action in zip(rows,self.names('action',[row[0] for row in rows]))])
         self.copy(cursor,'run_advisor',('run_id','position','advisor'),enumerate_rows(run_id,self.names('advisor',pending['advisors'])))
         if pending['proposal'] is not None:
             self.record_proposal(cursor,run_id,pending['proposal'])
         if pending['pick_model'] is not None:
-            cursor.execute('insert into pick_model (run_id,pauses,runs,seconds) values (%s,%s,%s,%s)',(run_id,*pending['pick_model']))
+            pauses,runs,seconds,params,importance=pending['pick_model']
+            cursor.execute('insert into pick_model (run_id,pauses,runs,seconds,iterations,depth,learning_rate,loss_function,random_seed,thread_count,rsm) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                           (run_id,pauses,runs,seconds,*(params[k] for k in ('iterations','depth','learning_rate','loss_function','random_seed','thread_count','rsm'))))
+            self.copy(cursor,'pick_importance',('run_id','feature','importance'),[(run_id,feature,value) for feature,value in importance])
         self.copy(cursor,'run_game_rule',('run_id','game_rule_setting'),[(run_id,rule) for rule in self.names('game_rule_setting',constants['game_rules'])])
         self.run_id=run_id
         self.constants=constants
@@ -256,6 +271,7 @@ class Store:
             self.copy(cursor,'pick_candidate_action',('run_id','seq','candidate','position','action'),
                       [(self.run_id,seq,index,position,next(codes)) for index,batch in enumerate(batches) for position,_ in enumerate(batch)])
 
+    @timed
     def record_proposal(self,cursor,run_id,proposal):
         cursor.execute('insert into smac_proposal (run_id,reward,method,observations,best_reward,predicted_reward,uncertainty,expected_improvement,beat_probability,candidates,seconds) '
                        'values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
@@ -302,6 +318,7 @@ class Store:
             out.append(tuple(values))
         return out
 
+    @timed_often
     def stored(self,layout,rows):
         converted=[list(row) for row in rows]
         if layout.name=='player_budget_line':
@@ -429,6 +446,7 @@ class Store:
                 else:
                     width=len(layout.keys)
                     self.copy(cursor,name,layout.names,[(self.run_id,*row[:width],seq,*row[width:]) for row in stored])
+            self.record_timing(cursor,seq)
             self.validate(cursor,seq)
             if opening:
                 cursor.execute('update run set heartbeat_at=clock_timestamp(),progress_at=clock_timestamp() where run_id=%s',(self.run_id,))
@@ -442,6 +460,21 @@ class Store:
                 self.previous[name]=current
         self.seq+=1
         return seq
+
+    @timed
+    def record_timing(self,cursor,seq=None):
+        self.absorb()
+        cursor.execute('delete from run_timing where run_id=%s',(self.run_id,))
+        self.copy(cursor,'run_timing',('run_id',*COLUMNS),[(self.run_id,*row) for row in RECORDER.totals()])
+        if seq is not None:
+            self.copy(cursor,'snapshot_timing',('run_id','seq',*INTERVAL_COLUMNS),[(self.run_id,seq,*row) for row in RECORDER.drain()])
+
+    def absorb(self):
+        while True:
+            try:
+                RECORDER.merge(self.beat_timing.get_nowait())
+            except queue.Empty:
+                return
 
     @timed
     def analyze(self,tables):
@@ -459,11 +492,13 @@ class Store:
         if broken:
             raise RuntimeError(f'Snapshot {seq} breaks foreign keys: {broken[:5]}')
 
+    @timed
     def catalogue(self,names):
         codes=self.names('action',list(names))
         self.connection.execute('delete from catalogue_action where action <> all(%s::int4[])',(codes,))
         self.connection.execute('insert into catalogue_action (action) select unnest(%s::int4[]) on conflict do nothing',(codes,))
 
+    @timed
     def log_action(self,entry,after):
         action=self.names('action',[entry['action']])[0]
         advisor=self.names('advisor',[entry['advisor']])[0]
@@ -486,11 +521,13 @@ class Store:
     def start_heartbeat(self):
         self.beat_run.value=self.run_id
 
+    @timed
     def flag_stalled(self,step,age):
         with psycopg.connect(self.dsn,autocommit=True) as connection:
             connection.execute("update run set ended_at=now(),end_reason='loop_stalled',end_detail=%s where run_id=%s and ended_at is null",
                                (f'{step} made no progress for {age:.1f} s; the limit is {STALL_LIMIT} s',self.run_id))
 
+    @timed
     def flag_game_exit(self,exited_at):
         with psycopg.connect(self.dsn,autocommit=True) as connection:
             if exited_at is None:
@@ -498,23 +535,31 @@ class Store:
             else:
                 connection.execute("update run set game_exited_at=%s where run_id=%s and end_reason='game_crashed' and game_exited_at is null",(exited_at,self.run_id))
 
+    @timed
     def end_run(self,reason,detail=None,game_exited_at=None):
         if self.beater is not None:
             self.beating.set()
-            self.beater.join()
+            while self.beater.is_alive():
+                self.absorb()
+                self.beater.join(HEARTBEAT)
+            self.absorb()
             self.beater=None
         self.connection.execute('update run set ended_at=now(),end_reason=%s,end_detail=%s,game_exited_at=%s where run_id=%s and ended_at is null',
                                 (reason,detail,game_exited_at,self.run_id))
+        if self.run_id is not None:
+            with self.connection.transaction(),self.connection.cursor() as cursor:
+                self.record_timing(cursor)
 
 
-def heartbeat(dsn,run,version,at,step,stop,parent):
+def heartbeat(dsn,run,version,at,step,stop,parent,timings):
     logging.basicConfig(level=logging.WARNING,format='%(asctime)s %(message)s')
     with psycopg.connect(dsn,autocommit=True) as connection:
         connection.execute('set synchronous_commit = off')
         longest=0
-        due=time.monotonic()
+        due=sent=time.monotonic()
         while not stop.is_set():
             if not psutil.pid_exists(parent):
+                timings.cancel_join_thread()
                 return
             if not run.value:
                 stop.wait(HEARTBEAT/10)
@@ -524,17 +569,22 @@ def heartbeat(dsn,run,version,at,step,stop,parent):
             if read is None:
                 continue
             name,age=read
-            started=time.monotonic()
-            if age>longest:
-                longest=age
-                connection.execute('update run set longest_step=%s,longest_step_ms=%s where run_id=%s',(name,round(age*1000),run.value))
-            connection.execute("update run set heartbeat_at=now(),progress_at=now()-%s*interval '1 second',progress_step=%s where run_id=%s",
-                               (age,name,run.value))
+            woke=time.monotonic()
+            with span('interface.recording.store.heartbeat.beat','interface',logging.DEBUG) as beat:
+                if age>longest:
+                    longest=age
+                    connection.execute('update run set longest_step=%s,longest_step_ms=%s where run_id=%s',(name,round(age*1000),run.value))
+                connection.execute("update run set heartbeat_at=now(),progress_at=now()-%s*interval '1 second',progress_step=%s where run_id=%s",
+                                   (age,name,run.value))
             done=time.monotonic()
             if done-due>SLOW_BEAT:
-                LOG.warning('SLOW BEAT in %s: woke %.3f s late, update took %.3f s',name,started-due,done-started)
+                LOG.warning('SLOW BEAT in %s: woke %.3f s late, update took %.3f s',name,woke-due,beat.seconds)
+            if done-sent>=TIMING_EVERY:
+                timings.put(RECORDER.take())
+                sent=done
             due=time.monotonic()+HEARTBEAT
             stop.wait(HEARTBEAT)
+        timings.put(RECORDER.take())
 
 
 def enumerate_rows(run_id,values):

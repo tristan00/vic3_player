@@ -21,6 +21,7 @@ class Spec:
     group:str|None=None
     label:str|None=None
     run:str|None=None
+    hidden:bool=False
 
 
 def recorded(column,prefix,group=None,name=None):
@@ -92,8 +93,9 @@ def grid(specs,source,params,filters=(),sort=None,desc=False,offset=0,limit=100,
     bound={**params,**extra,'limit':limit,'offset':offset}
     total=db.value(f'select count(*) from ({inner}) g{where}',bound)
     found=db.rows(f'select * from ({inner}) g{where} order by {",".join(ordering)} limit %(limit)s offset %(offset)s',bound)
-    return Grid(columns=[GridColumn(name=s.name,label=s.label or s.name,kind=s.kind,entity=s.entity,group=s.group) for s in specs],
-                rows=cells(specs,[[f[f'c{i}'] for i in range(len(specs))] for f in found],run_id),total=total,offset=offset,run=run_id)
+    shown=[i for i,s in enumerate(specs) if not s.hidden]
+    return Grid(columns=[GridColumn(name=specs[i].name,label=specs[i].label or specs[i].name,kind=specs[i].kind,entity=specs[i].entity,group=specs[i].group) for i in shown],
+                rows=[[row[i] for i in shown] for row in cells(specs,[[f[f'c{i}'] for i in range(len(specs))] for f in found],run_id)],total=total,offset=offset,run=run_id)
 
 
 def rows_source(types,rows):

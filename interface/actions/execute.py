@@ -5,6 +5,7 @@ import struct
 import time
 
 from ..common import progress, slot, timed
+from ..timing import span
 from ..recording.capture import plain
 from ..runner.memory import SCALE
 from ..script import keys
@@ -89,22 +90,23 @@ class Executor:
             writes.append((addresses[variable]+24,struct.pack('<q',value*SCALE)))
         time.sleep(max(0,self.last+GAP-time.monotonic(),self.started+CYCLE-time.monotonic()))
         started=self.started=time.monotonic()
-        reader.write(writes)
-        time.sleep(PRIME)
-        reader.write([(addresses[variable]+24,struct.pack('<q',value*SCALE)) for variable,value in (('interface_mode',2 if check else 1),('interface_flip',flip))])
         done=f'INTERFACE|action|{seq}|'
-        while time.monotonic()-started<LIMIT:
-            progress('executor')
-            reader.check()
-            text=self.game.log()
-            if done in text:
-                self.last=time.monotonic()
-                valid,_,desc=re.split(r'\n(?=\[\d\d:\d\d:\d\d\])',text.rsplit(done,1)[1],maxsplit=1)[0].partition('|')
-                transport=re.findall(rf'INTERFACE\|transport\|{seq}\|(\w+)',text)
-                if transport and transport[-1]=='started':
-                    valid,desc='1','transport started'
-                return {'action':name,'valid':valid=='1','desc':plain(desc),'ms':round((self.last-started)*1000)}
-            time.sleep(.005)
+        with span('interface.actions.execute.Executor.dispatch','interface') as dispatch:
+            reader.write(writes)
+            time.sleep(PRIME)
+            reader.write([(addresses[variable]+24,struct.pack('<q',value*SCALE)) for variable,value in (('interface_mode',2 if check else 1),('interface_flip',flip))])
+            while time.monotonic()-started<LIMIT:
+                progress('executor')
+                reader.check()
+                text=self.game.log()
+                if done in text:
+                    self.last=time.monotonic()
+                    valid,_,desc=re.split(r'\n(?=\[\d\d:\d\d:\d\d\])',text.rsplit(done,1)[1],maxsplit=1)[0].partition('|')
+                    transport=re.findall(rf'INTERFACE\|transport\|{seq}\|(\w+)',text)
+                    if transport and transport[-1]=='started':
+                        valid,desc='1','transport started'
+                    return {'action':name,'valid':valid=='1','desc':plain(desc),'ms':round(dispatch.ms)}
+                time.sleep(.005)
         reader.write([(addresses['interface_mode']+24,struct.pack('<q',ABORT*SCALE))])
         aborted=time.monotonic()
         while done not in self.game.log() and time.monotonic()-aborted<ABORT_LIMIT:

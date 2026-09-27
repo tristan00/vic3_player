@@ -1,13 +1,15 @@
 import { Link, useParams } from 'react-router-dom'
 import { DataGrid, Record } from '@/components/DataGrid'
+import { Neighbors } from '@/components/Neighbors'
 import { Section } from '@/components/primitives'
-import { useApi, type Grid } from '@/lib/api'
+import { useApi, type Grid, type S } from '@/lib/api'
 
 export function Action() {
   const params = useParams()
   const run = Number(params.run)
   const n = Number(params.n)
   const one = useApi<Grid>(`/api/runs/${run}/actions?f=n:${n}`)
+  const info = useApi<S['RunInfo']>(`/api/runs/${run}`, { live: true })
   const before = one.data?.rows[0]?.[one.data.columns.findIndex((c) => c.name === 'before_seq')]?.ref?.id
   return (
     <div className="space-y-4">
@@ -15,13 +17,11 @@ export function Action() {
         <Link className="linka num text-xs" to={`/runs/${run}?view=actions`}>
           run {run}
         </Link>
-        <Link className="linka num text-xs" to={`/runs/${run}/actions/${n - 1}`}>
-          {n - 1}
-        </Link>
-        <h1 className="num font-semibold">action {n}</h1>
-        <Link className="linka num text-xs" to={`/runs/${run}/actions/${n + 1}`}>
-          {n + 1}
-        </Link>
+        {info.data && (
+          <Neighbors previous={n > 1 ? n - 1 : null} next={info.data.last_action !== null && n < info.data.last_action ? n + 1 : null} to={(k) => `/runs/${run}/actions/${k}`}>
+            <h1 className="num font-semibold">action {n}</h1>
+          </Neighbors>
+        )}
       </div>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
         <Section title="loop_action">

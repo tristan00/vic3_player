@@ -369,6 +369,7 @@ def block_end(text,opener):
     return len(text)
 
 
+@timed
 def type_closers(root):
     closers={}
     for path in sorted(root.rglob('*.gui')):

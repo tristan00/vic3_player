@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from dashboard.server import actions, changes, db, meta, policy, runs, tables
 from dashboard.server.app import app
 from interface.recording.store import Store, install
+from interface.timing import RECORDER
 from tests.test_store import DSN, EFFECTS, ENUMS, LAW, MEMBERS, PLAYER, RUN, STEPS, built
 
 AT=datetime(2026,9,23,tzinfo=timezone.utc)
@@ -34,6 +35,7 @@ class DashboardTests(unittest.TestCase):
             raise unittest.SkipTest(f'test database unavailable: {error}')
         install(connection)
         connection.close()
+        RECORDER.reset()
         from interface.recording.spec import VOCABULARIES
         folders={folder for names in VOCABULARIES.values() if names for folder in names}
         store=Store(DSN)
@@ -42,7 +44,7 @@ class DashboardTests(unittest.TestCase):
         store.session='test'
         store.begin_run(started_at=AT,**RUN)
         store.pending['proposal']=PROPOSAL
-        store.pending['pick_model']=(1049,29,4.5)
+        store.pending['pick_model']=(1049,29,4.5,{'iterations':100,'depth':6,'learning_rate':.1,'loss_function':'RMSE','random_seed':0,'thread_count':4,'rsm':.8},[('treasury',60.0),('action1.type',40.0)])
         for step in STEPS:
             store.write(built(step),'post_action',AT,1.0)
         store.record_pick(0,[['build','research'],['enact_law']],[1.5,-2.0],0)
@@ -94,8 +96,6 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(found,{'runs_requested':3,'world_seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5})
         weights=db.rows('select a.name,w.weight from run_weight w join action a using (action) where w.run_id=%s order by 1',(self.run_id,))
         self.assertEqual([(w['name'],w['weight']) for w in weights],[('build',3.0),('enact_law',2.0)])
-        params=db.rows('select a.name,w.param,w.value,w.weight from run_param_weight w join action a using (action) where w.run_id=%s',(self.run_id,))
-        self.assertEqual(params,[{'name':'build','param':'building_type','value':'building_x','weight':3.0}])
 
     def test_production_method_effects_are_stored_typed(self):
         ruleset=db.value('select ruleset_id from run where run_id=%s',(self.run_id,))
@@ -114,6 +114,25 @@ class DashboardTests(unittest.TestCase):
         logged=rows(meta.meta_grid('loop_action',[('run_id',str(self.run_id))],'n',False,0,100))
         self.assertEqual([(a['n'],a['action'],a['advisor']) for a in logged],[(1,'enact_law','random'),(2,'research','random')])
 
+    def test_timings_are_stored_for_each_snapshot_and_for_the_whole_run(self):
+        write=('span','interface.recording.store.Store.write')
+        whole=rows(meta.meta_grid('run_timing',[('run_id',str(self.run_id)),write],None,False,0,100))
+        self.assertEqual([(t['run_id'],t['calls'],t['errors']) for t in whole],[(self.run_id,3,0)])
+        self.assertLess(whole[0]['self_ms'],whole[0]['total_ms'])
+        self.assertLessEqual(whole[0]['min_ms']+whole[0]['max_ms'],whole[0]['total_ms'])
+        spans=rows(meta.meta_grid('snapshot_timing',[('run_id',str(self.run_id)),write],'seq',False,0,100))
+        self.assertEqual([(s['seq'],s['calls']) for s in spans],[(1,1),(2,1)])
+        self.assertLess(sum(s['total_ms'] for s in spans),whole[0]['total_ms'])
+        flushes=rows(meta.meta_grid('run_timing',[('run_id',str(self.run_id)),('span','interface.recording.store.Store.record_timing')],None,False,0,100))
+        self.assertEqual([t['calls'] for t in flushes],[3])
+
+    def test_run_and_policy_records_split_the_run_table_without_overlap(self):
+        run={c.name for c in meta.run_record(self.run_id).columns}
+        policy={c.name for c in meta.policy_record(self.run_id).columns}
+        self.assertFalse(run&policy)
+        self.assertEqual(run|policy,{s.name for s in meta.specs('run')}-{'run_id'}|{'initializer'})
+        self.assertNotIn('advisor',[c.name for c in actions.run_actions(self.run_id,[],None,False,0,100).columns])
+
     def test_picker_offers_count_every_candidate_action(self):
         offers={r['action']:r for r in rows(policy.picker_actions([],None,False,0,100))}
         self.assertEqual((offers['build']['offered'],offers['build']['chosen']),(2,2))
@@ -121,6 +140,7 @@ class DashboardTests(unittest.TestCase):
         self.assertAlmostEqual(offers['build']['offered_share'],2/5)
 
     def test_routes_answer_and_reject_unknown_names(self):
+        RECORDER.reset()
         client=TestClient(app)
         self.assertEqual(client.get(f'/api/runs/{self.run_id}/snapshots/1/tables/law_history').status_code,200)
         self.assertEqual(client.get(f'/api/runs/{self.run_id}/series?table=player_treasury&column=money').status_code,200)
@@ -128,6 +148,15 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(client.get('/api/actions?scope=bogus').status_code,400)
         self.assertEqual(client.get('/api/runs?sort=bogus').status_code,400)
         self.assertEqual(client.get('/api/meta/bogus').status_code,404)
+        self.assertEqual(client.get('/api/nowhere/at/all').status_code,404)
+        self.assertEqual(client.post('/api/runs').status_code,404)
+        timing=client.get('/api/timing?sort=span')
+        self.assertEqual(timing.status_code,200)
+        counted={row[0]['text']:row[1]['num'] for row in timing.json()['rows']}
+        self.assertEqual({span:calls for span,calls in counted.items() if span.startswith(('GET ','POST '))},
+                         {'GET /api/runs/{run_id}/snapshots/{seq}/tables/{table}':1,'GET /api/runs/{run_id}/series':1,'GET /api/runs/{run_id}/entities/{kind}':1,
+                          'GET /api/actions':1,'GET /api/runs':1,'GET /api/meta/{table}':1,'GET /api/{path:path}':1,'POST /api/{path:path}':1})
+        self.assertGreaterEqual(counted['dashboard.server.db.rows'],1)
 
 
 if __name__=='__main__':

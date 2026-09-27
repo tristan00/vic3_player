@@ -19,6 +19,7 @@ def normal(color):
     return 'x'+color[1:].upper()
 
 
+@timed
 def assets(root):
     return {entry.relative_to(root).as_posix():entry.read_bytes() for entry in sorted(root.rglob('*')) if entry.is_file()}
 
@@ -28,6 +29,7 @@ def identity(files,manifest=b''):
     return hashlib.sha256(manifest+json.dumps(hashes,sort_keys=True,separators=(',',':')).encode('utf8')).hexdigest()
 
 
+@timed
 def mini_world(path):
     path=Path(path)
     raw=path.read_bytes()

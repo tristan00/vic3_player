@@ -2,7 +2,6 @@ import { useParams } from 'react-router-dom'
 import { DataGrid } from '@/components/DataGrid'
 import { Card, Loading, Section } from '@/components/primitives'
 import { useApi, type S } from '@/lib/api'
-import { num } from '@/lib/format'
 import { ScopeInput, useScope } from '@/routes/Actions'
 
 export function ActionType() {
@@ -24,10 +23,6 @@ export function ActionType() {
                 <tr className="border-line/60 border-b">
                   <td className="text-dim px-2 py-0.5">group</td>
                   <td className="px-2 py-0.5">{d.group}</td>
-                </tr>
-                <tr className="border-line/60 border-b">
-                  <td className="text-dim px-2 py-0.5">default weight</td>
-                  <td className="num px-2 py-0.5">{num(d.weight)}</td>
                 </tr>
                 {d.params.map((p) => (
                   <tr key={p.name} className="border-line/60 border-b last:border-0">

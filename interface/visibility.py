@@ -9,6 +9,7 @@ SLOT = 0xffffff
 
 
 class Visibility:
+    @timed
     def __init__(self, path=Path(__file__).parent / 'visibility.json'):
         data = json.loads(Path(path).read_text(encoding='utf-8'))
         self.tables = data['tables']

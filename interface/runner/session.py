@@ -11,7 +11,7 @@ import uuid
 
 import psutil
 
-from ..common import DEFAULT_DATA, DEFAULT_GAME, GameCrashed, progress, timed, write_json, write_script
+from ..common import DEFAULT_DATA, DEFAULT_GAME, GameCrashed, progress, timed, write_json, write_script, timed_often
 from .tail import LogTail
 
 STARTUP_QUIET=30
@@ -37,6 +37,7 @@ VANILLA_STATES=360
 LOADING_HOURS=(5000+9000)*365*24
 
 
+@timed
 def _spawn(arguments,directory):
     command=subprocess.list2cmdline(arguments).replace("'","''")
     script=("$ErrorActionPreference='Stop'; (Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments "
@@ -57,6 +58,7 @@ def _spawn(arguments,directory):
     return psutil.Process(int(out))
 
 
+@timed
 def _patch_harvest(pid):
     kernel=ctypes.WinDLL('kernel32',use_last_error=True);psapi=ctypes.WinDLL('psapi',use_last_error=True)
     kernel.OpenProcess.restype=wintypes.HANDLE
@@ -102,6 +104,7 @@ class GameInterface:
         self.saves=self.profile/'save games'
         self.since=''
 
+    @timed_often
     def session(self):
         return json.loads(self.session_file.read_text(encoding='utf-8'))
 
@@ -131,6 +134,7 @@ class GameInterface:
             raise RuntimeError(f'The GPU guard {guard["pid"]} is gone, so the unguarded game was closed')
         return process
 
+    @timed
     def settings(self,changes=None):
         path=self.profile/'pdx_settings.json'
         current=json.loads(path.read_text(encoding='utf-8-sig')) if path.exists() else {}

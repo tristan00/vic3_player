@@ -319,6 +319,7 @@ def _rates(game):
     return {'claims_per_state':history/states,'plays':plays,'company_count':companies}
 
 
+@timed
 def _crossings(game):
     return sum(1 for line in (game/'map_data/adjacencies.csv').read_text(encoding='utf-8-sig').splitlines() if line.split(';')[2:3]==['sea'])
 
@@ -329,6 +330,7 @@ def _straits(game):
     return natural/crossings
 
 
+@timed
 def _seas(game):
     text=(game/'map_data/default.map').read_text(encoding='utf-8-sig')
     return len(re.findall(r'x[0-9A-Fa-f]{6}',re.search(r'sea_starts\s*=\s*\{([^}]*)\}',text)[1]))

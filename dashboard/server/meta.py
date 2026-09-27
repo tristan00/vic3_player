@@ -12,11 +12,13 @@ TABLES=re.findall(r'^create table (\w+)',(Path(store.__file__).parent/'schema_me
 
 
 @cache
+@db.timed
 def named_tables():
     return {f['table_name'] for f in db.rows("select table_name from information_schema.columns where column_name='name' and table_schema='public'")}
 
 
 @cache
+@db.timed
 def specs(table):
     columns=db.rows('select column_name as name,data_type as type,domain_name as domain from information_schema.columns '
                     "where table_name=%s and table_schema='public' order by ordinal_position",(table,))
@@ -61,3 +63,26 @@ def meta_grid(table,filters,sort,desc,offset,limit,run_id=None):
                     where i.indrelid=%s::regclass and i.indisprimary''',(table,))
     order=[k['name'] for k in keys] or [found[0].name]
     return grid(found,f'from {table} t',{},filters,sort,desc,offset,limit,run_id,order)
+
+
+RUN_GROUPS={'lifecycle':['kind','started_at','heartbeat_at','progress_at','progress_step','longest_step','longest_step_ms','ended_at','end_reason','end_detail','game_exited_at'],
+            'world':['tag','player_country','world_file','world_id','world_seed','countries','states','tech','pop','ruleset_id','first_start'],
+            'launch':['cli_seed','run_seed','runs_requested','years','minutes','game_speed','profile','pool','custom_rng_seed','source_session']}
+POLICY_GROUPS={'config':['objective_gdp','objective_population','objective_sol','objective_alpha'],'picker':['picker','candidates']}
+INITIALIZER=Spec('initializer','text','(select a.name from run_advisor ra join advisor a using (advisor) where ra.run_id=t.run_id and ra.position=0)',group='initializer')
+
+
+def grouped(groups):
+    by_name={s.name:s for s in specs('run')}
+    by_name['player_country']=Spec('player_country','ref','t.player_country',entity='country')
+    return [Spec(name,by_name[name].kind,by_name[name].sql,entity=by_name[name].entity,group=group,run=by_name[name].run) for group,names in groups.items() for name in names]
+
+
+@db.timed
+def run_record(run_id):
+    return grid(grouped(RUN_GROUPS),'from run t where t.run_id=%(run)s',{'run':run_id},run_id=run_id,order=['kind'])
+
+
+@db.timed
+def policy_record(run_id):
+    return grid([INITIALIZER,*grouped(POLICY_GROUPS)],'from run t where t.run_id=%(run)s',{'run':run_id},run_id=run_id,order=['initializer'])

@@ -1,25 +1,25 @@
 import bisect
 import logging
-import time
+import os
 
 import numpy as np
 from catboost import CatBoostRegressor, Pool
 
 from interface.common import progress, timed
+from interface.timing import current, span
 from .features import CATEGORIES, FEATURES, LAWS, NUMBERS, History, LiveLookup, categories
-from .random_smac_weighting import COMPONENTS, DEBT_CAP_FROM_RUN, HOURS_PER_YEAR, SCORED, discount, peak, series
+from .random_smac_weighting import COMPONENTS, ENDED, HOURS_PER_YEAR, PLAYED, discount, peak, scored_runs, series
 
 LOG=logging.getLogger('loop')
 ANSWERS={'choose_event_option','quick_decline_proposal','accept_treaty','decline_treaty','accept_demand','reject_demand',
          'accept_action_proposal','decline_action_proposal','accept_sway','reject_sway'}
 CATEGORICAL=list(range(len(NUMBERS),len(NUMBERS)+len(CATEGORIES)+len(LAWS)))
 MIN_PAUSES=200
-ITERATIONS=100
+PARAMS={'iterations':100,'depth':10,'learning_rate':.1,'loss_function':'RMSE','random_seed':0,'thread_count':os.cpu_count(),'rsm':.8}
 
-RUNS='''select r.run_id,min(s.game_date),max(s.game_date)
-from run r join snapshot s on s.run_id=r.run_id
-where r.run_id>=%s and r.kind='mini' and r.end_reason = any(%s)
-group by r.run_id order by r.run_id'''
+RUNS=f'''select r.run_id,min(s.game_date),max(s.game_date)
+{ENDED}
+{PLAYED}'''
 
 PAUSES='''select la.run_id,la.before_seq,s.game_date,la.n,ac.name,p.name,p.integer_value,p.text_value
 from loop_action la join advisor ad on ad.advisor=la.advisor join action ac on ac.action=la.action
@@ -58,7 +58,7 @@ def value_at(points,date):
 @timed
 def training_rows(connection,objective):
     weights,alpha=objective
-    runs={run_id:(first,last) for run_id,first,last in connection.execute(RUNS,(DEBT_CAP_FROM_RUN,list(SCORED))).fetchall()}
+    runs={run_id:(first,last) for run_id,first,last in connection.execute(RUNS,scored_runs()).fetchall()}
     ids=list(runs)
     points={component:series(connection,component,ids) for component in COMPONENTS}
     pauses={}
@@ -82,7 +82,7 @@ def training_rows(connection,objective):
             continue
         first,last=runs[run_id]
         rows.append(numbers+categories(list(actions.values()),lookup)+lookup.laws+lookup.prices+lookup.institutions)
-        changes.append({component:(peak(first,last,points[component][run_id])/now[component]-1)*100/discount((last-date)/HOURS_PER_YEAR,alpha) for component in COMPONENTS})
+        changes.append({component:(peak(first,last,points[component][run_id])/now[component]-1)/discount((last-date)/HOURS_PER_YEAR,alpha) for component in COMPONENTS})
     scales={component:float(np.std([found[component] for found in changes])) for component in COMPONENTS}
     y=[sum(weights[component]*found[component]/scales[component] for component in COMPONENTS) for found in changes]
     return rows,np.array(y),len(runs)
@@ -97,14 +97,15 @@ class CatBoostPicker:
 
     @timed
     def start_run(self,store,world,objective):
-        started=time.perf_counter()
         rows,y,runs=training_rows(store.connection,objective)
         if len(y)<MIN_PAUSES:
             raise RuntimeError(f'the catboost picker needs {MIN_PAUSES} scored pauses to train on, found {len(y)} in {runs} runs')
-        self.model=CatBoostRegressor(iterations=ITERATIONS,depth=6,learning_rate=.1,loss_function='RMSE',verbose=False,random_seed=0,thread_count=4)
-        self.model.fit(pool(rows,y),callbacks=[Beat()])
-        self.trained=(len(y),runs,time.perf_counter()-started)
-        LOG.info('catboost picker trained for the composite objective on %d pauses from %d runs in %.1fs',*self.trained)
+        self.model=CatBoostRegressor(**PARAMS,verbose=False)
+        with span('advisors.pickers.CatBoostPicker.fit','loop'):
+            self.model.fit(pool(rows,y),callbacks=[Beat()])
+        importance=list(zip(FEATURES,(float(value) for value in self.model.get_feature_importance())))
+        self.trained=(len(y),runs,current().seconds,PARAMS,importance)
+        LOG.info('catboost picker trained for the composite objective on %d pauses from %d runs in %.1fs',*self.trained[:3])
 
     @timed
     def pick(self,candidates,snapshot):

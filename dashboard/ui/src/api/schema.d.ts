@@ -72,6 +72,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Run Record */
+        get: operations["get_run_record_api_runs__run_id__record_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/outcomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Outcomes */
+        get: operations["get_outcomes_api_runs__run_id__outcomes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/policy/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Policy Record */
+        get: operations["get_policy_record_api_policy_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/policy/runs/{run_id}/pauses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Pauses */
+        get: operations["get_pauses_api_policy_runs__run_id__pauses_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/policy/runs/{run_id}/reward": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reward */
+        get: operations["get_reward_api_policy_runs__run_id__reward_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/groups": {
         parameters: {
             query?: never;
@@ -412,15 +497,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/policy/scored": {
+    "/api/policy/runs": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Scored */
-        get: operations["get_scored_api_policy_scored_get"];
+        /** Get Run Policies */
+        get: operations["get_run_policies_api_policy_runs_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -463,6 +548,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/timing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Timing */
+        get: operations["get_timing_api_timing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events": {
         parameters: {
             query?: never;
@@ -490,8 +592,6 @@ export interface components {
             action: string;
             /** Group */
             group: string;
-            /** Weight */
-            weight: number;
             /** Params */
             params: components["schemas"]["ParamSpec"][];
         };
@@ -612,12 +712,12 @@ export interface components {
             component: string;
             /** Weight */
             weight: number;
-            /** Change */
-            change: number;
-            /** Divisor */
-            divisor: number;
-            /** Discounted */
-            discounted: number;
+            /** Gain */
+            gain: number;
+            /** Years Alpha */
+            years_alpha: number;
+            /** Gain Per Years Alpha */
+            gain_per_years_alpha: number;
             /** Scale */
             scale: number;
             /** Normalized */
@@ -642,10 +742,19 @@ export interface components {
             state: "running" | "stalled" | "lost" | "ended";
             /** Last Seq */
             last_seq: number | null;
-            /** Reward Years */
-            reward_years: number | null;
-            /** Reward Parts */
-            reward_parts: components["schemas"]["RewardPart"][];
+            /** Last Action */
+            last_action: number | null;
+            /** Previous */
+            previous: number | null;
+            /** Next */
+            next: number | null;
+        };
+        /** RunReward */
+        RunReward: {
+            /** Years */
+            years: number | null;
+            /** Parts */
+            parts: components["schemas"]["RewardPart"][];
         };
         /** Series */
         Series: {
@@ -817,6 +926,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_record_api_runs__run_id__record_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_outcomes_api_runs__run_id__outcomes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Series"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_policy_record_api_policy_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pauses_api_policy_runs__run_id__pauses_get: {
+        parameters: {
+            query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reward_api_policy_runs__run_id__reward_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunReward"];
                 };
             };
             /** @description Validation Error */
@@ -1554,7 +1824,7 @@ export interface operations {
             };
         };
     };
-    get_scored_api_policy_scored_get: {
+    get_run_policies_api_policy_runs_get: {
         parameters: {
             query?: {
                 f?: string[];
@@ -1625,6 +1895,41 @@ export interface operations {
         };
     };
     get_schema_api_schema_get: {
+        parameters: {
+            query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_timing_api_timing_get: {
         parameters: {
             query?: {
                 f?: string[];

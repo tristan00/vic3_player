@@ -1,11 +1,11 @@
 import logging
-import time
 
 import numpy as np
 from scipy.stats import norm
 from sklearn.ensemble import RandomForestRegressor
 
-from interface.common import timed
+from interface.common import timed, timed_often
+from interface.timing import current
 from .random_picker import RandomAdvisor
 
 LOG=logging.getLogger('loop')
@@ -19,17 +19,17 @@ NEIGHBOURS=50
 LOCAL_STEPS=20
 STEP=.125
 HOURS_PER_YEAR=365*24
-SCORED=('time','years','defeated','debt_cap')
+OUTCOMES=('time','years','defeated','debt_cap')
 DEBT_CAP_FROM_RUN=104
-GROUPS={'build:construction_sector':[('build','building_type','building_construction_sector')],
-        'build:government_administration':[('build','building_type','building_government_administration')]}
 
-HISTORY='''select r.run_id,min(s.game_date),max(s.game_date)
-from run r
-join snapshot s on s.run_id=r.run_id
-where r.run_id>=%s and r.kind='mini' and r.end_reason = any(%s) and (select count(*) from run_advisor ra where ra.run_id=r.run_id)=1
-group by r.run_id
+ENDED='''from run r join snapshot s on s.run_id=r.run_id
+where r.run_id>=%(first)s and r.kind='mini' and r.ended_at is not null'''
+PLAYED='''group by r.run_id
+having r.end_reason = any(%(outcomes)s) or max(s.game_date)-min(s.game_date)>=%(hours)s
 order by r.run_id'''
+HISTORY=f'''select r.run_id,min(s.game_date),max(s.game_date)
+{ENDED} and (select count(*) from run_advisor ra where ra.run_id=r.run_id)=1
+{PLAYED}'''
 
 POPULATION='''select p.run_id,s.game_date,p.lower_strata+p.middle_strata+p.upper_strata
 from player_population p join snapshot s on s.run_id=p.run_id and s.seq=p.seq
@@ -37,8 +37,6 @@ where p.run_id = any(%s)
 order by p.run_id,p.seq'''
 
 WEIGHTS='''select w.run_id,a.name,w.weight from run_weight w join action a on a.action=w.action where w.run_id = any(%s)'''
-
-PARAM_WEIGHTS='''select p.run_id,a.name,p.param,p.value,p.weight from run_param_weight p join action a on a.action=p.action where p.run_id = any(%s)'''
 
 GDP='''select e.run_id,s.game_date,e.gdp
 from country_economy_report e join run r on r.run_id=e.run_id and e.country=r.player_country join snapshot s on s.run_id=e.run_id and s.seq=e.seq
@@ -64,9 +62,14 @@ def change(first,last,points):
     start_date,start=points[0]
     if start_date!=first:
         raise RuntimeError(f'the value was not recorded at the first snapshot (hour {first})')
-    return (peak(first,last,points)/start-1)*100
+    return peak(first,last,points)/start-1
 
 
+def scored_runs():
+    return {'first':DEBT_CAP_FROM_RUN,'outcomes':list(OUTCOMES),'hours':MIN_YEARS*HOURS_PER_YEAR}
+
+
+@timed
 def series(connection,component,runs):
     points={}
     for run_id,date,value in connection.execute(COMPONENTS[component],(runs,)).fetchall():
@@ -104,14 +107,14 @@ def breakdown(changes,objective,run):
     values=discounted(changes,alpha)
     spread=scales(values)
     years,raw=changes[run]
-    return years,[{'component':component,'weight':weights[component],'change':raw[component],'divisor':discount(years,alpha),
-                   'discounted':values[run][component],'scale':spread[component],'normalized':values[run][component]/spread[component],
+    return years,[{'component':component,'weight':weights[component],'gain':raw[component],'years_alpha':discount(years,alpha),
+                   'gain_per_years_alpha':values[run][component],'scale':spread[component],'normalized':values[run][component]/spread[component],
                    'contribution':weights[component]*values[run][component]/spread[component]} for component in COMPONENTS]
 
 
 @timed
 def outcomes(connection):
-    found=connection.execute(HISTORY,(DEBT_CAP_FROM_RUN,list(SCORED))).fetchall()
+    found=connection.execute(HISTORY,scored_runs()).fetchall()
     points={component:series(connection,component,[row[0] for row in found]) for component in COMPONENTS}
     return {run_id:((last-first)/HOURS_PER_YEAR,{component:change(first,last,points[component][run_id]) for component in COMPONENTS})
             for run_id,first,last in found if all(run_id in points[component] and points[component][run_id][0][1]>0 for component in COMPONENTS)}
@@ -127,18 +130,12 @@ def history(connection,space,objective):
     weights={}
     for run_id,action,weight in connection.execute(WEIGHTS,(list(scored),)).fetchall():
         weights.setdefault(run_id,{})[action]=weight
-    params={}
-    for run_id,action,param,value,weight in connection.execute(PARAM_WEIGHTS,(list(scored),)).fetchall():
-        params.setdefault(run_id,{})[(action,param,value)]=weight
-    grouped={key for members in GROUPS.values() for key in members}
-    dimensions={**GROUPS,**{f'{action}:{param}={value}':[(action,param,value)] for action,param,value in sorted({key for found in params.values() for key in found}-grouped)}}
-    def levels(run_id):
-        return [{params.get(run_id,{}).get(key,1) for key in members} for members in dimensions.values()]
-    runs=[run_id for run_id in scored if all(weights.get(run_id,{}).get(action,0)>0 for action in space) and all(len(level)==1 for level in levels(run_id))]
-    X=np.array([[np.log10(weights[run_id][action]) for action in space]+[np.log10(level.pop()) for level in levels(run_id)] for run_id in runs])
-    return X.reshape(len(runs),len(space)+len(dimensions)),np.array([scored[run_id] for run_id in runs]),dimensions,runs
+    runs=[run_id for run_id in scored if all(weights.get(run_id,{}).get(action,0)>0 for action in space)]
+    X=np.array([[np.log10(weights[run_id][action]) for action in space] for run_id in runs])
+    return X.reshape(len(runs),len(space)),np.array([scored[run_id] for run_id in runs]),runs
 
 
+@timed_often
 def predict(forest,points,best):
     per_tree=np.stack([tree.predict(points) for tree in forest.estimators_])
     mean,spread=per_tree.mean(0),per_tree.std(0)+1e-9
@@ -150,6 +147,7 @@ def expected_improvement(forest,points,best):
     return predict(forest,points,best)[2]
 
 
+@timed
 def local_search(forest,starts,best,low,high,rng):
     points=starts.copy()
     scores=expected_improvement(forest,points,best)
@@ -167,7 +165,7 @@ def local_search(forest,starts,best,low,high,rng):
 class RandomSmacWeightingAdvisor(RandomAdvisor):
     name='random_smac_weighting'
 
-    def __init__(self,seed=None,weights=None,param_weights=None):
+    def __init__(self,seed=None,weights=None):
         super().__init__(seed)
         self.excluded={name for name,weight in (weights or {}).items() if weight==0}
 
@@ -203,21 +201,15 @@ class RandomSmacWeightingAdvisor(RandomAdvisor):
 
     @timed
     def start_run(self,store,actions,objective):
-        started=time.perf_counter()
         space=[name for name in actions if name not in self.excluded]
-        X,y,dimensions,runs=history(store.connection,space,objective)
-        names=space+list(dimensions)
-        x,record=self.propose(X,y,np.full(len(names),LOW),np.full(len(names),HIGH),names)
+        X,y,runs=history(store.connection,space,objective)
+        x,record=self.propose(X,y,np.full(len(space),LOW),np.full(len(space),HIGH),space)
         record['reward']='composite'
         record['observed']=[(run_id,float(reward)) for run_id,reward in zip(runs,y)]
-        record['seconds']=time.perf_counter()-started
+        record['seconds']=current().seconds
         self.proposal=record
         chosen=(10**x).tolist()
         self.weights={**{name:0 for name in actions if name in self.excluded},**dict(zip(space,chosen))}
-        self.param_weights={}
-        for members,weight in zip(dimensions.values(),chosen[len(space):]):
-            for action,param,value in members:
-                self.param_weights.setdefault(action,{}).setdefault(param,{})[value]=weight
         LOG.info('random_smac_weighting proposal (%s) from %d scored runs, best %s %.3f, predicted %s',
                  record['method'],len(y),'composite',record['best_reward'] or 0,'none' if record['predicted_reward'] is None else f"{record['predicted_reward']:.3f}")
         return self.weights

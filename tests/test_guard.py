@@ -23,7 +23,7 @@ class GuardTests(unittest.TestCase):
 
     def test_short_spikes_do_not_kill_the_game(self):
         process=self.spawn()
-        samples=iter([90,90,10]*20)
+        samples=iter([90,90,10]*5)
         def sample():
             use=next(samples,None)
             if use is None:

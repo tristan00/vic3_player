@@ -13,6 +13,7 @@ import numpy as np
 from ..actions.catalogue import action_folders
 from ..common import DEFAULT_DATA, slot, timed
 from ..runner.memory import LAYOUT, MONTH_STARTS
+from ..timing import span
 from ..script import alerts, blocks, body, building_methods, decisions, definitions, event_options, keys, method_effects, production_methods, read, scalar
 from .capture import (ALERT_SCOPES, BORROW_MAPS, RELEASE_MAPS, FORMABLE_MAPS, GROUPS, MESSAGE_MAPS, METRICS, PART, PROPOSAL_MAPS, UI_CHECKS, evaluable, method_block, metric_map,
                       map_data, missing_references, plain, province_colors)
@@ -63,32 +64,32 @@ def record(game,store,phase):
         store.session=identity
         register(game,session,world,store)
     reader=game.reader()
-    started=time.perf_counter()
-    nonce=random.randrange(1,10**6)
-    reader.request_capture(nonce)
-    reader.date()
-    snapshot=reader.snapshot()
-    player=reader.player()
-    own=reader.holder()
-    held=Held(own,nonce,reader.holders(sorted({ident(item) for name,items in own['lists'].items() if name.startswith('cap_possible_diplomatic_') for item in items})))
-    label=lambda code:reader.names[code-1][1] if code else None
-    tags={ident:label(code) for ident,code in zip(snapshot['country']['id'].tolist(),snapshot['country']['country_definition'].tolist())}
-    living={slot(c) for c in snapshot['state']['country'].tolist()}-{-1}
-    if player not in living:
-        raise RuntimeError(f'The played country {tags.get(player)} no longer owns any state')
-    windows=_event_options(reader)
-    for table in ('event','event_target'):
-        answered=~np.isin(snapshot[table]['id'].astype(np.int64)&0xffffff,list(windows))
-        snapshot[table]={column:values[~answered] for column,values in snapshot[table].items()}
-    tables={name:{column:values.tolist() for column,values in columns.items()} for name,columns in snapshot.items()}
-    manifest=json.loads(world.read_text(encoding='utf-8')) if world else None
+    with span('interface.recording.record.read','interface') as reading:
+        nonce=random.randrange(1,10**6)
+        reader.request_capture(nonce)
+        reader.date()
+        snapshot=reader.snapshot()
+        player=reader.player()
+        own=reader.holder()
+        held=Held(own,nonce,reader.holders(sorted({ident(item) for name,items in own['lists'].items() if name.startswith('cap_possible_diplomatic_') for item in items})))
+        label=lambda code:reader.names[code-1][1] if code else None
+        tags={ident:label(code) for ident,code in zip(snapshot['country']['id'].tolist(),snapshot['country']['country_definition'].tolist())}
+        living={slot(c) for c in snapshot['state']['country'].tolist()}-{-1}
+        if player not in living:
+            raise RuntimeError(f'The played country {tags.get(player)} no longer owns any state')
+        windows=_event_options(reader)
+        for table in ('event','event_target'):
+            answered=~np.isin(snapshot[table]['id'].astype(np.int64)&0xffffff,list(windows))
+            snapshot[table]={column:values[~answered] for column,values in snapshot[table].items()}
+        tables={name:{column:values.tolist() for column,values in columns.items()} for name,columns in snapshot.items()}
+        manifest=json.loads(world.read_text(encoding='utf-8')) if world else None
     try:
-        colors=_scripted(tables,snapshot,held,tags,label,player,living,manifest,map_data(game.game_dir,manifest))
-        _options(tables,snapshot,windows,label)
-        constants,meta,open_windows=snapshot_meta(tables,label)
-        rows=build(Capture(tables,label,player,reader.goods_codes.tolist(),open_windows),store.orders,colors)
-        read_ms=(time.perf_counter()-started)*1000
-        seq=store.write(Built(rows,constants,meta,colors),phase,datetime.now(timezone.utc),read_ms)
+        with span('interface.recording.record.assemble','interface') as assembling:
+            colors=_scripted(tables,snapshot,held,tags,label,player,living,manifest,map_data(game.game_dir,manifest))
+            _options(tables,snapshot,windows,label)
+            constants,meta,open_windows=snapshot_meta(tables,label)
+            rows=build(Capture(tables,label,player,reader.goods_codes.tolist(),open_windows),store.orders,colors)
+        seq=store.write(Built(rows,constants,meta,colors),phase,datetime.now(timezone.utc),reading.ms+assembling.ms)
     except RuntimeError as error:
         path=DEFAULT_DATA/'refusals'/f'{time.strftime("%Y%m%dT%H%M%S")}.pkl'
         path.parent.mkdir(parents=True,exist_ok=True)
@@ -421,6 +422,7 @@ def _messages(held):
     return [(index,*row) for index,row in enumerate(rows[:period])]
 
 
+@timed
 def _event_options(reader,timeout=1):
     deadline=time.monotonic()+timeout
     while True:

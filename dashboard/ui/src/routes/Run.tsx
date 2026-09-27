@@ -1,87 +1,37 @@
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { DataGrid, Record } from '@/components/DataGrid'
-import { Card, Loading, Section, Tabs, useTab } from '@/components/primitives'
-import { SeriesChart } from '@/components/SeriesChart'
+import { Neighbors } from '@/components/Neighbors'
+import { ErrorState, Loading, Section, Tabs, useTab } from '@/components/primitives'
+import { SeriesChart, SeriesView } from '@/components/SeriesChart'
 import { useApi, type S } from '@/lib/api'
-import { cn, num } from '@/lib/format'
+import { cn } from '@/lib/format'
 
-const VIEWS = ['record', 'actions', 'blocks', 'snapshots', 'countries', 'trade', 'entities', 'tables', 'charts']
-const PARTS: (keyof S['RewardPart'])[] = ['weight', 'change', 'divisor', 'discounted', 'scale', 'normalized', 'contribution']
+const VIEWS = ['record', 'actions', 'blocks', 'snapshots', 'countries', 'trade', 'entities', 'tables', 'charts', 'timing']
 
-function Reward({ info }: { info: S['RunInfo'] }) {
-  if (!info.reward_parts.length) return <Card className="text-dim px-3 py-2 text-xs">not scored</Card>
-  const total = info.reward_parts.reduce((a, p) => a + p.contribution, 0)
+function Outcomes({ run }: { run: number }) {
+  const state = useApi<S['Series'][]>(`/api/runs/${run}/outcomes`, { live: true })
+  if (state.error) return <ErrorState error={state.error} onRetry={state.reload} />
+  const found = state.data ?? [null, null, null]
   return (
-    <Card className="overflow-hidden">
-      <table className="text-xs">
-        <thead>
-          <tr className="border-line text-dim border-b">
-            <th className="px-2 py-1 text-left font-medium">component</th>
-            <th className="px-2 py-1 text-right font-medium">years</th>
-            {PARTS.map((p) => (
-              <th key={p} className="px-2 py-1 text-right font-medium">
-                {p}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {info.reward_parts.map((p) => (
-            <tr key={p.component} className="border-line/60 border-b">
-              <td className="px-2 py-0.5">{p.component}</td>
-              <td className="num px-2 py-0.5 text-right">{num(info.reward_years as number)}</td>
-              {PARTS.map((k) => (
-                <td key={k} className="num px-2 py-0.5 text-right">
-                  {num(p[k] as number)}
-                </td>
-              ))}
-            </tr>
-          ))}
-          <tr>
-            <td className="px-2 py-0.5">reward</td>
-            <td colSpan={PARTS.length} />
-            <td className="num px-2 py-0.5 text-right font-semibold">{num(total)}</td>
-          </tr>
-        </tbody>
-      </table>
-    </Card>
+    <div className="mb-4 grid gap-3 lg:grid-cols-3">
+      {found.map((s, i) => (
+        <SeriesView key={i} run={run} series={s} title={s?.table ?? ''} height={170} />
+      ))}
+    </div>
   )
 }
 
-function RecordView({ run, info }: { run: number; info: S['RunInfo'] }) {
-  const fixed = [`run_id:${run}`]
+function RecordView({ run }: { run: number }) {
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-      <Section title="run">
-        <DataGrid id="run" url="/api/meta/run" fixed={fixed} live render={(g) => <Record grid={g} />} />
+    <div className="space-y-5">
+      <DataGrid id="run" url={`/api/runs/${run}/record`} live render={(g) => <Record grid={g} />} />
+      <Section title="actions by group">
+        <DataGrid id="groups" url={`/api/runs/${run}/groups`} live />
       </Section>
-      <div className="min-w-0 space-y-5">
-        <Section title="reward">
-          <Reward info={info} />
-        </Section>
-        <Section title="actions by group">
-          <DataGrid id="groups" url={`/api/runs/${run}/groups`} live />
-        </Section>
-        <Section title="run_advisor">
-          <DataGrid id="advisor" url="/api/meta/run_advisor" fixed={fixed} />
-        </Section>
-        <Section title="smac_proposal">
-          <DataGrid id="proposal" url="/api/meta/smac_proposal" fixed={fixed} />
-        </Section>
-        <Section title="pick_model">
-          <DataGrid id="model" url="/api/meta/pick_model" fixed={fixed} />
-        </Section>
-        <Section title="run_weight">
-          <DataGrid id="weights" url="/api/meta/run_weight" fixed={fixed} initial={{ sort: 'weight', desc: true }} />
-        </Section>
-        <Section title="run_param_weight">
-          <DataGrid id="param_weights" url="/api/meta/run_param_weight" fixed={fixed} />
-        </Section>
-        <Section title="run_game_rule">
-          <DataGrid id="rules" url="/api/meta/run_game_rule" fixed={fixed} />
-        </Section>
-      </div>
+      <Section title="run_game_rule">
+        <DataGrid id="rules" url="/api/meta/run_game_rule" fixed={[`run_id:${run}`]} />
+      </Section>
     </div>
   )
 }
@@ -131,19 +81,19 @@ export function Run() {
       {(d) => (
         <div>
           <div className="mb-3 flex flex-wrap items-baseline gap-x-3 text-sm">
-            <Link className="linka text-xs" to={`/runs/${run - 1}`}>
-              {run - 1}
-            </Link>
-            <h1 className="num font-semibold">run {run}</h1>
-            <Link className="linka text-xs" to={`/runs/${run + 1}`}>
-              {run + 1}
-            </Link>
+            <Neighbors previous={d.previous} next={d.next} to={(n) => `/runs/${n}`}>
+              <h1 className="num font-semibold">run {run}</h1>
+            </Neighbors>
             <span className="num">{d.country}</span>
             <span className={cn('text-xs', d.state !== 'ended' && 'text-accent')}>{d.state}</span>
             <span className="text-dim num text-xs">last snapshot {d.last_seq ?? '∅'}</span>
+            <Link className="linka text-xs" to={`/policy/runs/${run}`}>
+              policy
+            </Link>
           </div>
+          <Outcomes run={run} />
           <Tabs views={VIEWS} />
-          {view === 'record' && <RecordView run={run} info={d} />}
+          {view === 'record' && <RecordView run={run} />}
           {view === 'actions' && <DataGrid id="actions" url={`/api/runs/${run}/actions`} live />}
           {view === 'blocks' && <DataGrid id="blocks" url={`/api/runs/${run}/blocks`} live />}
           {view === 'snapshots' && <DataGrid id="snapshots" url="/api/meta/snapshot" fixed={[`run_id:${run}`]} initial={{ sort: 'seq', desc: true }} live />}
@@ -170,6 +120,16 @@ export function Run() {
           {view === 'entities' && <DataGrid id="kinds" url={`/api/runs/${run}/kinds`} limit={100} />}
           {view === 'tables' && <DataGrid id="tables" url={`/api/runs/${run}/tables`} limit={500} />}
           {view === 'charts' && <Charts run={run} />}
+          {view === 'timing' && (
+            <div className="space-y-5">
+              <Section title="run_timing">
+                <DataGrid id="run_timing" url="/api/meta/run_timing" fixed={[`run_id:${run}`]} initial={{ sort: 'total_ms', desc: true }} limit={500} live />
+              </Section>
+              <Section title="snapshot_timing">
+                <DataGrid id="snapshot_timing" url="/api/meta/snapshot_timing" fixed={[`run_id:${run}`]} initial={{ sort: 'seq', desc: true }} live />
+              </Section>
+            </div>
+          )}
         </div>
       )}
     </Loading>

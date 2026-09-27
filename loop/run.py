@@ -10,14 +10,15 @@ import threading
 import time
 
 from advisors import ADVISORS
-from advisors.random_picker import TIME_CONTROL, backlogged
+from advisors.random_picker import TIME_CONTROL
 from advisors.pickers import PICKERS
 from advisors.random_smac_weighting import draw_objective
 from interface import GameInterface, generate, record
 from interface.actions import Executor
 from interface.actions.catalogue import BY_NAME, GROUP
-from interface.common import STALL_LIMIT, GameCrashed, progress, progress_age, timed
+from interface.common import STALL_LIMIT, GameCrashed, progress, progress_age, timed, timed_often
 from interface.recording.store import Store
+from interface.timing import RECORDER, current, span
 from interface.world.generate import MAP
 from interface.options import available
 from interface.options.stored import Stored
@@ -42,7 +43,6 @@ WEIGHTS={'start_play_country':0,'start_play_state':0,'start_play_confirmed':0,'a
          'disband_formation':.1,'disband_regulars':.1,'disband_conscripts':.1,'declare_bankruptcy':.1,
          'abandon_colony':.1,'unincorporate':.1,'remove_company':.1,'remove_decree':.1,'capitulate':.1,'white_peace':.1,'leave_power_bloc':.01,'kick_from_power_bloc':.01}
 WEIGHTS={**{name:.1 for name in BY_NAME if GROUP[name]=='navy'},**WEIGHTS}
-PARAM_WEIGHTS={'build':{'building_type':{'building_construction_sector':3}}}
 HOURS_PER_DAY=24
 ACTIONS=[name for name in BY_NAME if GROUP[name]!='time']
 CANDIDATES=(1,100)
@@ -98,11 +98,10 @@ class Drawer:
     def __init__(self,advisor,options,snapshot,links,touched):
         self.advisor=advisor
         self.seq=snapshot.seq
-        skipped=TIME_CONTROL|({'build'} if options.get('build') and backlogged(snapshot) else set())
-        self.names,self.combos,self.weights,self.targets,self.base=[],[],[],[],[]
+        self.names,self.combos,self.targets,self.base=[],[],[],[]
         self.index={}
         for name in sorted(options):
-            if name in skipped:
+            if name in TIME_CONTROL:
                 continue
             kept=[(combo,found) for combo in options[name] if not (found:=targets(name,combo,links))&touched]
             if not kept:
@@ -112,20 +111,18 @@ class Drawer:
             self.base.append(advisor.weights.get(name,1))
             self.combos.append([combo for combo,_ in kept])
             self.targets.append([found for _,found in kept])
-            self.weights.append([advisor.combo_weight(name,combo) for combo,_ in kept])
             for position,(_,found) in enumerate(kept):
                 for item in found:
                     self.index.setdefault(item,[]).append((action,position))
 
     def draw(self,rng):
         alive=[[True]*len(combos) for combos in self.combos]
-        total=[sum(weights) for weights in self.weights]
         count=[len(combos) for combos in self.combos]
         choose=self.advisor.random.choices
         batch=[]
         for n in range(rng.randint(*ACTIONS_PER_PAUSE)):
             progress('sample_batch')
-            weight={action:self.base[action]*total[action]/count[action] for action in range(len(self.names)) if count[action]}
+            weight={action:self.base[action] for action in range(len(self.names)) if count[action]}
             offered=[action for action,value in weight.items() if value>0]
             if not offered:
                 if not n:
@@ -133,20 +130,20 @@ class Drawer:
                 break
             action=choose(offered,weights=[weight[action] for action in offered])[0]
             remaining=[position for position,live in enumerate(alive[action]) if live]
-            position=choose(remaining,weights=[self.weights[action][position] for position in remaining])[0]
+            position=self.advisor.random.choice(remaining)
             batch.append((self.advisor,self.names[action],self.combos[action][position]))
             for item in self.targets[action][position]:
                 for other,slot in self.index[item]:
                     if alive[other][slot]:
                         alive[other][slot]=False
                         count[other]-=1
-                        total[other]-=self.weights[other][slot]
             if self.names[action] in ENDS_PAUSE:
                 break
         return batch
 
 
 class Loop:
+    @timed
     def __init__(self,game,advisors,rng,store,run,picker,candidates):
         self.game=game
         self.advisors=advisors
@@ -211,7 +208,7 @@ class Loop:
         options=available(snapshot)
         events=options['choose_event_option']
         for event in sorted({combo['event'] for combo in events}):
-            name,params=self.advisors[0].choose({'choose_event_option':[combo for combo in events if combo['event']==event]},snapshot)
+            name,params=self.advisors[0].choose({'choose_event_option':[combo for combo in events if combo['event']==event]})
             touched|=targets(name,params)
             self.perform(self.advisors[0].name,name,params,snapshot,batch)
         if batch:
@@ -227,10 +224,11 @@ class Loop:
         for pair in PROPOSAL_ANSWERS:
             for combo in sorted({tuple(combo.items()) for name in pair for combo in answers[name]}):
                 choices={name:[dict(combo)] for name in pair if dict(combo) in answers[name]}
-                name,params=self.advisors[0].choose({**choices,**({'quick_decline_proposal':[dict(combo)]} if dict(combo) in quick else {})},snapshot)
+                name,params=self.advisors[0].choose({**choices,**({'quick_decline_proposal':[dict(combo)]} if dict(combo) in quick else {})})
                 self.perform(self.advisors[0].name,name,params,snapshot,batch)
-        drawer=Drawer(self.advisors[0],options,snapshot,links,touched)
-        drawn=[drawer.draw(self.rng) for _ in range(self.candidates)]
+        with span('loop.run.Loop.draw_candidates','loop'):
+            drawer=Drawer(self.advisors[0],options,snapshot,links,touched)
+            drawn=[drawer.draw(self.rng) for _ in range(self.candidates)]
         chosen,predictions=self.picker.pick(drawn,snapshot)
         if predictions is not None:
             self.store.record_pick(snapshot.seq,[[name for _,name,_ in batch] for batch in drawn],predictions,chosen)
@@ -264,7 +262,6 @@ class Loop:
     def run_days(self,snapshot):
         days=self.rng.randint(*RUN_DAYS)
         entry=self.entry('loop','run_days',{'days':days},snapshot)
-        started=time.monotonic()
         reader=self.game.reader()
         target=reader.date()[0]+days*HOURS_PER_DAY
         pending=[]
@@ -296,15 +293,16 @@ class Loop:
             detail=f'{"+".join(left)} open after running days'
             for item,_,_ in pending+[(item,None,None) for item,_,_ in paused]:
                 self.note({**item,'status':'ui_leftover','detail':detail},after)
-            self.note({**entry,'ms':round((time.monotonic()-started)*1000),'status':'ui_leftover','detail':detail},after)
+            self.note({**entry,'ms':round(current().ms),'status':'ui_leftover','detail':detail},after)
             self.stuck(left)
             return after
         for item,_,_ in pending+paused:
             self.note({**item,'status':'done'},after)
-        self.note({**entry,'ms':round((time.monotonic()-started)*1000),'status':'done',
+        self.note({**entry,'ms':round(current().ms),'status':'done',
                    'detail':f'{(game_hours(after)-target)/HOURS_PER_DAY:+.1f} days past the target, longest tick gap {longest_gap*1000:.0f} ms'},after)
         return after
 
+    @timed
     def crashed(self):
         noticed=datetime.now(timezone.utc)
         LOG.error('GAME CRASHED: process %s is gone, noticed at %s UTC by the watcher',self.process.pid,noticed.strftime('%H:%M:%S.%f'))
@@ -386,6 +384,17 @@ def build(seed,countries,states,tech,pop):
     return generate(seed,countries,states,tech,pop)
 
 
+def build_apart(seed,countries,states,tech,pop):
+    world=build(seed,countries,states,tech,pop)
+    return world,RECORDER.take()
+
+
+def log_timings():
+    logging.basicConfig(level=logging.WARNING,format='%(asctime)s %(message)s')
+    logging.getLogger('interface').setLevel(logging.INFO)
+    logging.getLogger('loop').setLevel(logging.INFO)
+
+
 def world_size(rng,levels):
     states=rng.randint(*MAP['states'])
     tech,pop=levels
@@ -398,11 +407,11 @@ class WorldPool:
     def __init__(self,rng,workers,levels):
         self.rng=rng
         self.levels=levels
-        self.executor=ProcessPoolExecutor(workers)
+        self.executor=ProcessPoolExecutor(workers,initializer=log_timings)
         self.pending={self.submit() for _ in range(workers)}
 
     def submit(self):
-        return self.executor.submit(build,*world_size(self.rng,self.levels))
+        return self.executor.submit(build_apart,*world_size(self.rng,self.levels))
 
     @timed
     def take(self):
@@ -411,7 +420,9 @@ class WorldPool:
         self.pending-=done
         finished=done.pop()
         self.pending|=done|{self.submit()}
-        return finished.result()
+        world,spans=finished.result()
+        RECORDER.merge(spans)
+        return world
 
 
 WATCH=.1
@@ -434,6 +445,7 @@ class Watchdog:
                 self.trip(step,age)
                 os._exit(STALLED_EXIT)
 
+    @timed
     def trip(self,step,age):
         LOG.critical('LOOP STALLED: %s made no progress for %.1f s; the limit is %d s',step,age,STALL_LIMIT)
         try:
@@ -452,13 +464,13 @@ EXIT_GRACE_MS=1000
 CRASHES_IN_A_ROW=3
 
 
+@timed_often
 def dead(reader):
-    started=time.monotonic()
     for _ in range(DEATH_READS):
         if reader.alive():
             return False
         time.sleep(DEATH_READ_GAP)
-    LOG.error('DEFEATED: the played country owned no state in %d reads over %.0f ms',DEATH_READS,(time.monotonic()-started)*1000)
+    LOG.error('DEFEATED: the played country owned no state in %d reads over %.0f ms',DEATH_READS,current().ms)
     return True
 
 
@@ -474,6 +486,7 @@ def settle(reader):
             hours,steady=reader.date()[0],time.monotonic()
 
 
+@timed
 def running(reader):
     hours=reader.date()[0]
     deadline=time.monotonic()+RUNNING_PROBE
@@ -514,6 +527,7 @@ RECENT_ROUNDS=5
 
 @timed
 def session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,seconds):
+    RECORDER.reset()
     store=Store()
     objective=draw_objective(rng)
     advisor=advisors[rng.choice(arguments.advisors)]
@@ -547,7 +561,6 @@ def run_record(arguments,kind,world,tag,seed,generated,advisor,picker,candidates
     return {'kind':kind,'world':world,'tag':tag,'cli_seed':arguments.seed,'run_seed':seed,
             'years':arguments.years,'minutes':arguments.minutes,'profile':arguments.profile,'pool':arguments.pool,'runs_requested':arguments.runs,
             'generated':generated,'picker':picker.name,'candidates':candidates,'objective':objective,'weights':{name:advisor.weights[name] for name in ACTIONS},
-            'param_weights':[(action,param,value,weight) for action,params in advisor.param_weights.items() for param,values in params.items() for value,weight in values.items()],
             'proposal':advisor.proposal,'pick_model':picker.trained}
 
 
@@ -570,15 +583,13 @@ def main():
     if arguments.vanilla and (arguments.tech is not None or arguments.pop is not None):
         parser.error('--tech and --pop only apply to generated mini worlds')
     levels=(arguments.tech,arguments.pop)
-    logging.basicConfig(level=logging.WARNING,format='%(asctime)s %(message)s')
-    logging.getLogger('interface').setLevel(logging.INFO)
-    logging.getLogger('loop').setLevel(logging.INFO)
+    log_timings()
     game=GameInterface(arguments.profile)
     watchdog=Watchdog(game)
     watchdog.start()
     rng=random.Random(arguments.seed)
     weights={**WEIGHTS,**{name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}}
-    advisors={name:ADVISORS[name](rng.randrange(10**9),weights,PARAM_WEIGHTS) for name in sorted(set(arguments.advisors))}
+    advisors={name:ADVISORS[name](rng.randrange(10**9),weights) for name in sorted(set(arguments.advisors))}
     pickers={name:PICKERS[name]() for name in set(arguments.pickers)}
     worlds=Vanilla(rng) if arguments.vanilla else WorldPool(rng,arguments.pool,levels) if arguments.pool else Fresh(rng,levels)
     chosen=arguments.tag

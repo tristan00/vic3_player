@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import re
 
-from .common import timed
+from .common import timed, timed_often
 
 
 def blocks(text):
@@ -53,10 +53,12 @@ def scalar(text,key):
     return found[1] if found else None
 
 
+@timed_often
 def clean(path):
     return re.sub(r'"(?:\\.|[^"\\])*"|#[^\n]*',lambda m:'' if m[0][0]=='#' else m[0],path.read_text(encoding='utf-8-sig'))
 
 
+@timed_often
 def script_files(game,folder,mods=()):
     files={path.relative_to(game):path for path in (game/folder).rglob('*.txt')}
     for root in map(Path,mods):
@@ -67,7 +69,6 @@ def script_files(game,folder,mods=()):
     return [files[name] for name in sorted(files)]
 
 
-@timed
 def read(game,folder,mods=()):
     for path in script_files(game,folder,mods):
         yield from blocks(clean(path))

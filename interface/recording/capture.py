@@ -396,6 +396,7 @@ def map_data(game_dir,world):
     return Path(world['mod'])/'map_data' if world else Path(game_dir)/'game'/'map_data'
 
 
+@timed
 def province_block(maps):
     colors=list(dict.fromkeys('x'+color[1:].upper() for name in ('province_terrains.txt','default.map')
                               for color in re.findall(r'x[0-9A-Fa-f]{6}',(maps/name).read_text(encoding='utf-8-sig'))))

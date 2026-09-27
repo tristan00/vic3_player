@@ -17,7 +17,7 @@ from ..script import clean, read, scalar
 from .vanilla import boxes, rasters, textures, vanilla
 from .nations import nations, word
 
-MAP={'states':(15,60),'country_share':(1/8,1/5),'tech':(.5,1.2),'pop':(.5,1.2)}
+MAP={'states':(20,100),'country_share':(1/8,1/5),'tech':(.5,1.2),'pop':(.5,1.2)}
 PROVINCE_PIXELS=2000
 SEA_ID=3000
 NAVAL=83886
@@ -344,6 +344,7 @@ def _absent(text,tags):
     return re.sub(r'\bc:([A-Z0-9]{3})\s*\??=\s*(?=[\w:.])([\w:.]+)',lambda m:m[0] if m[1] in tags else 'always = no',text)
 
 
+@timed
 def _rewrites(game,states,strategic,regions,tags):
     state_map={}
     for state in states:

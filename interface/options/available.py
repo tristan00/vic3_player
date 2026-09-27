@@ -308,6 +308,7 @@ def play_allowed(s,play,**saved):
             and all(passes(s,'common/war_goal_types',goal,('possible','valid'),scope) for goal in goals))
 
 
+@timed
 def recently_disbanded(s):
     def compute():
         rows=s.connection.execute('''select t.name,g.game_date from company_history h

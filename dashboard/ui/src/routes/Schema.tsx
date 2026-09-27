@@ -10,6 +10,9 @@ export function Schema() {
       <Section title="capture_gap">
         <DataGrid id="gaps" url="/api/meta/capture_gap" limit={500} />
       </Section>
+      <Section title="dashboard timing">
+        <DataGrid id="timing" url="/api/timing" initial={{ sort: 'total_ms', desc: true }} limit={500} />
+      </Section>
     </div>
   )
 }

@@ -3,20 +3,19 @@ import contextlib
 from dataclasses import dataclass
 import logging
 from pathlib import Path
-import time
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from loop.run import WEIGHTS
 
 from interface.recording.spec import ENTITIES, TABLE
+from interface.timing import COLUMNS, RECORDER, TRACE, span
 
 from . import actions, blocks, changes, db, meta, policy, runs, schema, tables
-from .grid import parse_filters
-from .models import ActionInfo, EntityInfo, Grid, OpenRun, RunInfo, Series, SeriesChoice
+from .grid import Spec, grid, parse_filters, rows_source
+from .models import ActionInfo, EntityInfo, Grid, OpenRun, RunInfo, RunReward, Series, SeriesChoice
 
 LOG=logging.getLogger('dashboard')
 DIST=Path(__file__).resolve().parents[1]/'ui'/'dist'
@@ -46,13 +45,14 @@ async def timing(request:Request,call_next):
     if not request.url.path.startswith('/api/') or request.url.path=='/api/events':
         return await call_next(request)
     trace=[]
-    token=db.TRACE.set(trace)
-    started=time.perf_counter()
-    try:
-        response=await call_next(request)
-    finally:
-        db.TRACE.reset(token)
-    ms=(time.perf_counter()-started)*1000
+    with span(request.method,'dashboard',logging.DEBUG) as whole:
+        token=TRACE.set(trace)
+        try:
+            response=await call_next(request)
+        finally:
+            TRACE.reset(token)
+            whole.name=f'{request.method} {request.scope["route"].path}'
+    ms=whole.ms
     slowest=sorted(trace,key=lambda item:-item[1])[:6]
     LOG.warning('API %s %s %d %.0fms %s',request.method,request.url.path+('?'+request.url.query if request.url.query else ''),response.status_code,ms,
                 ' '.join(f'{name}={took:.0f}ms' for name,took in slowest))
@@ -122,6 +122,31 @@ def get_rounds(p:Page=Depends(page))->Grid:
 @app.get('/api/runs/{run_id}')
 def get_run(run_id:int)->RunInfo:
     return found(runs.run_info(run_id),f'run {run_id}')
+
+
+@app.get('/api/runs/{run_id}/record')
+def get_run_record(run_id:int)->Grid:
+    return meta.run_record(run_id)
+
+
+@app.get('/api/runs/{run_id}/outcomes')
+def get_outcomes(run_id:int)->list[Series]:
+    return runs.run_outcomes(run_id)
+
+
+@app.get('/api/policy/runs/{run_id}')
+def get_policy_record(run_id:int)->Grid:
+    return meta.policy_record(run_id)
+
+
+@app.get('/api/policy/runs/{run_id}/pauses')
+def get_pauses(run_id:int,p:Page=Depends(page))->Grid:
+    return policy.pauses(run_id,*p.args())
+
+
+@app.get('/api/policy/runs/{run_id}/reward')
+def get_reward(run_id:int)->RunReward:
+    return found(runs.run_reward(run_id),f'run {run_id}')
 
 
 @app.get('/api/runs/{run_id}/groups')
@@ -207,7 +232,7 @@ def get_action_stats(scope:str='all',p:Page=Depends(page))->Grid:
 def get_action(name:str)->ActionInfo:
     if name not in runs.GROUPS:
         raise HTTPException(404,f'no action {name}')
-    return ActionInfo(action=name,group=runs.GROUPS[name],weight=WEIGHTS.get(name,1),params=actions.param_specs(name))
+    return ActionInfo(action=name,group=runs.GROUPS[name],params=actions.param_specs(name))
 
 
 @app.get('/api/actions/{name}/runs')
@@ -230,9 +255,9 @@ def get_configs(p:Page=Depends(page))->Grid:
     return policy.configs(*p.args())
 
 
-@app.get('/api/policy/scored')
-def get_scored(p:Page=Depends(page))->Grid:
-    return policy.scored(*p.args())
+@app.get('/api/policy/runs')
+def get_run_policies(p:Page=Depends(page))->Grid:
+    return policy.run_policies(*p.args())
 
 
 @app.get('/api/policy/picker-actions')
@@ -243,6 +268,13 @@ def get_picker_actions(p:Page=Depends(page))->Grid:
 @app.get('/api/schema')
 def get_schema(p:Page=Depends(page))->Grid:
     return schema.schema_grid(*p.args())
+
+
+@app.get('/api/timing')
+def get_timing(p:Page=Depends(page))->Grid:
+    source,params=rows_source(['text','int8','int8']+['float8']*7,RECORDER.totals())
+    specs=[Spec(name,'text' if name=='span' else 'number',f't.v{i}') for i,name in enumerate(COLUMNS)]
+    return grid(specs,source,params,*p.args(),None,['span'])
 
 
 @app.get('/api/events')
@@ -258,12 +290,15 @@ async def events(request:Request):
     return StreamingResponse(stream(),media_type='text/event-stream',headers={'cache-control':'no-cache'})
 
 
+@app.api_route('/api/{path:path}',methods=['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS'],include_in_schema=False)
+def no_route(path:str):
+    raise HTTPException(404,f'no route /api/{path}')
+
+
 if DIST.exists():
     app.mount('/assets',StaticFiles(directory=DIST/'assets'),name='assets')
 
     @app.get('/{path:path}',include_in_schema=False)
     def spa(path:str):
-        if path.startswith('api/'):
-            raise HTTPException(404,f'no route /{path}')
         asset=DIST/path
         return FileResponse(asset if path and asset.is_file() and asset.resolve().is_relative_to(DIST) else DIST/'index.html')

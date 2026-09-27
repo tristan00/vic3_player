@@ -213,7 +213,7 @@ export function Pager({ offset, limit, shown, total, onOffset, onLimit }: { offs
         next
       </button>
       <select value={limit} onChange={(e) => onLimit(Number(e.target.value))} className="border-line rounded border px-1 py-0.5">
-        {LIMITS.map((l) => (
+        {[...new Set([limit, ...LIMITS])].sort((a, b) => a - b).map((l) => (
           <option key={l} value={l}>
             {l}
           </option>
@@ -258,7 +258,7 @@ export function DataGrid({
   const grid = state.data
   const pinned = grid?.keys ? grid.keys.every((k) => filters.some((f) => f.startsWith(`${k}:`))) : false
   return (
-    <div className="space-y-1.5">
+    <div className="w-fit max-w-full min-w-80 space-y-1.5">
       <div className="flex flex-wrap items-center gap-2">
         {toolbar}
         {g.filters.map((f, i) => (
@@ -304,19 +304,18 @@ export function DataGrid({
   )
 }
 
-export function Record({ grid }: { grid: Grid }) {
-  if (grid.rows.length !== 1) return <GridTable grid={grid} />
+function Pairs({ grid, idx }: { grid: Grid; idx: number[] }) {
   const row = grid.rows[0]
   return (
     <Card className="w-fit max-w-full overflow-hidden">
       <div className="tablewrap">
         <table className="text-xs">
           <tbody>
-            {grid.columns.map((c, i) => (
-              <tr key={c.name} className="border-line/60 border-b last:border-0">
-                <td className="text-dim px-2 py-0.5 whitespace-nowrap">{c.name}</td>
-                <td className={cn('px-2 py-0.5 whitespace-nowrap', right(c) && 'num')}>
-                  <CellValue col={c} cell={row[i]} run={grid.run} />
+            {idx.map((i) => (
+              <tr key={grid.columns[i].name} className="border-line/60 border-b last:border-0">
+                <td className="text-dim px-2 py-0.5 whitespace-nowrap">{grid.columns[i].label}</td>
+                <td className={cn('px-2 py-0.5 whitespace-nowrap', right(grid.columns[i]) && 'num')}>
+                  <CellValue col={grid.columns[i]} cell={row[i]} run={grid.run} />
                 </td>
               </tr>
             ))}
@@ -324,5 +323,26 @@ export function Record({ grid }: { grid: Grid }) {
         </table>
       </div>
     </Card>
+  )
+}
+
+export function Record({ grid }: { grid: Grid }) {
+  if (grid.rows.length !== 1) return <GridTable grid={grid} />
+  const sections: { group: string | null; idx: number[] }[] = []
+  grid.columns.forEach((c, i) => {
+    const g = c.group ?? null
+    const last = sections[sections.length - 1]
+    if (last && last.group === g) last.idx.push(i)
+    else sections.push({ group: g, idx: [i] })
+  })
+  return (
+    <div className="flex flex-wrap items-start gap-4">
+      {sections.map((s) => (
+        <div key={s.group ?? ''} className="min-w-0">
+          {s.group && <div className="text-dim mb-1 text-2xs">{s.group}</div>}
+          <Pairs grid={grid} idx={s.idx} />
+        </div>
+      ))}
+    </div>
   )
 }

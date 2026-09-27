@@ -13,7 +13,8 @@ SYNTHETIC={'strategic_region'}
 SLOTS=16
 PARAMS=2
 NONE='none'
-NUMBERS=['treasury','debt','interest','balance','population','bureaucracy_available','standard_of_living']
+NUMBERS=['treasury','debt','interest','balance','population','bureaucracy_available','standard_of_living','construction_queue_items','construction_queue_left',
+         'construction_capacity']
 CATEGORIES=[f'action{slot}.{part}' for slot in range(1,SLOTS+1) for part in ['type']+[f'param{index}' for index in range(1,PARAMS+1)]]
 LAW_GROUP={key:scalar(value,'group') for key,value in read(DEFAULT_GAME/'game','common/laws')}
 LAW_GROUPS=sorted(set(LAW_GROUP.values()))
@@ -64,6 +65,7 @@ def majority(rows):
     return {key:kind for key,(_,kind) in best.items()}
 
 
+@timed
 def interest_line(connection):
     return connection.execute('select line from budget_line where direction=%s and name=%s',INTEREST).fetchone()[0]
 
@@ -74,6 +76,7 @@ class LiveLookup:
         self.__dict__.update(snapshot.memo('feature_lookups',lambda:self.load(snapshot)))
 
     @staticmethod
+    @timed
     def load(s):
         world=s.connection.execute('select world_id from run where run_id=%s',(s.run_id,)).fetchone()[0]
         names,rows=s.table('player_treasury')
@@ -83,6 +86,8 @@ class LiveLookup:
         names,rows=s.table('player_politics')
         politics=dict(zip(names,rows[0]))
         sol=s.map('country_standard_of_living_report','country,average_standard_of_living_by_population').get(s.player)
+        queue=[left for left, in s.rows('player_construction_queue_item','construction_left')]
+        capacity=s.map('country_construction_report','country,base_construction_speed').get(s.player)
         line=interest_line(s.connection)
         return {'terrain':{region:kind for (_,region),kind in majority(s.connection.execute(TERRAIN,([world],)).fetchall()).items()},
                 'states':{state:(region,country) for state,region,country in s.rows('state','state,state_region,country')},
@@ -96,7 +101,8 @@ class LiveLookup:
                 'numbers':[treasury['money'],treasury['principal'],
                            sum(amount for direction,found,amount in s.rows('player_budget_line','direction,line,amount') if direction==INTEREST[0] and found==line),
                            treasury['balance_trend_current'],population['lower_strata']+population['middle_strata']+population['upper_strata'],
-                           politics['power_delta_bureaucracy'],float('nan') if sol is None else sol]}
+                           politics['power_delta_bureaucracy'],float('nan') if sol is None else sol,len(queue),sum(queue),
+                           float('nan') if capacity is None else capacity]}
 
     def state(self,state):
         return self.states.get(state,(None,None))
@@ -115,6 +121,7 @@ class LiveLookup:
 
 
 class Versions:
+    @timed
     def __init__(self,connection,table,keys,columns,runs):
         spec=TABLE[table]
         vocabularies={column.name:column.vocabulary for column in list(spec.keys)+list(spec.columns) if column.vocabulary}
@@ -143,6 +150,7 @@ class Versions:
 
 
 class Samples:
+    @timed
     def __init__(self,connection,table,columns,runs):
         self.index={}
         for run,seq,*values in connection.execute(f'select run_id,seq,{",".join(columns)} from {table} where run_id = any(%s) order by run_id,seq',(runs,)).fetchall():
@@ -178,6 +186,8 @@ class History:
         self.population=Samples(connection,'player_population',['lower_strata','middle_strata','upper_strata'],runs)
         self.politics=Samples(connection,'player_politics',['power_delta_bureaucracy'],runs)
         self.sol=load('country_standard_of_living_report',['country'],['average_standard_of_living_by_population'])
+        self.queue=load('player_construction_queue_item',['private','position'],['construction_left'])
+        self.capacity=load('country_construction_report',['country'],['base_construction_speed'])
         self.institution_rows=load('institution_history',['institution'],['institution_type','country','investment'])
 
     def at(self,run,seq):
@@ -201,7 +211,10 @@ class HistoryLookup:
             return None
         interest=self.h.budget.at(self.run,(INTEREST[0],self.h.interest),self.seq)
         sol=self.h.sol.at(self.run,(self.player,),self.seq)
-        return [treasury[0],treasury[1],interest[0] if interest else 0,treasury[2],sum(population),politics[0],float('nan') if sol is None else sol[0]]
+        queue=[left for left, in self.h.queue.live(self.run,self.seq)]
+        capacity=self.h.capacity.at(self.run,(self.player,),self.seq)
+        return [treasury[0],treasury[1],interest[0] if interest else 0,treasury[2],sum(population),politics[0],float('nan') if sol is None else sol[0],
+                len(queue),sum(queue),float('nan') if capacity is None else capacity[0]]
 
     @property
     def institutions(self):

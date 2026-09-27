@@ -9,6 +9,7 @@ from interface.actions.catalogue import BY_NAME
 from .runs import LOOP_PARAMS
 
 
+@db.timed
 def last_seq(run_id):
     return db.value('select max(seq) from snapshot where run_id=%s',(run_id,))
 
@@ -121,6 +122,7 @@ def run_kinds(run_id,filters,sort,desc,offset,limit):
     return grid(specs,f'from ({source}) u',{'run':run_id},filters,sort,desc,offset,limit,run_id,['kind'])
 
 
+@db.timed
 def snapshot_at(run_id,seq):
     last=last_seq(run_id)
     if last is None:

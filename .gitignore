@@ -6,3 +6,4 @@ __pycache__/
 .claude/scheduled_tasks.lock
 node_modules/
 dashboard/ui/dist/
+catboost_info/

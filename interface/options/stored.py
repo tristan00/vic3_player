@@ -1,5 +1,5 @@
 from ..actions.catalogue import action_folders
-from ..common import timed
+from ..common import timed, timed_often
 from ..recording.spec import VOCABULARIES
 from ..runner.memory import MONTH_STARTS
 
@@ -53,11 +53,13 @@ class Stored:
         self.names={}
         self.cache={}
 
+    @timed_often
     def vocabulary(self,name):
         if name not in self.names:
             self.names[name]=dict(self.connection.execute(f'select {name},name from {name}').fetchall())
         return self.names[name]
 
+    @timed_often
     def table(self,table):
         stored=table+'_history' if table+'_history' in self.tables else table
         def compute():
@@ -97,15 +99,18 @@ class Stored:
             self.cache[signature]=result
         return self.cache[signature]
 
+    @timed_often
     def adjacency(self):
         def compute():
             world_id,=self.connection.execute('select world_id from run where run_id=%s',(self.run_id,)).fetchone()
             return world_adjacency(self.connection,world_id)
         return self.memo('adjacency',compute)
 
+    @timed_often
     def province_colors(self):
         return self.memo('province_colors',lambda:dict(self.connection.execute('select province,color from province where run_id=%s',(self.run_id,)).fetchall()))
 
+    @timed_often
     def first_seen(self,table):
         return self.memo(('first_seen',table),lambda:dict(self.connection.execute(f'select {table},first_seq from {table} where run_id=%s',(self.run_id,)).fetchall()))
 
@@ -114,6 +119,7 @@ class Stored:
             self.cache[key]=compute()
         return self.cache[key]
 
+    @timed_often
     def definitions(self,folder):
         def compute():
             table={}
@@ -123,6 +129,7 @@ class Stored:
             return table
         return self.memo(('definitions',folder),compute)
 
+    @timed_often
     def order(self,folder):
         return self.memo(('order',folder),lambda:[name for name, in self.connection.execute(
             'select name from ruleset_definition where ruleset_id=%s and folder=%s order by position',(self.ruleset_id,folder))])
@@ -131,6 +138,7 @@ class Stored:
         return self.order(action_folders()[kind])
 
     @property
+    @timed_often
     def methods(self):
         return self.memo('methods',lambda:self.connection.execute(
             'select b.name,g.name,m.name from building_production_method p join building_type b using (building_type) '
@@ -138,6 +146,7 @@ class Stored:
             (self.ruleset_id,)).fetchall())
 
     @property
+    @timed_often
     def dlc(self):
         return self.memo('dlc',lambda:[name for name, in self.connection.execute('select name from dlc where ruleset_id=%s',(self.ruleset_id,))])
 

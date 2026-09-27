@@ -53,9 +53,9 @@ class OpenRun(BaseModel):
 class RewardPart(BaseModel):
     component:str
     weight:float
-    change:float
-    divisor:float
-    discounted:float
+    gain:float
+    years_alpha:float
+    gain_per_years_alpha:float
     scale:float
     normalized:float
     contribution:float
@@ -68,8 +68,14 @@ class RunInfo(BaseModel):
     player_label:str|None
     state:LiveState
     last_seq:int|None
-    reward_years:float|None
-    reward_parts:list[RewardPart]
+    last_action:int|None
+    previous:int|None
+    next:int|None
+
+
+class RunReward(BaseModel):
+    years:float|None
+    parts:list[RewardPart]
 
 
 class SeriesChoice(BaseModel):
@@ -119,5 +125,4 @@ class ParamSpec(BaseModel):
 class ActionInfo(BaseModel):
     action:str
     group:str
-    weight:float
     params:list[ParamSpec]

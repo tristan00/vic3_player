@@ -743,15 +743,6 @@ create table run_weight (
   primary key (run_id, action)
 );
 
-create table run_param_weight (
-  run_id int4 not null references run,
-  action int4 not null references action,
-  param text not null,
-  value text not null,
-  weight float8 not null,
-  primary key (run_id, action, param, value)
-);
-
 create table smac_proposal (
   run_id int4 primary key references run,
   method text not null check (method in ('default', 'random', 'expected_improvement')),
@@ -800,7 +791,21 @@ create table pick_model (
   run_id int4 primary key references run,
   pauses int4 not null,
   runs int4 not null,
-  seconds float8 not null
+  seconds float8 not null,
+  iterations int4 not null,
+  depth int2 not null,
+  learning_rate float8 not null,
+  loss_function text not null,
+  random_seed int4 not null,
+  thread_count int2 not null,
+  rsm float8 not null
+);
+
+create table pick_importance (
+  run_id int4 not null references pick_model,
+  feature text not null,
+  importance float8 not null,
+  primary key (run_id, feature)
 );
 
 create table pick_candidate_action (
@@ -877,6 +882,37 @@ create table loop_action_param (
   foreign key (run_id, n, action) references loop_action (run_id, n, action),
   foreign key (action, name) references action_parameter,
   check ((integer_value is null) <> (text_value is null))
+);
+
+create table run_timing (
+  run_id int4 not null references run,
+  span text not null,
+  calls int4 not null check (calls > 0),
+  errors int4 not null check (errors between 0 and calls),
+  total_ms float8 not null,
+  self_ms float8 not null check (self_ms >= 0),
+  min_ms float8 not null check (min_ms >= 0),
+  max_ms float8 not null,
+  p50_ms float8 not null,
+  p95_ms float8 not null,
+  p99_ms float8 not null,
+  primary key (run_id, span),
+  check (self_ms <= total_ms and max_ms <= total_ms),
+  check (min_ms <= p50_ms and p50_ms <= p95_ms and p95_ms <= p99_ms and p99_ms <= max_ms)
+);
+
+create table snapshot_timing (
+  run_id int4 not null,
+  seq int4 not null,
+  span text not null,
+  calls int4 not null check (calls > 0),
+  errors int4 not null check (errors between 0 and calls),
+  total_ms float8 not null,
+  self_ms float8 not null check (self_ms >= 0),
+  max_ms float8 not null check (max_ms >= 0),
+  primary key (run_id, seq, span),
+  foreign key (run_id, seq) references snapshot,
+  check (self_ms <= total_ms and max_ms <= total_ms)
 );
 
 create table country (

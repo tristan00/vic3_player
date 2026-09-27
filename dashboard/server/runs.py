@@ -3,11 +3,12 @@ from interface.common import STALL_LIMIT
 from interface.recording.spec import F, I2, I4, I8, TABLE
 from psycopg.rows import tuple_row
 
-from advisors.random_smac_weighting import breakdown, outcomes
+from advisors.random_smac_weighting import COMPONENTS, breakdown, outcomes
+from advisors.random_smac_weighting import series as component_series
 
 from . import db
 from .grid import Spec, grid
-from .models import OpenRun, RewardPart, RunInfo, Series, SeriesChoice
+from .models import OpenRun, RewardPart, RunInfo, RunReward, Series, SeriesChoice
 from .names import LAYOUTS, labels
 
 LOST_AFTER=.5
@@ -23,8 +24,8 @@ RUN_FROM='from run r join country_definition d on d.country_definition=r.tag'
 
 @db.timed
 def runs_grid(filters,sort,desc,offset,limit):
-    specs=[Spec('run','run','r.run_id'),Spec('round','round','r.cli_seed'),Spec('kind','text','r.kind'),Spec('country','text','d.name'),
-           Spec('world_file','text','r.world_file'),Spec('state','text',STATE),Spec('end_reason','text','r.end_reason'),Spec('end_detail','text','r.end_detail'),
+    specs=[Spec('run','run','r.run_id'),Spec('round','round','r.cli_seed',hidden=True),Spec('kind','text','r.kind'),Spec('country','text','d.name'),
+           Spec('state','text',STATE),Spec('end_reason','text','r.end_reason'),
            Spec('started_at','time','r.started_at'),Spec('ended_at','time','r.ended_at'),
            Spec('wall_s','number','extract(epoch from coalesce(r.ended_at,now())-r.started_at)'),Spec('minutes','number','r.minutes'),Spec('years','number','r.years'),
            Spec('game_from','date','(select game_date from snapshot s where s.run_id=r.run_id order by seq limit 1)'),
@@ -63,12 +64,35 @@ def run_info(run_id):
     found=db.row(f'select r.*,d.name as country,{STATE} as state {RUN_FROM} where r.run_id=%s',(run_id,))
     if found is None:
         return None
+    player=labels(run_id,'country',[found['player_country']])[found['player_country']]
+    near=db.row('''select (select max(seq) from snapshot where run_id=%(run)s) as last_seq,(select max(n) from loop_action where run_id=%(run)s) as last_action,
+                          (select max(run_id) from run where run_id<%(run)s) as previous,(select min(run_id) from run where run_id>%(run)s) as next''',{'run':run_id})
+    return RunInfo(run=run_id,country=found['country'],player=found['player_country'],player_label=player,state=found['state'],**near)
+
+
+@db.timed
+def run_reward(run_id):
+    found=db.row('select * from run where run_id=%s',(run_id,))
+    if found is None:
+        return None
     changes=reward_changes()
     years,parts=breakdown(changes,goal(found),run_id) if run_id in changes else (None,[])
-    player=labels(run_id,'country',[found['player_country']])[found['player_country']]
-    last=db.value('select max(seq) from snapshot where run_id=%s',(run_id,))
-    return RunInfo(run=run_id,country=found['country'],player=found['player_country'],player_label=player,state=found['state'],last_seq=last,
-                   reward_years=years,reward_parts=[RewardPart(**part) for part in parts])
+    return RunReward(years=years,parts=[RewardPart(**part) for part in parts])
+
+
+@db.timed
+def run_outcomes(run_id):
+    seqs={}
+    for f in db.rows('select seq,game_date from snapshot where run_id=%s order by seq',(run_id,)):
+        seqs.setdefault(f['game_date'],f['seq'])
+    out=[]
+    with db.POOL.connection() as connection:
+        cursor=connection.cursor(row_factory=tuple_row)
+        for component in COMPONENTS:
+            points=component_series(cursor,component,[run_id]).get(run_id,[])
+            out.append(Series(table=component,column=component,x='game_hours',xs=[h for h,_ in points],values=[float(v) for _,v in points],
+                              seqs=[seqs[h] for h,_ in points],hours=[h for h,_ in points]))
+    return out
 
 
 @db.timed

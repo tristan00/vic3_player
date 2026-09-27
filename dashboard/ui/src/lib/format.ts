@@ -10,6 +10,7 @@ export function n(v: number | null | undefined, digits = 0): string {
 }
 
 export function num(v: number): string {
+  if (v === 0) return '0'
   if (Number.isInteger(v)) return v.toLocaleString()
   const a = Math.abs(v)
   if (a !== 0 && a < 0.001) return v.toPrecision(3)

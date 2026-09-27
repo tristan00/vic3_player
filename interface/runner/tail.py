@@ -7,7 +7,7 @@ import re
 import threading
 import time
 
-from ..common import timed
+from ..common import timed, timed_often
 
 kernel=ctypes.WinDLL('kernel32',use_last_error=True)
 kernel.CreateFileW.restype=wintypes.HANDLE
@@ -22,6 +22,7 @@ STAMP=re.compile(rb'^\[(\d\d:\d\d:\d\d)\]')
 INVALID=wintypes.HANDLE(-1).value
 
 
+@timed_often
 def shared_read(path,offset):
     handle=kernel.CreateFileW(str(path),0x80000000,7,None,3,0x80,None)
     if handle==INVALID:
@@ -36,6 +37,7 @@ def rotation(path):
 
 
 class LogTail:
+    @timed_often
     def __init__(self,directory,store,since=''):
         self.directory=directory
         self.since=since.encode()
@@ -71,6 +73,7 @@ class LogTail:
     def continues(self,path,size):
         return size>=self.offset and shared_read(path,self.offset-len(self.last))[:len(self.last)]==self.last
 
+    @timed_often
     def step(self):
         with self.lock:
             files=self.files()

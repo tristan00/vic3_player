@@ -10,7 +10,7 @@ import weakref
 
 import numpy as np
 
-from ..common import DEFAULT_GAME, GameCrashed, progress, timed
+from ..common import DEFAULT_GAME, GameCrashed, progress, timed, timed_often
 from ..script import read, scalar
 from ..visibility import Visibility
 
@@ -226,6 +226,7 @@ class Reader:
             result[slot]=[shown.get(ordinal,(ordinal,-1,0,0,None,None)) for ordinal in range(total)]
         return result
 
+    @timed_often
     def variables(self,names):
         country=self.player()
         _,slots,addresses=self.objects(self.tables['country']['rva'])
@@ -309,6 +310,7 @@ class Reader:
     def control_targets(self):
         return {name:address+24 for name,address in self.variables(CONTROL_VARIABLES).items()}
 
+    @timed_often
     def write(self,writes):
         handle=kernel.OpenProcess(0x28,False,self.pid)
         if not handle:
@@ -557,6 +559,7 @@ class Reader:
         self.key_columns.add(('market_goods','goods'))
         return rows
 
+    @timed_often
     def table(self,name,visible=None):
         spec=self.tables[name]
         if 'root' in spec:

@@ -8,7 +8,7 @@ from .runs import GROUPS, LOOP_PARAMS, STATUSES
 
 ALIASES={'military_formation':'formation'}
 GROUP_VALUES='(values '+','.join(f"('{name}','{group}')" for name,group in GROUPS.items())+') grp(name,grp)'
-ACTION_FROM=f'''from loop_action l join action a using (action) join advisor v using (advisor) join snapshot s on s.run_id=l.run_id and s.seq=l.before_seq
+ACTION_FROM=f'''from loop_action l join action a using (action) join snapshot s on s.run_id=l.run_id and s.seq=l.before_seq
 join {GROUP_VALUES} on grp.name=a.name'''
 
 
@@ -22,6 +22,7 @@ def entity_of(kind):
     return kind if kind in ENTITIES else None
 
 
+@db.timed
 def param_columns(matched,params):
     found=db.rows(f'select distinct a.name as action,p.name from loop_action_param p join loop_action l using (run_id,n) join action a on a.action=l.action '
                   f'where (l.run_id,l.n) in ({matched})',params)
@@ -40,7 +41,7 @@ def param_columns(matched,params):
 def action_grid(where,params,filters,sort,desc,offset,limit,run_id=None):
     base=([Spec('run','run','l.run_id')] if run_id is None else [])+[
         Spec('n','n','l.n',run=None if run_id else 'run'),Spec('turn','number','l.turn'),Spec('game_date','date','s.game_date'),Spec('action','action','a.name'),
-        Spec('group','text','grp.grp'),Spec('advisor','text','v.name'),Spec('status','text','l.status'),Spec('detail','text','l.detail'),Spec('ms','number','l.ms'),
+        Spec('group','text','grp.grp'),Spec('status','text','l.status'),Spec('detail','text','l.detail'),Spec('ms','number','l.ms'),
         Spec('before_seq','seq','l.before_seq',run=None if run_id else 'run'),Spec('after_seq','seq','l.after_seq',run=None if run_id else 'run'),
         Spec('logged_at','time','l.logged_at')]
     chosen,extra=where_clause(base,[f for f in filters if not f[0].startswith('param.')])
