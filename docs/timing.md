@@ -10,9 +10,9 @@ Every function in `interface`, `loop`, `advisors` and `dashboard/server` is time
 
 | state | functions |
 | --- | --- |
-| timed by a decorator | 904 |
-| listed by name, inside a timed caller | 67 |
-| in a file listed as a whole | 87 |
+| timed by a decorator | 905 |
+| listed by name, inside a timed caller | 72 |
+| in a file listed as a whole | 82 |
 
 Reasons a function may be listed:
 
