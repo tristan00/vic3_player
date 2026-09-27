@@ -14,8 +14,15 @@ class RandomAdvisor:
 
     def __init__(self,seed=None,weights=None,param_weights=None):
         self.random=random.Random(seed)
-        self.weights=weights or {}
+        self.base=weights or {}
+        self.weights=dict(self.base)
         self.param_weights=param_weights or {}
+        self.proposal=None
+
+    def start_run(self,store,actions,objective):
+        self.weights={name:0 if self.base.get(name,1)==0 else 1 for name in actions}
+        self.param_weights={}
+        return self.weights
 
     def combo_weight(self,name,combo):
         weight=1

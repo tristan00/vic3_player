@@ -10,11 +10,15 @@ import threading
 import time
 
 from advisors import ADVISORS
+from advisors.random_picker import TIME_CONTROL, backlogged
+from advisors.pickers import PICKERS
+from advisors.random_smac_weighting import draw_objective
 from interface import GameInterface, generate, record
 from interface.actions import Executor
 from interface.actions.catalogue import BY_NAME, GROUP
 from interface.common import STALL_LIMIT, GameCrashed, progress, progress_age, timed
 from interface.recording.store import Store
+from interface.world.generate import MAP
 from interface.options import available
 from interface.options.stored import Stored
 
@@ -31,17 +35,17 @@ ACTIONS_PER_PAUSE=(6,16)
 ENDS_PAUSE={'capitulate','back_down','white_peace','declare_bankruptcy','leave_power_bloc'}
 PARKED=set()
 RUN_DAYS=(10,90)
-WORLD_STATES=(25,150)
 PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
 WEIGHTS={'start_play_country':0,'start_play_state':0,'start_play_confirmed':0,'add_war_goal':0,'make_primary_demand':0,'dequeue_research':0,'cancel_construction':0,'cancel_queue_item':0,
          'build':3,'research':3,'create_army':.01,'enact_law':2,'switch_production_method':3,'bulk_switch_production_method_state':3,'deploy_to_front':5,'set_strategic_objective':3,'mobilize':5,'mobilize_all':5,'raise_conscripts':3,
          'cancel_enactment':.1,'nationalize':.1,'bulk_nationalize_state':.1,'demobilize':.2,'demobilize_all':.2,'downsize':.1,'pause_construction':.01,'pause_all_construction':.01,
-         'disband_formation':.1,'disband_regulars':.1,'disband_conscripts':.1,'decommission_ship':.1,'cancel_ship':.1,'cancel_ship_item':.1,'delete_ship_template':.1,'declare_bankruptcy':.1,
+         'disband_formation':.1,'disband_regulars':.1,'disband_conscripts':.1,'declare_bankruptcy':.1,
          'abandon_colony':.1,'unincorporate':.1,'remove_company':.1,'remove_decree':.1,'capitulate':.1,'white_peace':.1,'leave_power_bloc':.01,'kick_from_power_bloc':.01}
+WEIGHTS={**{name:.1 for name in BY_NAME if GROUP[name]=='navy'},**WEIGHTS}
 PARAM_WEIGHTS={'build':{'building_type':{'building_construction_sector':3}}}
 HOURS_PER_DAY=24
-MAX_TECH=2
-POP_RANGE=(.5,2)
+ACTIONS=[name for name in BY_NAME if GROUP[name]!='time']
+CANDIDATES=(1,100)
 HOURS_PER_YEAR=365*HOURS_PER_DAY
 
 
@@ -90,10 +94,64 @@ def game_hours(snapshot):
     return snapshot.hours
 
 
+class Drawer:
+    def __init__(self,advisor,options,snapshot,links,touched):
+        self.advisor=advisor
+        self.seq=snapshot.seq
+        skipped=TIME_CONTROL|({'build'} if options.get('build') and backlogged(snapshot) else set())
+        self.names,self.combos,self.weights,self.targets,self.base=[],[],[],[],[]
+        self.index={}
+        for name in sorted(options):
+            if name in skipped:
+                continue
+            kept=[(combo,found) for combo in options[name] if not (found:=targets(name,combo,links))&touched]
+            if not kept:
+                continue
+            action=len(self.names)
+            self.names.append(name)
+            self.base.append(advisor.weights.get(name,1))
+            self.combos.append([combo for combo,_ in kept])
+            self.targets.append([found for _,found in kept])
+            self.weights.append([advisor.combo_weight(name,combo) for combo,_ in kept])
+            for position,(_,found) in enumerate(kept):
+                for item in found:
+                    self.index.setdefault(item,[]).append((action,position))
+
+    def draw(self,rng):
+        alive=[[True]*len(combos) for combos in self.combos]
+        total=[sum(weights) for weights in self.weights]
+        count=[len(combos) for combos in self.combos]
+        choose=self.advisor.random.choices
+        batch=[]
+        for n in range(rng.randint(*ACTIONS_PER_PAUSE)):
+            progress('sample_batch')
+            weight={action:self.base[action]*total[action]/count[action] for action in range(len(self.names)) if count[action]}
+            offered=[action for action,value in weight.items() if value>0]
+            if not offered:
+                if not n:
+                    raise GameCrashed(f'No selectable action during the pause at snapshot {self.seq}')
+                break
+            action=choose(offered,weights=[weight[action] for action in offered])[0]
+            remaining=[position for position,live in enumerate(alive[action]) if live]
+            position=choose(remaining,weights=[self.weights[action][position] for position in remaining])[0]
+            batch.append((self.advisor,self.names[action],self.combos[action][position]))
+            for item in self.targets[action][position]:
+                for other,slot in self.index[item]:
+                    if alive[other][slot]:
+                        alive[other][slot]=False
+                        count[other]-=1
+                        total[other]-=self.weights[other][slot]
+            if self.names[action] in ENDS_PAUSE:
+                break
+        return batch
+
+
 class Loop:
-    def __init__(self,game,advisors,rng,store,run):
+    def __init__(self,game,advisors,rng,store,run,picker,candidates):
         self.game=game
         self.advisors=advisors
+        self.picker=picker
+        self.candidates=candidates
         self.rng=rng
         self.store=store
         self.store.catalogue([name for name in BY_NAME if GROUP[name]!='time'])
@@ -171,17 +229,13 @@ class Loop:
                 choices={name:[dict(combo)] for name in pair if dict(combo) in answers[name]}
                 name,params=self.advisors[0].choose({**choices,**({'quick_decline_proposal':[dict(combo)]} if dict(combo) in quick else {})},snapshot)
                 self.perform(self.advisors[0].name,name,params,snapshot,batch)
-        for n in range(self.rng.randint(*ACTIONS_PER_PAUSE)):
-            advisor=self.rng.choice(self.advisors)
-            pick=advisor.choose({name:[combo for combo in combos if not targets(name,combo,links)&touched] for name,combos in options.items()},snapshot)
-            if pick is None:
-                if not n:
-                    raise GameCrashed(f'No selectable action during the pause at snapshot {snapshot.seq}')
-                break
-            touched|=targets(*pick,links)
-            self.perform(advisor.name,*pick,snapshot,batch)
-            if pick[0] in ENDS_PAUSE:
-                break
+        drawer=Drawer(self.advisors[0],options,snapshot,links,touched)
+        drawn=[drawer.draw(self.rng) for _ in range(self.candidates)]
+        chosen,predictions=self.picker.pick(drawn,snapshot)
+        if predictions is not None:
+            self.store.record_pick(snapshot.seq,[[name for _,name,_ in batch] for batch in drawn],predictions,chosen)
+        for advisor,name,params in drawn[chosen]:
+            self.perform(advisor.name,name,params,snapshot,batch)
         if not batch:
             return snapshot
         after=self.snapshot('post_action')
@@ -333,10 +387,11 @@ def build(seed,countries,states,tech,pop):
 
 
 def world_size(rng,levels):
-    states=rng.randint(*WORLD_STATES)
+    states=rng.randint(*MAP['states'])
     tech,pop=levels
-    return (rng.randrange(10**9),rng.randint(states//6,states//3),states,
-            round(rng.uniform(0,MAX_TECH),2) if tech is None else tech,round(rng.uniform(*POP_RANGE),2) if pop is None else pop)
+    low,high=MAP['country_share']
+    return (rng.randrange(10**9),rng.randint(max(2,int(states*low)),max(2,int(states*high))),states,
+            round(rng.uniform(*MAP['tech']),2) if tech is None else tech,round(rng.uniform(*MAP['pop']),2) if pop is None else pop)
 
 
 class WorldPool:
@@ -458,9 +513,12 @@ RECENT_ROUNDS=5
 
 
 @timed
-def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds,weights):
-    world=worlds.take()
+def session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,seconds):
     store=Store()
+    objective=draw_objective(rng)
+    advisor=advisors[rng.choice(arguments.advisors)]
+    advisor.start_run(store,ACTIONS,objective)
+    world=worlds.take()
     recent=store.recent_tags(RECENT_ROUNDS)
     if chosen in recent:
         raise ValueError(f'{chosen} was played in one of the last {RECENT_ROUNDS} rounds: {recent}')
@@ -473,7 +531,10 @@ def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds,weights):
     name=world.parent.name if world else 'vanilla'
     generated=None if world is None else {'seed':manifest['seed'],'countries':len(manifest['countries']),'states':len(manifest['states']),
                                           'tech':manifest['tech'],'pop':manifest['pop']}
-    loop=Loop(game,advisors,random.Random(seed),store,run_record(arguments,'vanilla' if world is None else 'mini',name,tag,seed,generated,weights))
+    picker=pickers[rng.choice(arguments.pickers)]
+    candidates=1 if picker.name=='first' else rng.randint(*CANDIDATES)
+    picker.start_run(store,generated,objective)
+    loop=Loop(game,[advisor],random.Random(seed),store,run_record(arguments,'vanilla' if world is None else 'mini',name,tag,seed,generated,advisor,picker,candidates,objective),picker,candidates)
     watchdog.store=store
     counts=loop.run(arguments.years,seconds)
     if isinstance(worlds,(WorldPool,Fresh)):
@@ -482,17 +543,19 @@ def session(game,watchdog,rng,worlds,advisors,arguments,chosen,seconds,weights):
     return counts
 
 
-def run_record(arguments,kind,world,tag,seed,generated,weights):
+def run_record(arguments,kind,world,tag,seed,generated,advisor,picker,candidates,objective):
     return {'kind':kind,'world':world,'tag':tag,'cli_seed':arguments.seed,'run_seed':seed,
             'years':arguments.years,'minutes':arguments.minutes,'profile':arguments.profile,'pool':arguments.pool,'runs_requested':arguments.runs,
-            'generated':generated,'weights':{name:weights.get(name,1) for name in BY_NAME if GROUP[name]!='time'},
-            'param_weights':[(action,param,value,weight) for action,params in PARAM_WEIGHTS.items() for param,values in params.items() for value,weight in values.items()]}
+            'generated':generated,'picker':picker.name,'candidates':candidates,'objective':objective,'weights':{name:advisor.weights[name] for name in ACTIONS},
+            'param_weights':[(action,param,value,weight) for action,params in advisor.param_weights.items() for param,values in params.items() for value,weight in values.items()],
+            'proposal':advisor.proposal,'pick_model':picker.trained}
 
 
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--profile',default='actions')
-    parser.add_argument('--advisors',nargs='+',default=['random'])
+    parser.add_argument('--advisors',nargs='+',choices=sorted(ADVISORS),default=['random'])
+    parser.add_argument('--pickers',nargs='+',choices=sorted(PICKERS),default=['first'])
     parser.add_argument('--runs',type=int,required=True)
     parser.add_argument('--years',type=float,default=100)
     parser.add_argument('--minutes',type=float,default=30)
@@ -515,14 +578,15 @@ def main():
     watchdog.start()
     rng=random.Random(arguments.seed)
     weights={**WEIGHTS,**{name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}}
-    advisors=[ADVISORS[name](rng.randrange(10**9),weights,PARAM_WEIGHTS) for name in arguments.advisors]
+    advisors={name:ADVISORS[name](rng.randrange(10**9),weights,PARAM_WEIGHTS) for name in sorted(set(arguments.advisors))}
+    pickers={name:PICKERS[name]() for name in set(arguments.pickers)}
     worlds=Vanilla(rng) if arguments.vanilla else WorldPool(rng,arguments.pool,levels) if arguments.pool else Fresh(rng,levels)
     chosen=arguments.tag
     crashes=0
     completed=0
     while completed<arguments.runs:
         try:
-            counts=session(game,watchdog,rng,worlds,advisors,arguments,chosen,arguments.minutes*60,weights)
+            counts=session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,arguments.minutes*60)
         except GameCrashed as error:
             crashes+=1
             LOG.error('GAME CRASHED (%d in a row): %s',crashes,error)

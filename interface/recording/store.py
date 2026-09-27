@@ -202,13 +202,13 @@ class Store:
     def recent_tags(self,count):
         return [name for name, in self.connection.execute('select d.name from run r join country_definition d on d.country_definition=r.tag order by run_id desc limit %s',(count,))]
 
-    def begin_run(self,started_at,kind,advisors,tag,world,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,generated,weights,param_weights):
+    def begin_run(self,started_at,kind,advisors,tag,world,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,generated,weights,param_weights,picker,candidates,objective,proposal=None,pick_model=None):
         lost=self.connection.execute("update run set ended_at=heartbeat_at,end_reason='loop_lost' where ended_at is null returning run_id,heartbeat_at").fetchall()
         for run_id,heartbeat_at in lost:
             LOG.error('RUN %s WAS LOST: its loop last beat at %s UTC',run_id,heartbeat_at)
         self.pending={'started_at':started_at,'kind':kind,'advisors':list(advisors),'tag':tag,'world':world,'cli_seed':cli_seed,'run_seed':run_seed,'years':years,'minutes':minutes,'profile':profile,'pool':pool,
                       'runs_requested':runs_requested,'generated':generated,'weights':dict(weights),
-                      'param_weights':list(param_weights)}
+                      'param_weights':list(param_weights),'picker':picker,'candidates':candidates,'objective':objective,'proposal':proposal,'pick_model':pick_model}
         self.run_id=None
         self.constants=None
         self.seq=0
@@ -226,21 +226,45 @@ class Store:
         tag=self.names('country_definition',[pending['tag']])[0]
         run_id=cursor.execute('insert into run (kind,source_session,started_at,heartbeat_at,progress_at,progress_step,world_id,ruleset_id,player_country,'
                               'game_speed,first_start,custom_rng_seed,tag,world_file,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,'
-                              'world_seed,countries,states,tech,pop) '
-                              'values (%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
+                              'world_seed,countries,states,tech,pop,picker,candidates,objective_gdp,objective_population,objective_sol,objective_alpha) '
+                              'values (%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
                               (pending['kind'],self.session,pending['started_at'],'open_run',self.world_id,self.ruleset_id,constants['player_country'],
                                constants['game_speed'],constants['first_start'],constants['custom_rng_seed'],tag,pending['world'],pending['cli_seed'],
                                pending['run_seed'],pending['years'],pending['minutes'],pending['profile'],pending['pool'],pending['runs_requested'],
-                               *[None if pending['generated'] is None else pending['generated'][k] for k in ('seed','countries','states','tech','pop')])).fetchone()[0]
+                               *[None if pending['generated'] is None else pending['generated'][k] for k in ('seed','countries','states','tech','pop')],pending['picker'],pending['candidates'],pending['objective'][0]['gdp'],pending['objective'][0]['population'],pending['objective'][0]['sol'],pending['objective'][1])).fetchone()[0]
         names=sorted(pending['weights'])
         self.copy(cursor,'run_weight',('run_id','action','weight'),[(run_id,action,pending['weights'][name]) for name,action in zip(names,self.names('action',names))])
         rows=pending['param_weights']
         self.copy(cursor,'run_param_weight',('run_id','action','param','value','weight'),
                   [(run_id,action,param,value,weight) for (_,param,value,weight),action in zip(rows,self.names('action',[row[0] for row in rows]))])
         self.copy(cursor,'run_advisor',('run_id','position','advisor'),enumerate_rows(run_id,self.names('advisor',pending['advisors'])))
+        if pending['proposal'] is not None:
+            self.record_proposal(cursor,run_id,pending['proposal'])
+        if pending['pick_model'] is not None:
+            cursor.execute('insert into pick_model (run_id,pauses,runs,seconds) values (%s,%s,%s,%s)',(run_id,*pending['pick_model']))
         self.copy(cursor,'run_game_rule',('run_id','game_rule_setting'),[(run_id,rule) for rule in self.names('game_rule_setting',constants['game_rules'])])
         self.run_id=run_id
         self.constants=constants
+
+    @timed
+    def record_pick(self,seq,batches,predictions,chosen):
+        with self.connection.cursor() as cursor:
+            self.copy(cursor,'pick_candidate',('run_id','seq','candidate','actions','predicted_change','chosen'),
+                      [(self.run_id,seq,index,len(batch),predicted,index==chosen) for index,(batch,predicted) in enumerate(zip(batches,predictions))])
+            names=[name for batch in batches for name in batch]
+            codes=iter(self.names('action',names))
+            self.copy(cursor,'pick_candidate_action',('run_id','seq','candidate','position','action'),
+                      [(self.run_id,seq,index,position,next(codes)) for index,batch in enumerate(batches) for position,_ in enumerate(batch)])
+
+    def record_proposal(self,cursor,run_id,proposal):
+        cursor.execute('insert into smac_proposal (run_id,reward,method,observations,best_reward,predicted_reward,uncertainty,expected_improvement,beat_probability,candidates,seconds) '
+                       'values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
+                       (run_id,proposal['reward'],proposal['method'],proposal['observations'],proposal['best_reward'],proposal['predicted_reward'],proposal['uncertainty'],
+                        proposal['expected_improvement'],proposal['beat_probability'],proposal['candidates'],proposal['seconds']))
+        self.copy(cursor,'smac_observation',('run_id','observed_run','reward'),[(run_id,observed,reward) for observed,reward in proposal['observed']])
+        self.copy(cursor,'smac_candidate',('run_id','rank','source','predicted_reward','uncertainty','expected_improvement','beat_probability'),
+                  [(run_id,*row) for row in proposal['candidate_rows']])
+        self.copy(cursor,'smac_importance',('run_id','dimension','importance'),[(run_id,name,value) for name,value in proposal['importance']])
 
     def live(self,rows):
         live={}

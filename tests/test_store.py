@@ -59,7 +59,7 @@ def built(step):
 
 RUN={'kind':'mini','advisors':['random'],'tag':'AAA','world':'w','cli_seed':1,'run_seed':2,'years':1.0,'minutes':1.0,'profile':'actions','pool':0,'runs_requested':3,
      'generated':{'seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5},'weights':{'build':3,'enact_law':2},
-     'param_weights':[('build','building_type','building_x',3)]}
+     'param_weights':[('build','building_type','building_x',3)],'picker':'first','candidates':1,'objective':({'gdp':0.0,'population':1.0,'sol':0.0},0.0)}
 STEPS=[{'progress':0.1,'second':True,'head':1,'samples':[(1,0.5)]},
        {'progress':0.2,'second':True,'head':2,'samples':[(1,0.5),(2,0.6)]},
        {'progress':0.2,'second':False,'head':2,'samples':[(2,0.6)]}]
@@ -160,6 +160,31 @@ class StoreTests(unittest.TestCase):
         self.assertIsNone(self.store.beater)
         self.assertEqual(c.execute('select end_reason,ended_at is not null from run where run_id=%s',(run,)).fetchone(),('time',True))
 
+    def test_a_policy_proposal_is_written_with_the_run(self):
+        self.store.pending['proposal']={'reward':'composite','method':'expected_improvement','observations':12,'best_reward':4.5,'predicted_reward':5.0,'uncertainty':.5,
+                                        'expected_improvement':.7,'beat_probability':.8,'candidates':2,'seconds':.2,'observed':[],
+                                        'candidate_rows':[(0,'local_search',5.0,.5,.7,.8),(1,'random',3.0,.2,.1,.1)],'importance':[('build',.6),('enact_law',.4)]}
+        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+        c=self.store.connection
+        run=self.store.run_id
+        self.assertEqual(c.execute('select method,observations,predicted_reward,candidates from smac_proposal where run_id=%s',(run,)).fetchone(),('expected_improvement',12,5.0,2))
+        self.assertEqual(c.execute('select rank,source from smac_candidate where run_id=%s order by rank',(run,)).fetchall(),[(0,'local_search'),(1,'random')])
+        self.assertEqual(c.execute('select dimension,importance from smac_importance where run_id=%s order by dimension',(run,)).fetchall(),[('build',.6),('enact_law',.4)])
+        self.store.end_run('time')
+
+    def test_picks_record_every_candidate_with_its_actions_and_the_model_behind_them(self):
+        self.store.pending['pick_model']=(1049,29,4.5)
+        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+        self.store.record_pick(0,[['build','research'],['enact_law']],[1.5,-2.0],0)
+        c=self.store.connection
+        run=self.store.run_id
+        self.assertEqual(c.execute('select pauses,runs from pick_model where run_id=%s',(run,)).fetchone(),(1049,29))
+        self.assertEqual(c.execute('select candidate,actions,predicted_change,chosen from pick_candidate where run_id=%s order by candidate',(run,)).fetchall(),
+                         [(0,2,1.5,True),(1,1,-2.0,False)])
+        self.assertEqual(c.execute('select p.candidate,p.position,a.name from pick_candidate_action p join action a using (action) where run_id=%s order by 1,2',(run,)).fetchall(),
+                         [(0,0,'build'),(0,1,'research'),(1,0,'enact_law')])
+        self.store.end_run('time')
+
     def test_a_stalled_run_is_listed_and_the_watchdog_flag_ends_it(self):
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
         c=self.store.connection
@@ -179,6 +204,8 @@ class StoreTests(unittest.TestCase):
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
         c=self.store.connection
         lost=self.store.run_id
+        self.store.beater.kill()
+        self.store.beater.join()
         c.execute("update run set heartbeat_at=now()-interval '9 seconds' where run_id=%s",(lost,))
         other=Store(DSN)
         other.begin_run(started_at=datetime(2026,9,23,tzinfo=timezone.utc),**RUN)

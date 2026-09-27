@@ -17,6 +17,7 @@ from ..script import clean, read, scalar
 from .vanilla import boxes, rasters, textures, vanilla
 from .nations import nations, word
 
+MAP={'states':(15,60),'country_share':(1/8,1/5),'tech':(.5,1.2),'pop':(.5,1.2)}
 PROVINCE_PIXELS=2000
 SEA_ID=3000
 NAVAL=83886

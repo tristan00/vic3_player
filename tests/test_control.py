@@ -237,12 +237,7 @@ class AbsentReferenceTests(unittest.TestCase):
         if not GAME.is_dir():
             self.skipTest('game install not present')
         from interface.recording.capture import capture_body, missing_references
-        import json
-        from interface.common import DEFAULT_DATA
-        worlds = sorted((DEFAULT_DATA / 'worlds').glob('*/manifest.json')) if (DEFAULT_DATA / 'worlds').is_dir() else []
-        if not worlds:
-            self.skipTest('generated world not present')
-        world = json.loads(worlds[0].read_text(encoding='utf-8'))
+        world = self.WORLD
         body = capture_body(DEFAULT_GAME, 'XAA', world)
         for name, shown, _ in decisions(GAME, [world['mod']]):
             marker = 'name = cap_decision target = flag:' + name + ' '
@@ -256,14 +251,10 @@ class AbsentReferenceTests(unittest.TestCase):
         self.assertEqual(missing_references('owns = s:STATE_SINAI c:AUS ?= this', None), [])
 
     def test_the_generated_script_omits_decisions_gated_on_absent_regions(self):
-        import json
-        from interface.common import DEFAULT_DATA
-        worlds = sorted((DEFAULT_DATA / 'worlds').glob('*/manifest.json')) if (DEFAULT_DATA / 'worlds').is_dir() else []
-        if not GAME.is_dir() or not worlds:
-            self.skipTest('game install or generated world not present')
+        if not GAME.is_dir():
+            self.skipTest('game install not present')
         from interface.recording.capture import capture_body
-        world = json.loads(worlds[0].read_text(encoding='utf-8'))
-        body = capture_body(DEFAULT_GAME, 'XAA', world)
+        body = capture_body(DEFAULT_GAME, 'XAA', self.WORLD)
         self.assertNotIn('STATE_SINAI', body)
         self.assertNotIn('STATE_PANAMA', body)
         self.assertLess(body.count('name = cap_decision target = '), len(list(decisions(GAME))))

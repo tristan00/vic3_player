@@ -1,3 +1,4 @@
 from .random_picker import RandomAdvisor
+from .random_smac_weighting import RandomSmacWeightingAdvisor
 
-ADVISORS={RandomAdvisor.name:RandomAdvisor}
+ADVISORS={advisor.name:advisor for advisor in (RandomAdvisor,RandomSmacWeightingAdvisor)}

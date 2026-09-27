@@ -708,12 +708,19 @@ create table run (
   states int2,
   tech float8,
   pop float8,
+  picker text not null check (picker in ('first', 'catboost')),
+  candidates int2 not null check (candidates >= 1),
+  objective_gdp float8 not null check (objective_gdp between 0 and 1),
+  objective_population float8 not null check (objective_population between 0 and 1),
+  objective_sol float8 not null check (objective_sol between 0 and 1),
+  objective_alpha float8 not null check (objective_alpha between 0 and 1),
   check ((kind = 'mini') = (num_nonnulls(world_seed, countries, states, tech, pop) = 5)),
   check ((kind = 'vanilla') = (num_nulls(world_seed, countries, states, tech, pop) = 5)),
   unique (run_id, world_id),
   check ((ended_at is null) = (end_reason is null)),
   check (end_detail is null or end_reason in ('loop_crashed', 'game_crashed', 'loop_stalled')),
-  check ((longest_step is null) = (longest_step_ms is null))
+  check ((longest_step is null) = (longest_step_ms is null)),
+  check (abs(objective_gdp + objective_population + objective_sol - 1) < 1e-9)
 );
 
 create table run_advisor (
@@ -743,6 +750,74 @@ create table run_param_weight (
   value text not null,
   weight float8 not null,
   primary key (run_id, action, param, value)
+);
+
+create table smac_proposal (
+  run_id int4 primary key references run,
+  method text not null check (method in ('default', 'random', 'expected_improvement')),
+  observations int4 not null,
+  best_reward float8,
+  predicted_reward float8,
+  uncertainty float8,
+  expected_improvement float8,
+  beat_probability float8,
+  candidates int4 not null,
+  seconds float8 not null,
+  reward text not null check (reward in ('years_survived', 'population_growth', 'population_change', 'gdp_change', 'sol_change', 'composite')),
+  check ((observations = 0) = (best_reward is null)),
+  check (num_nulls(predicted_reward, uncertainty, expected_improvement, beat_probability) in (0, 4))
+);
+
+create table smac_observation (
+  run_id int4 not null references smac_proposal,
+  observed_run int4 not null references run,
+  reward float8 not null,
+  primary key (run_id, observed_run)
+);
+
+create table smac_candidate (
+  run_id int4 not null references smac_proposal,
+  rank int4 not null,
+  source text not null check (source in ('random', 'local_search')),
+  predicted_reward float8 not null,
+  uncertainty float8 not null,
+  expected_improvement float8 not null,
+  beat_probability float8 not null,
+  primary key (run_id, rank)
+);
+
+create table pick_candidate (
+  run_id int4 not null references run,
+  seq int4 not null,
+  candidate int2 not null,
+  actions int2 not null,
+  predicted_change float8 not null,
+  chosen bool not null,
+  primary key (run_id, seq, candidate)
+);
+
+create table pick_model (
+  run_id int4 primary key references run,
+  pauses int4 not null,
+  runs int4 not null,
+  seconds float8 not null
+);
+
+create table pick_candidate_action (
+  run_id int4 not null,
+  seq int4 not null,
+  candidate int2 not null,
+  position int2 not null,
+  action int4 not null references action,
+  primary key (run_id, seq, candidate, position),
+  foreign key (run_id, seq, candidate) references pick_candidate
+);
+
+create table smac_importance (
+  run_id int4 not null references smac_proposal,
+  dimension text not null,
+  importance float8 not null,
+  primary key (run_id, dimension)
 );
 
 create table snapshot (
