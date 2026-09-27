@@ -2,11 +2,11 @@
 
 This records what has been done to cut the time the loop spends on its own scaffolding, and what each change measured. Nothing here may change what a run does. Every hour the timing tables are reviewed and this document is replaced with the current state.
 
-Last review: 2026-09-27 10:45, covering runs 260 and 261.
+Last review: 2026-09-27 11:45, covering runs 261 and 262.
 
 ## State
 
-Commits 7b49bf3 and d6f8025 are live since round collect_65, launched at 06:59:35. Runs 253 to 261 used them and show no errors.
+Commits 7b49bf3 and d6f8025 are live since round collect_65, launched at 06:59:35. Runs 253 to 262 used them and show no errors.
 
 Commit 8f59257 is not live. It loads when the supervisor next starts a round. The running round is left to end by itself.
 
@@ -27,6 +27,7 @@ Setup on the new code:
 | 259 | 90 | 36 | 33 | 35 | 5.6 | 75 |
 | 260 | 94 | 41 | 33 | 35 | 7.6 | 81 |
 | 261 | 56 | 24 | 31 | 36 | 7.9 | 69 |
+| 262 | 95 | 42 | 35 | 35 | 5.7 | 82 |
 
 On the old code, runs 241 to 252: world generation 22 to 56 s, training 21 to 25 s after the game loaded, game launch and load 31 to 36 s, statistics refresh 17.7 to 21.6 s, and 87 to 112 s between runs.
 
@@ -52,23 +53,25 @@ Over a whole hour of play, run 244 on the old code against run 254 on the new:
 | row building, ms | 306 | 252 |
 | whole snapshot, ms | 1564 | 1190 |
 
-Validation took 198 s of run 244, 64 s of run 254 and 61 s of run 260, which wrote 530 snapshots of a 94 state world. It still grows during a run, because later snapshots write to more tables and the pop tables are the costly ones to check.
+Validation took 198 s of run 244, 64 s of run 254 and 61 s of run 260, which wrote 530 snapshots of a 94 state world. Run 261 wrote 551 snapshots of a 56 state world and spent 38 s. It still grows during a run, because later snapshots write to more tables and the pop tables are the costly ones to check.
 
 ## Run function, before and after
 
-| measure | old code, runs 220 to 252 | new code, runs 253 to 261 |
+| measure | old code, runs 220 to 252 | new code, runs 253 to 262 |
 | --- | --- | --- |
-| actions done | 99.810 % of 27310 | 99.709 % of 12019 |
-| actions invalid | 0.176 % | 0.258 % |
+| actions done | 99.810 % of 27310 | 99.755 % of 15494 |
+| actions invalid | 0.176 % | 0.219 % |
 | actions invalid, share within a run | 0 to 4.5 %, mean 0.25 % | 0 to 1.2 %, mean 0.30 % |
-| actions that found no game object | 0.015 % | 0.033 % |
+| actions that found no game object | 0.015 % | 0.026 % |
 | advisor actions per pause | 8.7 to 10.3 | 7.0 to 13.6 |
-| snapshots in an hour of play | 520 and 445 | 513 and 530 |
+| snapshots in an hour of play | 520 and 445 | 513, 530 and 551 |
 | copy calls over snapshots 2 to 80 | 23399 to 23430 | 23423 and 23476 |
-| end reasons | time 2, debt_cap 6, loop_lost 1, loop_crashed 1 | time 2, debt_cap 6, one still playing |
+| end reasons | time 2, debt_cap 6, loop_lost 1, loop_crashed 1 | time 2, debt_cap 6, defeated 1, one still playing |
 | traceback, stall, crash or block in the round log | see the rollover below | none |
 
-Every invalid action on the new code was refused by the game for a game reason. Eighteen of the 31 came from two runs, 257 and 260, where a diplomatic action needed more technologies than the target had. The four actions that found no game object are subsidy and charter toggles, the same actions that miss on the old code. Invalid actions cluster by run on the old code as well.
+Every invalid action on the new code was refused by the game for a game reason. Eighteen of the 34 came from two runs, 257 and 260, where a diplomatic action needed more technologies than the target had. The four actions that found no game object are subsidy and charter toggles, the same actions that miss on the old code. Invalid actions cluster by run on the old code as well.
+
+Run 261 ended because the played country lost its last state after 58 minutes of play. That is an outcome of the game, detected by the same check as before.
 
 The copy calls show that a snapshot still writes the same set of tables.
 
