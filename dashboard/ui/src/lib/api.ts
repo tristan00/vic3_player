@@ -2,18 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { components } from '@/api/schema'
 
 export type S = components['schemas']
-export type Status = S['StatusCount']['status']
-export type LiveState = S['RunRow']['state']
+export type Grid = S['Grid']
+export type GridColumn = S['GridColumn']
 export type Cell = S['Cell']
-export type Column = S['Column']
 export type Ref = S['Ref']
-export type Scope = S['Scope']
-export type Count = S['Count']
-export type Rate = S['Rate']
 export type Series = S['Series']
-export type ActionRow = S['ActionRow']
-export type RunRow = S['RunRow']
-export type StatusCount = S['StatusCount']
 
 const THROTTLE_MS = 3000
 const RECONNECT_MS = 3000
@@ -147,9 +140,12 @@ export function useConnected(): boolean {
   return c
 }
 
-export function qs(params: Record<string, string | number | boolean | null | undefined>): string {
+export function qs(params: Record<string, string | number | boolean | string[] | null | undefined>): string {
   const p = new URLSearchParams()
-  for (const [k, v] of Object.entries(params)) if (v !== null && v !== undefined && v !== '') p.set(k, String(v))
+  for (const [k, v] of Object.entries(params)) {
+    if (Array.isArray(v)) v.forEach((x) => p.append(k, x))
+    else if (v !== null && v !== undefined && v !== '' && v !== false) p.set(k, String(v))
+  }
   const s = p.toString()
   return s ? `?${s}` : ''
 }

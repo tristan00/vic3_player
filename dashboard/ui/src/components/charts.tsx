@@ -1,7 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Swatch } from '@/components/primitives'
-import type { Status, StatusCount } from '@/lib/api'
-import { cn, compact, n, STATUS_FILL, STATUS_HELP, STATUS_LABEL, STATUSES } from '@/lib/format'
+import { cn, compact, num } from '@/lib/format'
 
 function useWidth<T extends HTMLElement>() {
   const ref = useRef<T>(null)
@@ -53,7 +51,7 @@ export function LineChart({
   yFormat = compact,
   tip,
   onPick,
-  empty = 'no values recorded',
+  empty = '0 values',
 }: {
   xs: number[]
   ys: number[]
@@ -158,71 +156,10 @@ export function LineChart({
           className="bg-surface border-line pointer-events-none absolute top-1 z-10 rounded-md border px-2 py-1 text-2xs shadow-md"
           style={{ left: Math.min(width - 170, Math.max(0, pad.l + geo.sx(xs[hover]) + 10)) }}
         >
-          <div className="num text-xs font-semibold">{n(ys[hover], Number.isInteger(ys[hover]) ? 0 : 3)}</div>
+          <div className="num text-xs font-semibold">{num(ys[hover])}</div>
           <div className="text-dim">{tip ? tip(hover) : xFormat(xs[hover])}</div>
         </div>
       )}
-    </div>
-  )
-}
-
-export function StatusBar({ counts, height = 10, onPick }: { counts: StatusCount[]; height?: number; onPick?: (s: Status) => void }) {
-  const total = counts.reduce((a, c) => a + c.count, 0)
-  const [hover, setHover] = useState<Status | null>(null)
-  if (!total) return <div className="bg-raised w-full rounded" style={{ height }} title="no actions" />
-  const shown = counts.filter((c) => c.count > 0)
-  return (
-    <div className="relative">
-      <div className="flex w-full gap-[2px]" style={{ height }}>
-        {shown.map((c, i) => (
-          <button
-            key={c.status}
-            type="button"
-            aria-label={`${STATUS_LABEL[c.status]} ${c.count}`}
-            onPointerEnter={() => setHover(c.status)}
-            onPointerLeave={() => setHover(null)}
-            onFocus={() => setHover(c.status)}
-            onBlur={() => setHover(null)}
-            onClick={(e) => {
-              e.stopPropagation()
-              onPick?.(c.status)
-            }}
-            className={cn('h-full min-w-[3px] transition-opacity', i === 0 && 'rounded-l', i === shown.length - 1 && 'rounded-r', hover && hover !== c.status && 'opacity-60')}
-            style={{ flexGrow: c.count, flexBasis: 0, background: STATUS_FILL[c.status] }}
-          />
-        ))}
-      </div>
-      {hover && (
-        <div className="bg-surface border-line pointer-events-none absolute top-full left-0 z-10 mt-1 rounded-md border px-2 py-1 text-2xs whitespace-nowrap shadow-md">
-          <span className="num font-semibold">{n(counts.find((c) => c.status === hover)!.count)}</span>{' '}
-          <span className="text-dim">
-            {STATUS_LABEL[hover]} · {((100 * counts.find((c) => c.status === hover)!.count) / total).toFixed(1)}%
-          </span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-export function StatusLegend({ counts }: { counts?: StatusCount[] }) {
-  const total = counts?.reduce((a, c) => a + c.count, 0) ?? 0
-  return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-2xs">
-      {STATUSES.map((s) => {
-        const c = counts?.find((x) => x.status === s)?.count
-        return (
-          <span key={s} className="inline-flex items-center gap-1.5" title={STATUS_HELP[s]}>
-            <Swatch color={STATUS_FILL[s]} shape="box" />
-            <span>{STATUS_LABEL[s]}</span>
-            {counts && (
-              <span className="text-dim num">
-                {n(c ?? 0)}
-                {total ? ` · ${(((c ?? 0) * 100) / total).toFixed(1)}%` : ''}
-              </span>
-            )}
-          </span>
-        )
-      })}
     </div>
   )
 }

@@ -4,12 +4,25 @@ import unittest
 import psycopg
 from fastapi.testclient import TestClient
 
-from dashboard.server import actions, changes, db, entities, runs
+from dashboard.server import actions, changes, db, meta, policy, runs, tables
 from dashboard.server.app import app
 from interface.recording.store import Store, install
 from tests.test_store import DSN, EFFECTS, ENUMS, LAW, MEMBERS, PLAYER, RUN, STEPS, built
 
 AT=datetime(2026,9,23,tzinfo=timezone.utc)
+PROPOSAL={'reward':'composite','method':'expected_improvement','observations':12,'best_reward':4.5,'predicted_reward':5.0,'uncertainty':.5,'expected_improvement':.7,
+          'beat_probability':.8,'candidates':3,'seconds':.2,'observed':[],'importance':[('build',.6),('enact_law',.4)],
+          'candidate_rows':[(0,'local_search',5.0,.5,.7,.8),(1,'random',6.0,.1,.3,.6),(2,'random',3.0,.9,.1,.1)]}
+
+
+def value(cell):
+    if cell.ref:
+        return cell.ref.id
+    return cell.text if cell.text is not None else cell.num
+
+
+def rows(grid):
+    return [{c.name:value(v) for c,v in zip(grid.columns,row)} for row in grid.rows]
 
 
 class DashboardTests(unittest.TestCase):
@@ -28,8 +41,12 @@ class DashboardTests(unittest.TestCase):
         store.world('ab',[{'color':'x000001','region':'STATE_TEST','terrain':'plains','area_pixels':4,'x':1.0,'y':2.0}],[],{})
         store.session='test'
         store.begin_run(started_at=AT,**RUN)
+        store.pending['proposal']=PROPOSAL
+        store.pending['pick_model']=(1049,29,4.5)
         for step in STEPS:
             store.write(built(step),'post_action',AT,1.0)
+        store.record_pick(0,[['build','research'],['enact_law']],[1.5,-2.0],0)
+        store.record_pick(1,[['research'],['build']],[0.5,3.0],1)
         store.log_action({'turn':1,'seq':1,'advisor':'random','action':'enact_law','params':{'law':LAW},'snapshot':0,'status':'done','ms':5},1)
         store.log_action({'turn':1,'seq':2,'advisor':'random','action':'research','params':{'technology':'cotton_gin'},'snapshot':0,'status':'invalid',
                           'detail':'not researchable'},None)
@@ -43,40 +60,34 @@ class DashboardTests(unittest.TestCase):
         db.close_pool()
 
     def test_runs_list_counts_actions_and_status(self):
-        page=runs.runs_page(0,10,'run_id',True)
-        row=next(r for r in page.rows if r.run_id==self.run_id)
-        self.assertEqual((row.actions,row.done.n,row.snapshots,row.state,row.end_reason),(2,1,3,'ended','time'))
+        row=next(r for r in rows(runs.runs_grid([],None,False,0,100)) if r['run']==self.run_id)
+        self.assertEqual((row['actions'],row['snapshots'],row['state'],row['end_reason']),(2,3,'ended','time'))
 
     def test_snapshot_changes_show_before_and_after(self):
-        summary=changes.snapshot_changes(self.run_id,1)
-        self.assertIn('law_history',[t.table for t in summary.tables])
-        self.assertEqual([a.n for a in summary.actions],[1])
-        law=changes.table_changes(self.run_id,1,'law_history',0,100)
-        changed=next(r for r in law.rows if r.keys[0].ref.id==LAW)
-        progress=[c.name for c in law.columns].index('progress')
-        self.assertEqual((changed.changed,changed.before[progress].num,changed.cells[progress].num),(['progress'],0.1,0.2))
-        gone=changes.table_changes(self.run_id,2,'law_history',0,100)
-        self.assertEqual([(r.keys[0].ref.id,r.present) for r in gone.rows],[(LAW+1,False)])
+        self.assertIn('law_history',[r['table'] for r in rows(changes.changed_tables(self.run_id,1,[],None,False,0,500))])
+        law=next(r for r in rows(changes.table_changes(self.run_id,1,'law_history',[],None,False,0,100)) if r['law']==LAW)
+        self.assertEqual((law['progress.before'],law['progress']),(0.1,0.2))
+        gone=rows(changes.table_changes(self.run_id,2,'law_history',[],None,False,0,100))
+        self.assertEqual([(r['law'],r['present']) for r in gone],[(LAW+1,'no')])
 
     def test_entities_resolve_at_a_snapshot_and_label_by_vocabulary(self):
-        self.assertEqual(entities.entity_list(self.run_id,'law',1,0,100,False).total.value,2)
-        self.assertEqual(entities.entity_list(self.run_id,'law',2,0,100,False).total.value,1)
-        self.assertEqual(entities.entity_list(self.run_id,'law',2,0,100,True).total.value,2)
-        detail=entities.entity_detail(self.run_id,'law',LAW)
-        self.assertEqual(detail.ref.label,'law_one')
-        self.assertEqual([v.seq for v in detail.history.groups[0].versions],[0,1])
-        self.assertEqual([a.n for a in detail.actions],[1])
-        country=entities.entity_detail(self.run_id,'country',PLAYER)
-        self.assertEqual(country.ref.label,'AAA')
+        self.assertEqual(tables.entity_grid(self.run_id,'law',1,False,[],None,False,0,100).total,2)
+        self.assertEqual(tables.entity_grid(self.run_id,'law',2,False,[],None,False,0,100).total,1)
+        self.assertEqual(tables.entity_grid(self.run_id,'law',2,True,[],None,False,0,100).total,2)
+        versions=rows(tables.table_grid(self.run_id,'law_history',2,True,[('law',str(LAW))],None,False,0,100))
+        self.assertEqual([r['seq'] for r in versions],[0,1])
+        info=tables.entity_info(self.run_id,'law',LAW)
+        self.assertEqual((info.ref.label,info.actions),('law_one',1))
+        self.assertEqual(tables.entity_info(self.run_id,'country',PLAYER).ref.label,'AAA')
 
     def test_action_params_link_entities_and_stats_split_status(self):
-        detail=actions.action_detail(self.run_id,1)
-        self.assertEqual((detail.action.params[0].ref.kind,detail.action.params[0].ref.label),('law','law_one'))
-        self.assertEqual([a.n for a in detail.batch],[2])
-        stats=actions.action_stats(f'run:{self.run_id}')
-        self.assertEqual({(r.action,s.status):s.count for r in stats.rows for s in r.statuses if s.count},{('enact_law','done'):1,('research','invalid'):1})
-        kind=actions.action_type('research',f'run:{self.run_id}')
-        self.assertEqual([(d.status,d.detail,d.count) for d in kind.details],[('invalid','not researchable',1)])
+        grid=actions.run_actions(self.run_id,[('n','1')],None,False,0,100)
+        law=grid.rows[0][[c.name for c in grid.columns].index('param.law')].ref
+        self.assertEqual((law.kind,law.label),('law','law_one'))
+        stats={r['action']:r for r in rows(actions.action_stats(f'run:{self.run_id}',[],None,False,0,500))}
+        self.assertEqual((stats['enact_law']['done'],stats['research']['invalid'],stats['build']['picks']),(1,1,0))
+        details=rows(actions.action_details('research',f'run:{self.run_id}',[],None,False,0,100))
+        self.assertEqual([(d['status'],d['detail'],d['count']) for d in details],[('invalid','not researchable',1)])
 
     def test_the_run_records_the_parameters_that_launched_it(self):
         found=db.row('select runs_requested,world_seed,countries,states,tech,pop from run where run_id=%s',(self.run_id,))
@@ -97,20 +108,26 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(db.value('select key from production_method_requirement where ruleset_id=%s',(ruleset,)),'tech_x')
         self.assertEqual(db.value('select ratio from production_method_profession_ratio where ruleset_id=%s',(ruleset,)),97.0)
 
+    def test_meta_tables_resolve_names_and_link_runs(self):
+        candidates=rows(meta.meta_grid('smac_candidate',[('run_id',str(self.run_id))],'rank',False,0,100))
+        self.assertEqual([(c['run_id'],c['rank'],c['source']) for c in candidates],[(self.run_id,0,'local_search'),(self.run_id,1,'random'),(self.run_id,2,'random')])
+        logged=rows(meta.meta_grid('loop_action',[('run_id',str(self.run_id))],'n',False,0,100))
+        self.assertEqual([(a['n'],a['action'],a['advisor']) for a in logged],[(1,'enact_law','random'),(2,'research','random')])
+
+    def test_picker_offers_count_every_candidate_action(self):
+        offers={r['action']:r for r in rows(policy.picker_actions([],None,False,0,100))}
+        self.assertEqual((offers['build']['offered'],offers['build']['chosen']),(2,2))
+        self.assertAlmostEqual(offers['build']['chosen_share'],2/3)
+        self.assertAlmostEqual(offers['build']['offered_share'],2/5)
+
     def test_routes_answer_and_reject_unknown_names(self):
         client=TestClient(app)
         self.assertEqual(client.get(f'/api/runs/{self.run_id}/snapshots/1/tables/law_history').status_code,200)
         self.assertEqual(client.get(f'/api/runs/{self.run_id}/series?table=player_treasury&column=money').status_code,200)
         self.assertEqual(client.get(f'/api/runs/{self.run_id}/entities/nothing').status_code,404)
         self.assertEqual(client.get('/api/actions?scope=bogus').status_code,400)
-
-
-class MedianYearOverYearTests(unittest.TestCase):
-    def test_growth_compares_each_value_with_the_one_a_game_year_earlier(self):
-        year=runs.HOURS_PER_YEAR
-        self.assertAlmostEqual(runs.median_yoy([(0,100),(year,110),(2*year,121)]),.1)
-        self.assertAlmostEqual(runs.median_yoy([(0,100),(year,90),(year+240,80)]),-.15)
-        self.assertIsNone(runs.median_yoy([(0,100),(year-1,105)]))
+        self.assertEqual(client.get('/api/runs?sort=bogus').status_code,400)
+        self.assertEqual(client.get('/api/meta/bogus').status_code,404)
 
 
 if __name__=='__main__':

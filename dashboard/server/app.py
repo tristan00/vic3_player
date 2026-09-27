@@ -1,20 +1,22 @@
 import asyncio
 import contextlib
+from dataclasses import dataclass
 import logging
 from pathlib import Path
 import time
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from loop.run import WEIGHTS
 
 from interface.recording.spec import ENTITIES, TABLE
 
-from . import actions, blocks, changes, db, entities, live, progress, runs
-from .models import (BlockDetail, BlockLog, CountryProgress, TradePage, TradeSeries, ActionDetail, ActionLog, ActionStats, ActionType, EntityDetail, EntityList, EntityTable, TableChanges, LivePage, RoundsPage, RunDetail, RunsPage, SchemaPage, Series,
-                     SnapshotChanges, SnapshotsPage)
+from . import actions, blocks, changes, db, meta, policy, runs, schema, tables
+from .grid import parse_filters
+from .models import ActionInfo, EntityInfo, Grid, OpenRun, RunInfo, Series, SeriesChoice
 
 LOG=logging.getLogger('dashboard')
 DIST=Path(__file__).resolve().parents[1]/'ui'/'dist'
@@ -30,8 +32,13 @@ async def lifespan(_app):
         db.close_pool()
 
 
-app=FastAPI(title='vic3 dashboard',version='1',lifespan=lifespan)
+app=FastAPI(title='vic3 dashboard',version='2',lifespan=lifespan)
 app.add_middleware(GZipMiddleware,minimum_size=2048)
+
+
+@app.exception_handler(ValueError)
+async def bad_request(_request,error):
+    return JSONResponse(status_code=400,content={'detail':str(error)})
 
 
 @app.middleware('http')
@@ -53,6 +60,22 @@ async def timing(request:Request,call_next):
     return response
 
 
+@dataclass
+class Page:
+    filters:list
+    sort:str|None
+    desc:bool
+    offset:int
+    limit:int
+
+    def args(self):
+        return self.filters,self.sort,self.desc,self.offset,self.limit
+
+
+def page(f:list[str]=Query([]),sort:str|None=None,desc:bool=False,offset:int=Query(0,ge=0),limit:int=Query(100,ge=1,le=1000))->Page:
+    return Page(parse_filters(f),sort,desc,offset,limit)
+
+
 def found(value,what):
     if value is None:
         raise HTTPException(404,f'no {what}')
@@ -65,125 +88,161 @@ def entity_kind(kind):
     return kind
 
 
-def scope_of(scope):
-    try:
-        actions.parse_scope(scope)
-    except ValueError as error:
-        raise HTTPException(400,str(error))
-    return scope
+def table_name(table):
+    if table not in TABLE:
+        raise HTTPException(404,f'no table {table}')
+    return table
 
 
-@app.get('/api/live')
-def get_live()->LivePage:
-    return live.live_page()
+def at(grid,run_id,seq):
+    grid.seq,grid.last_seq,grid.game_date=tables.snapshot_at(run_id,seq)
+    return grid
+
+
+def resolved(run_id,seq):
+    chosen,_,_=tables.snapshot_at(run_id,seq)
+    return found(chosen,f'snapshot in run {run_id}')
+
+
+@app.get('/api/open')
+def get_open()->list[OpenRun]:
+    return runs.open_runs()
 
 
 @app.get('/api/runs')
-def get_runs(offset:int=Query(0,ge=0),limit:int=Query(50,ge=1,le=500),sort:str=Query('run_id',pattern='^('+'|'.join(runs.SORTS)+')$'),desc:bool=True,
-             kind:str|None=None,end_reason:str|None=None,tag:str|None=None,round:int|None=None)->RunsPage:
-    return runs.runs_page(offset,limit,sort,desc,kind,end_reason,tag,round)
+def get_runs(p:Page=Depends(page))->Grid:
+    return runs.runs_grid(*p.args())
 
 
 @app.get('/api/rounds')
-def get_rounds(offset:int=Query(0,ge=0),limit:int=Query(50,ge=1,le=500))->RoundsPage:
-    return runs.rounds_page(offset,limit)
+def get_rounds(p:Page=Depends(page))->Grid:
+    return runs.rounds_grid(*p.args())
 
 
 @app.get('/api/runs/{run_id}')
-def get_run(run_id:int)->RunDetail:
-    return found(runs.run_detail(run_id),f'run {run_id}')
+def get_run(run_id:int)->RunInfo:
+    return found(runs.run_info(run_id),f'run {run_id}')
 
 
-@app.get('/api/runs/{run_id}/series')
-def get_series(run_id:int,table:str,column:str)->Series:
-    if table not in TABLE:
-        raise HTTPException(404,f'no table {table}')
-    return found(runs.series(run_id,table,column),f'numeric column {table}.{column}')
+@app.get('/api/runs/{run_id}/groups')
+def get_groups(run_id:int,p:Page=Depends(page))->Grid:
+    return runs.run_groups(run_id,*p.args())
 
 
 @app.get('/api/runs/{run_id}/actions')
-def get_run_actions(run_id:int,offset:int=Query(0,ge=0),limit:int=Query(100,ge=1,le=500),action:str|None=None,group:str|None=None,
-                    status:str|None=None)->ActionLog:
-    return actions.run_log(run_id,offset,limit,action,group,status)
-
-
-@app.get('/api/runs/{run_id}/actions/{n}')
-def get_run_action(run_id:int,n:int)->ActionDetail:
-    return found(actions.action_detail(run_id,n),f'action {n} in run {run_id}')
+def get_actions_of_run(run_id:int,p:Page=Depends(page))->Grid:
+    return actions.run_actions(run_id,*p.args())
 
 
 @app.get('/api/runs/{run_id}/blocks')
-def get_blocks(run_id:int,offset:int=Query(0,ge=0),limit:int=Query(50,ge=1,le=500),kind:str|None=Query(None,pattern='^(decision|events|time)$'))->BlockLog:
-    return blocks.run_blocks(run_id,offset,limit,kind)
+def get_blocks(run_id:int,p:Page=Depends(page))->Grid:
+    return blocks.run_blocks(run_id,*p.args())
 
 
-@app.get('/api/runs/{run_id}/blocks/{seq}')
-def get_block(run_id:int,seq:int)->BlockDetail:
-    return found(blocks.block_detail(run_id,seq),f'block chosen from snapshot {seq} in run {run_id}')
+@app.get('/api/runs/{run_id}/tables')
+def get_run_tables(run_id:int,p:Page=Depends(page))->Grid:
+    return tables.run_tables(run_id,*p.args())
 
 
-@app.get('/api/runs/{run_id}/snapshots')
-def get_snapshots(run_id:int,offset:int=Query(0,ge=0),limit:int=Query(100,ge=1,le=500))->SnapshotsPage:
-    return runs.snapshots_page(run_id,offset,limit)
+@app.get('/api/runs/{run_id}/kinds')
+def get_kinds(run_id:int,p:Page=Depends(page))->Grid:
+    return tables.run_kinds(run_id,*p.args())
 
 
-@app.get('/api/runs/{run_id}/snapshots/{seq}')
-def get_snapshot(run_id:int,seq:int)->SnapshotChanges:
-    return found(changes.snapshot_changes(run_id,seq),f'snapshot {seq} in run {run_id}')
-
-
-@app.get('/api/runs/{run_id}/snapshots/{seq}/tables/{table}')
-def get_snapshot_table(run_id:int,seq:int,table:str,offset:int=Query(0,ge=0),limit:int=Query(100,ge=1,le=500))->TableChanges:
-    if table not in TABLE:
-        raise HTTPException(404,f'no table {table}')
-    return changes.table_changes(run_id,seq,table,offset,limit)
+@app.get('/api/runs/{run_id}/tables/{table}')
+def get_table(run_id:int,table:str,seq:int|None=None,versions:bool=False,p:Page=Depends(page))->Grid:
+    chosen=resolved(run_id,seq)
+    return at(tables.table_grid(run_id,table_name(table),chosen,versions,*p.args()),run_id,chosen)
 
 
 @app.get('/api/runs/{run_id}/entities/{kind}')
-def get_entities(run_id:int,kind:str,seq:int|None=None,offset:int=Query(0,ge=0),limit:int=Query(100,ge=1,le=500),gone:bool=False)->EntityList:
-    return found(entities.entity_list(run_id,entity_kind(kind),seq,offset,limit,gone),f'snapshot in run {run_id}')
+def get_entities(run_id:int,kind:str,seq:int|None=None,gone:bool=False,p:Page=Depends(page))->Grid:
+    chosen=resolved(run_id,seq)
+    return at(tables.entity_grid(run_id,entity_kind(kind),chosen,gone,*p.args()),run_id,chosen)
 
 
 @app.get('/api/runs/{run_id}/entities/{kind}/{ident}')
-def get_entity(run_id:int,kind:str,ident:int)->EntityDetail:
-    return found(entities.entity_detail(run_id,entity_kind(kind),ident),f'{kind} {ident} in run {run_id}')
+def get_entity(run_id:int,kind:str,ident:int)->EntityInfo:
+    return found(tables.entity_info(run_id,entity_kind(kind),ident),f'{kind} {ident} in run {run_id}')
 
 
-@app.get('/api/runs/{run_id}/entities/{kind}/{ident}/tables/{table}')
-def get_entity_table(run_id:int,kind:str,ident:int,table:str)->EntityTable:
-    if table not in TABLE:
+@app.get('/api/runs/{run_id}/entities/{kind}/{ident}/actions')
+def get_entity_actions(run_id:int,kind:str,ident:int,p:Page=Depends(page))->Grid:
+    return tables.entity_actions(run_id,entity_kind(kind),ident,*p.args())
+
+
+@app.get('/api/runs/{run_id}/snapshots/{seq}/tables')
+def get_changed_tables(run_id:int,seq:int,p:Page=Depends(page))->Grid:
+    return changes.changed_tables(run_id,seq,*p.args())
+
+
+@app.get('/api/runs/{run_id}/snapshots/{seq}/tables/{table}')
+def get_table_changes(run_id:int,seq:int,table:str,p:Page=Depends(page))->Grid:
+    return changes.table_changes(run_id,seq,table_name(table),*p.args())
+
+
+@app.get('/api/runs/{run_id}/series')
+def get_series(run_id:int,table:str,column:str,f:list[str]=Query([]),player:bool=False)->Series:
+    return found(runs.series(run_id,table_name(table),column,parse_filters(f),player),f'numeric column {table}.{column}')
+
+
+@app.get('/api/series')
+def get_series_choices()->list[SeriesChoice]:
+    return runs.series_choices()
+
+
+@app.get('/api/meta/{table}')
+def get_meta(table:str,run:int|None=None,p:Page=Depends(page))->Grid:
+    if table not in meta.TABLES:
         raise HTTPException(404,f'no table {table}')
-    return found(entities.entity_table(run_id,entity_kind(kind),ident,table,entities.snapshot_dates(run_id)),f'{table} rows owned by {kind}')
-
-
-@app.get('/api/runs/{run_id}/countries')
-def get_countries(run_id:int)->CountryProgress:
-    return found(progress.country_progress(run_id),f'snapshots in run {run_id}')
-
-
-@app.get('/api/runs/{run_id}/trade')
-def get_trade(run_id:int,market:int|None=None,seq:int|None=None)->TradePage:
-    return found(progress.trade_page(run_id,market,seq),f'snapshots in run {run_id}')
-
-
-@app.get('/api/runs/{run_id}/trade/goods')
-def get_trade_goods(run_id:int,market:int,goods:str)->TradeSeries:
-    return found(progress.trade_series(run_id,market,goods),f'goods {goods}')
+    return meta.meta_grid(table,*p.args(),run)
 
 
 @app.get('/api/actions')
-def get_actions(scope:str='all')->ActionStats:
-    return actions.action_stats(scope_of(scope))
+def get_action_stats(scope:str='all',p:Page=Depends(page))->Grid:
+    return actions.action_stats(scope,*p.args())
 
 
 @app.get('/api/actions/{name}')
-def get_action(name:str,scope:str='all')->ActionType:
-    return found(actions.action_type(name,scope_of(scope)),f'action {name}')
+def get_action(name:str)->ActionInfo:
+    if name not in runs.GROUPS:
+        raise HTTPException(404,f'no action {name}')
+    return ActionInfo(action=name,group=runs.GROUPS[name],weight=WEIGHTS.get(name,1),params=actions.param_specs(name))
+
+
+@app.get('/api/actions/{name}/runs')
+def get_action_runs(name:str,scope:str='all',p:Page=Depends(page))->Grid:
+    return actions.action_runs(name,scope,*p.args())
+
+
+@app.get('/api/actions/{name}/details')
+def get_action_details(name:str,scope:str='all',p:Page=Depends(page))->Grid:
+    return actions.action_details(name,scope,*p.args())
+
+
+@app.get('/api/actions/{name}/picks')
+def get_action_picks(name:str,scope:str='all',p:Page=Depends(page))->Grid:
+    return actions.action_picks(name,scope,*p.args())
+
+
+@app.get('/api/policy/configs')
+def get_configs(p:Page=Depends(page))->Grid:
+    return policy.configs(*p.args())
+
+
+@app.get('/api/policy/scored')
+def get_scored(p:Page=Depends(page))->Grid:
+    return policy.scored(*p.args())
+
+
+@app.get('/api/policy/picker-actions')
+def get_picker_actions(p:Page=Depends(page))->Grid:
+    return policy.picker_actions(*p.args())
 
 
 @app.get('/api/schema')
-def get_schema()->SchemaPage:
-    return live.schema_page()
+def get_schema(p:Page=Depends(page))->Grid:
+    return schema.schema_grid(*p.args())
 
 
 @app.get('/api/events')
@@ -191,7 +250,7 @@ async def events(request:Request):
     async def stream():
         last=None
         while not await request.is_disconnected():
-            current=await run_in_threadpool(live.stamp)
+            current=await run_in_threadpool(schema.stamp)
             if current!=last:
                 last=current
                 yield f'event: stamp\ndata: {current}\n\n'

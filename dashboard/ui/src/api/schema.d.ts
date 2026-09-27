@@ -4,15 +4,15 @@
  */
 
 export interface paths {
-    "/api/live": {
+    "/api/open": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Live */
-        get: operations["get_live_api_live_get"];
+        /** Get Open */
+        get: operations["get_open_api_open_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -72,15 +72,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/series": {
+    "/api/runs/{run_id}/groups": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Series */
-        get: operations["get_series_api_runs__run_id__series_get"];
+        /** Get Groups */
+        get: operations["get_groups_api_runs__run_id__groups_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -96,25 +96,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Run Actions */
-        get: operations["get_run_actions_api_runs__run_id__actions_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/runs/{run_id}/actions/{n}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Run Action */
-        get: operations["get_run_action_api_runs__run_id__actions__n__get"];
+        /** Get Actions Of Run */
+        get: operations["get_actions_of_run_api_runs__run_id__actions_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -140,15 +123,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/blocks/{seq}": {
+    "/api/runs/{run_id}/tables": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Block */
-        get: operations["get_block_api_runs__run_id__blocks__seq__get"];
+        /** Get Run Tables */
+        get: operations["get_run_tables_api_runs__run_id__tables_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -157,15 +140,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/snapshots": {
+    "/api/runs/{run_id}/kinds": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Snapshots */
-        get: operations["get_snapshots_api_runs__run_id__snapshots_get"];
+        /** Get Kinds */
+        get: operations["get_kinds_api_runs__run_id__kinds_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -174,32 +157,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/snapshots/{seq}": {
+    "/api/runs/{run_id}/tables/{table}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Snapshot */
-        get: operations["get_snapshot_api_runs__run_id__snapshots__seq__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/runs/{run_id}/snapshots/{seq}/tables/{table}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Snapshot Table */
-        get: operations["get_snapshot_table_api_runs__run_id__snapshots__seq__tables__table__get"];
+        /** Get Table */
+        get: operations["get_table_api_runs__run_id__tables__table__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -242,15 +208,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/entities/{kind}/{ident}/tables/{table}": {
+    "/api/runs/{run_id}/entities/{kind}/{ident}/actions": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Entity Table */
-        get: operations["get_entity_table_api_runs__run_id__entities__kind___ident__tables__table__get"];
+        /** Get Entity Actions */
+        get: operations["get_entity_actions_api_runs__run_id__entities__kind___ident__actions_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -259,15 +225,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/countries": {
+    "/api/runs/{run_id}/snapshots/{seq}/tables": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Countries */
-        get: operations["get_countries_api_runs__run_id__countries_get"];
+        /** Get Changed Tables */
+        get: operations["get_changed_tables_api_runs__run_id__snapshots__seq__tables_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -276,15 +242,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/trade": {
+    "/api/runs/{run_id}/snapshots/{seq}/tables/{table}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Trade */
-        get: operations["get_trade_api_runs__run_id__trade_get"];
+        /** Get Table Changes */
+        get: operations["get_table_changes_api_runs__run_id__snapshots__seq__tables__table__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -293,15 +259,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runs/{run_id}/trade/goods": {
+    "/api/runs/{run_id}/series": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Trade Goods */
-        get: operations["get_trade_goods_api_runs__run_id__trade_goods_get"];
+        /** Get Series */
+        get: operations["get_series_api_runs__run_id__series_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Series Choices */
+        get: operations["get_series_choices_api_series_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/{table}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Meta */
+        get: operations["get_meta_api_meta__table__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -317,8 +317,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Actions */
-        get: operations["get_actions_api_actions_get"];
+        /** Get Action Stats */
+        get: operations["get_action_stats_api_actions_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -336,6 +336,108 @@ export interface paths {
         };
         /** Get Action */
         get: operations["get_action_api_actions__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/actions/{name}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Action Runs */
+        get: operations["get_action_runs_api_actions__name__runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/actions/{name}/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Action Details */
+        get: operations["get_action_details_api_actions__name__details_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/actions/{name}/picks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Action Picks */
+        get: operations["get_action_picks_api_actions__name__picks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/policy/configs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Configs */
+        get: operations["get_configs_api_policy_configs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/policy/scored": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Scored */
+        get: operations["get_scored_api_policy_scored_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/policy/picker-actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Picker Actions */
+        get: operations["get_picker_actions_api_policy_picker_actions_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -382,164 +484,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** ActionDetail */
-        ActionDetail: {
-            action: components["schemas"]["ActionRow"];
-            /** Batch */
-            batch: components["schemas"]["ActionRow"][];
-            before: components["schemas"]["SnapshotRow"];
-            after: components["schemas"]["SnapshotRow"] | null;
-        };
-        /** ActionLog */
-        ActionLog: {
-            scope: components["schemas"]["Scope"];
-            total: components["schemas"]["Count"];
-            /** Rows */
-            rows: components["schemas"]["ActionRow"][];
-            /** Actions */
-            actions: components["schemas"]["Facet"][];
-            /** Groups */
-            groups: components["schemas"]["Facet"][];
-            /** Statuses */
-            statuses: components["schemas"]["StatusCount"][];
-        };
-        /** ActionRow */
-        ActionRow: {
-            /** Run Id */
-            run_id: number;
-            /** N */
-            n: number;
-            /** Turn */
-            turn: number;
+        /** ActionInfo */
+        ActionInfo: {
             /** Action */
             action: string;
             /** Group */
             group: string;
-            /** Advisor */
-            advisor: string;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "done" | "invalid" | "raced" | "no_object" | "ui_leftover";
-            /** Detail */
-            detail: string | null;
-            /** Ms */
-            ms: number | null;
-            /** Before Seq */
-            before_seq: number;
-            /** After Seq */
-            after_seq: number | null;
-            game_date: components["schemas"]["GameDate"];
-            /** Logged At */
-            logged_at: string;
-            /** Params */
-            params: components["schemas"]["Param"][];
-        };
-        /** ActionStat */
-        ActionStat: {
-            /** Action */
-            action: string;
-            /** Group */
-            group: string;
-            /** Total */
-            total: number;
-            /** Runs */
-            runs: number;
-            /** Statuses */
-            statuses: components["schemas"]["StatusCount"][];
-            /** Ms Median */
-            ms_median: number | null;
-            /** Ms P90 */
-            ms_p90: number | null;
-        };
-        /** ActionStats */
-        ActionStats: {
-            scope: components["schemas"]["Scope"];
-            total: components["schemas"]["Count"];
-            runs: components["schemas"]["Count"];
-            /** Statuses */
-            statuses: components["schemas"]["StatusCount"][];
-            /** Groups */
-            groups: components["schemas"]["GroupStatus"][];
-            /** Rows */
-            rows: components["schemas"]["ActionStat"][];
-            /** Never */
-            never: string[];
-        };
-        /** ActionType */
-        ActionType: {
-            scope: components["schemas"]["Scope"];
-            /** Action */
-            action: string;
-            /** Group */
-            group: string;
-            /** Params */
-            params: components["schemas"]["ParamSpec"][];
             /** Weight */
             weight: number;
-            total: components["schemas"]["Count"];
-            /** Statuses */
-            statuses: components["schemas"]["StatusCount"][];
-            /** Details */
-            details: components["schemas"]["DetailCount"][];
-            /** Runs */
-            runs: components["schemas"]["RunStatus"][];
-            /** Recent */
-            recent: components["schemas"]["ActionRow"][];
-        };
-        /** BlockDetail */
-        BlockDetail: {
-            block: components["schemas"]["BlockRow"];
-            /** Actions */
-            actions: components["schemas"]["ActionRow"][];
-            before: components["schemas"]["SnapshotRow"];
-            after: components["schemas"]["SnapshotRow"] | null;
-            /** Previous */
-            previous: number | null;
-            /** Next */
-            next: number | null;
-        };
-        /** BlockLog */
-        BlockLog: {
-            scope: components["schemas"]["Scope"];
-            total: components["schemas"]["Count"];
-            /** Rows */
-            rows: components["schemas"]["BlockRow"][];
-            /** Kinds */
-            kinds: components["schemas"]["Facet"][];
-        };
-        /** BlockRow */
-        BlockRow: {
-            /** Before Seq */
-            before_seq: number;
-            /** After Seq */
-            after_seq: number | null;
-            /** Turn */
-            turn: number;
-            game_date: components["schemas"]["GameDate"];
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "decision" | "events" | "time";
-            /** Actions */
-            actions: number;
-            /** Ms */
-            ms: number;
-            /** Names */
-            names: string[];
-            /** Statuses */
-            statuses: components["schemas"]["StatusCount"][];
-        };
-        /** CaptureGap */
-        CaptureGap: {
-            /** Kind */
-            kind: string;
-            /** Subject */
-            subject: string;
-            /** Detail */
-            detail: string;
+            /** Params */
+            params: components["schemas"]["ParamSpec"][];
         };
         /** Cell */
         Cell: {
@@ -549,82 +503,8 @@ export interface components {
             num?: number | null;
             ref?: components["schemas"]["Ref"] | null;
         };
-        /** ChangeRow */
-        ChangeRow: {
-            /** Keys */
-            keys: components["schemas"]["Cell"][];
-            /** Present */
-            present: boolean;
-            /** Cells */
-            cells: components["schemas"]["Cell"][];
-            /** Before */
-            before: components["schemas"]["Cell"][] | null;
-            /** Changed */
-            changed: string[];
-        };
-        /** Column */
-        Column: {
-            /** Name */
-            name: string;
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "number" | "bool" | "text" | "date" | "ref" | "vocab" | "enum";
-            /** Entity */
-            entity?: string | null;
-        };
-        /** Count */
-        Count: {
-            /** Value */
-            value: number;
-            /** Noun */
-            noun: string;
-            /** Population */
-            population: string;
-        };
-        /** CountryProgress */
-        CountryProgress: {
-            scope: components["schemas"]["Scope"];
-            /** Seqs */
-            seqs: number[];
-            /** Hours */
-            hours: number[];
-            /** Countries */
-            countries: components["schemas"]["CountryTrack"][];
-        };
-        /** CountryTrack */
-        CountryTrack: {
-            ref: components["schemas"]["Ref"];
-            /** Player */
-            player: boolean;
-            /** States */
-            states: (number | null)[];
-            /** Provinces */
-            provinces: (number | null)[];
-            /** Population */
-            population: (number | null)[];
-            /** Gdp */
-            gdp: (number | null)[];
-            /** Exports */
-            exports: (number | null)[];
-            /** Imports */
-            imports: (number | null)[];
-        };
-        /** DetailCount */
-        DetailCount: {
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "done" | "invalid" | "raced" | "no_object" | "ui_leftover";
-            /** Detail */
-            detail: string | null;
-            /** Count */
-            count: number;
-        };
-        /** EntityDetail */
-        EntityDetail: {
+        /** EntityInfo */
+        EntityInfo: {
             ref: components["schemas"]["Ref"];
             /** First Seq */
             first_seq: number;
@@ -632,71 +512,12 @@ export interface components {
             last_seq: number;
             /** Present */
             present: boolean;
-            history: components["schemas"]["EntityTable"] | null;
-            /** Tables */
-            tables: components["schemas"]["TableCount"][];
-            /** Series */
-            series: components["schemas"]["Series"][];
+            /** Owned */
+            owned: components["schemas"]["TableCount"][];
+            /** References */
+            references: components["schemas"]["Reference"][];
             /** Actions */
-            actions: components["schemas"]["ActionRow"][];
-            scope: components["schemas"]["Scope"];
-        };
-        /** EntityKindRow */
-        EntityKindRow: {
-            /** Kind */
-            kind: string;
-            /** Live */
-            live: number;
-            /** Ever */
-            ever: number;
-            /** Tables */
-            tables: number;
-        };
-        /** EntityList */
-        EntityList: {
-            scope: components["schemas"]["Scope"];
-            /** Kind */
-            kind: string;
-            /** Seq */
-            seq: number;
-            game_date: components["schemas"]["GameDate"];
-            total: components["schemas"]["Count"];
-            /** Columns */
-            columns: components["schemas"]["Column"][];
-            /** Rows */
-            rows: components["schemas"]["EntityRow"][];
-        };
-        /** EntityRow */
-        EntityRow: {
-            ref: components["schemas"]["Ref"];
-            /** First Seq */
-            first_seq: number;
-            /** Present */
-            present: boolean;
-            /** Cells */
-            cells: components["schemas"]["Cell"][];
-        };
-        /** EntityTable */
-        EntityTable: {
-            /** Table */
-            table: string;
-            /** Kind */
-            kind: string;
-            /** Keys */
-            keys: components["schemas"]["Column"][];
-            /** Columns */
-            columns: components["schemas"]["Column"][];
-            /** Groups */
-            groups: components["schemas"]["KeyedVersions"][];
-            /** Rows */
-            rows: number;
-        };
-        /** Facet */
-        Facet: {
-            /** Value */
-            value: string;
-            /** Count */
-            count: number;
+            actions: number;
         };
         /** GameDate */
         GameDate: {
@@ -705,95 +526,58 @@ export interface components {
             /** Text */
             text: string;
         };
-        /** GroupStatus */
-        GroupStatus: {
-            /** Group */
-            group: string;
-            /** Statuses */
-            statuses: components["schemas"]["StatusCount"][];
+        /** Grid */
+        Grid: {
+            /** Columns */
+            columns: components["schemas"]["GridColumn"][];
+            /** Rows */
+            rows: components["schemas"]["Cell"][][];
             /** Total */
             total: number;
+            /** Offset */
+            offset: number;
+            /** Run */
+            run: number | null;
+            /** Seq */
+            seq?: number | null;
+            /** Last Seq */
+            last_seq?: number | null;
+            game_date?: components["schemas"]["GameDate"] | null;
+            /** Keys */
+            keys?: string[] | null;
+        };
+        /** GridColumn */
+        GridColumn: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "number" | "bool" | "text" | "date" | "time" | "ref" | "run" | "seq" | "n" | "action" | "table" | "kind" | "round";
+            /** Entity */
+            entity?: string | null;
+            /** Group */
+            group?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /** KeyedVersions */
-        KeyedVersions: {
-            /** Keys */
-            keys: components["schemas"]["Cell"][];
-            /** Versions */
-            versions: components["schemas"]["Version"][];
-        };
-        /** LivePage */
-        LivePage: {
-            /** Now */
-            now: string;
-            /** Live */
-            live: components["schemas"]["LiveRun"][];
-            /** Blocks */
-            blocks: {
-                [key: string]: components["schemas"]["BlockRow"][];
-            };
-            last: components["schemas"]["RunRow"] | null;
-            round: components["schemas"]["RoundRow"] | null;
-        };
-        /** LiveRun */
-        LiveRun: {
-            run: components["schemas"]["RunRow"];
-            player: components["schemas"]["Ref"];
-            /** Progress Step */
-            progress_step: string;
-            /** Heartbeat Age S */
-            heartbeat_age_s: number;
-            /** Progress Age S */
-            progress_age_s: number;
-            /** Turn */
-            turn: number;
-            game_start: components["schemas"]["GameDate"] | null;
-            game_now: components["schemas"]["GameDate"] | null;
-            /** Statuses */
-            statuses: components["schemas"]["StatusCount"][];
-            /** Recent */
-            recent: components["schemas"]["ActionRow"][];
-            /** Read Ms */
-            read_ms: number[];
-            /** Read Seq */
-            read_seq: number[];
-        };
-        /** MarketGoods */
-        MarketGoods: {
-            /** Goods */
-            goods: string;
-            /** Price */
-            price: number;
-            /** Base */
-            base: number | null;
-            /** Sell */
-            sell: number;
-            /** Buy */
-            buy: number;
-        };
-        /** MarketRow */
-        MarketRow: {
-            /** Market */
-            market: number;
-            owner: components["schemas"]["Ref"];
-            /** Goods */
-            goods: number;
-            /** Player */
-            player: boolean;
-        };
-        /** Param */
-        Param: {
-            /** Name */
-            name: string;
-            /** Kind */
-            kind: string;
-            /** Text */
-            text: string;
-            ref?: components["schemas"]["Ref"] | null;
+        /** OpenRun */
+        OpenRun: {
+            /** Run */
+            run: number;
+            /** Country */
+            country: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "running" | "stalled" | "lost" | "ended";
         };
         /** ParamSpec */
         ParamSpec: {
@@ -801,28 +585,6 @@ export interface components {
             name: string;
             /** Kind */
             kind: string;
-        };
-        /** ParamWeight */
-        ParamWeight: {
-            /** Action */
-            action: string;
-            /** Param */
-            param: string;
-            /** Value */
-            value: string;
-            /** Weight */
-            weight: number;
-        };
-        /** Rate */
-        Rate: {
-            /** N */
-            n: number;
-            /** Of */
-            of: number;
-            /** Noun */
-            noun: string;
-            /** Population */
-            population: string;
         };
         /** Ref */
         Ref: {
@@ -832,221 +594,58 @@ export interface components {
             id: number;
             /** Label */
             label: string | null;
+            /** Run */
+            run?: number | null;
         };
-        /** RoundRow */
-        RoundRow: {
-            /** Round */
-            round: number;
-            /** Runs */
-            runs: number;
-            /** Live */
-            live: number;
-            /** Started At */
-            started_at: string;
-            /** Last At */
-            last_at: string;
-            /** Kinds */
-            kinds: components["schemas"]["Facet"][];
-            /** Tags */
-            tags: string[];
-            /** End Reasons */
-            end_reasons: components["schemas"]["Facet"][];
-            /** Actions */
-            actions: number | null;
-        };
-        /** RoundsPage */
-        RoundsPage: {
-            scope: components["schemas"]["Scope"];
-            total: components["schemas"]["Count"];
+        /** Reference */
+        Reference: {
+            /** Table */
+            table: string;
+            /** Column */
+            column: string;
             /** Rows */
-            rows: components["schemas"]["RoundRow"][];
+            rows: number;
         };
-        /** RunDetail */
-        RunDetail: {
-            run: components["schemas"]["RunRow"];
-            /** Runs Requested */
-            runs_requested: number;
-            /** World Seed */
-            world_seed: number | null;
-            /** Countries */
-            countries: number | null;
-            /** States */
-            states: number | null;
-            /** Tech */
-            tech: number | null;
-            /** Pop */
-            pop: number | null;
-            /** Weights */
-            weights: components["schemas"]["Weight"][];
-            /** Param Weights */
-            param_weights: components["schemas"]["ParamWeight"][];
-            player: components["schemas"]["Ref"];
-            /** World Id */
-            world_id: number;
-            /** Ruleset Id */
-            ruleset_id: number;
-            /** Run Seed */
-            run_seed: number;
-            /** Cli Seed */
-            cli_seed: number;
-            /** Profile */
-            profile: string;
-            /** Pool */
-            pool: number;
-            /** Game Speed */
-            game_speed: number;
-            /** Custom Rng Seed */
-            custom_rng_seed: string;
-            /** Rules */
-            rules: string[];
-            /** Progress Step */
-            progress_step: string;
-            /** Heartbeat Age S */
-            heartbeat_age_s: number;
-            /** Progress Age S */
-            progress_age_s: number;
-            /** Longest Step */
-            longest_step: string | null;
-            /** Longest Step Ms */
-            longest_step_ms: number | null;
-            /** Game Exited At */
-            game_exited_at: string | null;
-            /** Statuses */
-            statuses: components["schemas"]["StatusCount"][];
-            /** Groups */
-            groups: components["schemas"]["GroupStatus"][];
-            /** Read Ms */
-            read_ms: number[];
-            /** Read Seq */
-            read_seq: number[];
-            /** Series */
-            series: components["schemas"]["SeriesChoice"][];
-            /** Entities */
-            entities: components["schemas"]["EntityKindRow"][];
+        /** RewardPart */
+        RewardPart: {
+            /** Component */
+            component: string;
+            /** Weight */
+            weight: number;
+            /** Change */
+            change: number;
+            /** Divisor */
+            divisor: number;
+            /** Discounted */
+            discounted: number;
+            /** Scale */
+            scale: number;
+            /** Normalized */
+            normalized: number;
+            /** Contribution */
+            contribution: number;
         };
-        /** RunRow */
-        RunRow: {
-            /** Run Id */
-            run_id: number;
-            /** Round */
-            round: number;
-            /** Kind */
-            kind: string;
-            /** Tag */
-            tag: string;
-            /** World */
-            world: string;
-            /** Advisors */
-            advisors: string[];
-            /** Started At */
-            started_at: string;
-            /** Ended At */
-            ended_at: string | null;
-            /** Wall S */
-            wall_s: number;
-            /** Minutes */
-            minutes: number;
-            /** Years */
-            years: number;
-            /** End Reason */
-            end_reason: string | null;
-            /** End Detail */
-            end_detail: string | null;
+        /** RunInfo */
+        RunInfo: {
+            /** Run */
+            run: number;
+            /** Country */
+            country: string;
+            /** Player */
+            player: number;
+            /** Player Label */
+            player_label: string | null;
             /**
              * State
              * @enum {string}
              */
             state: "running" | "stalled" | "lost" | "ended";
-            /** Snapshots */
-            snapshots: number;
-            game_from: components["schemas"]["GameDate"] | null;
-            game_to: components["schemas"]["GameDate"] | null;
-            /** Actions */
-            actions: number;
-            done: components["schemas"]["Rate"];
-            /** Gdp Start */
-            gdp_start: number | null;
-            /** Gdp End */
-            gdp_end: number | null;
-            /** Gdp Peak */
-            gdp_peak: number | null;
-            /** Gdp Yoy */
-            gdp_yoy: number | null;
-            /** Population Yoy */
-            population_yoy: number | null;
-        };
-        /** RunStatus */
-        RunStatus: {
-            /** Run Id */
-            run_id: number;
-            /** Tag */
-            tag: string;
-            /** Statuses */
-            statuses: components["schemas"]["StatusCount"][];
-            /** Total */
-            total: number;
-        };
-        /** RunsPage */
-        RunsPage: {
-            scope: components["schemas"]["Scope"];
-            total: components["schemas"]["Count"];
-            /** Rows */
-            rows: components["schemas"]["RunRow"][];
-            /** Kinds */
-            kinds: components["schemas"]["Facet"][];
-            /** End Reasons */
-            end_reasons: components["schemas"]["Facet"][];
-            /** Tags */
-            tags: components["schemas"]["Facet"][];
-        };
-        /** SchemaColumn */
-        SchemaColumn: {
-            /** Name */
-            name: string;
-            /** Type */
-            type: string;
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "number" | "bool" | "text" | "date" | "ref" | "vocab" | "enum";
-            /** Target */
-            target: string | null;
-            /** Optional */
-            optional: boolean;
-        };
-        /** SchemaPage */
-        SchemaPage: {
-            /** Entities */
-            entities: string[];
-            /** Tables */
-            tables: components["schemas"]["SchemaTable"][];
-            /** Ruleset Id */
-            ruleset_id: number | null;
-            /** Gaps */
-            gaps: components["schemas"]["CaptureGap"][];
-        };
-        /** SchemaTable */
-        SchemaTable: {
-            /** Name */
-            name: string;
-            /** Kind */
-            kind: string;
-            /** Owner */
-            owner: string | null;
-            /** Scope */
-            scope: string;
-            /** Keys */
-            keys: components["schemas"]["SchemaColumn"][];
-            /** Columns */
-            columns: components["schemas"]["SchemaColumn"][];
-        };
-        /** Scope */
-        Scope: {
-            /** Text */
-            text: string;
-            /** Detail */
-            detail?: string | null;
+            /** Last Seq */
+            last_seq: number | null;
+            /** Reward Years */
+            reward_years: number | null;
+            /** Reward Parts */
+            reward_parts: components["schemas"]["RewardPart"][];
         };
         /** Series */
         Series: {
@@ -1054,10 +653,6 @@ export interface components {
             table: string;
             /** Column */
             column: string;
-            /** Label */
-            label: string;
-            /** Title */
-            title: string;
             /**
              * X
              * @enum {string}
@@ -1071,7 +666,6 @@ export interface components {
             seqs: number[];
             /** Hours */
             hours: (number | null)[];
-            scope: components["schemas"]["Scope"];
         };
         /** SeriesChoice */
         SeriesChoice: {
@@ -1079,81 +673,6 @@ export interface components {
             table: string;
             /** Column */
             column: string;
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "singleton" | "sample" | "subject" | "history" | "child";
-            /** Label */
-            label: string;
-        };
-        /** SnapshotChanges */
-        SnapshotChanges: {
-            scope: components["schemas"]["Scope"];
-            snapshot: components["schemas"]["SnapshotRow"];
-            previous: components["schemas"]["SnapshotRow"] | null;
-            /** Tables */
-            tables: components["schemas"]["TableCount"][];
-            /** Actions */
-            actions: components["schemas"]["ActionRow"][];
-        };
-        /** SnapshotRow */
-        SnapshotRow: {
-            /** Seq */
-            seq: number;
-            /** Phase */
-            phase: string;
-            game_date: components["schemas"]["GameDate"];
-            /** Taken At */
-            taken_at: string;
-            /** Read Ms */
-            read_ms: number;
-            /** Paused */
-            paused: boolean | null;
-            /** Speed */
-            speed: number | null;
-            /** Ui Panel Open */
-            ui_panel_open: boolean;
-            /** Ui Interaction Open */
-            ui_interaction_open: boolean;
-            /** Ui Map List Open */
-            ui_map_list_open: boolean;
-            /** Actions */
-            actions: number;
-        };
-        /** SnapshotsPage */
-        SnapshotsPage: {
-            scope: components["schemas"]["Scope"];
-            total: components["schemas"]["Count"];
-            /** Rows */
-            rows: components["schemas"]["SnapshotRow"][];
-        };
-        /** StatusCount */
-        StatusCount: {
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "done" | "invalid" | "raced" | "no_object" | "ui_leftover";
-            /** Count */
-            count: number;
-        };
-        /** TableChanges */
-        TableChanges: {
-            /** Table */
-            table: string;
-            /** Kind */
-            kind: string;
-            /** Owner */
-            owner: string | null;
-            /** Keys */
-            keys: components["schemas"]["Column"][];
-            /** Columns */
-            columns: components["schemas"]["Column"][];
-            /** Rows */
-            rows: components["schemas"]["ChangeRow"][];
-            /** Total */
-            total: number;
         };
         /** TableCount */
         TableCount: {
@@ -1163,43 +682,10 @@ export interface components {
             kind: string;
             /** Owner */
             owner: string | null;
+            /** Keyed */
+            keyed: boolean;
             /** Rows */
             rows: number;
-        };
-        /** TradePage */
-        TradePage: {
-            scope: components["schemas"]["Scope"];
-            /** Seq */
-            seq: number;
-            game_date: components["schemas"]["GameDate"];
-            /** Markets */
-            markets: components["schemas"]["MarketRow"][];
-            /** Market */
-            market: number | null;
-            /** Goods */
-            goods: components["schemas"]["MarketGoods"][];
-        };
-        /** TradeSeries */
-        TradeSeries: {
-            /** Goods */
-            goods: string;
-            /** Market */
-            market: number;
-            /** Seqs */
-            seqs: number[];
-            /** Hours */
-            hours: number[];
-            /** Price */
-            price: (number | null)[];
-            /** Sell */
-            sell: (number | null)[];
-            /** Buy */
-            buy: (number | null)[];
-            /** World N */
-            world_n: number[];
-            /** World Price */
-            world_price: number[];
-            scope: components["schemas"]["Scope"];
         };
         /** ValidationError */
         ValidationError: {
@@ -1214,25 +700,6 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
-        /** Version */
-        Version: {
-            /** Seq */
-            seq: number;
-            game_date: components["schemas"]["GameDate"];
-            /** Present */
-            present: boolean;
-            /** Cells */
-            cells: components["schemas"]["Cell"][];
-            /** Before */
-            before?: components["schemas"]["Cell"][] | null;
-        };
-        /** Weight */
-        Weight: {
-            /** Action */
-            action: string;
-            /** Weight */
-            weight: number;
-        };
     };
     responses: never;
     parameters: never;
@@ -1242,7 +709,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    get_live_api_live_get: {
+    get_open_api_open_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1257,7 +724,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["LivePage"];
+                    "application/json": components["schemas"]["OpenRun"][];
                 };
             };
         };
@@ -1265,14 +732,11 @@ export interface operations {
     get_runs_api_runs_get: {
         parameters: {
             query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
                 offset?: number;
                 limit?: number;
-                sort?: string;
-                desc?: boolean;
-                kind?: string | null;
-                end_reason?: string | null;
-                tag?: string | null;
-                round?: number | null;
             };
             header?: never;
             path?: never;
@@ -1286,7 +750,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RunsPage"];
+                    "application/json": components["schemas"]["Grid"];
                 };
             };
             /** @description Validation Error */
@@ -1303,6 +767,9 @@ export interface operations {
     get_rounds_api_rounds_get: {
         parameters: {
             query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
                 offset?: number;
                 limit?: number;
             };
@@ -1318,7 +785,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RoundsPage"];
+                    "application/json": components["schemas"]["Grid"];
                 };
             };
             /** @description Validation Error */
@@ -1349,7 +816,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RunDetail"];
+                    "application/json": components["schemas"]["RunInfo"];
                 };
             };
             /** @description Validation Error */
@@ -1363,48 +830,14 @@ export interface operations {
             };
         };
     };
-    get_series_api_runs__run_id__series_get: {
-        parameters: {
-            query: {
-                table: string;
-                column: string;
-            };
-            header?: never;
-            path: {
-                run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Series"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_run_actions_api_runs__run_id__actions_get: {
+    get_groups_api_runs__run_id__groups_get: {
         parameters: {
             query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
                 offset?: number;
                 limit?: number;
-                action?: string | null;
-                group?: string | null;
-                status?: string | null;
             };
             header?: never;
             path: {
@@ -1420,7 +853,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ActionLog"];
+                    "application/json": components["schemas"]["Grid"];
                 };
             };
             /** @description Validation Error */
@@ -1434,13 +867,18 @@ export interface operations {
             };
         };
     };
-    get_run_action_api_runs__run_id__actions__n__get: {
+    get_actions_of_run_api_runs__run_id__actions_get: {
         parameters: {
-            query?: never;
+            query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
             header?: never;
             path: {
                 run_id: number;
-                n: number;
             };
             cookie?: never;
         };
@@ -1452,7 +890,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ActionDetail"];
+                    "application/json": components["schemas"]["Grid"];
                 };
             };
             /** @description Validation Error */
@@ -1469,9 +907,11 @@ export interface operations {
     get_blocks_api_runs__run_id__blocks_get: {
         parameters: {
             query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
                 offset?: number;
                 limit?: number;
-                kind?: string | null;
             };
             header?: never;
             path: {
@@ -1487,7 +927,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BlockLog"];
+                    "application/json": components["schemas"]["Grid"];
                 };
             };
             /** @description Validation Error */
@@ -1501,41 +941,12 @@ export interface operations {
             };
         };
     };
-    get_block_api_runs__run_id__blocks__seq__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                run_id: number;
-                seq: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BlockDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_snapshots_api_runs__run_id__snapshots_get: {
+    get_run_tables_api_runs__run_id__tables_get: {
         parameters: {
             query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
                 offset?: number;
                 limit?: number;
             };
@@ -1553,7 +964,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SnapshotsPage"];
+                    "application/json": components["schemas"]["Grid"];
                 };
             };
             /** @description Validation Error */
@@ -1567,48 +978,57 @@ export interface operations {
             };
         };
     };
-    get_snapshot_api_runs__run_id__snapshots__seq__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                run_id: number;
-                seq: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SnapshotChanges"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_snapshot_table_api_runs__run_id__snapshots__seq__tables__table__get: {
+    get_kinds_api_runs__run_id__kinds_get: {
         parameters: {
             query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
                 offset?: number;
                 limit?: number;
             };
             header?: never;
             path: {
                 run_id: number;
-                seq: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_table_api_runs__run_id__tables__table__get: {
+        parameters: {
+            query?: {
+                seq?: number | null;
+                versions?: boolean;
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                run_id: number;
                 table: string;
             };
             cookie?: never;
@@ -1621,7 +1041,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TableChanges"];
+                    "application/json": components["schemas"]["Grid"];
                 };
             };
             /** @description Validation Error */
@@ -1639,9 +1059,12 @@ export interface operations {
         parameters: {
             query?: {
                 seq?: number | null;
+                gone?: boolean;
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
                 offset?: number;
                 limit?: number;
-                gone?: boolean;
             };
             header?: never;
             path: {
@@ -1658,7 +1081,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EntityList"];
+                    "application/json": components["schemas"]["Grid"];
                 };
             };
             /** @description Validation Error */
@@ -1691,7 +1114,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EntityDetail"];
+                    "application/json": components["schemas"]["EntityInfo"];
                 };
             };
             /** @description Validation Error */
@@ -1705,14 +1128,96 @@ export interface operations {
             };
         };
     };
-    get_entity_table_api_runs__run_id__entities__kind___ident__tables__table__get: {
+    get_entity_actions_api_runs__run_id__entities__kind___ident__actions_get: {
         parameters: {
-            query?: never;
+            query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
             header?: never;
             path: {
                 run_id: number;
                 kind: string;
                 ident: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_changed_tables_api_runs__run_id__snapshots__seq__tables_get: {
+        parameters: {
+            query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                run_id: number;
+                seq: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_table_changes_api_runs__run_id__snapshots__seq__tables__table__get: {
+        parameters: {
+            query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                run_id: number;
+                seq: number;
                 table: string;
             };
             cookie?: never;
@@ -1725,7 +1230,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EntityTable"];
+                    "application/json": components["schemas"]["Grid"];
                 };
             };
             /** @description Validation Error */
@@ -1739,13 +1244,47 @@ export interface operations {
             };
         };
     };
-    get_countries_api_runs__run_id__countries_get: {
+    get_series_api_runs__run_id__series_get: {
+        parameters: {
+            query: {
+                table: string;
+                column: string;
+                f?: string[];
+                player?: boolean;
+            };
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Series"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_series_choices_api_series_get: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                run_id: number;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -1756,29 +1295,24 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CountryProgress"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["SeriesChoice"][];
                 };
             };
         };
     };
-    get_trade_api_runs__run_id__trade_get: {
+    get_meta_api_meta__table__get: {
         parameters: {
             query?: {
-                market?: number | null;
-                seq?: number | null;
+                run?: number | null;
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
             };
             header?: never;
             path: {
-                run_id: number;
+                table: string;
             };
             cookie?: never;
         };
@@ -1790,7 +1324,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TradePage"];
+                    "application/json": components["schemas"]["Grid"];
                 };
             };
             /** @description Validation Error */
@@ -1804,44 +1338,15 @@ export interface operations {
             };
         };
     };
-    get_trade_goods_api_runs__run_id__trade_goods_get: {
-        parameters: {
-            query: {
-                market: number;
-                goods: string;
-            };
-            header?: never;
-            path: {
-                run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TradeSeries"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_actions_api_actions_get: {
+    get_action_stats_api_actions_get: {
         parameters: {
             query?: {
                 scope?: string;
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -1855,7 +1360,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ActionStats"];
+                    "application/json": components["schemas"]["Grid"];
                 };
             };
             /** @description Validation Error */
@@ -1871,8 +1376,44 @@ export interface operations {
     };
     get_action_api_actions__name__get: {
         parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_action_runs_api_actions__name__runs_get: {
+        parameters: {
             query?: {
                 scope?: string;
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
             };
             header?: never;
             path: {
@@ -1888,7 +1429,188 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ActionType"];
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_action_details_api_actions__name__details_get: {
+        parameters: {
+            query?: {
+                scope?: string;
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_action_picks_api_actions__name__picks_get: {
+        parameters: {
+            query?: {
+                scope?: string;
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_configs_api_policy_configs_get: {
+        parameters: {
+            query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_scored_api_policy_scored_get: {
+        parameters: {
+            query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_picker_actions_api_policy_picker_actions_get: {
+        parameters: {
+            query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
                 };
             };
             /** @description Validation Error */
@@ -1904,7 +1626,13 @@ export interface operations {
     };
     get_schema_api_schema_get: {
         parameters: {
-            query?: never;
+            query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1917,7 +1645,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SchemaPage"];
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
