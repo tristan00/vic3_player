@@ -2,11 +2,11 @@
 
 This records what has been done to cut the time the loop spends on its own scaffolding, and what each change measured. Nothing here may change what a run does. Every hour the timing tables are reviewed and this document is replaced with the current state.
 
-Last review: 2026-09-27 04:45, covering runs 244 and 245.
+Last review: 2026-09-27 05:45, covering runs 245 to 248.
 
 ## Blocked
 
-The speedups are committed but no run has used them. Round collect_63 started at 03:06, before the first commit, and a round keeps the code it loaded until its process exits. It is asked for 1000 runs, so it will not exit by itself soon. The supervisor starts the next round on the new code.
+The speedups are committed but no run has used them. Round collect_63 started at 03:06, before the first commit, has played five runs since, and a round keeps the code it loaded until its process exits. It is asked for 1000 runs, so it will not exit by itself soon. The supervisor starts the next round on the new code.
 
 Ending the round is the owner's decision. Until a run has used the new code, live verification cannot start and no further change is stacked on top.
 
@@ -69,19 +69,20 @@ One thing did change order. The picker and the number of candidates are now draw
 
 All of these runs used the old code.
 
-| measure | run 243 | run 244 | run 245, still playing |
-| --- | --- | --- | --- |
-| end reason | debt_cap | time | |
-| snapshots | 112 | 520 | 245 |
-| actions | 628 | 2750 | 1552 |
-| advisor actions per pause | | 7.2 | 9.1 |
-| action status | all done | all done | 1551 done, 1 no_object |
-| validation per snapshot, ms | 250 | 380 | 304 |
-| statistics refresh, s | 18.5 | 19.0 | 17.7 |
-| world generation, s | 43.3 | 38.2 | 49.3 |
-| picker training, s | 24.4 | 25.4 | 21.4 |
+| measure | run 244 | run 245 | run 246 | run 247 |
+| --- | --- | --- | --- | --- |
+| end reason | time | time | debt_cap | debt_cap |
+| snapshots | 520 | 445 | 64 | 130 |
+| actions | 2750 | 2966 | 404 | 914 |
+| action status other than done | none | 3 no_object, 1 invalid | none | none |
+| validation per snapshot, ms | 380 | 403 | 232 | 216 |
+| statistics refresh, s | 19.0 | 17.7 | 21.0 | 20.3 |
+| world generation, s | 38.2 | 49.3 | 44.3 | 25.8 |
+| picker training, s | 25.4 | 21.4 | 24.4 | 23.0 |
 
-Logs for collect_63 hold no traceback, stall, crash or block. The one failed span is the action that found no game object in run 245, which the loop handles.
+Run 248 is playing. The time between one run ending and the next run row opening was 112, 109, 87 and 101 seconds.
+
+Logs for collect_63 hold no traceback, stall, crash or block. The failed spans are the three actions that found no game object in run 245, which the loop handles.
 
 Known failures that predate the changes: run 241 ended with the game date still moving 3 s after pausing, and round collect_62 exited because the heartbeat process died.
 
