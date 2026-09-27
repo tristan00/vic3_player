@@ -4,6 +4,7 @@ import unittest
 import psycopg
 from fastapi.testclient import TestClient
 
+from advisors.pickers import PARAMS
 from dashboard.server import actions, changes, db, meta, policy, runs, tables
 from dashboard.server.app import app
 from interface.recording.store import Store, install
@@ -44,7 +45,7 @@ class DashboardTests(unittest.TestCase):
         store.session='test'
         store.begin_run(started_at=AT,**RUN)
         store.pending['proposal']=PROPOSAL
-        store.pending['pick_model']=(1049,29,4.5,{'iterations':100,'depth':6,'learning_rate':.1,'loss_function':'RMSE','random_seed':0,'thread_count':4,'rsm':.8},[('treasury',60.0),('action1.type',40.0)])
+        store.pending['pick_model']=(1049,29,4.5,PARAMS,[('treasury',60.0),('action1.type',40.0)])
         for step in STEPS:
             store.write(built(step),'post_action',AT,1.0)
         store.record_pick(0,[['build','research'],['enact_law']],[1.5,-2.0],0)

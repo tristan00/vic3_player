@@ -266,7 +266,10 @@ create table pick_model (
   loss_function text not null,
   random_seed int4 not null,
   thread_count int2 not null,
-  rsm float8 not null
+  rsm float8 not null,
+  l2_leaf_reg float8 not null,
+  random_strength float8 not null,
+  one_hot_max_size int2 not null
 );
 
 create table pick_importance (

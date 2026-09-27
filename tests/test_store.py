@@ -4,6 +4,7 @@ import unittest
 
 import psycopg
 
+from advisors.pickers import PARAMS
 from interface.options.stored import Stored
 from interface.recording.store import Store, install
 from interface.recording.spec import TABLES
@@ -200,7 +201,7 @@ class StoreTests(unittest.TestCase):
         self.store.end_run('time')
 
     def test_picks_record_every_candidate_with_its_actions_and_the_model_behind_them(self):
-        self.store.pending['pick_model']=(1049,29,4.5,{'iterations':100,'depth':6,'learning_rate':.1,'loss_function':'RMSE','random_seed':0,'thread_count':4,'rsm':.8},[('treasury',60.0),('action1.type',40.0)])
+        self.store.pending['pick_model']=(1049,29,4.5,PARAMS,[('treasury',60.0),('action1.type',40.0)])
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
         self.store.record_pick(0,[['build','research'],['enact_law']],[1.5,-2.0],0)
         c=self.store.connection

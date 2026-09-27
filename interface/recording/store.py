@@ -256,8 +256,7 @@ class Store:
             self.record_proposal(cursor,run_id,pending['proposal'])
         if pending['pick_model'] is not None:
             pauses,runs,seconds,params,importance=pending['pick_model']
-            cursor.execute('insert into pick_model (run_id,pauses,runs,seconds,iterations,depth,learning_rate,loss_function,random_seed,thread_count,rsm) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
-                           (run_id,pauses,runs,seconds,*(params[k] for k in ('iterations','depth','learning_rate','loss_function','random_seed','thread_count','rsm'))))
+            cursor.execute(f'insert into pick_model (run_id,pauses,runs,seconds,{",".join(params)}) values ({",".join(["%s"]*(4+len(params)))})',(run_id,pauses,runs,seconds,*params.values()))
             self.copy(cursor,'pick_importance',('run_id','feature','importance'),[(run_id,feature,value) for feature,value in importance])
         self.copy(cursor,'run_game_rule',('run_id','game_rule_setting'),[(run_id,rule) for rule in self.names('game_rule_setting',constants['game_rules'])])
         self.run_id=run_id

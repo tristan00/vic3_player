@@ -15,7 +15,8 @@ ANSWERS={'choose_event_option','quick_decline_proposal','accept_treaty','decline
          'accept_action_proposal','decline_action_proposal','accept_sway','reject_sway'}
 CATEGORICAL=list(range(len(NUMBERS),len(NUMBERS)+len(CATEGORIES)+len(LAWS)))
 MIN_PAUSES=200
-PARAMS={'iterations':100,'depth':10,'learning_rate':.1,'loss_function':'RMSE','random_seed':0,'thread_count':os.cpu_count(),'rsm':.8}
+PARAMS={'iterations':200,'depth':9,'learning_rate':.0688,'l2_leaf_reg':13.2451,'rsm':.77,'random_strength':5.8403,'one_hot_max_size':32,'loss_function':'RMSE','random_seed':0,
+        'thread_count':os.cpu_count()}
 
 RUNS=f'''select r.run_id,min(s.game_date),max(s.game_date)
 {ENDED}
