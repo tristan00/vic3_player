@@ -2,11 +2,11 @@
 
 This records what has been done to cut the time the loop spends on its own scaffolding, and what each change measured. Nothing here may change what a run does. Every hour the timing tables are reviewed and this document is replaced with the current state.
 
-Last review: 2026-09-27 08:45, covering runs 254 to 256.
+Last review: 2026-09-27 09:45, covering runs 256 to 260.
 
 ## State
 
-Commits 7b49bf3 and d6f8025 are live since round collect_65, launched at 06:59:35. Runs 253 to 256 used them and show no errors.
+Commits 7b49bf3 and d6f8025 are live since round collect_65, launched at 06:59:35. Runs 253 to 260 used them and show no errors.
 
 Commit 8f59257 is not live. It loads when the supervisor next starts a round. The running round is left to end by itself.
 
@@ -14,18 +14,24 @@ No code changed in this review.
 
 ## Measured live
 
-Setup:
+Setup on the new code:
 
-| step | old code, runs 244 to 252 | run 253 | run 254 | run 255 | run 256 |
-| --- | --- | --- | --- | --- | --- |
-| states in the world | 41 to 93 | 22 | 63 | 94 | 53 |
-| world generation, s | 22 to 56 | 15 | 24 | 39 | 25 |
-| picker training, s | 21 to 25, after the game loaded | 31 | 31 | 34 | 31 |
-| game launch and load, s | 31 | 31 | 33 | 36 | 34 |
-| statistics refresh, s | 17.7 to 21.6 | 5.1 | 5.5 | 5.6 | 5.2 |
-| previous run ending to this run row opening, s | 87 to 112 | | 67 | 79 | 69 |
+| run | states | world generation, s | picker training, s | game launch and load, s | statistics refresh, s | previous run ending to run row opening, s |
+| --- | --- | --- | --- | --- | --- | --- |
+| 253 | 22 | 15 | 31 | 31 | 5.1 | |
+| 254 | 63 | 24 | 31 | 33 | 5.5 | 67 |
+| 255 | 94 | 39 | 34 | 36 | 5.6 | 79 |
+| 256 | 53 | 25 | 31 | 34 | 5.2 | 69 |
+| 257 | 20 | 11 | 29 | 34 | 5.7 | 67 |
+| 258 | 32 | 13 | 28 | 33 | 7.8 | 66 |
+| 259 | 90 | 36 | 33 | 35 | 5.6 | 75 |
+| 260 | 94 | 41 | 33 | 35 | 7.6 | 81 |
 
-World generation for 94 states took 39 s. On the old code a world of 93 states took 56 s.
+On the old code, runs 241 to 252: world generation 22 to 56 s, training 21 to 25 s after the game loaded, game launch and load 31 to 36 s, statistics refresh 17.7 to 21.6 s, and 87 to 112 s between runs.
+
+Game launch and load is the same on both. World generation for 94 states took 39 and 41 s. On the old code a world of 93 states took 56 s.
+
+In runs 257 and 258 the world was ready after 11 and 13 s and the game then waited 16 to 18 s for training. Commit 8f59257 removes that wait.
 
 During play, mean over snapshots 2 to 80:
 
@@ -49,18 +55,19 @@ Validation took 198 s of run 244 and 64 s of run 254. It still grows during a ru
 
 ## Run function, before and after
 
-| measure | old code, runs 220 to 252 | new code, runs 253 to 256 |
+| measure | old code, runs 220 to 252 | new code, runs 253 to 260 |
 | --- | --- | --- |
-| actions done | 99.810 % of 27310 | 99.800 % of 5501 |
-| actions invalid | 0.176 % | 0.182 % |
-| actions that found no game object | 0.015 % | 0.018 % |
-| advisor actions per pause | 8.7 to 10.3 | 7.0 to 10.1 |
+| actions done | 99.810 % of 27310 | 99.747 % of 8685 |
+| actions invalid | 0.176 % | 0.242 % |
+| actions invalid, share within a run | 0 to 4.5 %, mean 0.25 % | 0 to 1.2 %, mean 0.30 % |
+| actions that found no game object | 0.015 % | 0.012 % |
+| advisor actions per pause | 8.7 to 10.3 | 7.0 to 13.6 |
 | snapshots in an hour of play | 520 and 445 | 513 |
 | copy calls over snapshots 2 to 80 | 23399 to 23430 | 23423 and 23476 |
-| end reasons | time 2, debt_cap 6, loop_lost 1, loop_crashed 1 | time 1, debt_cap 2, one still playing |
+| end reasons | time 2, debt_cap 6, loop_lost 1, loop_crashed 1 | time 1, debt_cap 6, one still playing |
 | traceback, stall, crash or block in the round log | see the rollover below | none |
 
-Every invalid action on the new code was refused by the game for a game reason, such as a law that lacks support. The same reasons appear on the old code.
+Every invalid action on the new code was refused by the game for a game reason. Ten of the 21 came from one run, 257, where a diplomatic action needed more technologies than the target had. Invalid actions cluster by run on the old code as well.
 
 The copy calls show that a snapshot still writes the same set of tables.
 
@@ -119,7 +126,7 @@ The supervisor launched collect_64 at 06:58:14. A script from the fourth review,
 | picker training | 31, overlapped | it no longer holds anything up once 8f59257 is live, unless it outlasts world and game together |
 | world generation | 15 to 40 | see candidates |
 | closing the previous game | 4 | no |
-| registration | 3 | small |
+| registration | 3 | it reads game files and the world, not the game, so it could run during the game load; it is called from the first snapshot and keyed to the game session, which makes moving it a larger change than 3 s justifies |
 | first snapshot with statistics refresh | 9 | the refresh is bounded by its largest table at 2.8 s |
 
 ## Looked at and left alone
