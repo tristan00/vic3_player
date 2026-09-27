@@ -439,7 +439,6 @@ class Store:
                            (self.run_id,seq,phase,meta['game_date'],taken_at,read_ms,meta['local_date_time'],meta['paused'],meta['speed'],meta['ui_panel_open'],
                             meta['ui_interaction_open'],meta['ui_map_list_open']))
             cursor.execute('set local session_replication_role = replica')
-            cursor.execute('set local enable_nestloop = off')
             written={}
             for entity,idents in anchors.items():
                 if entity=='province':
