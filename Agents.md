@@ -29,3 +29,6 @@ When you update a document, do not patch an update. wipe the full document, dele
 Actively keep an eye out for out of date docs to delete or replace.
 
 Don't read or search past transcripts unless explicitly asked to.
+
+
+do not push code under any circumstances 

@@ -4,6 +4,8 @@
 
 Clock reads that remain elsewhere are deadlines and pacing, such as a timeout or the gap between two actions. None of them produces a reported duration.
 
+What the measurements have been used to speed up, with before and after numbers, is in `loop_speed.md`.
+
 ## Timing a function
 
 ```python
@@ -85,6 +87,20 @@ Memory per span is bounded by the histogram, so a process can run indefinitely.
 
 A large `self_ms` means time the span spent on work that is not itself a span. For `Loop.run_days`, `GameInterface.ready` and `Executor.run` that is waiting on the game.
 
+## Work on other threads
+
+Three pieces of setup run on worker threads of the loop process. Their spans are recorded directly, like any other.
+
+| work | thread | the span that waits for it |
+| --- | --- | --- |
+| world generation | one worker inside `Fresh.take` | `loop.run.Fresh.take` |
+| picker training | one worker started by `session` | `loop.run.session` |
+| statistics refresh after the first snapshot | eight workers inside `Store.analyze`, each an `analyze_batch` span | `interface.recording.store.Store.analyze` |
+
+A span on a worker thread has no parent, so its time is not subtracted from the span that waits. The waiting span shows the wait as `self_ms`.
+
+Spans that overlap in time add up to more than the wall clock. Picker training and world generation run together, so the first interval of a run sums to more than its length. The wall time of setup is `min(snapshot.taken_at) - run.started_at` plus the time before the run row opens, which the log shows.
+
 ## Other processes
 
 One recorder per run holds everything. Spans measured in another process are sent to the loop and merged.
@@ -93,7 +109,6 @@ One recorder per run holds everything. Spans measured in another process are sen
 | --- | --- |
 | heartbeat | sends what it measured every second over a queue; the store merges it before each write |
 | world pool worker | returns its spans with the finished world; merged when the world is taken |
-| world built in a thread | same process, recorded directly |
 
 A pooled world may have been built while an earlier run was playing. Its spans belong to the run that takes it.
 
