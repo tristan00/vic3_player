@@ -1,162 +1,153 @@
 # Loop speed
 
-This records what has been done to cut the time the loop spends on its own scaffolding, and what each change measured. Nothing here may change what a run does. Every hour the timing tables are reviewed and this document is replaced with the current state.
+This records what has been done to cut the time the loop spends on its own scaffolding, what each change measured, and the proof that runs are unchanged. How timing works is in `timing.md`.
 
-Last review: 2026-09-27 11:45, covering runs 261 and 262.
+Last update: 2026-09-27 14:10, covering runs 269 to 271.
 
 ## State
 
-Commits 7b49bf3 and d6f8025 are live since round collect_65, launched at 06:59:35. Runs 253 to 262 used them and show no errors.
+All changes below are live since round collect_67, launched at 13:53:05. Runs 270 and 271 use them. Round collect_66 ran one hour earlier on a first version with slow validation, which run 269 used.
 
-Commit 8f59257 is not live. It loads when the supervisor next starts a round. The running round is left to end by itself.
+| commit | content |
+| --- | --- |
+| 7be451d | spans on every function, coverage test, faster snapshot reading, validation, row building and offered actions |
+| 396e41c | validation uses index lookups |
+| bcc9ddb | faster log file listing, two hot helpers listed instead of timed |
 
-No code changed in this review.
+Earlier commits 7b49bf3, d6f8025 and 8f59257 are described at the end. Commit 8f59257, which launches the game while picker training finishes, went live with collect_66.
 
 ## Measured live
 
-Setup on the new code:
+Mean per call over snapshots 2 to 98, on worlds of similar size.
 
-| run | states | world generation, s | picker training, s | game launch and load, s | statistics refresh, s | previous run ending to run row opening, s |
-| --- | --- | --- | --- | --- | --- | --- |
-| 253 | 22 | 15 | 31 | 31 | 5.1 | |
-| 254 | 63 | 24 | 31 | 33 | 5.5 | 67 |
-| 255 | 94 | 39 | 34 | 36 | 5.6 | 79 |
-| 256 | 53 | 25 | 31 | 34 | 5.2 | 69 |
-| 257 | 20 | 11 | 29 | 34 | 5.7 | 67 |
-| 258 | 32 | 13 | 28 | 33 | 7.8 | 66 |
-| 259 | 90 | 36 | 33 | 35 | 5.6 | 75 |
-| 260 | 94 | 41 | 33 | 35 | 7.6 | 81 |
-| 261 | 56 | 24 | 31 | 36 | 7.9 | 69 |
-| 262 | 95 | 42 | 35 | 35 | 5.7 | 82 |
-
-On the old code, runs 241 to 252: world generation 22 to 56 s, training 21 to 25 s after the game loaded, game launch and load 31 to 36 s, statistics refresh 17.7 to 21.6 s, and 87 to 112 s between runs.
-
-Game launch and load is the same on both. World generation for 94 states took 39 and 41 s. On the old code a world of 93 states took 56 s.
-
-In runs 257 and 258 the world was ready after 11 and 13 s and the game then waited 16 to 18 s for training. Commit 8f59257 removes that wait.
-
-During play, mean over snapshots 2 to 80:
-
-| span | run 248, 66 states | run 250, 41 states | run 254, 63 states |
+| span | run 248, 66 states, before any speedup | run 254, 63 states, earlier speedups | run 270, 70 states, now |
 | --- | --- | --- | --- |
-| validation, ms | 215 | 206 | 58 |
-| whole write, ms | 324 | 282 | 167 |
-| row building, ms | 107 | 82 | 111 |
-| action dispatch, ms | 362 | 355 | 350 |
+| whole snapshot, ms | 1039 | 909 | 821 |
+| wait for the game's capture, ms | 417 | 461 | 465 |
+| holder decode, ms | 104 | 88 | 17 |
+| snapshot write, ms | 333 | 173 | 137 |
+| validation, ms | 219 | 61 | 20 |
+| row building, ms | 113 | 121 | 129 |
+| offered actions per pause, ms | 268 | 225 | 120 |
+| action dispatch, ms | 368 | 378 | 365 |
 
-Over a whole hour of play, run 244 on the old code against run 254 on the new:
+Row building did not improve live. Offline it fell from 45 to 32 ms on a 46 state capture. Run 270 builds more rows, and each builder now carries its own span, so the comparison is not like for like. Its breakdown is below.
 
-| span | run 244, 520 snapshots | run 254, 513 snapshots |
+Validation and offered actions used to grow during a run. Validation scanned every row the run had written to a table. Offered actions reread ruleset data on every pause. Neither does so now. Run 244 spent 380 ms per snapshot on validation over a full hour. An hour-long run on the new code has not finished yet, so the hourly figure is still open.
+
+## Where a snapshot goes now
+
+Run 270, mean per snapshot.
+
+| part | ms | whose time |
 | --- | --- | --- |
-| validation, ms | 380 | 124 |
-| whole write, ms | 579 | 289 |
-| row building, ms | 306 | 252 |
-| whole snapshot, ms | 1564 | 1190 |
+| wait for the game's capture | 465 | the game |
+| memory snapshot decode | 50 | loop |
+| holder decode | 17 | loop |
+| row building | 129 | loop |
+| write: copy to the database | 39 | loop and database |
+| write: versions | 29 | loop |
+| write: resolve | 23 | loop |
+| write: validation | 20 | database |
+| write: timing rows | 13 | loop and database |
+| write: samples | 10 | loop |
 
-Validation took 198 s of run 244, 64 s of run 254 and 61 s of run 260, which wrote 530 snapshots of a 94 state world. Run 261 wrote 551 snapshots of a 56 state world and spent 38 s. It still grows during a run, because later snapshots write to more tables and the pop tables are the costly ones to check.
+Inside row building the largest parts are ordering rows into column order at 35 ms, grouping child rows at 25 ms, and reading rows at 13 ms.
 
-## Run function, before and after
+## Where an action goes now
 
-| measure | old code, runs 220 to 252 | new code, runs 253 to 262 |
+Run 270, mean per action. These spans are new, so there is no earlier figure.
+
+| part | ms | whose time |
 | --- | --- | --- |
-| actions done | 99.810 % of 27310 | 99.755 % of 15494 |
-| actions invalid | 0.176 % | 0.219 % |
-| actions invalid, share within a run | 0 to 4.5 %, mean 0.25 % | 0 to 1.2 %, mean 0.30 % |
-| actions that found no game object | 0.015 % | 0.026 % |
-| advisor actions per pause | 8.7 to 10.3 | 7.0 to 13.6 |
-| snapshots in an hour of play | 520 and 445 | 513, 530 and 551 |
-| copy calls over snapshots 2 to 80 | 23399 to 23430 | 23423 and 23476 |
-| end reasons | time 2, debt_cap 6, loop_lost 1, loop_crashed 1 | time 2, debt_cap 6, defeated 1, one still playing |
-| traceback, stall, crash or block in the round log | see the rollover below | none |
+| pacing gap before the action | 46 | fixed by the transport |
+| prime delay | 100 | fixed by the transport |
+| wait for the game's answer | 292 | the game, including its fixed 100 ms cleanup delay |
 
-Every invalid action on the new code was refused by the game for a game reason. Eighteen of the 34 came from two runs, 257 and 260, where a diplomatic action needed more technologies than the target had. The four actions that found no game object are subsidy and charter toggles, the same actions that miss on the old code. Invalid actions cluster by run on the old code as well.
-
-Run 261 ended because the played country lost its last state after 58 minutes of play. That is an outcome of the game, detected by the same check as before.
-
-The copy calls show that a snapshot still writes the same set of tables.
+Actions take about 37 % of an hour of play. The fixed delays were raised on purpose. Commit ee93fb5 set the 300 ms cycle because faster commands were dropped by the game. They are left as they are.
 
 ## Changes
 
-| commit | change | before | after | how it was measured |
-| --- | --- | --- | --- | --- |
-| 7b49bf3 | Statistics refresh runs over eight connections | 17.7 to 21.6 s | 5.1 and 5.5 s | runs 253 and 254 |
-| 7b49bf3 | Picker training runs while the world generates | 25 s after the game loaded | up to 16 s added when the world is ready first | runs 253 and 254 |
-| d6f8025 | Stray province pixels are filled from their coordinates, not by sweeping the whole map | 6.0 s | 1.1 s | same input, identical output array |
-| d6f8025 | The minimap is resized from the image in memory, not decoded again from the file just written | 7.8 s | under 1 s | world hash |
-| d6f8025 | Road and sea lane cost maps are built for the box being routed, not the whole map | 8.1 s | 4.6 s | world hash |
-| d6f8025 | A rewrite pattern runs on a file only when the file contains the text it needs | 4.8 s | 3.1 s | world hash |
-| d6f8025 | Validation asks only about tables the snapshot wrote rows to | 215 ms | 58 ms | run 248 against run 254 |
-| 8f59257 | The game launches as soon as the world is ready, while training finishes | launch waited 7 to 16 s for training | not yet measured | pending the next round |
-
-World generation as a whole, three seeds in sequence: 95.0 s before, 64.3 s after.
-
-## Why 8f59257
-
-World generation became faster than training. In run 253 the world was ready after 15 s and the game then waited 16 s for training. In run 254 it waited 7 s. The game needs only the world. Training is needed at the first pick, which comes after the first snapshot.
-
-What to check when it goes live:
-
-| measure | expected |
-| --- | --- |
-| game launch and load | near 31 s; training uses every core for part of the load, so it may rise |
-| picker training | near 31 s |
-| previous run ending to this run row opening | 67 s falling to 50 to 60 s |
-| `pick_model` row of the run | present, as now |
-
-If the game load grows by more than the wait it removes, revert the commit.
+| change | before | after | measured on |
+| --- | --- | --- | --- |
+| Holder decode looks a token up in memory before reading the game | 104 ms | 17 ms | runs 248 and 270 |
+| Validation asks the database about the values just written, in one pipeline of prepared statements | 219 ms | 20 ms | runs 248 and 270 |
+| Offered actions load their tables over eight connections | 171 ms in sequence for 106 tables | about 130 ms, bounded by the largest table | run 260, snapshot 500, offline |
+| Ruleset data, table list and name tables are read once per run | reread on every snapshot | read once | offline |
+| A cached lookup no longer opens a span on every hit | about 130 ms per pause | 0 | run 260, 110000 calls per pause |
+| Rows are ordered by one prepared getter per row shape | 16 ms | 10 ms | capture of 39000 rows, offline |
+| Resolve visits only columns that need a check | 14 ms | 12 ms | offline |
+| The action answer is searched in the log text gained since the action started | whole 16 MB window decoded on every poll | only new text | not measured apart |
+| Log files are listed with one directory read | 0.39 ms | 0.065 ms | offline, 300 calls |
+| A span costs less | 1.2 µs | 0.8 µs | 300000 calls |
+| Test suite | 253 tests in 17.4 s | 267 tests in 14.7 s | full suite |
 
 ## Proof that runs are unchanged
 
 | change | evidence |
 | --- | --- |
-| world generation | The 717, 711 and 725 files written for seeds 123456, 777 and 31337 hash to the same SHA-256 before and after. |
-| validation | A check reads rows of one table at one run and snapshot. Only `Store.write` puts rows there, so a table it wrote nothing to has nothing to check. A test breaks a foreign key and confirms the check still fires for a written table. |
-| statistics refresh | The same tables are analyzed, and `write` still returns only after all of them finish. A test confirms the tables are analyzed. |
-| picker training | Same data, same parameters, same model. It is joined before the loop is built, so the run row and the first pick see the trained model as before. |
+| offered actions | 40 stored snapshots from 8 runs give the same 56568 offered combinations on old and new code |
+| row building | two captures read from the running game give identical rows on old and new code |
+| snapshot write and validation | eight writes of those captures leave 88799 rows with the same digest on old and new code |
+| holder decode | five back-to-back reads of the running game are equal between old and new code |
+| world and control mod | 764 generated files are identical; the HUD differs only by its random token |
+| live action status | runs 269 to 271: 1688 done and 2 invalid, no action without a game object |
+| round logs | collect_66 and collect_67 hold no traceback, stall, crash or block |
 
-One thing did change order. The picker and the number of candidates are now drawn from the round's random stream before the world size, not after the run seed. The distributions are the same. A round replayed with the same `--seed` draws different values than it did before commit 7b49bf3. Commit 8f59257 moves no draw.
+Validation changed what it asks. It used to look for rows of the snapshot whose target is missing. It now checks that every value written has its target. Only `Store.write` writes those rows, so both catch the same fault. A test writes a value without a target and confirms the refusal.
 
-## The rollover at 06:58
+## The slow validation in collect_66
 
-Round collect_63 exited by itself at 06:58:08 with code -1 and no traceback, in the middle of run 252. That run is recorded as loop_lost after 38 minutes of play. The cause is unknown.
+The first version kept a setting that disabled nested loops inside the snapshot transaction. With the new checks that forced a scan of whole target tables, and validation took 1060 ms per snapshot in run 269. The run is otherwise normal and its data is valid. The setting is removed in 396e41c.
 
-The supervisor launched collect_64 at 06:58:14. A script from the fourth review, waiting to stop the old round between runs, stopped collect_64 by mistake 72 seconds into its setup. No run row was open and no run was lost. The supervisor launched collect_65 ten seconds later. The script is not used again, and rounds are left to end by themselves.
+## Rollovers
 
-## Where setup time goes now
+Both restarts happened between runs, so no run was lost.
+
+| time | what |
+| --- | --- |
+| 13:34:42 | run 268 ended; collect_65 stopped during its next setup; collect_66 launched at 13:34:48 |
+| 13:52:59 | run 269 ended; collect_66 stopped during its next setup; collect_67 launched at 13:53:05 |
+
+## Setup
 
 | step | seconds | can it shrink |
 | --- | --- | --- |
-| game launch and load | 31 to 33 | no, it is the game |
-| picker training | 31, overlapped | it no longer holds anything up once 8f59257 is live, unless it outlasts world and game together |
-| world generation | 15 to 40 | see candidates |
-| closing the previous game | 4 | no |
-| registration | 3 | it reads game files and the world, not the game, so it could run during the game load; it is called from the first snapshot and keyed to the game session, which makes moving it a larger change than 3 s justifies |
-| first snapshot with statistics refresh | 9 | the refresh is bounded by its largest table at 2.8 s |
+| game launch and load | 33 | no, it is the game |
+| picker training | 34, overlapped | it holds nothing up unless it outlasts world and game together |
+| world generation | 15 to 40 | `--pool 1` builds the next world during play; the supervisor arguments are the owner's choice |
+| first snapshot with statistics refresh | 9 | the refresh is bounded by its largest table |
+| registration | 3 | small |
 
 ## Looked at and left alone
 
 | item | finding |
 | --- | --- |
-| action dispatch | Three quarters of actions take 230 to 300 ms and the rest 700 to 1300 ms. The floor is a fixed 100 ms wait plus the game's answer. This is pacing against the game. |
-| log tail | 136,000 polls in 30 minutes cost 0.75 s per snapshot interval, mostly on its own thread or inside waits that would sleep anyway. Skipping reads when the size is unchanged would alter how a rotated log is detected. |
-| death check while days run | Reads game memory 500 times per snapshot interval, all inside the wait for the game. No wall time to save. |
-| vanilla map rasters | 5 s once per round. A disk cache would add invalidation logic for a saving of seconds per round. |
-| validation in one statement | The checks that remain could be sent as one query. Measured on all 870 checks it saved 30 %, which on the 60 to 120 ms left is 20 to 40 ms. |
-| statistics refresh on fewer tables | Would change what the planner knows and so how later queries run. |
-| picker model reuse | The objective is drawn anew for every run and every run adds training rows, so a trained model cannot be kept. |
-| training features kept between runs | Worth 6 s of training, which no longer holds up the launch. |
+| transport delays | see above; raised on purpose in ee93fb5 |
+| frame rate cap of 30 | the transport advances once per frame, so a higher cap would shorten every action and capture; the GPU sits at 12 to 19 % and the guard kills the game above 50 %, so the cap is the owner's protection |
+| skipping log reads when the file size is unchanged | Windows reported a stale size for a full 25 s while new data was readable, so the read is required |
+| one copy statement per table | 290 statements cost 39 ms per snapshot; batching small tables as inserts would add a second write path |
+| pop needs table | its read scans every version a run has written and bounds the parallel load at 80 to 120 ms late in a run; a filter on the player's states was slower |
+| statistics refresh in the background | the first offered actions would be planned without statistics on multi-gigabyte tables |
+| picker training rows | 6 s of Python with 10 million calls to one lookup; it no longer holds anything up |
 
-## Candidates not yet done
+## Earlier changes
 
-| candidate | cost today | what it needs |
-| --- | --- | --- |
-| row building per snapshot | 40 to 320 ms, grows with the run and the world | a real capture to profile against; the name table is read from the memory of the running game, so it cannot be rebuilt from files, and attaching a second reader to the live game is the owner's decision |
-| staging and copy in the write | 50 to 210 ms | same |
-| offered actions | 200 to 260 ms per pause | same |
-| world generation during play | 15 to 40 s per run | `--pool 1` builds the next world while the current run plays; it competes with the game for CPU and the supervisor arguments are the owner's choice |
+| commit | change | before | after |
+| --- | --- | --- | --- |
+| 7b49bf3 | statistics refresh over eight connections | 17.7 to 21.6 s | 5.1 to 8.8 s |
+| 7b49bf3 | picker training runs while the world generates | 25 s after the game loaded | overlapped |
+| d6f8025 | world generation, three seeds | 95.0 s | 64.3 s |
+| 8f59257 | the game launches as soon as the world is ready | waited 7 to 18 s for training | no wait |
+
+Commit 7b49bf3 moved two random draws, so a round replayed with the same `--seed` draws different values than before it.
 
 ## Simplifications and fallbacks noticed
 
-`Fresh.take` and the picker training in `session` both start a one-worker thread pool and poll it once a second to stamp progress. One helper could serve both.
-
-`_absent` is still called for files without any country reference. The call is cheap and keeps its span count comparable with older runs.
+| where | note |
+| --- | --- |
+| `loop.run.build` | a one-line pass to `generate`; the pool and the tests could call `generate` directly |
+| `Fresh.take` and `session` | both start a one-worker pool and poll it once a second to stamp progress; one helper could serve both |
+| `LogTail.poll` | swallows `PermissionError` and `FileNotFoundError`; a missing log directory is hidden until the log goes quiet |
+| `record._event_options` | retries `OSError` for a second before raising |
+| `tests/timing_exempt.json` | `Reader.tokens` is listed as hot; after the token lookup it runs far less and could be timed |
