@@ -2,6 +2,7 @@ import bisect
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -11,7 +12,7 @@ from catboost import CatBoostRegressor, FeaturesData, Pool
 from interface.common import progress, timed, timed_often
 from interface.timing import current, span
 from .features import INSTITUTIONS, LAWS, NUMBERS, PRICES, History, LiveLookup
-from .histograms import Histograms, Holdings, entries, live_holdings
+from .histograms import COUNTRY, Histograms, Holdings, entries, live_holdings
 from .random_smac_weighting import COMPONENTS, ENDED, HOURS_PER_YEAR, PLAYED, discount, peak, scored_runs, series
 
 LOG=logging.getLogger('loop')
@@ -19,7 +20,7 @@ ANSWERS={'choose_event_option','quick_decline_proposal','accept_treaty','decline
          'accept_action_proposal','decline_action_proposal','accept_sway','reject_sway'}
 MIN_PAUSES=200
 DESIGN=json.loads((Path(__file__).parent/'picker_design.json').read_text(encoding='utf-8'))
-SIZES=DESIGN['sizes']
+SIZES={**DESIGN['sizes'],**{name:sys.maxsize for name in COUNTRY}}
 PARAMS={**DESIGN['params'],'loss_function':'RMSE','random_seed':0,'thread_count':os.cpu_count()}
 BATCH_SIZE='batch_size'
 WAIT='run_days'
@@ -115,7 +116,7 @@ def training_data(connection,objective):
         changes.append({component:(peak(first,last,points[component][run_id])/now[component]-1)/discount((last-date)/HOURS_PER_YEAR,alpha) for component in COMPONENTS})
     scales={component:float(np.std([found[component] for found in changes])) for component in COMPONENTS}
     y=[sum(weights[component]*found[component]/scales[component] for component in COMPONENTS) for found in changes]
-    return SimpleNamespace(y=np.array(y),runs=np.array(groups),played=len(runs),state=np.array(state,np.float32).reshape(len(y),-1),laws=np.array(laws,object).reshape(len(y),-1),
+    return SimpleNamespace(y=np.array(y),runs=np.array(groups),played=len(runs),state=np.array(state,np.float32).reshape(len(y),len(NUMBERS+PRICES+INSTITUTIONS)),laws=np.array(laws,object).reshape(len(y),len(LAWS)),
                            sizes=np.array(sizes,np.float32).reshape(len(y),2),actions=Histograms(acted),held=Histograms(held))
 
 

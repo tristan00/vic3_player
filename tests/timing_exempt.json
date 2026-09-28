@@ -5,6 +5,9 @@
   "Versions.live": "hot",
   "resolve": "hot"
  },
+ "advisors/histograms.py": {
+  "Latest.at": "hot"
+ },
  "advisors/pickers.py": {
   "value_at": "hot"
  },

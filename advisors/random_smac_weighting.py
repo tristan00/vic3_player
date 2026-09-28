@@ -19,7 +19,7 @@ LOCAL_STEPS=20
 STEP=.125
 HOURS_PER_YEAR=365*24
 OUTCOMES=('time','years','defeated','debt_cap')
-DEBT_CAP_FROM_RUN=104
+DEBT_CAP_FROM_RUN=1
 
 ENDED='''from run r join snapshot s on s.run_id=r.run_id
 where r.run_id>=%(first)s and r.kind='mini' and r.ended_at is not null'''
