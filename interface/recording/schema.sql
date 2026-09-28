@@ -4355,7 +4355,7 @@ create table war_goal_history (
   foreign key (demand_type) references war_goal_demand_type,
   foreign key (status) references war_goal_status,
   foreign key (pressed) references war_goal_pressed,
-  check (present = (num_nulls(holder, creator, diplomatic_play, war_goal_type, demand_type, status, pressed) = 0)),
+  check (present = (num_nulls(holder, creator, war_goal_type, demand_type, status, pressed) = 0)),
   check (present or num_nonnulls(holder, creator, diplomatic_play, war_goal_type, target_state, target_country, target_other, demand_type, status, pressed) = 0)
 );
 

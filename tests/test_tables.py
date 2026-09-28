@@ -1,12 +1,19 @@
 import unittest
 
-from interface.recording.spec import EPOCH_DATE
+from interface.recording.spec import EPOCH_DATE, TABLE
 from interface.recording.tables import movement_modifiers, owning_types, ownership_owner
 
 TYPES={10:'building_textile_mill',20:'building_manor_house',30:'building_financial_district',40:'building_company_basic_fabrics',
        50:'building_company_regional_headquarter',60:'building_farm',70:'building_regional_company_basic_fabrics',80:'building_company_basic_textiles'}
 HEADQUARTERS={40:7}
 OWNING=owning_types(['company_basic_fabrics','company_basic_textiles'])
+
+
+class WarGoalTests(unittest.TestCase):
+    def test_a_war_goal_outlives_its_diplomatic_play(self):
+        optional={column.name:column.optional for column in TABLE['war_goal_history'].columns}
+        self.assertTrue(optional['diplomatic_play'])
+        self.assertFalse(optional['holder'] or optional['creator'] or optional['status'])
 
 
 class OwnershipOwnerTests(unittest.TestCase):
