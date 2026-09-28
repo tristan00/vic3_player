@@ -225,6 +225,42 @@ class BatchSamplerTests(unittest.TestCase):
         self.assertTrue(all(RUN_DAYS[0]<=value<=RUN_DAYS[1] for value in days))
         self.assertGreater(len(set(days)),10)
 
+    def test_blocks_are_redrawn_for_a_stored_pause_from_the_recorded_weights(self):
+        from unittest import mock
+        from loop import run
+
+        class Snapshot:
+            seq=7
+            player=1
+
+            def buildings(self):
+                return []
+
+            def rows(self,table,columns,**equal):
+                return []
+
+        class Connection:
+            def execute(self,sql,arguments):
+                self.asked=arguments
+                return mock.Mock(fetchall=lambda:[('research',5.0),('enact_law',0.0),('build',2.0)])
+        offered={'research':[{'technology':'a'},{'technology':'b'}],'enact_law':[{'law':1}],'build':[{'state':1,'building_type':'farm'}],
+                 'choose_event_option':[{'event':'x.1','option':0}],'accept_treaty':[{'treaty':1}],'quick_decline_proposal':[{'treaty':1}],'pause':[{}]}
+        connection=Connection()
+        with mock.patch.object(run,'Stored',lambda found,run_id,seq:Snapshot()),mock.patch.object(run,'available',lambda snapshot:offered):
+            snapshot,blocks=run.redraw(connection,12,7,25,3)
+            again=run.redraw(connection,12,7,25,3)[1]
+            other=run.redraw(connection,12,7,25,4)[1]
+            chosen=run.redraw(connection,12,7,25,3,{'enact_law':1.0,'research':0.0,'build':0.0})[1]
+        self.assertEqual((connection.asked,snapshot.seq,len(blocks)),((12,),7,25))
+        self.assertEqual(blocks,again)
+        self.assertNotEqual(blocks,other)
+        for block in blocks:
+            self.assertEqual(block[-1][0],'run_days')
+            self.assertTrue(run.RUN_DAYS[0]<=block[-1][1]['days']<=run.RUN_DAYS[1])
+            self.assertLessEqual({name for name,_ in block[:-1]},{'research','build'})
+            self.assertTrue(block[:-1])
+        self.assertEqual({name for block in chosen for name,_ in block[:-1]},{'enact_law'})
+
     def test_pick_first_takes_the_first_batch(self):
         from advisors.pickers import PickFirst
         self.assertEqual(PickFirst().pick([['a'],['b']],None),(0,None))

@@ -9,7 +9,7 @@ import shutil
 import threading
 import time
 
-from advisors import ADVISORS
+from advisors import ADVISORS, RandomAdvisor
 from advisors.random_picker import TIME_CONTROL
 from advisors.pickers import PICKERS
 from advisors.random_smac_weighting import draw_objective
@@ -142,6 +142,29 @@ class Drawer:
         return batch+[(self.advisor,WAIT,{'days':rng.randint(*RUN_DAYS)})]
 
 
+ANSWERED={'choose_event_option','quick_decline_proposal',*(name for pair in PROPOSAL_ANSWERS for name in pair)}
+RECORDED='select a.name,w.weight from run_weight w join action a on a.action=w.action where w.run_id=%s'
+
+
+@timed_often
+def linked(snapshot):
+    return {**{('building',ident):('building_type',kind) for ident,kind,_ in snapshot.buildings()},
+            **{('character',ident):('military_formation',formation) for ident,formation in snapshot.rows('character','character,formation',country=snapshot.player) if formation},
+            **{('war',war):('diplomatic_play',play) for play,war in snapshot.rows('diplomatic_play','diplomatic_play,war') if war is not None},
+            **{('ship',ship):('military_formation',fleet) for ship,fleet in snapshot.rows('ship','ship,fleet') if fleet is not None}}
+
+
+@timed
+def redraw(connection,run_id,seq,count,seed,weights=None):
+    snapshot=Stored(connection,run_id,seq)
+    advisor=RandomAdvisor(seed)
+    advisor.weights=dict(connection.execute(RECORDED,(run_id,)).fetchall()) if weights is None else weights
+    options={name:combos for name,combos in available(snapshot).items() if name not in PARKED and name not in ANSWERED}
+    drawer=Drawer(advisor,options,snapshot,linked(snapshot),set())
+    rng=random.Random(seed)
+    return snapshot,[[(name,params) for _,name,params in drawer.draw(rng)] for _ in range(count)]
+
+
 class Loop:
     @timed
     def __init__(self,game,advisors,rng,store,run,picker,candidates):
@@ -221,10 +244,7 @@ class Loop:
             snapshot=self.snapshot('post_action')
             options=available(snapshot)
         options={name:combos for name,combos in options.items() if name not in PARKED and name!='choose_event_option'}
-        links={**{('building',ident):('building_type',kind) for ident,kind,_ in snapshot.buildings()},
-               **{('character',ident):('military_formation',formation) for ident,formation in snapshot.rows('character','character,formation',country=snapshot.player) if formation},
-               **{('war',war):('diplomatic_play',play) for play,war in snapshot.rows('diplomatic_play','diplomatic_play,war') if war is not None},
-               **{('ship',ship):('military_formation',fleet) for ship,fleet in snapshot.rows('ship','ship,fleet') if fleet is not None}}
+        links=linked(snapshot)
         answers={name:options.pop(name,[]) for pair in PROPOSAL_ANSWERS for name in pair}
         quick=options.pop('quick_decline_proposal',[])
         for pair in PROPOSAL_ANSWERS:
