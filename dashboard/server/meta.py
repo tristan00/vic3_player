@@ -66,7 +66,7 @@ def meta_grid(table,filters,sort,desc,offset,limit,run_id=None):
 
 
 RUN_GROUPS={'lifecycle':['kind','started_at','heartbeat_at','progress_at','progress_step','longest_step','longest_step_ms','ended_at','end_reason','end_detail','game_exited_at'],
-            'world':['tag','player_country','world_file','world_id','world_seed','countries','states','tech','pop','ruleset_id','first_start'],
+            'world':['tag','player_country','world_file','world_id','world_seed','countries','states','tech','pop','modernity','copies','diversity','ruleset_id','first_start'],
             'launch':['cli_seed','run_seed','runs_requested','years','minutes','game_speed','profile','pool','custom_rng_seed','source_session']}
 POLICY_GROUPS={'config':['objective_gdp','objective_population','objective_sol','objective_alpha'],'picker':['picker','candidates']}
 INITIALIZER=Spec('initializer','text','(select a.name from run_advisor ra join advisor a using (advisor) where ra.run_id=t.run_id and ra.position=0)',group='initializer')

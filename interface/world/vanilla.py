@@ -1,4 +1,5 @@
 import collections
+import colorsys
 from functools import lru_cache
 import re
 import warnings
@@ -32,6 +33,9 @@ MILITARY={'building_barrack':'barracks','building_naval_administration':'naval'}
 POLICIES={'set_institution_investment_level','set_import_tariff_level','set_export_tariff_level'}
 
 
+TOP=('GBR','RUS','FRA','USA','AUS','PRU','TUR','BRZ','NET','SPA','CHI','JAP','SIA','PER','SIC','POR','BEL','HUN','MEX','SWE','BOL','SAR','BAV','DEN','CLM')
+
+
 @timed_often
 def _foreign(value):
     return re.search(FOREIGN+r'(?!\s*\?=)',value) or 'journal_entry' in value or 'can_form_nation' in value
@@ -56,18 +60,49 @@ def _templates(game):
 
 
 @timed_often
+def _journal(value,free):
+    lines=[]
+    for key,text in blocks(body(value)):
+        guard=re.match(r'if\s*=\s*\{\s*limit\s*=\s*\{\s*(has_dlc_feature\s*=\s*\w+)\s*\}',text)
+        if key=='add_journal_entry' or guard:
+            added=[f'add_journal_entry = {{ type = {kind} }}' for kind in re.findall(r'add_journal_entry\s*=\s*\{\s*type\s*=\s*(\w+)',text) if kind in free]
+            lines+=[f'if = {{ limit = {{ {guard[1]} }} {" ".join(added)} }}'] if guard and added else [] if guard else added
+    return lines
+
+
+@timed_often
+def _color(value):
+    kind,inner=re.search(r'color\s*=\s*(\w*)\s*\{([^}]*)\}',value).groups()
+    parts=[float(part) for part in inner.split()]
+    if kind.startswith('hsv'):
+        hue,saturation,brightness=[part/(360,100,100)[i] if kind=='hsv360' else part for i,part in enumerate(parts)]
+        parts=[round(part*255) for part in colorsys.hsv_to_rgb(hue,saturation,brightness)]
+    return ' '.join(str(int(part)) for part in parts)
+
+
+@timed_often
 def _profiles(game):
     types={tag:scalar(value,'country_type') for tag,value in read(game,'common/country_definitions')}
+    looks={tag:(_color(value),scalar(value,'tier')) for tag,value in read(game,'common/country_definitions') if tag in TOP}
+    natives={tag:re.findall(r'\w+',body(dict(blocks(body(value)))['cultures'])) for tag,value in read(game,'common/country_definitions') if tag in TOP}
+    tied=re.compile(r'STATE_\w+|\bsr:\w+|\bc:[A-Z0-9]{3}\b')
+    entries_text=list(read(game,'common/journal_entries'))
+    free=lambda tag:{key for key,value in entries_text if not tied.search(re.sub(r'\bc:'+tag+r'\b','',value))}
+    names=dict(re.findall(r'^ (\w+):\d* "([^"]*)"',(game/'localization/english/countries_l_english.yml').read_text(encoding='utf-8-sig'),re.M))
     population={key:value for _,key,value in entries(game,'common/history/population')}
     groups={key:scalar(value,'group') for key,value in read(game,'common/laws')}
     generic={key for key,value in read(game,'common/amendments') if not re.search(r'\bc:[A-Z0-9]{3}\b|was_formed_from|STATE_|has_template',value)}
-    profiles=[];bands={};amendments=[]
+    progress={key:float(scalar(value,'progressiveness')) for key,value in read(game,'common/laws')}
+    defaults=_politics_laws(game,groups)
+    parties={tag:[' '.join(text.split()) for _,text in blocks(body(value))] for _,tag,value in entries(game,'common/history/governments') if tag!='every_country'}
+    profiles=[];bands={};amendments=[];governments={}
     for _,tag,value in entries(game,'common/history/countries'):
         tier=re.search(r'effect_starting_technology_tier_(\d)_tech',value)
         politics=re.search(r'effect_starting_politics_(\w+?)\s*=\s*yes',value)
-        if not tier or not politics or types.get(tag) not in {'recognized','unrecognized'} or politics[1]=='princely_state':
+        if not tier or types.get(tag) not in {'recognized','unrecognized'} or (politics and politics[1]=='princely_state') or not (politics or tag in TOP):
             continue
-        bands[tag]=BANDS[tier[1]]
+        if politics:
+            bands[tag]=BANDS[tier[1]]
         people=population.get(tag,'')
         laws={}
         for law in re.findall(r'activate_law\s*=\s*law_type:(\w+)',value):
@@ -77,13 +112,21 @@ def _profiles(game):
         amendments+=[(laws[key.split(':')[1]],text) for key,text in blocks(body(value))
                      if key.startswith('active_law:') and scalar(text,'type') in generic and key.split(':')[1] in laws and not _foreign(text)]
         policies+=re.findall(r'add_taxed_goods\s*=\s*g:\w+',value)
-        profiles.append({'band':BANDS[tier[1]],'tier':int(tier[1]),'politics':politics[1],'type':types[tag],'laws':laws,
+        held={**defaults.get(politics[1] if politics else None,{}),**laws}
+        found={'tag':tag,'held':held,'progress':sum(progress[law] for law in held.values())/len(held),'parties':parties.get(tag,[]),
+               'election':re.findall(r'set_next_election_date\s*=\s*[\d.]+',value)}
+        if tag in TOP:
+            governments[tag]=found
+            found.update({'color':looks[tag][0],'rank':looks[tag][1],'name':names[tag],'cultures':natives[tag],'journal':_journal(value,free(tag))})
+        if politics:
+            profiles.append(found)
+        found.update({'band':BANDS[tier[1]],'tier':int(tier[1]),'politics':politics[1] if politics else None,'type':types[tag],'laws':laws,
                          'policies':[text for text in policies if not _foreign(text)],
                          'ruling':sorted(set(re.findall(r'ig:(\w+)\s*\??=\s*\{\s*add_ruling_interest_group\s*=\s*yes',value))),
                          'tax':scalar(value,'set_tax_level'),
                          'wealth':next(iter(re.findall(r'effect_starting_pop_wealth_(\w+?)\s*=',people)),None),
                          'literacy':next(iter(re.findall(r'effect_starting_pop_literacy_(\w+?)\s*=',people)),None)})
-    return profiles,groups,bands,amendments
+    return profiles,groups,bands,amendments,governments,progress
 
 
 @timed
@@ -147,7 +190,7 @@ def _mixes(game,bands):
             total=sum(sizes.values())
             if tag in bands and total:
                 (mixes['unincorporated'] if (state,tag) in colonial else mixes['incorporated'][bands[tag]]).append(
-                    {'primary':sum(s for c,s in sizes.items() if c in primary[tag])/total,
+                    {'tag':tag,'primary':sum(s for c,s in sizes.items() if c in primary[tag])/total,
                      'others':sorted((s/total for c,s in sizes.items() if c not in primary[tag]),reverse=True),'faith':faith/total})
     owned=set().union(*(primary[tag] for tag in bands))
     return {'mixes':mixes,'primary_cultures':len(found.keys()&owned)/len(bands),'stateless_cultures':len(found.keys()-set().union(*(primary.get(tag,set()) for tag in started)))/len(bands)}
@@ -168,29 +211,31 @@ def _walk(text,key):
 def _characters(game):
     templates=dict(read(game,'common/character_templates'))
     politics={tag:found[1] for _,tag,value in entries(game,'common/history/countries') if (found:=re.search(r'effect_starting_politics_(\w+?)\s*=\s*yes',value))}
-    groups={key:scalar(value,'group') for key,value in read(game,'common/laws')}
-    defaults=_politics_laws(game,groups)
-    laws={}
-    for _,tag,value in entries(game,'common/history/countries'):
-        laws[tag]=dict(defaults.get(politics.get(tag),{}))
-        laws[tag].update({groups.get(law):law for law in re.findall(r'activate_law\s*=\s*law_type:(\w+)',value)})
-    elective=set()
-    rulers=collections.defaultdict(list);casts=collections.defaultdict(list)
+    rulers=collections.defaultdict(list);casts=collections.defaultdict(list);rulers_of={}
     for folder in ('characters','military_formations'):
         for _,tag,value in entries(game,'common/history/'+folder):
             for block in _walk(body(value),'create_character'):
                 source=templates[scalar(block,'template')] if scalar(block,'template') else block
-                role=next((name for flag,name in ROLES if re.search(r'\b'+flag+r'\s*=\s*yes',source)),None)
+                role=next((name for flag,name in ROLES if re.search(r'\b'+flag+r'\s*=\s*yes',source) or scalar(source,'role')=='character_role_'+name),None)
                 traits=dict(blocks(body(source))).get('traits','{}')
-                record={'role':role,'female':bool(re.search(r'\bfemale\s*=\s*yes',source)),'age':1836-int(scalar(source,'birth_date').split('.')[0]) if scalar(source,'birth_date') else None,
-                        'traits':re.findall(r'\w+',body(traits)),'interest_group':scalar(source,'interest_group'),'ideology':scalar(source,'ideology')}
-                if role=='ruler' and tag in politics:
-                    rulers[politics[tag]].append(record)
-                    if 'republic' in laws[tag].get('lawgroup_governance_principles','') and re.search(r'\big_leader\s*=\s*yes',source):
-                        elective.add(laws[tag]['lawgroup_distribution_of_power'])
-                elif role and role!='ruler':
+                rank=scalar(source,'commander_rank')
+                record={'role':role,'female':bool(re.search(r'\bfemale\s*=\s*yes',source)),
+                        'age':1836-int(scalar(source,'birth_date').split('.')[0]) if scalar(source,'birth_date') else int(scalar(source,'age')) if (scalar(source,'age') or '').isdigit() else None,
+                        'traits':re.findall(r'\w+',body(traits)),'interest_group':scalar(source,'interest_group'),'ideology':scalar(source,'ideology'),
+                        'first':scalar(source,'first_name'),'last':scalar(source,'last_name'),
+                        'rank':rank if rank and rank.startswith('commander_rank_') else None,'noble':bool(re.search(r'\bnoble\s*=\s*yes',source)),
+                        'leads':role=='ruler' and bool(re.search(r'\big_leader\s*=\s*yes',source))}
+                if role=='ruler':
+                    rulers_of.setdefault(tag,record)
+                    if tag in politics:
+                        rulers[politics[tag]].append(record)
+                elif role:
                     casts[tag].append(record)
-    return {'rulers':dict(rulers),'casts':dict(casts),'elective_laws':elective}
+    ages=collections.defaultdict(list)
+    for record in [r for pool in rulers.values() for r in pool]+[r for cast in casts.values() for r in cast]:
+        if record['age'] is not None:
+            ages[record['role']].append(record['age'])
+    return {'rulers':dict(rulers),'casts':dict(casts),'rulers_of':rulers_of,'ages':dict(ages)}
 
 
 @timed_often
@@ -250,7 +295,7 @@ def _politics_laws(game,groups):
         if key.startswith('effect_starting_politics_'):
             laws=defaults[key.removeprefix('effect_starting_politics_')]={}
             for law in re.findall(r'law_type:(\w+)',value):
-                laws.setdefault(groups.get(law),law)
+                laws[groups.get(law)]=law
     return defaults
 
 
@@ -356,7 +401,7 @@ def vanilla(game):
             roots[folder]=root
             if (folder in GLOBAL_HISTORY or key=='every_country') and not _foreign(value) and not re.match(r'(?:cu|c):',value):
                 universal.setdefault(folder,[]).append(value)
-    profiles,groups,bands,amendments=_profiles(game)
+    profiles,groups,bands,amendments,governments,progress=_profiles(game)
     economy,allowed,owners=_economy(game,bands)
     cultures,religions=_cultures(game)
     strategies,goals=_ai(game)
@@ -367,9 +412,23 @@ def vanilla(game):
     trade=_trade(game,bands)
     rules=_law_rules(game)
     counts=[len(rules['tier_techs'][p['tier']]) for p in profiles]
+    people=_characters(game)
+    commanders=lambda role:sum(r['role']==role for t in trade for r in people['casts'].get(t['tag'],[]))
+    modern=sorted(p['progress'] for p in profiles)
+    mixes=_mixes(game,bands)
+    settled=[mix for found in mixes['mixes']['incorporated'].values() for mix in found]
+    mixed=sorted(1-mix['primary'] for mix in settled)
+    homes=collections.defaultdict(list)
+    for mix in settled:
+        homes[mix['tag']].append(1-mix['primary'])
     density=np.sort(np.repeat([t['population']/len(t['provinces']) for t in templates],[len(t['provinces']) for t in templates]))
     return {'templates':templates,'seas_per_state':_seas(game)/len(every),'straits_per_crossing':_straits(game),'crossings_per_state':_crossings(game)/len(every),'trade':trade,'profiles':profiles,'amendments':amendments,'allowed':allowed,'owners':owners,'law_groups':groups,'cultures':cultures,'religions':religions,
-            'companies':_companies(game),**_rates(game),**_natives(game),**_mixes(game,bands),**_characters(game),**_armies(game,groups),**rules,**_relations(game),
+            'companies':_companies(game),**_rates(game),**_natives(game),**mixes,**people,**_armies(game,groups),**rules,**_relations(game),
+            'governments':governments,'diversity_range':(mixed[int(len(mixed)*TRIM)],sum(mixed)/len(mixed),mixed[len(mixed)-1-int(len(mixed)*TRIM)]),'diversity_spread':float(np.std(mixed)),'diversity_within':float(np.std([share-sum(found)/len(found) for found in homes.values() for share in found])),
+            'culture_religion':{key:scalar(value,'religion') for key,value in read(game,'common/cultures')},
+'law_progress':progress,'generals_per_unit':commanders('general')/sum(t['units'] for t in trade),'admirals_per_ship':commanders('admiral')/sum(t['ships'] for t in trade),
+            'progress_range':(modern[int(len(modern)*TRIM)],sum(modern)/len(modern),modern[len(modern)-1-int(len(modern)*TRIM)]),'progress_spread':float(np.std(modern)),
+            'elections':{law:[p['election'] for p in profiles if p['held']['lawgroup_distribution_of_power']==law] for law in {p['held']['lawgroup_distribution_of_power'] for p in profiles}},
             'tech_range':(min(counts),sum(counts)/len(counts),max(counts)),
             'province_population_range':(float(density[int(len(density)*TRIM)]),float(density.mean()),float(density[len(density)-1-int(len(density)*TRIM)])),
             'strategies':strategies,'goals':goals,'roots':roots,'universal':universal,'terrains':terrains,'regions':regions,

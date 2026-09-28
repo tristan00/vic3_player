@@ -248,12 +248,12 @@ class Store:
         tag=self.names('country_definition',[pending['tag']])[0]
         run_id=cursor.execute('insert into run (kind,source_session,started_at,heartbeat_at,progress_at,progress_step,world_id,ruleset_id,player_country,'
                               'game_speed,first_start,custom_rng_seed,tag,world_file,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,'
-                              'world_seed,countries,states,tech,pop,picker,candidates,objective_gdp,objective_population,objective_sol,objective_alpha) '
-                              'values (%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
+                              'world_seed,countries,states,tech,pop,modernity,copies,diversity,picker,candidates,objective_gdp,objective_population,objective_sol,objective_alpha) '
+                              'values (%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
                               (pending['kind'],self.session,pending['started_at'],'open_run',self.world_id,self.ruleset_id,constants['player_country'],
                                constants['game_speed'],constants['first_start'],constants['custom_rng_seed'],tag,pending['world'],pending['cli_seed'],
                                pending['run_seed'],pending['years'],pending['minutes'],pending['profile'],pending['pool'],pending['runs_requested'],
-                               *[None if pending['generated'] is None else pending['generated'][k] for k in ('seed','countries','states','tech','pop')],pending['picker'],pending['candidates'],pending['objective'][0]['gdp'],pending['objective'][0]['population'],pending['objective'][0]['sol'],pending['objective'][1])).fetchone()[0]
+                               *[None if pending['generated'] is None else pending['generated'][k] for k in ('seed','countries','states','tech','pop','modernity','copies','diversity')],pending['picker'],pending['candidates'],pending['objective'][0]['gdp'],pending['objective'][0]['population'],pending['objective'][0]['sol'],pending['objective'][1])).fetchone()[0]
         names=sorted(pending['weights'])
         self.copy(cursor,'run_weight',('run_id','action','weight'),[(run_id,action,pending['weights'][name]) for name,action in zip(names,self.names('action',names))])
         self.copy(cursor,'run_advisor',('run_id','position','advisor'),enumerate_rows(run_id,self.names('advisor',pending['advisors'])))

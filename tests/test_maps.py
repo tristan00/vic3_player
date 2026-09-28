@@ -152,7 +152,7 @@ class NationTests(unittest.TestCase):
         cls.groups = [[1, 2, 3], [4, 5], [6], [7, 8]]
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
         strategic = [{'key': 'region_interface_1', 'states': cls.regions}]
-        cls.world = nations(random.Random(5), cls.data, cls.regions, cls.groups, [1, 4, 6, 7], neighbours, strategic, .5, .5)
+        cls.world = nations(random.Random(5), cls.data, cls.regions, cls.groups, [1, 4, 6, 7], neighbours, strategic, .5, .5, .5, .2, .5)
 
     @staticmethod
     def governed(world):
@@ -161,7 +161,7 @@ class NationTests(unittest.TestCase):
     def test_decentralized_nations_follow_vanilla_natives_and_stay_out_of_diplomacy(self):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
         worlds = [nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
-                          [{'key': 'region_interface_1', 'states': self.regions}], .5, .5) for seed in range(12)]
+                          [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, .2, .5) for seed in range(12)]
         natives = [(w, c) for w in worlds for c in w['countries'] if c['country_type'] == 'decentralized']
         self.assertTrue(natives)
         self.assertTrue(all(self.governed(w) for w in worlds))
@@ -179,7 +179,7 @@ class NationTests(unittest.TestCase):
         founded = 0
         for seed in range(60):
             world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
-                            [{'key': 'region_interface_1', 'states': self.regions}], .5, .5)
+                            [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, .2, .5)
             files = world['files']
             for tag, company, state in re.findall(r'c:(\w+) \?= \{ add_company = company_type:(\w+) .*?set_company_state_region = s:(\w+)',
                                                  files['common/history/countries/interface.txt']):
@@ -194,15 +194,17 @@ class NationTests(unittest.TestCase):
         self.assertTrue(founded)
 
     def test_every_state_is_owned_by_its_group(self):
-        tags = [c['tag'] for c in self.world['countries']]
+        neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
+        tags = [c['tag'] for c in nations(random.Random(5), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
+                                          [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, .5, .5)['countries']]
         for tag, members in zip(tags, self.groups):
             for sid in members:
                 self.assertEqual(self.regions[sid - 1]['country'], tag)
 
     def test_countries_are_new_and_not_vanilla(self):
         for country in self.world['countries']:
-            self.assertNotIn(country['tag'], self.data['tags'])
-            self.assertTrue(country['culture'].startswith('culture_interface_'))
+            self.assertEqual(country['tag'] in self.data['tags'], bool(country['copy']))
+            self.assertEqual(country['culture'].startswith('culture_interface_'), not country['copy'])
             self.assertIn(country['religion'], {r['key'] for r in self.data['religions']})
 
     def test_generated_script_is_balanced_and_covers_the_vanilla_history_folders(self):
@@ -243,7 +245,7 @@ class NationTests(unittest.TestCase):
             self.assertIn(kind, allowed | SPECIAL)
         pops = self.world['files']['common/history/pops/interface.txt']
         for chunk in pops.split('region_state:')[1:]:
-            self.assertAlmostEqual(sum(map(int, re.findall(r'size = (\d+)', chunk))), self.data['province_population_range'][1], delta=10)
+            self.assertAlmostEqual(sum(map(int, re.findall(r'size = (\d+)', chunk))), self.data['province_population_range'][1], delta=self.data['province_population_range'][1] * .5)
 
     def test_country_types_are_vanilla_country_types(self):
         for country in self.world['countries']:
@@ -263,7 +265,7 @@ class NationTests(unittest.TestCase):
     def test_personal_union_subjects_have_no_ruler_or_heir_of_their_own(self):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
         worlds = (nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
-                          [{'key': 'region_interface_1', 'states': self.regions}], .5, .5)['files'] for seed in range(60))
+                          [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, .2, .5)['files'] for seed in range(60))
         files = next(f for f in worlds if 'type = personal_union' in f['common/history/diplomacy/interface.txt'])
         templates = dict(re.findall(r'^(\w+) = (\{.*\})$', files['common/character_templates/interface.txt'], re.M))
         created = re.findall(r'^c:(\w+) \?= \{ create_character = \{ template = (\w+) \} \}$', files['common/history/characters/interface.txt'], re.M)
@@ -277,19 +279,28 @@ class NationTests(unittest.TestCase):
 
     def test_populations_scale_to_the_requested_province_level(self):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
-        world = nations(random.Random(5), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
-                        [{'key': 'region_interface_1', 'states': self.regions}], .5, 1)
-        sizes = [sum(map(int, re.findall(r'size = (\d+)', chunk))) for chunk in world['files']['common/history/pops/interface.txt'].split('region_state:')[1:]]
-        self.assertAlmostEqual(sum(sizes) / len(sizes), self.data['province_population_range'][2], delta=10)
+        sizes = []
+        for seed in range(60):
+            world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
+                            [{'key': 'region_interface_1', 'states': self.regions}], .5, 1, .5, .2, .5)
+            sizes += [sum(map(int, re.findall(r'size = (\d+)', chunk))) for chunk in world['files']['common/history/pops/interface.txt'].split('region_state:')[1:]]
+        top = self.data['province_population_range'][2]
+        self.assertAlmostEqual(sum(sizes) / len(sizes), top, delta=top * .1)
+        self.assertGreater(len({size for size in sizes}), 10)
 
     def test_the_lowest_tech_level_gives_every_country_the_vanilla_minimum(self):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
-        world = nations(random.Random(5), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
-                        [{'key': 'region_interface_1', 'states': self.regions}], 0, .5)
-        governed = {c['tag'] for c in self.governed(world)}
-        counts = [line.count('add_technology_researched') for line in world['files']['common/history/countries/interface.txt'].splitlines()
-                  if line.startswith('c:') and line[2:5] in governed and 'add_technology_researched' in line]
-        self.assertEqual(counts, [self.data['tech_range'][0]] * len(governed))
+        counts = []
+        for seed in range(20):
+            world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
+                            [{'key': 'region_interface_1', 'states': self.regions}], 0, .5, .5, 0, .5)
+            governed = {c['tag'] for c in self.governed(world)}
+            counts += [line.count('add_technology_researched') for line in world['files']['common/history/countries/interface.txt'].splitlines()
+                       if line.startswith('c:') and line[2:5] in governed and 'add_technology_researched' in line]
+        low, mean, _ = self.data['tech_range']
+        self.assertEqual(min(counts), low)
+        self.assertGreater(counts.count(low), len(counts) / 3)
+        self.assertLess(sum(counts) / len(counts), (low + mean) / 2)
 
     def test_extra_technologies_have_their_prerequisites(self):
         base = self.data['tier_techs'][max(self.data['tier_techs'])]
@@ -316,7 +327,7 @@ class NationTests(unittest.TestCase):
         self.assertEqual(homelands, ['culture_interface_1', 'culture_interface_2', 'culture_interface_3'])
 
     def test_every_character_copies_a_vanilla_character_of_its_role(self):
-        records = [r for pool in self.data['rulers'].values() for r in pool] + [r for cast in self.data['casts'].values() for r in cast]
+        records = [r for pool in self.data['rulers'].values() for r in pool] + [r for cast in self.data['casts'].values() for r in cast] + list(self.data['rulers_of'].values())
         known = {(r['role'], r['female'], tuple(r['traits'])) for r in records}
         roles = {flag: role for role, flag in FLAGS.items()}
         for line in self.world['files']['common/character_templates/interface.txt'].splitlines():
@@ -325,6 +336,135 @@ class NationTests(unittest.TestCase):
             role = next(role for flag, role in roles.items() if flag in line)
             traits = tuple(re.search(r'traits = \{ ([^}]*)\}', line)[1].split())
             self.assertIn((role, 'female = yes' in line, traits), known, line)
+
+    def many(self, modernity, copies, seeds=40):
+        neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
+        return [country for seed in range(seeds) for country in nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
+                [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, modernity, copies, .5)['countries'] if country['country_type'] != 'decentralized']
+
+    def test_the_copied_share_of_governments_matches_a_top_vanilla_country_whole(self):
+        countries = self.many(.5, .5)
+        copied = [c for c in countries if c['copy']]
+        self.assertAlmostEqual(len(copied) / len(countries), .5, delta=.08)
+        self.assertEqual([c for c in self.many(.5, 0, 10) if c['copy']], [])
+        for country in copied:
+            source = self.data['governments'][country['copy']]
+            self.assertEqual((country['laws'], country['ruling'], country['politics']), (list(source['laws'].values()), source['ruling'], source['politics']))
+            self.assertEqual((country['tag'], country['name'], country['country_type'], country['tier']), (source['tag'], source['name'], source['type'], source['rank']))
+
+    def test_only_journal_entries_free_of_vanilla_places_and_countries_are_kept(self):
+        kept = {tag: re.findall(r'type = (\w+)', ' '.join(source['journal'])) for tag, source in self.data['governments'].items()}
+        self.assertEqual(kept['JAP'], ['je_sakoku', 'je_tenpo_crisis'])
+        self.assertEqual(kept['FRA'], ['je_divided_monarchists'])
+        self.assertEqual(kept['GBR'], [])
+        self.assertIn('if = { limit = { has_dlc_feature = ep2_content } add_journal_entry = { type = je_sakoku } add_journal_entry = { type = je_tenpo_crisis } }', self.data['governments']['JAP']['journal'])
+
+    def test_a_copied_country_keeps_its_vanilla_flag_name_and_characters(self):
+        neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
+        world = nations(random.Random(3), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, 1, .5)
+        for country in world['countries']:
+            if country['country_type'] == 'decentralized':
+                continue
+            tag = country['tag']
+            self.assertIn(tag, self.data['governments'])
+            self.assertNotIn(f'common/coat_of_arms/coat_of_arms/{tag}.txt', world['files'])
+            self.assertFalse([line for line in world['localization'] if line.startswith(f' {tag}:')])
+            self.assertIn(f'{tag} = {{ color = {{ {self.data["governments"][tag]["color"]} }} country_type = {self.data["governments"][tag]["type"]} ', world['files']['common/country_definitions/interface.txt'])
+            source = self.data['governments'][tag]
+            self.assertIn(f'cultures = {{ {" ".join(source["cultures"])} }}', next(line for line in world['files']['common/country_definitions/interface.txt'].splitlines() if line.startswith(tag)))
+            self.assertEqual(country['culture'], source['cultures'][0])
+            history = next(line for line in world['files']['common/history/countries/interface.txt'].splitlines() if line.startswith(f'c:{tag} '))
+            for line in source['journal']:
+                self.assertIn(line, history)
+            pops = ' '.join(re.search(rf's:{key} = \{{ region_state:{tag} = \{{ (.*) \}} \}}', world['files']['common/history/pops/interface.txt'])[1] for key in country['states'])
+            self.assertIn(f'culture = {source["cultures"][0]} ', pops)
+            ruler = self.data['rulers_of'][tag]
+            self.assertIn(f'{tag}_character_1 = {{ first_name = {ruler["first"]} last_name = {ruler["last"]} ', world['files']['common/character_templates/interface.txt'])
+
+    def test_no_vanilla_government_is_copied_twice_in_one_world(self):
+        neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
+        for seed in range(20):
+            world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, 1, .5)
+            copies = [c['copy'] for c in world['countries'] if c['copy']]
+            self.assertEqual(len(copies), len(set(copies)))
+            self.assertEqual(len(copies), sum(c['country_type'] != 'decentralized' for c in world['countries']))
+
+    def test_diversity_moves_the_share_of_people_outside_the_primary_culture(self):
+        neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
+
+        def minority(diversity):
+            inside = everyone = 0
+            for seed in range(40):
+                world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, .5, diversity)
+                pops = world['files']['common/history/pops/interface.txt']
+                for country in world['countries']:
+                    if country['country_type'] == 'decentralized':
+                        continue
+                    for key in country['states']:
+                        found = re.search(rf's:{key} = \{{ region_state:{country["tag"]} = \{{ (.*) \}} \}}', pops)[1]
+                        for culture, size in re.findall(r'culture = (\w+) +(?:religion = \w+ +)?size = (\d+)', found):
+                            everyone += int(size)
+                            inside += int(size) * (culture == country['culture'])
+            return 1 - inside / everyone
+        national, middle, plural = minority(0), minority(.5), minority(1)
+        self.assertLess(national, middle)
+        self.assertLess(middle, plural)
+        self.assertGreater(plural - national, .2)
+
+    def test_countries_of_one_world_differ_in_diversity_more_than_their_own_states_do(self):
+        neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
+        within, between = [], []
+        for seed in range(60):
+            world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, .5, .5)
+            pops = world['files']['common/history/pops/interface.txt']
+            means = []
+            for country in world['countries']:
+                if country['country_type'] == 'decentralized':
+                    continue
+                shares = []
+                for key in country['states']:
+                    sizes = [(culture, int(size)) for culture, size in re.findall(r'culture = (\w+) +(?:religion = \w+ +)?size = (\d+)',
+                             re.search(rf's:{key} = \{{ region_state:{country["tag"]} = \{{ (.*) \}} \}}', pops)[1])]
+                    shares.append(sum(size for culture, size in sizes if culture == country['culture']) / sum(size for _, size in sizes))
+                means.append(sum(shares) / len(shares))
+                within += [share - means[-1] for share in shares]
+            between += [mean - sum(means) / len(means) for mean in means]
+        spread = lambda values: (sum(value ** 2 for value in values) / len(values)) ** .5
+        self.assertGreater(spread(between), .2)
+        self.assertLess(spread(within), spread(between))
+
+    def test_law_modernity_moves_the_mean_progressiveness_of_generated_laws(self):
+        mean = lambda modernity: sum(self.progress(c) for c in self.many(modernity, 0)) / len(self.many(modernity, 0))
+        low, middle, high = mean(0), mean(.5), mean(1)
+        self.assertLess(low, middle)
+        self.assertLess(middle, high)
+        self.assertGreater(high - low, 10)
+
+    def progress(self, country):
+        held = {**self.data['politics_laws'][country['politics']], **{self.data['law_groups'][law]: law for law in country['laws']}}
+        return sum(self.data['law_progress'][law] for law in held.values()) / len(held)
+
+    def test_commanders_follow_the_vanilla_rate_per_unit_and_are_all_posted(self):
+        neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
+        generals = units = 0
+        for seed in range(150):
+            world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, .2, .5)
+            formations = world['files']['common/history/military_formations/interface.txt']
+            templates = world['files']['common/character_templates/interface.txt']
+            generals += templates.count('is_general = yes')
+            units += sum(c['army'] for c in world['countries'])
+            created = re.findall(r'create_character = \{ template = (\w+) save_scope_as', formations)
+            self.assertEqual(sorted(created), sorted(re.findall(r'scope:(\w+) = \{ transfer_to_formation', formations)))
+            for country in world['countries']:
+                if not country['army']:
+                    self.assertNotIn(f'scope:army_{country["tag"]}', formations)
+        self.assertLess(generals / units, self.data['generals_per_unit'] * 1.1)
+        self.assertGreater(generals / units, self.data['generals_per_unit'] * .5)
+
+    def test_every_character_has_a_birth_date(self):
+        lines = [line for line in self.world['files']['common/character_templates/interface.txt'].splitlines() if '_character_' in line]
+        self.assertTrue(lines)
+        self.assertTrue(all('birth_date = ' in line for line in lines))
 
     def test_every_character_name_is_localized(self):
         localized = {line.split(':')[0].strip() for line in self.world['localization']}

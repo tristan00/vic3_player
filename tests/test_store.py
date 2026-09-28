@@ -60,7 +60,7 @@ def built(step):
 
 
 RUN={'kind':'mini','advisors':['random'],'tag':'AAA','world':'w','cli_seed':1,'run_seed':2,'years':1.0,'minutes':1.0,'profile':'actions','pool':0,'runs_requested':3,
-     'generated':{'seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5},'weights':{'build':3,'enact_law':2},
+     'generated':{'seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5,'modernity':0.25,'copies':0.2,'diversity':0.5},'weights':{'build':3,'enact_law':2},
      'picker':'first','candidates':1,'objective':({'gdp':0.0,'population':1.0,'sol':0.0},0.0)}
 STEPS=[{'progress':0.1,'second':True,'head':1,'samples':[(1,0.5)]},
        {'progress':0.2,'second':True,'head':2,'samples':[(1,0.5),(2,0.6)]},

@@ -109,29 +109,65 @@ def _permitted(law,laws,rules,techs):
     return needs<=techs and (not unlocking or unlocking&set(laws)) and not disallowing&set(laws) and not any(law in rules[other][0] for other in laws)
 
 
+JITTER=.1
+
+
 @timed_often
-def _laws(rng,pool,rules,techs):
+def _around(rng,value):
+    return min(2,max(0,rng.gauss(value,JITTER)))
+
+
+@timed_often
+def _mixed(rng,found,target,spread):
+    return rng.choices(found,[math.exp(-((1-mix['primary']-target)/spread)**2/2) for mix in found])[0]
+
+
+@timed_often
+def _closeness(pool,target,spread):
+    return [math.exp(-((p['progress']-target)/spread)**2/2) for p in pool]
+
+
+@timed_often
+def _laws(rng,pool,weights,rules,techs):
     laws=[]
-    for group in rng.sample(sorted({g for p in pool for g in p['laws']}),len({g for p in pool for g in p['laws']})):
-        law=rng.choice(pool)['laws'].get(group)
+    groups=sorted({g for p in pool for g in p['laws']})
+    for group in rng.sample(groups,len(groups)):
+        law=rng.choices(pool,weights)[0]['laws'].get(group)
         if law and _permitted(law,laws,rules,techs):
             laws.append(law)
     return laws
+
+
+@timed_often
+def _required(laws,rules,requires):
+    needed=set()
+    stack=[tech for law in laws for tech in rules[law][2]]
+    while stack:
+        tech=stack.pop()
+        if tech not in needed:
+            needed.add(tech)
+            stack+=requires.get(tech,())
+    return needed
 
 
 FLAGS={'ruler':'ruler = yes','heir':'heir = yes','general':'is_general = yes','admiral':'is_admiral = yes','ig_leader':'ig_leader = yes'}
 
 
 @timed_often
-def _character(rng,tag,index,culture,record,interest_group):
+def _character(rng,tag,index,culture,record,interest_group,ages,named):
     lists=culture['lists']
     key=f'{tag}_character_{index}'
-    first=rng.choice(lists['female' if record['female'] else 'male'])
-    last=rng.choice(lists['noble' if record['role'] in ('ruler','heir') else 'common'])
-    born=f'birth_date = {1836-record["age"]}.{rng.randint(1,12)}.{rng.randint(1,28)} ' if record['age'] is not None else ''
+    first='nm_'+rng.choice(lists['female' if record['female'] else 'male'])
+    last='nm_'+rng.choice(lists['noble' if record['role'] in ('ruler','heir') else 'common'])
+    if named:
+        first,last=record['first'],record['last']
+    age=rng.choice(ages[record['role']]) if record['age'] is None else record['age']
+    born=f'birth_date = {1836-age}.{rng.randint(1,12)}.{rng.randint(1,28)} '
     ideology=f'ideology = {record["ideology"]} ' if record['ideology'] else ''
-    text=(f'{key} = {{ first_name = nm_{first} last_name = nm_{last} culture = cu:{culture["key"]} female = {"yes" if record["female"] else "no"} '
-          f'{born}{"interest_group = "+interest_group+" " if interest_group else ""}{FLAGS[record["role"]]} {"ig_leader = yes " if record.get("leads") else ""}{ideology}traits = {{ {" ".join(record["traits"])} }} }}')
+    rank=f'commander_rank = {record["rank"]} ' if record['rank'] else ''
+    text=(f'{key} = {{ first_name = {first} last_name = {last} culture = cu:{culture["key"]} female = {"yes" if record["female"] else "no"} '
+          f'{born}{"noble = yes " if record["noble"] else ""}{rank}{"interest_group = "+interest_group+" " if interest_group else ""}{FLAGS[record["role"]]} '
+          f'{"ig_leader = yes " if record["leads"] else ""}{ideology}traits = {{ {" ".join(record["traits"])} }} }}')
     return key,text
 
 
@@ -234,11 +270,10 @@ def _army(band,units):
 
 
 @timed
-def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop):
+def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop,modernity,copies,diversity):
     low,mean,top=data['tech_range']
-    target=level(tech,low,mean,top)
-    tech_count=lambda base:round(low+(len(base)-low)*(target-low)/(mean-low)) if target<mean else round(len(base)+target-mean)
-    factor=level(pop,*data['province_population_range'])*sum(len(s['province_codes']) for s in regions)/sum(s['source']['population']*_scale(s) for s in regions)
+    tech_count=lambda base,target:round(low+(len(base)-low)*(target-low)/(mean-low)) if target<mean else round(len(base)+target-mean)
+    crowding=sum(len(s['province_codes']) for s in regions)/sum(s['source']['population']*_scale(s) for s in regions)
     used=set();names=set()
     by_id={s['id']:s for s in regions}
     region_of={s['id']:r['key'] for r in strategic for s in r['states']}
@@ -272,37 +307,61 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
     natives={i for i in range(count) if rng.random()<NATIVE_SHARE}
     if len(natives)==count:
         natives.discard(max(range(count),key=lambda i:len(groups[i])))
+    governed=[i for i in range(count) if i not in natives]
+    copied=dict(zip(rng.sample(governed,min(len(governed),int(len(governed)*copies+rng.random()))),rng.sample(sorted(data['governments']),len(data['governments']))))
+    modern=level(modernity,*data['progress_range'])
+    plural=level(diversity,*data['diversity_range'])
+    tags=[copied.get(i,tag) for i,tag in enumerate(tags)]
+    for i,tag in copied.items():
+        native=data['governments'][tag]['cultures']
+        primary[i]=dict(primary[i],key=native[0],religion=data['culture_religion'][native[0]],native=native)
+    everyone=cultures+[primary[i] for i in sorted(copied)]
     for i,(tag,members) in enumerate(zip(tags,groups)):
         band=rng.choices(list(band_weights),weights=list(band_weights.values()))[0]
         pool=[p for p in data['profiles'] if p['band']==band]
+        near=_closeness(pool,modern,data['progress_spread'])
+        factor=level(_around(rng,pop),*data['province_population_range'])*crowding
+        lean=1-_mixed(rng,data['mixes']['incorporated'][band],plural,data['diversity_spread'])['primary']
+        source=data['governments'].get(copied.get(i))
         culture=primary[i]
         states=[by_id[s] for s in members]
         capital=by_id[capitals[i]]
         name=word(rng,used,culture['phonology'])
         tier=next(t for limit,t in TIERS if len(states)<=limit)
         country_type='decentralized' if i in natives else _pick(rng,pool,'type')
-        politics=_pick(rng,pool,'politics')
-        ruling=rng.choice([p['ruling'] for p in pool if p['ruling']])
+        if source:
+            name,tier,country_type=source['name'],source['rank'],source['type']
+        politics=source['politics'] if source else rng.choices(pool,near)[0]['politics']
+        ruling=source['ruling'] if source else rng.choices(pool,near)[0]['ruling']
         tax,wealth,literacy=(_pick(rng,pool,k) for k in ('tax','wealth','literacy'))
         technology=_pick(rng,pool,'tier')
         base=data['tier_techs'][technology]
-        techs=_techs(rng,base,tech_count(base),data['tech_requires'])
-        laws=_laws(rng,pool,data['law_rules'],techs)
-        color=_rgb(rng)
-        definitions.append(f'{tag} = {{ color = {{ {color} }} country_type = {country_type} tier = {tier} cultures = {{ {culture["key"]} }} capital = {capital["key"]} }}')
+        techs=_techs(rng,base,tech_count(base,level(_around(rng,tech),low,mean,top)),data['tech_requires'])
+        if source:
+            techs|=_required(source['laws'].values(),data['law_rules'],data['tech_requires'])
+        laws=list(source['laws'].values()) if source else _laws(rng,pool,near,data['law_rules'],techs)
+        held=lambda group:next((law for law in laws if data['law_groups'].get(law)==group),data['politics_laws'].get(politics,{}).get(group,''))
+        color=source['color'] if source else _rgb(rng)
+        definitions.append(f'{tag} = {{ color = {{ {color} }} country_type = {country_type} tier = {tier} cultures = {{ {" ".join(culture.get("native",[culture["key"]]))} }} capital = {capital["key"]} }}')
         one,two,three=rng.sample(FLAG_COLORS,3)
-        files[f'common/coat_of_arms/coat_of_arms/{tag}.txt']=(f'{tag} = {{ pattern = "{rng.choice(data["patterns"])}" color1 = "{one}" color2 = "{two}" '
-            f'colored_emblem = {{ texture = "{rng.choice(data["emblems"])}" color1 = "{three}" color2 = "{one}" instance = {{ position = {{ 0.5 0.5 }} scale = {{ 0.6 0.6 }} }} }} }}')
-        localization+=[f' {tag}: "{name}"',f' {tag}_ADJ: "{name}"']
+        flag=(f'{tag} = {{ pattern = "{rng.choice(data["patterns"])}" color1 = "{one}" color2 = "{two}" '
+              f'colored_emblem = {{ texture = "{rng.choice(data["emblems"])}" color1 = "{three}" color2 = "{one}" instance = {{ position = {{ 0.5 0.5 }} scale = {{ 0.6 0.6 }} }} }} }}')
+        if not source:
+            files[f'common/coat_of_arms/coat_of_arms/{tag}.txt']=flag
+            localization+=[f' {tag}: "{name}"',f' {tag}_ADJ: "{name}"']
         if i in natives:
             countries.append(_native(rng,data,tag,name,culture,states,capital,[c for c in cultures if c is not culture],religions,band,factor,history,color))
             continue
-        lines=[f'add_technology_researched = {name}' for name in sorted(techs)]+[f'effect_starting_politics_{politics} = yes']
+        lines=[f'add_technology_researched = {name}' for name in sorted(techs)]+([f'effect_starting_politics_{politics} = yes'] if politics else [])
         lines+=[f'set_tax_level = {tax}'] if tax else []
         lines+=[f'activate_law = law_type:{law}' for law in laws]
         lines+=[f'ig:{ig} ?= {{ add_ruling_interest_group = yes }}' for ig in ruling]
-        lines+=_pick(rng,pool,'policies')
+        lines+=source['policies']+source['election']+source['journal'] if source else rng.choices(pool,near)[0]['policies']
+        if not source:
+            lines+=rng.choice(data['elections'][held('lawgroup_distribution_of_power')])
         history['countries'].append(f'c:{tag} ?= {{ {" ".join(lines)} }}')
+        if source and source['parties']:
+            history['governments'].append(f'c:{tag} ?= {{ {" ".join(source["parties"])} }}')
         people=[f'effect_starting_pop_wealth_{wealth} = yes'] if wealth else []
         people+=[f'effect_starting_pop_literacy_{literacy} = yes'] if literacy else []
         history['population'].append(f'c:{tag} ?= {{ {" ".join(people)} }}')
@@ -320,12 +379,12 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
         centers={s['id']:level for s,level in zip(ranked,trade['centers'])}
         populations=[]
         for state in states:
-            local=[c for c in cultures if c is not culture and (any(c is primary[j] for j in neighbours[i]) or state['id'] in homes.get(c['key'],()))]
-            rest=[c for c in cultures if c is not culture and c not in local]
-            mix=rng.choice(data['mixes']['incorporated'][band] if state['id'] in reachable else data['mixes']['unincorporated'])
+            local=[c for c in everyone if c is not culture and (any(c is primary[j] for j in neighbours[i]) or state['id'] in homes.get(c['key'],()))]
+            rest=[c for c in everyone if c is not culture and c not in local]
+            mix=_mixed(rng,data['mixes']['incorporated'][band] if state['id'] in reachable else data['mixes']['unincorporated'],lean,data['diversity_within'])
             populations.append(_pops(rng,state,culture,rng.sample(local,len(local))+rng.sample(rest,len(rest)),religions,mix,factor))
-        army_law=next((law for law in laws if law in data['barracks_cap']),data['politics_army'][politics])
-        if not _permitted(army_law,laws,data['law_rules'],techs):
+        army_law=next((law for law in laws if law in data['barracks_cap']),data['politics_army'].get(politics))
+        if army_law is None or not _permitted(army_law,laws,data['law_rules'],techs):
             army_law=next(law for law in data['barracks_cap'] if _permitted(law,laws,data['law_rules'],techs))
         weights=[size for size,_,_ in populations]
         garrison=_allot(trade['barracks'] if buildable('building_barrack') else 0,weights,data['barracks_cap'][army_law])
@@ -348,18 +407,19 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
             for building in made:
                 if building in GOODS and GOODS[building] in data['goods']:
                     produced.setdefault(GOODS[building],state['key'])
-        held=lambda group:next((law for law in laws if data['law_groups'].get(law)==group),data['politics_laws'][politics].get(group,''))
         governance=held('lawgroup_governance_principles')
-        vanilla_cast=data['casts'].get(trade['tag'],[])
-        ruler=dict(rng.choice(data['rulers'][politics]),leads='republic' in governance and held('lawgroup_distribution_of_power') in data['elective_laws'])
-        leaders={r['interest_group']:r for r in vanilla_cast if r['role']=='ig_leader' and not (ruler['leads'] and r['interest_group']==ruling[0])}
-        chosen=([(ruler,ruling[0])]
+        vanilla_cast=data['casts'].get(source['tag'] if source else trade['tag'],[])
+        ruler=data['rulers_of'][source['tag']] if source else rng.choice([r for r in data['rulers'][politics] if r['interest_group'] in ruling] or data['rulers'][politics])
+        home=ruler['interest_group'] or next(iter(ruling),None)
+        leaders={r['interest_group']:r for r in vanilla_cast if r['role']=='ig_leader' and not (ruler['leads'] and r['interest_group']==home)}
+        serving=lambda role,size,rate:rng.sample(found:=[r for r in vanilla_cast if r['role']==role],min(len(found),int(size*rate+rng.random())))
+        chosen=([(ruler,home)]
                 +[(r,r['interest_group']) for r in vanilla_cast if r['role']=='heir' and 'republic' not in governance][:1]
                 +[(r,group) for group,r in leaders.items()]
-                +[(r,r['interest_group']) for r in vanilla_cast if r['role']=='general' or (r['role']=='admiral' and navy)])
+                +[(r,r['interest_group']) for r in serving('general',sum(count for _,count in units),data['generals_per_unit'])+serving('admiral',navy,data['admirals_per_ship'])])
         cast=[];commanders=[];monarchs=[]
         for index,(record,group) in enumerate(chosen,1):
-            key,text=_character(rng,tag,index,culture,record,group)
+            key,text=_character(rng,tag,index,culture,record,group,data['ages'],bool(source) and bool(record['first']) and bool(record['last']))
             templates.append(text)
             if record['role'] in ('general','admiral'):
                 commanders.append((key,'army' if record['role']=='general' else 'fleet'))
@@ -373,8 +433,7 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
             formations.append(f'create_military_formation = {{ type = fleet hq_region = sr:{region_of[naval_home["id"]]} save_scope_as = fleet_{tag} ship = {{ type = ship_type:{ship} count = {navy} }} }}')
         for key,branch in commanders:
             formations.append(f'create_character = {{ template = {key} save_scope_as = {key} }}')
-            if branch=='fleet' or units:
-                formations.append(f'scope:{key} = {{ transfer_to_formation = scope:{branch}_{tag} }}')
+            formations.append(f'scope:{key} = {{ transfer_to_formation = scope:{branch}_{tag} }}')
         history['military_formations'].append(f'c:{tag} ?= {{ {" ".join(formations)} }}')
         history['characters']+=[f'c:{tag} ?= {{ create_character = {{ template = {key} }} }}' for key in cast]
         if band==0:
@@ -383,7 +442,7 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
         history['ai'].append(f'c:{tag} ?= {{ {" ".join("set_strategy = "+s for s in strategies)} }}')
         countries.append({'tag':tag,'name':name,'states':[s['key'] for s in states],'capital':capital['key'],'culture':culture['key'],
                           'religion':culture['religion'],'color':[int(c) for c in color.split()],'band':band,'technology_tier':technology,
-                          'country_type':country_type,'tier':tier,'politics':politics,'laws':laws,'ruling':ruling,'produced':produced,'trade':trade,'holdings':holdings,'armed':bool(units),'army':sum(count for _,count in units),'navy':navy,'monarchs':monarchs,
+                          'country_type':country_type,'tier':tier,'politics':politics,'copy':source['tag'] if source else None,'laws':laws,'ruling':ruling,'produced':produced,'trade':trade,'holdings':holdings,'armed':bool(units),'army':sum(count for _,count in units),'navy':navy,'monarchs':monarchs,
                           'provinces':[p for s in states for p in s['province_codes']]})
     _diplomacy(rng,data,countries,neighbours,history,localization)
     _claims(rng,data,regions,state_neighbours,history,{c['tag'] for c in countries if c['country_type']=='decentralized'})
@@ -425,7 +484,7 @@ def _native(rng,data,tag,name,culture,states,capital,others,religions,band,facto
         history['pops'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {pops} }} }}')
         history['buildings'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ }} }}')
     return {'tag':tag,'name':name,'states':[s['key'] for s in states],'capital':capital['key'],'culture':culture['key'],'religion':culture['religion'],
-            'color':[int(c) for c in color.split()],'band':band,'country_type':'decentralized','laws':[],'ruling':[],'produced':{},'holdings':[],
+            'color':[int(c) for c in color.split()],'band':band,'country_type':'decentralized','copy':None,'laws':[],'ruling':[],'produced':{},'holdings':[],
             'armed':False,'army':0,'navy':0,'monarchs':[],'provinces':[p for s in states for p in s['province_codes']]}
 
 

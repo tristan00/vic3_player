@@ -37,6 +37,7 @@ ENDS_PAUSE={'capitulate','back_down','white_peace','declare_bankruptcy','leave_p
 PARKED=set()
 RUN_DAYS=(10,90)
 WAIT='run_days'
+SLIDERS=('tech','pop','modernity','copies','diversity')
 PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
 HOURS_PER_DAY=24
 ACTIONS=[name for name in BY_NAME if GROUP[name]!='time']
@@ -68,7 +69,7 @@ SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_q
        'imposition':('impose_law',),
        'play':('start_play_country','start_play_state','start_play_confirmed','abandon_colony'),
        'bloc':('form_power_bloc','leave_power_bloc','request_join_power_bloc','kick_from_power_bloc','pick_principle','upgrade_principle'),
-       'enactment':('enact_law','cancel_enactment','negotiate','reform_government'),
+       'enactment':('enact_law','cancel_enactment','negotiate','reform_government','reform_government_party'),
        'commanders':('hire_commander','hire_commander_for','unassign_commander'),
        'army_state':('raise_conscripts','raise_conscripts_selected','mobilize','mobilize_all','mobilize_selected','demobilize','demobilize_all','demobilize_selected','station_formation','rehome_formation','back_down','capitulate','disband_formation','disband_regulars',
                      'deploy_to_front','deploy_selected_to_front','defend_invasion'),
@@ -398,12 +399,12 @@ def at_debt_cap(snapshot):
 
 
 @timed_often
-def build(seed,countries,states,tech,pop):
-    return generate(seed,countries,states,tech,pop)
+def build(*size):
+    return generate(*size)
 
 
-def build_apart(seed,countries,states,tech,pop):
-    world=build(seed,countries,states,tech,pop)
+def build_apart(*size):
+    world=build(*size)
     return world,RECORDER.take()
 
 
@@ -417,10 +418,9 @@ def log_timings():
 @timed_often
 def world_size(rng,levels):
     states=rng.randint(*MAP['states'])
-    tech,pop=levels
     low,high=MAP['country_share']
     return (rng.randrange(10**9),rng.randint(max(2,int(states*low)),max(2,int(states*high))),states,
-            round(rng.uniform(*MAP['tech']),2) if tech is None else tech,round(rng.uniform(*MAP['pop']),2) if pop is None else pop)
+            *[round(rng.uniform(*MAP[name]),2) if value is None else value for name,value in zip(SLIDERS,levels)])
 
 
 class WorldPool:
@@ -578,7 +578,7 @@ def session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,seconds):
     seed=rng.randrange(10**9)
     name=world.parent.name if world else 'vanilla'
     generated=None if world is None else {'seed':manifest['seed'],'countries':len(manifest['countries']),'states':len(manifest['states']),
-                                          'tech':manifest['tech'],'pop':manifest['pop']}
+                                          **{name:manifest[name] for name in SLIDERS}}
     loop=Loop(game,[advisor],random.Random(seed),store,run_record(arguments,'vanilla' if world is None else 'mini',name,tag,seed,generated,advisor,picker,candidates,objective),picker,candidates)
     watchdog.store=store
     counts=loop.run(arguments.years,seconds)
@@ -609,12 +609,12 @@ def main():
     parser.add_argument('--vanilla',action='store_true')
     parser.add_argument('--tag')
     parser.add_argument('--weight',nargs='+',default=[])
-    parser.add_argument('--tech',type=float)
-    parser.add_argument('--pop',type=float)
+    for name in SLIDERS:
+        parser.add_argument('--'+name,type=float)
     arguments=parser.parse_args()
-    if arguments.vanilla and (arguments.tech is not None or arguments.pop is not None):
-        parser.error('--tech and --pop only apply to generated mini worlds')
-    levels=(arguments.tech,arguments.pop)
+    levels=[getattr(arguments,name) for name in SLIDERS]
+    if arguments.vanilla and any(value is not None for value in levels):
+        parser.error('world sliders only apply to generated mini worlds')
     log_timings()
     game=GameInterface(arguments.profile)
     watchdog=Watchdog(game)
