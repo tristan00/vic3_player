@@ -36,16 +36,11 @@ ACTIONS_PER_PAUSE=(6,16)
 ENDS_PAUSE={'capitulate','back_down','white_peace','declare_bankruptcy','leave_power_bloc'}
 PARKED=set()
 RUN_DAYS=(10,90)
+WAIT='run_days'
 PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
-WEIGHTS={'start_play_country':0,'start_play_state':0,'start_play_confirmed':0,'add_war_goal':0,'make_primary_demand':0,'dequeue_research':0,'cancel_construction':0,'cancel_queue_item':0,
-         'build':3,'research':3,'create_army':.01,'enact_law':2,'switch_production_method':3,'bulk_switch_production_method_state':3,'deploy_to_front':5,'set_strategic_objective':3,'mobilize':5,'mobilize_all':5,'raise_conscripts':3,
-         'cancel_enactment':.1,'nationalize':.1,'bulk_nationalize_state':.1,'demobilize':.2,'demobilize_all':.2,'downsize':.1,'pause_construction':.01,'pause_all_construction':.01,
-         'disband_formation':.1,'disband_regulars':.1,'disband_conscripts':.1,'declare_bankruptcy':.1,
-         'abandon_colony':.1,'unincorporate':.1,'remove_company':.1,'remove_decree':.1,'capitulate':.1,'white_peace':.1,'leave_power_bloc':.01,'kick_from_power_bloc':.01}
-WEIGHTS={**{name:.1 for name in BY_NAME if GROUP[name]=='navy'},**WEIGHTS}
 HOURS_PER_DAY=24
 ACTIONS=[name for name in BY_NAME if GROUP[name]!='time']
-CANDIDATES=(1,100)
+CANDIDATES=(8,50)
 HOURS_PER_YEAR=365*HOURS_PER_DAY
 
 
@@ -142,7 +137,7 @@ class Drawer:
                         count[other]-=1
             if self.names[action] in ENDS_PAUSE:
                 break
-        return batch
+        return batch+[(self.advisor,WAIT,{'days':rng.randint(*RUN_DAYS)})]
 
 
 class Loop:
@@ -241,20 +236,22 @@ class Loop:
         chosen,predictions=self.picker.pick(drawn,snapshot)
         if predictions is not None:
             self.store.record_pick(snapshot.seq,[[name for _,name,_ in batch] for batch in drawn],predictions,chosen)
-        for advisor,name,params in drawn[chosen]:
+        *block,(advisor,_,wait)=drawn[chosen]
+        wait=(advisor.name,wait['days'],snapshot)
+        for advisor,name,params in block:
             self.perform(advisor.name,name,params,snapshot,batch)
         if not batch:
-            return snapshot
+            return snapshot,wait
         after=self.snapshot('post_action')
         left=self.open_ui(after)
         if left:
             for entry,_,_ in batch:
                 self.note({**entry,'status':'ui_leftover','detail':f'{"+".join(left)} open after the pause: {" ".join(item["action"] for item,_,_ in batch)}'},after)
             self.stuck(left)
-            return after
+            return after,wait
         for entry,_,_ in batch:
             self.note({**entry,'status':'done'},after)
-        return after
+        return after,wait
 
     @timed_often
     def open_ui(self,snapshot):
@@ -270,9 +267,8 @@ class Loop:
             raise Stuck()
 
     @timed
-    def run_days(self,snapshot):
-        days=self.rng.randint(*RUN_DAYS)
-        entry=self.entry('loop','run_days',{'days':days},snapshot)
+    def run_days(self,snapshot,source,days,drawn):
+        entry=self.entry(source,WAIT,{'days':days},drawn)
         reader=self.game.reader()
         target=reader.date()[0]+days*HOURS_PER_DAY
         pending=[]
@@ -391,8 +387,8 @@ class Loop:
                 LOG.info('debt cap reached at snapshot %s: principal %s, credit %s',snapshot.seq,*snapshot.rows('player_treasury','principal,credit')[0])
                 return self.end('debt_cap')
             self.turn+=1
-            snapshot=self.turn_actions(snapshot)
-            snapshot=self.run_days(snapshot)
+            snapshot,wait=self.turn_actions(snapshot)
+            snapshot=self.run_days(snapshot,*wait)
 
 
 @timed_often
@@ -624,7 +620,7 @@ def main():
     watchdog=Watchdog(game)
     watchdog.start()
     rng=random.Random(arguments.seed)
-    weights={**WEIGHTS,**{name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}}
+    weights={name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}
     advisors={name:ADVISORS[name](rng.randrange(10**9),weights) for name in sorted(set(arguments.advisors))}
     pickers={name:PICKERS[name]() for name in set(arguments.pickers)}
     worlds=Vanilla(rng) if arguments.vanilla else WorldPool(rng,arguments.pool,levels) if arguments.pool else Fresh(rng,levels)

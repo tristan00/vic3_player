@@ -188,9 +188,7 @@ class RandomSmacWeightingAdvisor(RandomAdvisor):
         if len(y)>=INITIAL:
             forest=RandomForestRegressor(n_estimators=TREES,min_samples_leaf=2,max_features=5/6,random_state=int(rng.integers(2**31))).fit(X,y)
             record['importance']=[(name,float(value)) for name,value in zip(names,forest.feature_importances_)]
-        if not (X==0).all(1).any():
-            x,method=np.zeros(len(low)),'default'
-        elif forest is None or self.random.random()<RANDOM_SHARE:
+        if forest is None or self.random.random()<RANDOM_SHARE:
             x,method=rng.uniform(low,high),'random'
         else:
             random_points=rng.uniform(low,high,(CANDIDATES,len(low)))

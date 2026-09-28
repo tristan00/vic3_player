@@ -10,12 +10,9 @@ TYPED={'law':('law','law_type'),'institution':('institution','institution_type')
        'company':('company','company_type'),'military_formation':('formation','formation_type')}
 RAW={'int','choice','event'}
 SYNTHETIC={'strategic_region'}
-SLOTS=16
-PARAMS=2
 NONE='none'
 NUMBERS=['treasury','debt','interest','balance','population','bureaucracy_available','standard_of_living','construction_queue_items','construction_queue_left',
          'construction_capacity']
-CATEGORIES=[f'action{slot}.{part}' for slot in range(1,SLOTS+1) for part in ['type']+[f'param{index}' for index in range(1,PARAMS+1)]]
 LAW_GROUP={key:scalar(value,'group') for key,value in read(DEFAULT_GAME/'game','common/laws')}
 LAW_GROUPS=sorted(set(LAW_GROUP.values()))
 LAWS=[f'law.{group}' for group in LAW_GROUPS]
@@ -23,25 +20,10 @@ GOODS=[key for key,_ in read(DEFAULT_GAME/'game','common/goods')]
 PRICES=[f'price.{goods}' for goods in GOODS]
 INSTITUTION_TYPES=[key for key,_ in read(DEFAULT_GAME/'game','common/institutions')]
 INSTITUTIONS=[f'institution.{kind}' for kind in INSTITUTION_TYPES]
-FEATURES=NUMBERS+CATEGORIES+LAWS+PRICES+INSTITUTIONS
 TERRAIN='''select p.world_id,sr.name,t.name,sum(p.area_pixels) from world_province p join state_region sr on sr.state_region=p.state_region join terrain t on t.terrain=p.terrain
 where p.world_id = any(%s) group by 1,2,3'''
 INTEREST=('expense','interest')
 KINDS={name:[tuple(spec.split(':')) if ':' in spec else (spec,spec) for spec in action.params] for name,action in BY_NAME.items()}
-
-
-def rank(kind):
-    if kind in SYNTHETIC:
-        return 5
-    if kind in RAW:
-        return 4
-    if kind=='state':
-        return 3
-    if kind in ('character','country'):
-        return 2
-    if kind=='building':
-        return 1
-    return 0
 
 
 @timed_often
@@ -289,15 +271,3 @@ def resolve(param,kind,value,lookup):
     if kind in RAW:
         return f'{param}={value}'
     return value if isinstance(value,str) else param
-
-
-def slot(action,params,lookup):
-    ordered=sorted(((rank(kind),position,param,kind) for position,(param,kind) in enumerate(KINDS[action]) if param in params))
-    values=[resolve(param,kind,params[param],lookup) for _,_,param,kind in ordered[:PARAMS]]
-    return [action]+values+[NONE]*(PARAMS-len(values))
-
-
-@timed_often
-def categories(batch,lookup):
-    slots=[value for action,params in batch[:SLOTS] for value in slot(action,params,lookup)]
-    return slots+[NONE]*(len(CATEGORIES)-len(slots))

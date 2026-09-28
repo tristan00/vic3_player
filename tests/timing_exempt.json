@@ -3,9 +3,7 @@
   "Samples.at": "hot",
   "Versions.at": "hot",
   "Versions.live": "hot",
-  "rank": "hot",
-  "resolve": "hot",
-  "slot": "hot"
+  "resolve": "hot"
  },
  "advisors/pickers.py": {
   "value_at": "hot"

@@ -94,17 +94,16 @@ class RandomAdvisorTests(unittest.TestCase):
         self.assertGreater(max(drawn),10)
 
 class RandomSmacWeightingTests(unittest.TestCase):
-    def test_every_weight_at_one_is_played_before_anything_else(self):
+    def test_too_few_scored_runs_give_random_weights(self):
         import numpy as np
-        from advisors import RandomSmacWeightingAdvisor
+        from advisors.random_smac_weighting import INITIAL, RandomSmacWeightingAdvisor
         low,high=np.full(4,-2.),np.full(4,2.)
-        x,record=RandomSmacWeightingAdvisor(0).propose(np.ones((12,4)),np.arange(12.),low,high)
-        self.assertEqual(record['method'],'default')
-        self.assertTrue((x==0).all())
-        self.assertIsNotNone(record['predicted_reward'])
-        x,record=RandomSmacWeightingAdvisor(0).propose(np.zeros((1,4)),np.zeros(1),low,high)
-        self.assertEqual(record['method'],'random')
-        self.assertIsNone(record['predicted_reward'])
+        for observations in (0,INITIAL-1):
+            x,record=RandomSmacWeightingAdvisor(0).propose(np.ones((observations,4)),np.arange(float(observations)),low,high)
+            self.assertEqual(record['method'],'random')
+            self.assertIsNone(record['predicted_reward'])
+            self.assertTrue(((x>=low)&(x<=high)).all())
+            self.assertGreater(len(set(x.tolist())),1)
 
     def test_the_forest_proposes_inside_the_bounds_and_toward_better_weights(self):
         import numpy as np
@@ -209,8 +208,22 @@ class BatchSamplerTests(unittest.TestCase):
         self.assertEqual(len(picked),len(set(picked)))
         self.assertTrue(all(a is advisor for a,_,_ in batch))
         ending=Drawer(advisor,{'capitulate':[{}],'research':[{'technology':'a'}]},Snapshot(),{},set()).draw(random.Random(3))
-        names=[name for _,name,_ in ending]
+        names=[name for _,name,_ in ending[:-1]]
         self.assertTrue('capitulate' not in names or names[-1]=='capitulate')
+
+    def test_every_batch_ends_with_running_a_drawn_number_of_days(self):
+        import random
+        from loop.run import RUN_DAYS, Drawer
+        class Snapshot:
+            seq=1
+        drawer=Drawer(RandomAdvisor(0),{'research':[{'technology':'a'},{'technology':'b'}]},Snapshot(),{},set())
+        rng=random.Random(2)
+        batches=[drawer.draw(rng) for _ in range(40)]
+        self.assertEqual({batch[-1][1] for batch in batches},{'run_days'})
+        self.assertTrue(all('run_days' not in [name for _,name,_ in batch[:-1]] for batch in batches))
+        days=[batch[-1][2]['days'] for batch in batches]
+        self.assertTrue(all(RUN_DAYS[0]<=value<=RUN_DAYS[1] for value in days))
+        self.assertGreater(len(set(days)),10)
 
     def test_pick_first_takes_the_first_batch(self):
         from advisors.pickers import PickFirst
@@ -230,16 +243,6 @@ class FeatureTests(unittest.TestCase):
             return 'ideology_reformer'
         def country(self,ident):
             return 'rank_major'
-
-    def test_an_action_becomes_its_type_and_its_two_most_telling_parameters(self):
-        from advisors.features import slot
-        lookup=self.Lookup()
-        self.assertEqual(slot('switch_production_method',{'building':5,'production_method':'pm_open_air_cattle'},lookup),
-                         ['switch_production_method','pm_open_air_cattle','building_livestock_ranch'])
-        self.assertEqual(slot('build',{'state':2,'building_type':'building_rye_farm'},lookup),['build','building_rye_farm','foreign/plains'])
-        self.assertEqual(slot('enact_law',{'law':3},lookup),['enact_law','law_serfdom','none'])
-        self.assertEqual(slot('research',{'technology':'railways'},lookup),['research','railways','none'])
-        self.assertEqual(slot('white_peace',{'war':4},lookup),['white_peace','war','none'])
 
     def test_current_laws_fill_one_slot_per_law_group(self):
         from advisors.features import LAW_GROUP, LAW_GROUPS, NONE, laws
@@ -262,14 +265,6 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(len(found),len(INSTITUTION_TYPES))
         self.assertEqual(found[INSTITUTION_TYPES.index('institution_schools')],2.0)
         self.assertEqual(sum(found),2.0)
-
-    def test_a_batch_fills_sixteen_slots_of_three(self):
-        from advisors.features import CATEGORIES, categories
-        filled=categories([('research',{'technology':'railways'}),('enact_law',{'law':3})],self.Lookup())
-        self.assertEqual(len(filled),len(CATEGORIES))
-        self.assertEqual(filled[:6],['research','railways','none','enact_law','law_serfdom','none'])
-        self.assertEqual(set(filled[6:]),{'none'})
-        self.assertEqual(len(categories([('research',{'technology':'a'})]*20,self.Lookup())),len(CATEGORIES))
 
     def test_numbers_include_the_construction_queue_and_capacity(self):
         from types import SimpleNamespace as Space
@@ -294,10 +289,12 @@ class FeatureTests(unittest.TestCase):
         import numpy as np
         from unittest import mock
         from advisors import pickers
+        from advisors.features import GOODS, INSTITUTION_TYPES, LAW_GROUPS
+        from advisors.histograms import BUILDINGS, Histograms
+        seen=[]
         class Model:
             def predict(self,data):
                 return np.array([0.1,0.9,0.4])
-        from advisors.features import GOODS, INSTITUTION_TYPES, LAW_GROUPS
         class Lookup(self.Lookup):
             numbers=[1.0,0.0,0.0,0.0,100.0,5.0,20.0,2,300.0,10.0]
             laws=['none']*len(LAW_GROUPS)
@@ -305,11 +302,19 @@ class FeatureTests(unittest.TestCase):
             institutions=[0.0]*len(INSTITUTION_TYPES)
         picker=pickers.CatBoostPicker()
         picker.model=Model()
-        candidates=[[(None,'research',{'technology':'a'})],[(None,'research',{'technology':'b'})],[(None,'enact_law',{'law':3})]]
-        with mock.patch.object(pickers,'LiveLookup',lambda snapshot:Lookup()):
+        picker.actions=Histograms([[('action','research',1),('research.technology','a',1)],[('action','enact_law',1)]])
+        picker.held=Histograms([[(BUILDINGS,'farm',2)]])
+        candidates=[[(None,'research',{'technology':'a'}),(None,'run_days',{'days':30})],[(None,'research',{'technology':'b'}),(None,'run_days',{'days':45})],
+                    [(None,'enact_law',{'law':3}),(None,'run_days',{'days':60})]]
+        sizes={'action':2,'research.technology':1,BUILDINGS:1}
+        with mock.patch.object(pickers,'LiveLookup',lambda snapshot:Lookup()),mock.patch.object(pickers,'live_holdings',lambda snapshot:[(BUILDINGS,'farm',5),(BUILDINGS,'mine',1)]),                mock.patch.object(pickers,'SIZES',sizes),mock.patch.object(pickers,'frame',lambda *parts:seen.append(parts)):
             chosen,predictions=picker.pick(candidates,None)
         self.assertEqual(chosen,1)
         self.assertEqual([round(value,6) for value in predictions],[0.1,0.9,0.4])
+        state,laws,held,batch,actions,names=seen[0]
+        self.assertEqual(names[-6:],['player.buildings=farm','batch_size','run_days','action=enact_law','action=research','research.technology=a'])
+        self.assertEqual(np.hstack([held,batch,actions]).tolist(),[[5,1,30,0,1,1],[5,1,45,0,1,0],[5,1,60,1,0,0]])
+        self.assertEqual((state.shape,laws.shape),((3,len(names)-6),(3,len(LAW_GROUPS))))
 
 
 if __name__=='__main__':
