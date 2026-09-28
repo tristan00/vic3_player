@@ -314,11 +314,10 @@ def _natives(game):
     owners=set()
     for _,_,value in entries(game,'common/history/states'):
         owners|=set(re.findall(r'country\s*=\s*c:(\w+)',value))
-    counted=[types.get(tag) for tag in owners if types.get(tag) in ('recognized','unrecognized','decentralized')]
     population={tag:' '.join(body(value).split()) for _,tag,value in entries(game,'common/history/population')}
     natives=[{'history':' '.join(body(value).split()),'population':population.get(tag,'')} for _,tag,value in entries(game,'common/history/countries')
              if types.get(tag)=='decentralized' and tag in owners and not _foreign(body(value))]
-    return {'natives':natives,'native_share':counted.count('decentralized')/len(counted)}
+    return {'natives':natives}
 
 
 @timed_often

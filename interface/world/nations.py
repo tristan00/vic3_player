@@ -269,7 +269,7 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
     for folder in ['diplomacy','diplomatic_plays','military_deployments','power_blocs','treaties','lobbies','trade','states','pops','buildings']:
         history.setdefault(folder,[])
     definitions=[];templates=[]
-    natives={i for i in range(count) if rng.random()<data['native_share']}
+    natives={i for i in range(count) if rng.random()<NATIVE_SHARE}
     if len(natives)==count:
         natives.discard(max(range(count),key=lambda i:len(groups[i])))
     for i,(tag,members) in enumerate(zip(tags,groups)):
@@ -450,6 +450,7 @@ def _claims(rng,data,regions,state_neighbours,history,natives):
 
 
 COMPANY_LEVELS=5
+NATIVE_SHARE=.05
 
 
 @timed_often

@@ -177,7 +177,7 @@ class NationTests(unittest.TestCase):
     def test_every_starting_company_owns_a_building_of_its_own_type(self):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
         founded = 0
-        for seed in range(12):
+        for seed in range(60):
             world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
                             [{'key': 'region_interface_1', 'states': self.regions}], .5, .5)
             files = world['files']
