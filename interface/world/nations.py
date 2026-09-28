@@ -309,8 +309,6 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
         natives.discard(max(range(count),key=lambda i:len(groups[i])))
     governed=[i for i in range(count) if i not in natives]
     copied=dict(zip(rng.sample(governed,min(len(governed),int(len(governed)*copies+rng.random()))),rng.sample(sorted(data['governments']),len(data['governments']))))
-    modern=level(modernity,*data['progress_range'])
-    plural=level(diversity,*data['diversity_range'])
     tags=[copied.get(i,tag) for i,tag in enumerate(tags)]
     for i,tag in copied.items():
         native=data['governments'][tag]['cultures']
@@ -319,9 +317,10 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
     for i,(tag,members) in enumerate(zip(tags,groups)):
         band=rng.choices(list(band_weights),weights=list(band_weights.values()))[0]
         pool=[p for p in data['profiles'] if p['band']==band]
-        near=_closeness(pool,modern,data['progress_spread'])
+        modern,plural=round(rng.uniform(*modernity),2),round(rng.uniform(*diversity),2)
+        near=_closeness(pool,level(modern,*data['progress_range']),data['progress_spread'])
         factor=level(_around(rng,pop),*data['province_population_range'])*crowding
-        lean=1-_mixed(rng,data['mixes']['incorporated'][band],plural,data['diversity_spread'])['primary']
+        lean=level(plural,*data['diversity_range'])
         source=data['governments'].get(copied.get(i))
         culture=primary[i]
         states=[by_id[s] for s in members]
@@ -442,7 +441,7 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
         history['ai'].append(f'c:{tag} ?= {{ {" ".join("set_strategy = "+s for s in strategies)} }}')
         countries.append({'tag':tag,'name':name,'states':[s['key'] for s in states],'capital':capital['key'],'culture':culture['key'],
                           'religion':culture['religion'],'color':[int(c) for c in color.split()],'band':band,'technology_tier':technology,
-                          'country_type':country_type,'tier':tier,'politics':politics,'copy':source['tag'] if source else None,'laws':laws,'ruling':ruling,'produced':produced,'trade':trade,'holdings':holdings,'armed':bool(units),'army':sum(count for _,count in units),'navy':navy,'monarchs':monarchs,
+                          'country_type':country_type,'tier':tier,'politics':politics,'copy':source['tag'] if source else None,'modernity':modern,'diversity':plural,'laws':laws,'ruling':ruling,'produced':produced,'trade':trade,'holdings':holdings,'armed':bool(units),'army':sum(count for _,count in units),'navy':navy,'monarchs':monarchs,
                           'provinces':[p for s in states for p in s['province_codes']]})
     _diplomacy(rng,data,countries,neighbours,history,localization)
     _claims(rng,data,regions,state_neighbours,history,{c['tag'] for c in countries if c['country_type']=='decentralized'})

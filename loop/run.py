@@ -38,6 +38,7 @@ PARKED=set()
 RUN_DAYS=(10,90)
 WAIT='run_days'
 SLIDERS=('tech','pop','modernity','copies','diversity')
+PER_COUNTRY=('modernity','diversity')
 PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
 HOURS_PER_DAY=24
 ACTIONS=[name for name in BY_NAME if GROUP[name]!='time']
@@ -420,7 +421,7 @@ def world_size(rng,levels):
     states=rng.randint(*MAP['states'])
     low,high=MAP['country_share']
     return (rng.randrange(10**9),rng.randint(max(2,int(states*low)),max(2,int(states*high))),states,
-            *[round(rng.uniform(*MAP[name]),2) if value is None else value for name,value in zip(SLIDERS,levels)])
+            *[(MAP[name] if value is None else (value,value)) if name in PER_COUNTRY else round(rng.uniform(*MAP[name]),2) if value is None else value for name,value in zip(SLIDERS,levels)])
 
 
 class WorldPool:
@@ -578,7 +579,7 @@ def session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,seconds):
     seed=rng.randrange(10**9)
     name=world.parent.name if world else 'vanilla'
     generated=None if world is None else {'seed':manifest['seed'],'countries':len(manifest['countries']),'states':len(manifest['states']),
-                                          **{name:manifest[name] for name in SLIDERS}}
+                                          **{name:next(country for country in manifest['countries'] if country['tag']==tag)[name] if name in PER_COUNTRY else manifest[name] for name in SLIDERS}}
     loop=Loop(game,[advisor],random.Random(seed),store,run_record(arguments,'vanilla' if world is None else 'mini',name,tag,seed,generated,advisor,picker,candidates,objective),picker,candidates)
     watchdog.store=store
     counts=loop.run(arguments.years,seconds)

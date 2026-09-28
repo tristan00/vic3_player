@@ -575,10 +575,10 @@ def generate(seed,countries,states,tech,pop,modernity,copies,diversity,*,game_di
         raise ValueError('Need at least one country and no more countries than states')
     if not 0<=tech<=2 or not 0<=pop<=2:
         raise ValueError(f'tech and pop must be within 0..2, got {tech} and {pop}')
-    if not 0<=modernity<=1 or not 0<=copies<=1 or not 0<=diversity<=1:
-        raise ValueError(f'modernity, copies and diversity must be within 0..1, got {modernity}, {copies} and {diversity}')
+    if not 0<=copies<=1 or not all(0<=low<=high<=1 for low,high in (modernity,diversity)):
+        raise ValueError(f'copies and the modernity and diversity ranges must be within 0..1, got {copies}, {modernity} and {diversity}')
     game=Path(game_dir)/'game'
-    out=Path(data_dir)/'worlds'/f'seed_{seed}_{countries}_{states}_tech{tech}_pop{pop}_modernity{modernity}_copies{copies}_diversity{diversity}'
+    out=Path(data_dir)/'worlds'/f'seed_{seed}_{countries}_{states}_tech{tech}_pop{pop}_copies{copies}'
     if out.exists():
         raise FileExistsError(out)
     work=out.with_name(out.name+'.building')
@@ -760,7 +760,7 @@ def generate(seed,countries,states,tech,pop,modernity,copies,diversity,*,game_di
             write_script(mod/path/'interface_empty.txt','')
     write_json(mod/'.metadata/metadata.json',{'name':f'Interface world {seed} {countries} {states}','id':f'local.interface.world.{seed}.{countries}.{states}','version':'1',
         'supported_game_version':'1.13.*','short_description':'Random miniature world','tags':[],'relationships':[],'game_custom_data':{'replace_paths':replace}})
-    manifest={'seed':seed,'tech':tech,'pop':pop,'modernity':modernity,'copies':copies,'diversity':diversity,'width':width,'height':height,'mod':str((out/'mod').resolve()),'countries':world['countries'],
+    manifest={'seed':seed,'tech':tech,'pop':pop,'copies':copies,'width':width,'height':height,'mod':str((out/'mod').resolve()),'countries':world['countries'],
               'states':[{'id':s['id'],'key':s['key'],'name':s['name'],'country':s['country'],'provinces':s['province_codes'],'coastal':s['coastal'],
                          'hubs':s['hubs'],'template':s['template']} for s in regions],
               'seas':[{'id':s['id'],'key':s['key'],'name':s['name'],'province':codes[s['province']]} for s in seas],

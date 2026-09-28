@@ -424,7 +424,7 @@ def vanilla(game):
     density=np.sort(np.repeat([t['population']/len(t['provinces']) for t in templates],[len(t['provinces']) for t in templates]))
     return {'templates':templates,'seas_per_state':_seas(game)/len(every),'straits_per_crossing':_straits(game),'crossings_per_state':_crossings(game)/len(every),'trade':trade,'profiles':profiles,'amendments':amendments,'allowed':allowed,'owners':owners,'law_groups':groups,'cultures':cultures,'religions':religions,
             'companies':_companies(game),**_rates(game),**_natives(game),**mixes,**people,**_armies(game,groups),**rules,**_relations(game),
-            'governments':governments,'diversity_range':(mixed[int(len(mixed)*TRIM)],sum(mixed)/len(mixed),mixed[len(mixed)-1-int(len(mixed)*TRIM)]),'diversity_spread':float(np.std(mixed)),'diversity_within':float(np.std([share-sum(found)/len(found) for found in homes.values() for share in found])),
+            'governments':governments,'diversity_range':(mixed[int(len(mixed)*TRIM)],sum(mixed)/len(mixed),mixed[len(mixed)-1-int(len(mixed)*TRIM)]),'diversity_within':float(np.std([share-sum(found)/len(found) for found in homes.values() for share in found])),
             'culture_religion':{key:scalar(value,'religion') for key,value in read(game,'common/cultures')},
 'law_progress':progress,'generals_per_unit':commanders('general')/sum(t['units'] for t in trade),'admirals_per_ship':commanders('admiral')/sum(t['ships'] for t in trade),
             'progress_range':(modern[int(len(modern)*TRIM)],sum(modern)/len(modern),modern[len(modern)-1-int(len(modern)*TRIM)]),'progress_spread':float(np.std(modern)),

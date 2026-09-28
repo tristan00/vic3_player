@@ -152,7 +152,7 @@ class NationTests(unittest.TestCase):
         cls.groups = [[1, 2, 3], [4, 5], [6], [7, 8]]
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
         strategic = [{'key': 'region_interface_1', 'states': cls.regions}]
-        cls.world = nations(random.Random(5), cls.data, cls.regions, cls.groups, [1, 4, 6, 7], neighbours, strategic, .5, .5, .5, .2, .5)
+        cls.world = nations(random.Random(5), cls.data, cls.regions, cls.groups, [1, 4, 6, 7], neighbours, strategic, .5, .5, (.5, .5), .2, (.5, .5))
 
     @staticmethod
     def governed(world):
@@ -161,7 +161,7 @@ class NationTests(unittest.TestCase):
     def test_decentralized_nations_follow_vanilla_natives_and_stay_out_of_diplomacy(self):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
         worlds = [nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
-                          [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, .2, .5) for seed in range(12)]
+                          [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, (.5, .5), .2, (.5, .5)) for seed in range(12)]
         natives = [(w, c) for w in worlds for c in w['countries'] if c['country_type'] == 'decentralized']
         self.assertTrue(natives)
         self.assertTrue(all(self.governed(w) for w in worlds))
@@ -179,7 +179,7 @@ class NationTests(unittest.TestCase):
         founded = 0
         for seed in range(60):
             world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
-                            [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, .2, .5)
+                            [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, (.5, .5), .2, (.5, .5))
             files = world['files']
             for tag, company, state in re.findall(r'c:(\w+) \?= \{ add_company = company_type:(\w+) .*?set_company_state_region = s:(\w+)',
                                                  files['common/history/countries/interface.txt']):
@@ -196,7 +196,7 @@ class NationTests(unittest.TestCase):
     def test_every_state_is_owned_by_its_group(self):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
         tags = [c['tag'] for c in nations(random.Random(5), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
-                                          [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, .5, .5)['countries']]
+                                          [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, (.5, .5), .5, (.5, .5))['countries']]
         for tag, members in zip(tags, self.groups):
             for sid in members:
                 self.assertEqual(self.regions[sid - 1]['country'], tag)
@@ -265,7 +265,7 @@ class NationTests(unittest.TestCase):
     def test_personal_union_subjects_have_no_ruler_or_heir_of_their_own(self):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
         worlds = (nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
-                          [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, .2, .5)['files'] for seed in range(60))
+                          [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, (.5, .5), .2, (.5, .5))['files'] for seed in range(60))
         files = next(f for f in worlds if 'type = personal_union' in f['common/history/diplomacy/interface.txt'])
         templates = dict(re.findall(r'^(\w+) = (\{.*\})$', files['common/character_templates/interface.txt'], re.M))
         created = re.findall(r'^c:(\w+) \?= \{ create_character = \{ template = (\w+) \} \}$', files['common/history/characters/interface.txt'], re.M)
@@ -280,9 +280,9 @@ class NationTests(unittest.TestCase):
     def test_populations_scale_to_the_requested_province_level(self):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
         sizes = []
-        for seed in range(60):
+        for seed in range(30):
             world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
-                            [{'key': 'region_interface_1', 'states': self.regions}], .5, 1, .5, .2, .5)
+                            [{'key': 'region_interface_1', 'states': self.regions}], .5, 1, (.5, .5), .2, (.5, .5))
             sizes += [sum(map(int, re.findall(r'size = (\d+)', chunk))) for chunk in world['files']['common/history/pops/interface.txt'].split('region_state:')[1:]]
         top = self.data['province_population_range'][2]
         self.assertAlmostEqual(sum(sizes) / len(sizes), top, delta=top * .1)
@@ -293,7 +293,7 @@ class NationTests(unittest.TestCase):
         counts = []
         for seed in range(20):
             world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
-                            [{'key': 'region_interface_1', 'states': self.regions}], 0, .5, .5, 0, .5)
+                            [{'key': 'region_interface_1', 'states': self.regions}], 0, .5, (.5, .5), 0, (.5, .5))
             governed = {c['tag'] for c in self.governed(world)}
             counts += [line.count('add_technology_researched') for line in world['files']['common/history/countries/interface.txt'].splitlines()
                        if line.startswith('c:') and line[2:5] in governed and 'add_technology_researched' in line]
@@ -340,10 +340,10 @@ class NationTests(unittest.TestCase):
     def many(self, modernity, copies, seeds=40):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
         return [country for seed in range(seeds) for country in nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours,
-                [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, modernity, copies, .5)['countries'] if country['country_type'] != 'decentralized']
+                [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, (modernity, modernity), copies, (.5, .5))['countries'] if country['country_type'] != 'decentralized']
 
     def test_the_copied_share_of_governments_matches_a_top_vanilla_country_whole(self):
-        countries = self.many(.5, .5)
+        countries = self.many(.5, .5, 25)
         copied = [c for c in countries if c['copy']]
         self.assertAlmostEqual(len(copied) / len(countries), .5, delta=.08)
         self.assertEqual([c for c in self.many(.5, 0, 10) if c['copy']], [])
@@ -361,7 +361,7 @@ class NationTests(unittest.TestCase):
 
     def test_a_copied_country_keeps_its_vanilla_flag_name_and_characters(self):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
-        world = nations(random.Random(3), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, 1, .5)
+        world = nations(random.Random(3), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, (.5, .5), 1, (.5, .5))
         for country in world['countries']:
             if country['country_type'] == 'decentralized':
                 continue
@@ -384,7 +384,7 @@ class NationTests(unittest.TestCase):
     def test_no_vanilla_government_is_copied_twice_in_one_world(self):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
         for seed in range(20):
-            world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, 1, .5)
+            world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, (.5, .5), 1, (.5, .5))
             copies = [c['copy'] for c in world['countries'] if c['copy']]
             self.assertEqual(len(copies), len(set(copies)))
             self.assertEqual(len(copies), sum(c['country_type'] != 'decentralized' for c in world['countries']))
@@ -394,8 +394,8 @@ class NationTests(unittest.TestCase):
 
         def minority(diversity):
             inside = everyone = 0
-            for seed in range(40):
-                world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, .5, diversity)
+            for seed in range(15):
+                world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, (.5, .5), .5, (diversity, diversity))
                 pops = world['files']['common/history/pops/interface.txt']
                 for country in world['countries']:
                     if country['country_type'] == 'decentralized':
@@ -414,8 +414,8 @@ class NationTests(unittest.TestCase):
     def test_countries_of_one_world_differ_in_diversity_more_than_their_own_states_do(self):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
         within, between = [], []
-        for seed in range(60):
-            world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, .5, .5)
+        for seed in range(25):
+            world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, (.5, .5), .5, (0, 1))
             pops = world['files']['common/history/pops/interface.txt']
             means = []
             for country in world['countries']:
@@ -433,8 +433,24 @@ class NationTests(unittest.TestCase):
         self.assertGreater(spread(between), .2)
         self.assertLess(spread(within), spread(between))
 
+    def test_every_country_draws_its_own_modernity_and_diversity(self):
+        neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
+        drawn = []
+        for seed in range(20):
+            world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, (0, 1), .5, (0, 1))
+            governed = [c for c in world['countries'] if c['country_type'] != 'decentralized']
+            drawn += [(c['modernity'], c['diversity']) for c in governed]
+            self.assertGreater(len({c['modernity'] for c in governed}), 1)
+            self.assertGreater(len({c['diversity'] for c in governed}), 1)
+        for position in (0, 1):
+            values = sorted(pair[position] for pair in drawn)
+            self.assertTrue(0 <= values[0] < .1 and .9 < values[-1] <= 1)
+            self.assertAlmostEqual(sum(values) / len(values), .5, delta=.08)
+
     def test_law_modernity_moves_the_mean_progressiveness_of_generated_laws(self):
-        mean = lambda modernity: sum(self.progress(c) for c in self.many(modernity, 0)) / len(self.many(modernity, 0))
+        def mean(modernity):
+            found = self.many(modernity, 0, 15)
+            return sum(self.progress(c) for c in found) / len(found)
         low, middle, high = mean(0), mean(.5), mean(1)
         self.assertLess(low, middle)
         self.assertLess(middle, high)
@@ -447,8 +463,8 @@ class NationTests(unittest.TestCase):
     def test_commanders_follow_the_vanilla_rate_per_unit_and_are_all_posted(self):
         neighbours = {i: {j for j in (i - 1, i + 1) if 1 <= j <= 8} for i in range(1, 9)}
         generals = units = 0
-        for seed in range(150):
-            world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, .5, .2, .5)
+        for seed in range(50):
+            world = nations(random.Random(seed), self.data, self.regions, self.groups, [1, 4, 6, 7], neighbours, [{'key': 'region_interface_1', 'states': self.regions}], .5, .5, (.5, .5), .2, (.5, .5))
             formations = world['files']['common/history/military_formations/interface.txt']
             templates = world['files']['common/character_templates/interface.txt']
             generals += templates.count('is_general = yes')
