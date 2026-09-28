@@ -24,7 +24,7 @@ RUN_FROM='from run r join country_definition d on d.country_definition=r.tag'
 
 @db.timed
 def runs_grid(filters,sort,desc,offset,limit):
-    specs=[Spec('run','run','r.run_id'),Spec('round','round','r.cli_seed',hidden=True),Spec('kind','text','r.kind'),Spec('country','text','d.name'),
+    specs=[Spec('run','run','r.run_id'),Spec('round','round','r.cli_seed',hidden=True),Spec('kind','text','r.kind'),Spec('country','ref','r.player_country',entity='country',run='run'),
            Spec('state','text',STATE),Spec('end_reason','text','r.end_reason'),
            Spec('started_at','time','r.started_at'),Spec('ended_at','time','r.ended_at'),
            Spec('wall_s','number','extract(epoch from coalesce(r.ended_at,now())-r.started_at)'),Spec('minutes','number','r.minutes'),Spec('years','number','r.years'),

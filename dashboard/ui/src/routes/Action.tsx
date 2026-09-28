@@ -23,12 +23,12 @@ export function Action() {
           </Neighbors>
         )}
       </div>
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-        <Section title="loop_action">
+      <div className="space-y-6">
+        <Section title="Action details and targets">
           <DataGrid id="a" url={`/api/runs/${run}/actions`} fixed={[`n:${n}`]} render={(g) => <Record grid={g} />} />
         </Section>
         {before !== undefined && (
-          <Section title={`loop_action with before_seq ${before}`}>
+          <Section title={`Actions from snapshot ${before}`}>
             <DataGrid id="batch" url={`/api/runs/${run}/actions`} fixed={[`before_seq:${before}`]} initial={{ sort: 'n', desc: false }} />
           </Section>
         )}

@@ -49,7 +49,12 @@ def action_grid(where,params,filters,sort,desc,offset,limit,run_id=None):
         Spec('logged_at','time','l.logged_at')]
     chosen,extra=where_clause(base,[f for f in filters if not f[0].startswith('param.')])
     columns=','.join(f'{s.sql} as c{i}' for i,s in enumerate(base))
-    specs=base+param_columns(f'select g.rid,g.nn from (select l.run_id as rid,l.n as nn,{columns} {ACTION_FROM} {where}) g{chosen}',{**params,**extra})
+    targets=param_columns(f'select g.rid,g.nn from (select l.run_id as rid,l.n as nn,{columns} {ACTION_FROM} {where}) g{chosen}',{**params,**extra})
+    if run_id is None:
+        for target in targets:
+            if target.kind=='ref':
+                target.run='run'
+    specs=base+targets
     first='n' if run_id else 'run'
     return grid(specs,f'{ACTION_FROM} {where}',params,filters,sort or first,True if sort is None else desc,offset,limit,run_id,['n'])
 
@@ -96,8 +101,8 @@ def action_stats(scope,filters,sort,desc,offset,limit):
 def action_runs(name,scope,filters,sort,desc,offset,limit):
     where,params=scope_sql(scope)
     source=f'''from loop_action l join action a using (action) join run r on r.run_id=l.run_id join country_definition d on d.country_definition=r.tag
-               where a.name=%(name)s and {where} group by l.run_id,d.name'''
-    specs=[Spec('run','run','l.run_id'),Spec('country','text','d.name'),Spec('picks','number','count(*)')]
+               where a.name=%(name)s and {where} group by l.run_id,r.player_country,d.name'''
+    specs=[Spec('run','run','l.run_id'),Spec('country','ref','r.player_country',entity='country',run='run'),Spec('picks','number','count(*)')]
     specs+=[Spec(s,'number',f"count(*) filter (where l.status='{s}')") for s in STATUSES]
     return grid(specs,source,{**params,'name':name},filters,sort or 'run',True if sort is None else desc,offset,limit,None,['run'])
 

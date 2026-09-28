@@ -10,6 +10,15 @@ INITIALIZER='(select a.name from run_advisor ra join advisor a using (advisor) w
 
 
 @db.timed
+def weights(filters,sort,desc,offset,limit):
+    specs=[Spec('run','run','r.run_id'),Spec('action','action','a.name'),Spec('weight','number','w.weight'),
+           Spec('initializer','text',INITIALIZER),
+           Spec('method','text',f"case when {INITIALIZER}='random_smac_weighting' then p.method end",label='SMAC selection')]
+    source='from run_weight w join run r using (run_id) join action a using (action) left join smac_proposal p using (run_id)'
+    return grid(specs,source,{},filters,sort or 'run',True if sort is None else desc,offset,limit,None,['run','action'])
+
+
+@db.timed
 def configs(filters,sort,desc,offset,limit):
     specs=[Spec('initializer','text',INITIALIZER),Spec('picker','text','r.picker'),Spec('runs','number','count(*)'),
            Spec('open','number','count(*) filter (where r.ended_at is null)'),Spec('first_run','run','min(r.run_id)'),Spec('last_run','run','max(r.run_id)')]
@@ -50,6 +59,18 @@ def pauses(run_id,filters,sort,desc,offset,limit):
            Spec('actions','number',chosen.format('actions'),group='chosen')]
     source='from pick_candidate c join snapshot s on s.run_id=c.run_id and s.seq=c.seq where c.run_id=%(run)s group by c.seq,s.game_date'
     return grid(specs,source,{'run':run_id},filters,sort or 'seq',desc,offset,limit,run_id,['seq'])
+
+
+@db.timed
+def candidates(run_id,seq,filters,sort,desc,offset,limit):
+    specs=[Spec('rank','number','rank() over (order by c.predicted_change desc)',label='Rank'),
+           Spec('block','text',"(select string_agg(a.name,' → ' order by p.position) from pick_candidate_action p join action a using (action) "
+                "where p.run_id=c.run_id and p.seq=c.seq and p.candidate=c.candidate)",label='Action block (execution order)'),
+           Spec('predicted_change','number','c.predicted_change',label='Predicted score'),Spec('chosen','bool','c.chosen',label='Chosen'),
+           Spec('gap','number','max(c.predicted_change) over ()-c.predicted_change',label='Gap to best'),
+           Spec('candidate','number','c.candidate',label='Block ID'),Spec('actions','number','c.actions',label='Actions')]
+    source='from pick_candidate c where c.run_id=%(run)s and c.seq=%(seq)s'
+    return grid(specs,source,{'run':run_id,'seq':seq},filters,sort or 'rank',desc,offset,limit,run_id,['rank','candidate'])
 
 
 @db.timed

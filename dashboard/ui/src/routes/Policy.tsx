@@ -1,26 +1,47 @@
 import { DataGrid } from '@/components/DataGrid'
-import { Section } from '@/components/primitives'
+import { Section, Tabs, useTab } from '@/components/primitives'
 import { policyLink } from '@/routes/PolicyRun'
 
-const META = ['smac_proposal', 'smac_candidate', 'smac_importance', 'smac_observation', 'pick_model', 'pick_candidate', 'pick_candidate_action']
+const VIEWS = ['runs', 'initializer', 'picker', 'outcomes']
+const LABELS = { runs: 'Overview', initializer: 'Action weights', picker: 'Block selection', outcomes: 'Objectives & outcomes' }
+const INITIALIZER = ['weights', 'proposals', 'candidates', 'importance', 'observations']
+const PICKER = ['decisions', 'action_offers', 'model', 'importance']
+const TABLES: Record<string, string> = { proposals: 'smac_proposal', candidates: 'smac_candidate', importance: 'smac_importance', observations: 'smac_observation' }
 
 export function Policy() {
+  const view = useTab(VIEWS)
+  const overview = useTab(['runs', 'configurations'], 'overview')
+  const initializer = useTab(INITIALIZER, 'initializer_view')
+  const picker = useTab(PICKER, 'picker_view')
   return (
     <div className="space-y-5">
-      <Section title="runs">
-        <DataGrid id="runs" url="/api/policy/runs" link={policyLink} live />
-      </Section>
-      <Section title="configurations">
-        <DataGrid id="configs" url="/api/policy/configs" link={policyLink} live />
-      </Section>
-      <Section title="picker offers by action">
-        <DataGrid id="offers" url="/api/policy/picker-actions" />
-      </Section>
-      {META.map((t) => (
-        <Section key={t} title={<span className="num">{t}</span>}>
-          <DataGrid id={t} url={`/api/meta/${t}`} initial={{ sort: 'run_id', desc: true }} link={policyLink} live />
-        </Section>
-      ))}
+      <h1 className="font-semibold">Policy</h1>
+      <p className="text-dim text-sm">Action weights shape the proposed blocks. The block picker selects what to execute. Objectives define how results are scored.</p>
+      <Tabs views={VIEWS} labels={LABELS} />
+      {view === 'runs' && <Section title="Policy across runs">
+        <Tabs views={['runs', 'configurations']} param="overview" />
+        {overview === 'runs'
+          ? <DataGrid id="runs" url="/api/policy/runs" columns={['run', 'state', 'initializer', 'picker', 'years', 'reward']} link={policyLink} live />
+          : <DataGrid id="configs" url="/api/policy/configs" link={policyLink} live />}
+      </Section>}
+      {view === 'initializer' && <Section title="Action weights">
+        <p className="text-dim mb-3 text-sm">Each run starts with an action weight vector from the random or SMAC initializer. These weights control action sampling while blocks are generated; they are separate from the objective weights.</p>
+        <Tabs views={INITIALIZER} param="initializer_view" labels={{ weights: 'All run weights', proposals: 'SMAC proposals', candidates: 'SMAC alternatives', importance: 'SMAC importance', observations: 'SMAC observations' }} />
+        {initializer === 'weights'
+          ? <DataGrid id="weights" url="/api/policy/weights" link={(col, cell) => col.kind === 'run' && cell.ref ? `/policy/runs/${cell.ref.id}?view=initializer` : undefined} live />
+          : <DataGrid key={initializer} id={TABLES[initializer]} url={`/api/meta/${TABLES[initializer]}`} initial={{ sort: 'run_id', desc: true }} link={(col, cell) => col.kind === 'run' && cell.ref ? `/policy/runs/${cell.ref.id}?view=initializer&initializer_view=${initializer}` : undefined} live />}
+      </Section>}
+      {view === 'picker' && <Section title="Block selection">
+        <p className="text-dim mb-3 text-sm">The picker chooses among generated action blocks at each decision. Open a run to compare its blocks and rankings.</p>
+        <Tabs views={PICKER} param="picker_view" labels={{ decisions: 'Decisions by run', action_offers: 'Action offer totals', model: 'CatBoost models', importance: 'CatBoost importance' }} />
+        {picker === 'decisions' && <DataGrid id="picker_runs" url="/api/policy/runs" columns={['run', 'state', 'picker', 'candidates']} link={(col, cell) => col.kind === 'run' && cell.ref ? `/policy/runs/${cell.ref.id}?view=picker` : undefined} live />}
+        {picker === 'action_offers' && <DataGrid id="offers" url="/api/policy/picker-actions" />}
+        {(picker === 'model' || picker === 'importance') && <DataGrid key={picker} id={`pick_${picker}`} url={`/api/meta/pick_${picker}` } initial={{ sort: 'run_id', desc: true }} link={(col, cell) => col.kind === 'run' && cell.ref ? `/policy/runs/${cell.ref.id}?view=picker&picker_view=${picker}` : undefined} live />}
+      </Section>}
+      {view === 'outcomes' && <Section title="Objectives and measured rewards">
+        <p className="text-dim mb-3 text-sm">Objective weights combine GDP, population, and standard of living gains into the reward. Open a run for the full calculation.</p>
+        <DataGrid id="outcomes" url="/api/policy/runs" columns={['run', 'state', 'objective_gdp', 'objective_population', 'objective_sol', 'objective_alpha', 'years', 'reward']} link={(col, cell) => col.kind === 'run' && cell.ref ? `/policy/runs/${cell.ref.id}?view=outcomes` : undefined} live />
+      </Section>}
     </div>
   )
 }

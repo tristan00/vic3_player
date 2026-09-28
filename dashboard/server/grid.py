@@ -110,14 +110,18 @@ def rows_source(types,rows):
 
 @db.timed
 def cells(specs,rows,run_id):
+    runs=[specs.index(next(s for s in specs if s.name==spec.run)) if spec.run else None for spec in specs]
     wanted=defaultdict(set)
     for row in rows:
-        for spec,value in zip(specs,row):
+        for i,(spec,value) in enumerate(zip(specs,row)):
             if spec.kind=='ref' and value is not None:
-                wanted[spec.entity].add(value)
-    named={kind:labels(run_id,kind,ids) for kind,ids in wanted.items()} if run_id is not None else {}
-    runs=[specs.index(next(s for s in specs if s.name==spec.run)) if spec.run else None for spec in specs]
-    return [[cell(spec,value,named,run_id if runs[i] is None else row[runs[i]]) for i,(spec,value) in enumerate(zip(specs,row))] for row in rows]
+                owner=run_id if runs[i] is None else row[runs[i]]
+                wanted[owner,spec.entity].add(value)
+    named=defaultdict(dict)
+    for (owner,kind),ids in wanted.items():
+        named[owner][kind]=labels(owner,kind,ids)
+    return [[cell(spec,value,named[run_id if runs[i] is None else row[runs[i]]],run_id if runs[i] is None else row[runs[i]])
+             for i,(spec,value) in enumerate(zip(specs,row))] for row in rows]
 
 
 def cell(spec,value,named,run_id):

@@ -1,6 +1,6 @@
 import { Moon, Sun } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
 import { useApi, useConnected, type S } from '@/lib/api'
 import { cn } from '@/lib/format'
 
@@ -20,6 +20,12 @@ function readTheme(): string {
 }
 
 export function Layout() {
+  const { run } = useParams()
+  const location = useLocation()
+  useEffect(() => {
+    if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView()
+    else window.scrollTo(0, 0)
+  }, [location.pathname, location.hash])
   const [theme, setTheme] = useState(readTheme)
   const connected = useConnected()
   const open = useApi<S['OpenRun'][]>('/api/open', { live: true })
@@ -59,7 +65,8 @@ export function Layout() {
         </div>
       </header>
       <main className="px-4 pt-4 pb-16">
-        <Outlet />
+        {run && location.pathname !== `/runs/${run}` && <nav aria-label="Run navigation" className="border-line mb-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-b pb-3 text-xs"><Link className="linka font-semibold" to={`/runs/${run}`}>Run {run}</Link>{['actions', 'snapshots', 'entities', 'tables'].map((v) => <Link key={v} className="linka capitalize" to={`/runs/${run}?view=${v}`}>{v}</Link>)}<Link className="linka" to={`/policy/runs/${run}`}>Policy</Link></nav>}
+        <Outlet key={location.pathname} />
       </main>
     </div>
   )

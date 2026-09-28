@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import unittest
+from unittest.mock import patch
 
 import psycopg
 from fastapi.testclient import TestClient
@@ -7,6 +8,7 @@ from fastapi.testclient import TestClient
 from advisors.pickers import PARAMS
 from dashboard.server import actions, changes, db, meta, policy, runs, tables
 from dashboard.server.app import app
+from dashboard.server.grid import Spec, cells
 from interface.recording.store import Store
 from interface.timing import RECORDER
 from tests.test_store import DSN, EFFECTS, ENUMS, LAW, MEMBERS, PLAYER, RUN, STEPS, built, clean
@@ -63,8 +65,18 @@ class DashboardTests(unittest.TestCase):
         db.close_pool()
 
     def test_runs_list_counts_actions_and_status(self):
-        row=next(r for r in rows(runs.runs_grid([],None,False,0,100)) if r['run']==self.run_id)
+        found=runs.runs_grid([],None,False,0,100)
+        row=next(r for r in rows(found) if r['run']==self.run_id)
         self.assertEqual((row['actions'],row['snapshots'],row['state'],row['end_reason']),(2,3,'ended','time'))
+        country=next(r for r in found.rows if r[0].ref.id==self.run_id)[[c.name for c in found.columns].index('country')].ref
+        self.assertEqual((country.run,country.kind,country.id,country.label),(self.run_id,'country',PLAYER,'AAA'))
+
+    def test_entity_labels_are_resolved_separately_for_each_run(self):
+        specs=[Spec('run','run','run_id'),Spec('target','ref','law',entity='law',run='run')]
+        with patch('dashboard.server.grid.labels',side_effect=lambda run,kind,ids:{i:f'{run}.{i}' for i in ids}) as lookup:
+            result=cells(specs,[[12,7],[13,7],[12,8]],None)
+        self.assertEqual([(r[1].ref.run,r[1].ref.label) for r in result],[(12,'12.7'),(13,'13.7'),(12,'12.8')])
+        self.assertEqual(lookup.call_count,2)
 
     def test_snapshot_changes_show_before_and_after(self):
         self.assertIn('law_history',[r['table'] for r in rows(changes.changed_tables(self.run_id,1,[],None,False,0,500))])
@@ -87,6 +99,12 @@ class DashboardTests(unittest.TestCase):
         grid=actions.run_actions(self.run_id,[('n','1')],None,False,0,100)
         law=grid.rows[0][[c.name for c in grid.columns].index('param.law')].ref
         self.assertEqual((law.kind,law.label),('law','law_one'))
+        across=actions.action_picks('enact_law',f'run:{self.run_id}',[],None,False,0,100)
+        target=across.rows[0][[c.name for c in across.columns].index('param.law')].ref
+        self.assertEqual((target.run,target.kind,target.label),(self.run_id,'law','law_one'))
+        by_run=actions.action_runs('enact_law',f'run:{self.run_id}',[],None,False,0,100)
+        country=by_run.rows[0][1].ref
+        self.assertEqual((country.run,country.kind,country.id),(self.run_id,'country',PLAYER))
         stats={r['action']:r for r in rows(actions.action_stats(f'run:{self.run_id}',[],None,False,0,500))}
         self.assertEqual((stats['enact_law']['done'],stats['research']['invalid'],stats['build']['picks']),(1,1,0))
         details=rows(actions.action_details('research',f'run:{self.run_id}',[],None,False,0,100))
@@ -139,6 +157,25 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual((offers['build']['offered'],offers['build']['chosen']),(2,2))
         self.assertAlmostEqual(offers['build']['chosen_share'],2/3)
         self.assertAlmostEqual(offers['build']['offered_share'],2/5)
+
+    def test_random_initializer_weights_are_exposed_with_their_source(self):
+        found=rows(policy.weights([('run',str(self.run_id))],'weight',True,0,100))
+        self.assertEqual([(r['initializer'],r['method'],r['action'],r['weight']) for r in found],
+                         [('random',None,'build',3),('random',None,'enact_law',2)])
+        response=TestClient(app).get(f'/api/policy/weights?f=run:{self.run_id}')
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json()['total'],2)
+
+    def test_candidate_rank_and_gap_stay_global_when_filtered_or_paginated(self):
+        ranked=rows(policy.candidates(self.run_id,1,[],None,False,0,100))
+        self.assertEqual([(r['rank'],r['candidate'],r['chosen'],r['predicted_change'],r['gap'],r['block']) for r in ranked],
+                         [(1,1,'yes',3,0,'build'),(2,0,'no',0.5,2.5,'research')])
+        self.assertEqual(rows(policy.candidates(self.run_id,1,[],None,False,1,1)),ranked[1:])
+        self.assertEqual(rows(policy.candidates(self.run_id,1,[('candidate','0')],None,False,0,100)),ranked[1:])
+        self.assertEqual(rows(policy.candidates(self.run_id,0,[],None,False,0,100))[0]['block'],'build → research')
+        response=TestClient(app).get(f'/api/policy/runs/{self.run_id}/pauses/1/candidates')
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.json()['total'],2)
 
     def test_routes_answer_and_reject_unknown_names(self):
         RECORDER.reset()

@@ -3,9 +3,9 @@
 @theme {
   --font-ui: system-ui, 'Segoe UI Variable Text', 'Segoe UI', -apple-system, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Code', 'Cascadia Mono', SFMono-Regular, Consolas, monospace;
-  --text-2xs: 0.6875rem;
-  --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
+  --text-2xs: 0.75rem;
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
   --text-base: 0.9375rem;
   --text-lg: 1.1875rem;
   --text-xl: 1.5rem;
@@ -122,7 +122,7 @@ code {
 }
 
 .linka {
-  color: var(--fg);
+  color: var(--accent);
   text-decoration: underline;
   text-decoration-color: color-mix(in oklab, var(--accent) 35%, transparent);
   text-decoration-thickness: 1px;
@@ -140,11 +140,23 @@ code {
 }
 
 .tablewrap thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   background: var(--surface);
 }
+
+.tablewrap table { min-width: 100%; }
+.tablewrap th, .tablewrap td { padding: 0.5rem 0.65rem; }
+.tablewrap th { vertical-align: bottom; }
+.tablewrap td { max-width: 24rem; }
+.tablewrap tbody tr:nth-child(even) { background: color-mix(in srgb, var(--raised) 45%, var(--surface)); }
+.tablewrap tbody tr:hover { background: var(--raised); }
+main h1 { font-size: var(--text-xl); font-family: var(--font-ui); }
+main section { scroll-margin-top: 1rem; }
+main section > header { margin-bottom: 0.75rem; }
+.grid-control { position: relative; font-size: var(--text-xs); }
+.grid-control summary { cursor: pointer; padding: 0.35rem 0.65rem; border: 1px solid var(--line); border-radius: 0.35rem; }
+.control-panel { position: absolute; left: 0; top: 100%; z-index: 30; min-width: 19rem; max-width: min(32rem, 85vw); padding: 1rem; background: var(--surface); border: 1px solid var(--line); border-radius: 0.35rem; box-shadow: 0 8px 24px #0003; }
+.control-panel input:not([type='checkbox']), .control-panel select { max-width: 100%; }
+main select, main input:not([type='checkbox']), .control-panel button { max-width: 100%; border: 1px solid var(--line); border-radius: 0.25rem; padding: 0.3rem 0.45rem; }
 
 .stale {
   opacity: 0.55;

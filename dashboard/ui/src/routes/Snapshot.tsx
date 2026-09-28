@@ -24,15 +24,15 @@ export function Snapshot() {
           </Neighbors>
         )}
       </div>
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+      <div className="space-y-6">
         <Section title="snapshot">
           <DataGrid id="s" url="/api/meta/snapshot" fixed={[`run_id:${run}`, `seq:${seq}`]} render={(g) => <Record grid={g} />} />
         </Section>
         <div className="min-w-0 space-y-5">
-          <Section title="loop_action with before_seq">
+          <Section title="Actions starting from this snapshot">
             <DataGrid id="chosen" url={`/api/runs/${run}/actions`} fixed={[`before_seq:${seq}`]} />
           </Section>
-          <Section title="loop_action with after_seq">
+          <Section title="Actions ending at this snapshot">
             <DataGrid id="executed" url={`/api/runs/${run}/actions`} fixed={[`after_seq:${seq}`]} />
           </Section>
           <Section title="rows recorded at this snapshot">
@@ -40,15 +40,15 @@ export function Snapshot() {
               id="changed"
               url={`/api/runs/${run}/snapshots/${seq}/tables`}
               limit={500}
-              link={(col, cell) => (col.kind === 'table' ? `${at(seq)}?table=${cell.text}` : undefined)}
+              link={(col, cell) => col.kind === 'table' ? `${at(seq)}?table=${cell.text}#changes` : col.kind === 'kind' ? `/runs/${run}/entities/${cell.text}?seq=${seq}` : undefined}
             />
           </Section>
         </div>
       </div>
       {table && (
-        <Section title={<span className="num">{table}</span>}>
-          <DataGrid key={table} id="rows" url={`/api/runs/${run}/snapshots/${seq}/tables/${table}`} />
-        </Section>
+        <div id="changes"><Section title={<Link className="linka" to={`/runs/${run}/tables/${table}?seq=${seq}`}>{table}</Link>}>
+          <DataGrid key={table} id="rows" url={`/api/runs/${run}/snapshots/${seq}/tables/${table}`} link={(col, cell) => col.kind === 'ref' && cell.ref ? `/runs/${run}/entities/${cell.ref.kind}/${cell.ref.id}?seq=${seq}` : undefined} />
+        </Section></div>
       )}
     </div>
   )

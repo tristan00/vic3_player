@@ -112,7 +112,7 @@ def entity_actions(run_id,kind,ident,filters,sort,desc,offset,limit):
 def run_tables(run_id,filters,sort,desc,offset,limit):
     source=' union all '.join(f"select '{t.name}' as name,'{t.kind}' as kind,{repr(t.owner) if t.owner else 'null'}::text as owner,{len(t.keys)} as keys,"
                               f"{len(t.columns)} as columns,(select count(*) from {t.name} where run_id=%(run)s) as rows" for t in TABLES)
-    specs=[Spec('table','table','u.name'),Spec('kind','text','u.kind'),Spec('owner','text','u.owner'),Spec('keys','number','u.keys'),
+    specs=[Spec('table','table','u.name'),Spec('kind','text','u.kind'),Spec('owner','kind','u.owner'),Spec('keys','number','u.keys'),
            Spec('columns','number','u.columns'),Spec('rows','number','u.rows')]
     return grid(specs,f'from ({source}) u',{'run':run_id},filters,sort,desc,offset,limit,run_id,['table'])
 

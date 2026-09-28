@@ -9,7 +9,7 @@ from .names import LAYOUTS, key_columns
 def changed_tables(run_id,seq,filters,sort,desc,offset,limit):
     source=' union all '.join(f"select '{t.name}' as name,'{t.kind}' as kind,{repr(t.owner) if t.owner else 'null'}::text as owner,"
                               f"(select count(*) from {t.name} where run_id=%(run)s and seq=%(seq)s) as rows" for t in TABLES)
-    specs=[Spec('table','table','u.name'),Spec('kind','text','u.kind'),Spec('owner','text','u.owner'),Spec('rows','number','u.rows')]
+    specs=[Spec('table','table','u.name'),Spec('kind','text','u.kind'),Spec('owner','kind','u.owner'),Spec('rows','number','u.rows')]
     return grid(specs,f'from ({source}) u where u.rows>0',{'run':run_id,'seq':seq},filters,sort or 'rows',True if sort is None else desc,offset,limit,run_id,['table'])
 
 

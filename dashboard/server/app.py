@@ -151,6 +151,11 @@ def get_pauses(run_id:int,p:Page=Depends(page))->Grid:
     return policy.pauses(run_id,*p.args())
 
 
+@app.get('/api/policy/runs/{run_id}/pauses/{seq}/candidates')
+def get_candidates(run_id:int,seq:int,p:Page=Depends(page))->Grid:
+    return policy.candidates(run_id,seq,*p.args())
+
+
 @app.get('/api/policy/runs/{run_id}/reward')
 def get_reward(run_id:int)->RunReward:
     return found(runs.run_reward(run_id),f'run {run_id}')
@@ -265,6 +270,11 @@ def get_configs(p:Page=Depends(page))->Grid:
 @app.get('/api/policy/runs')
 def get_run_policies(p:Page=Depends(page))->Grid:
     return policy.run_policies(*p.args())
+
+
+@app.get('/api/policy/weights')
+def get_weights(p:Page=Depends(page))->Grid:
+    return policy.weights(*p.args())
 
 
 @app.get('/api/policy/picker-actions')

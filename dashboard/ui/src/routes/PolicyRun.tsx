@@ -87,23 +87,25 @@ function Reward({ reward }: { reward: S["RunReward"] }) {
   );
 }
 
-const VIEWS = ["config", "initializer", "picker"];
+const VIEWS = ["config", "initializer", "picker", "outcomes"];
 
 function Meta({
   table,
+  title,
   run,
   fixed = [],
   initial,
   onRow,
 }: {
   table: string;
+  title?: string;
   run: number;
   fixed?: string[];
   initial?: { sort: string; desc: boolean };
   onRow?: (row: Cell[], grid: Grid) => void;
 }) {
   return (
-    <Section title={<span className="num">{table}</span>}>
+    <Section title={title ?? table}>
       <DataGrid
         id={table}
         url={`/api/meta/${table}`}
@@ -118,6 +120,7 @@ function Meta({
 }
 
 function Picker({ run }: { run: number }) {
+  const view = useTab(["decisions", "model", "importance"], "picker_view");
   const [params, setParams] = useSearchParams();
   const pause = params.get("pause");
   const candidate = params.get("candidate");
@@ -131,13 +134,16 @@ function Picker({ run }: { run: number }) {
   };
   return (
     <>
-      <Meta table="pick_model" run={run} />
-      <Meta
+      <Tabs views={["decisions", "model", "importance"]} param="picker_view" />
+      {view === "model" && <Meta title="CatBoost model" table="pick_model" run={run} />}
+      {view === "importance" && <Meta
+        title="CatBoost feature importance"
         table="pick_importance"
         run={run}
         initial={{ sort: "importance", desc: true }}
-      />
-      <Section title="pauses">
+      />}
+      {view === "decisions" && pause === null && <Section title="Decision snapshots">
+        <p className="text-dim mb-3 text-xs">Inspect a decision snapshot to compare every action block CatBoost scored, ranked best first.</p>
         <DataGrid
           id="pauses"
           url={`/api/policy/runs/${run}/pauses`}
@@ -146,14 +152,20 @@ function Picker({ run }: { run: number }) {
           }
           live
         />
-      </Section>
-      {pause !== null && (
-        <Meta
+      </Section>}
+      {view === "decisions" && pause !== null && <nav className="flex flex-wrap items-center gap-4 text-sm" aria-label="Policy decision">
+        <button className="linka" onClick={() => set({ pause: null, candidate: null })}>All decision snapshots</button>
+        <Link className="linka" to={`/runs/${run}/snapshots/${pause}`}>Snapshot {pause}</Link>
+        {candidate !== null && <><button className="linka" onClick={() => set({ candidate: null })}>All candidates</button><span>Candidate {candidate}</span></>}
+      </nav>}
+      {view === "decisions" && pause !== null && (
+        <Section title="Ranked action blocks">
+        <p className="text-dim mb-3 text-xs">Higher predicted scores rank first. Chosen marks the block selected for execution; tied scores share a rank. Arrows show action order, including repeats. Saved alternatives contain action names only, without target parameters.</p>
+        <DataGrid
           key={`c${pause}`}
-          table="pick_candidate"
-          run={run}
-          fixed={[`seq:${pause}`]}
-          initial={{ sort: "predicted_change", desc: true }}
+          id={`candidate_blocks.${pause}`}
+          url={`/api/policy/runs/${run}/pauses/${pause}/candidates`}
+          initial={{ sort: "rank", desc: false }}
           onRow={(row, grid) =>
             set({
               candidate: String(
@@ -162,10 +174,12 @@ function Picker({ run }: { run: number }) {
             })
           }
         />
+        </Section>
       )}
-      {pause !== null && candidate !== null && (
+      {view === "decisions" && pause !== null && candidate !== null && (
         <Meta
           key={`a${pause}.${candidate}`}
+          title={`Actions in block ${candidate}`}
           table="pick_candidate_action"
           run={run}
           fixed={[`seq:${pause}`, `candidate:${candidate}`]}
@@ -183,6 +197,7 @@ export function PolicyRun() {
   const info = useApi<S["RunInfo"]>(`/api/runs/${run}`, { live: true });
   const record = useApi<Grid>(`/api/policy/runs/${run}`, { live: true });
   const view = useTab(VIEWS);
+  const initializerView = useTab(["weights", "proposals", "candidates", "importance", "observations"], "initializer_view");
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-baseline gap-3 text-sm">
@@ -202,45 +217,37 @@ export function PolicyRun() {
           run page
         </Link>
       </div>
-      <Tabs views={VIEWS} />
+      <Tabs views={VIEWS} labels={{ config: "Overview", initializer: "Action weights", picker: "Block selection", outcomes: "Objectives & outcomes" }} />
       <Loading state={record}>
         {(g) => (
           <div className="space-y-4">
-            {view === "config" && (
-              <>
-                <Record grid={only(g, "config")} />
-                <Section title="reward">
-                  <Loading state={reward}>
-                    {(r) => <Reward reward={r} />}
-                  </Loading>
-                </Section>
-              </>
-            )}
-            {view === "initializer" && (
-              <>
-                <Record grid={only(g, "initializer")} />
-                <Meta
-                  table="run_weight"
-                  run={run}
-                  initial={{ sort: "weight", desc: true }}
-                />
-                {text(g, "initializer") === "random_smac_weighting" && (
-                  <>
-                    <Meta table="smac_proposal" run={run} />
-                    <Meta
-                      table="smac_importance"
-                      run={run}
-                      initial={{ sort: "importance", desc: true }}
-                    />
-                    <Meta table="smac_candidate" run={run} />
-                    <Meta table="smac_observation" run={run} />
-                  </>
-                )}
-              </>
-            )}
+            {view === "config" && <Section title="How this run chooses actions">
+              <div className="space-y-4 text-sm">
+                <div><Link className="linka font-semibold" to={`?view=initializer`}>1. Initialize action weights</Link><p className="text-dim">{text(g, "initializer")} sets the weights used to sample actions into candidate blocks.</p></div>
+                <div><Link className="linka font-semibold" to={`?view=picker`}>2. Select an action block</Link><p className="text-dim">{text(g, "picker")} chooses which generated block to execute at each decision.</p></div>
+                <div><Link className="linka font-semibold" to={`?view=outcomes`}>3. Score the outcome</Link><p className="text-dim">The objective combines economic and population gains into a reward.</p></div>
+              </div>
+            </Section>}
+            {view === "outcomes" && <>
+              <Section title="Objective weights"><Record grid={only(g, "config")} /></Section>
+              <Section title="Measured reward"><Loading state={reward}>{(r) => <Reward reward={r} />}</Loading></Section>
+            </>}
+            {view === "initializer" && <>
+              <Section title="Weight initializer"><Record grid={only(g, "initializer")} /></Section>
+              <p className="text-dim text-sm">These are the action sampling weights used by this run. Higher weights make eligible actions more likely to be proposed; zero disables an action.</p>
+              {text(g, "initializer") === "random" && <p className="text-dim text-sm">The table shows this run’s recorded weights, including uniform or disabled weights in older runs.</p>}
+              {text(g, "initializer") === "random_smac_weighting" && <Tabs views={["weights", "proposals", "candidates", "importance", "observations"]} param="initializer_view" labels={{ weights: "Run weights", proposals: "SMAC proposal", candidates: "SMAC alternatives", importance: "SMAC importance", observations: "SMAC observations" }} />}
+              {(text(g, "initializer") !== "random_smac_weighting" || initializerView === "weights") && <Section title="Run action weights"><DataGrid id="run_weights" url="/api/policy/weights" fixed={[`run:${run}`]} columns={text(g, "initializer") === "random_smac_weighting" ? ['action', 'weight', 'method'] : ['action', 'weight']} initial={{ sort: "weight", desc: true }} live /></Section>}
+              {text(g, "initializer") === "random_smac_weighting" && initializerView === "proposals" && <Meta title="How SMAC selected these weights" table="smac_proposal" run={run} />}
+              {text(g, "initializer") === "random_smac_weighting" && initializerView === "candidates" && <Meta title="Alternative weight proposals" table="smac_candidate" run={run} initial={{ sort: "rank", desc: false }} />}
+              {text(g, "initializer") === "random_smac_weighting" && initializerView === "importance" && <Meta title="Action weight importance" table="smac_importance" run={run} initial={{ sort: "importance", desc: true }} />}
+              {text(g, "initializer") === "random_smac_weighting" && initializerView === "observations" && <Meta title="Runs observed by SMAC" table="smac_observation" run={run} />}
+            </>}
             {view === "picker" && (
               <>
-                <Record grid={only(g, "picker")} />
+                <Section title="Block picker"><Record grid={only(g, "picker")} /></Section>
+                <p className="text-dim text-sm">The picker selects a block after the initializer’s weighted sampling generates the alternatives.</p>
+                {text(g, "picker") === "first" && <p className="text-dim text-sm">This picker executes the first generated block without model scoring.</p>}
                 {text(g, "picker") === "catboost" && <Picker run={run} />}
               </>
             )}

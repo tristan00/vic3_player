@@ -1,10 +1,12 @@
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { DataGrid } from '@/components/DataGrid'
-import { Card, Loading, Section } from '@/components/primitives'
+import { Card, Loading, Section, Tabs, useTab } from '@/components/primitives'
+import { label } from '@/lib/format'
 import { useApi, type S } from '@/lib/api'
 import { ScopeInput, useScope } from '@/routes/Actions'
 
 export function ActionType() {
+  const view = useTab(['executions', 'outcomes', 'runs'])
   const name = useParams().name!
   const { scope } = useScope()
   const info = useApi<S['ActionInfo']>(`/api/actions/${name}`)
@@ -12,7 +14,8 @@ export function ActionType() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <h1 className="num font-semibold">{name}</h1>
+        <Link className="linka" to={`/actions?scope=${scope}`}>Actions</Link>
+        <h1 className="font-semibold">{label(name)}</h1>
         <ScopeInput />
       </div>
       <Loading state={info}>
@@ -35,15 +38,16 @@ export function ActionType() {
           </Card>
         )}
       </Loading>
-      <Section title="by status and detail">
+      <Tabs views={['executions', 'outcomes', 'runs']} />
+      {view === 'outcomes' && <Section title="by status and detail">
         <DataGrid id="details" url={`${base}/details`} query={{ scope }} />
-      </Section>
-      <Section title="by run">
+      </Section>}
+      {view === 'runs' && <Section title="by run">
         <DataGrid id="runs" url={`${base}/runs`} query={{ scope }} />
-      </Section>
-      <Section title="loop_action">
-        <DataGrid id="picks" url={`${base}/picks`} query={{ scope }} />
-      </Section>
+      </Section>}
+      {view === 'executions' && <Section title="Executed actions and targets">
+        <DataGrid id="picks" url={`${base}/picks`} columns={['run', 'n', 'status', 'before_seq', 'after_seq']} query={{ scope }} />
+      </Section>}
     </div>
   )
 }

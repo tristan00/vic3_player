@@ -32,5 +32,5 @@ export function ScopeInput() {
 
 export function Actions() {
   const { scope } = useScope()
-  return <DataGrid id="stats" url="/api/actions" query={{ scope }} limit={500} toolbar={<ScopeInput />} />
+  return <div className="space-y-4"><h1 className="font-semibold">Actions</h1><p className="text-dim">Compare action outcomes and timings. Open an action to inspect its runs and entity targets.</p><DataGrid id="stats" url="/api/actions" query={{ scope }} limit={50} toolbar={<ScopeInput />} /></div>
 }

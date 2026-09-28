@@ -7,7 +7,7 @@ import { SeriesChart, SeriesView } from '@/components/SeriesChart'
 import { useApi, type S } from '@/lib/api'
 import { cn } from '@/lib/format'
 
-const VIEWS = ['record', 'actions', 'blocks', 'snapshots', 'countries', 'trade', 'entities', 'tables', 'charts', 'timing']
+const VIEWS = ['overview', 'actions', 'blocks', 'snapshots', 'countries', 'trade', 'entities', 'tables', 'charts', 'record', 'timing']
 
 function Outcomes({ run }: { run: number }) {
   const state = useApi<S['Series'][]>(`/api/runs/${run}/outcomes`, { live: true })
@@ -84,17 +84,19 @@ export function Run() {
             <Neighbors previous={d.previous} next={d.next} to={(n) => `/runs/${n}`}>
               <h1 className="num font-semibold">run {run}</h1>
             </Neighbors>
-            <span className="num">{d.country}</span>
+            <Link className="linka" to={`/runs/${run}/entities/country/${d.player}`}>{d.player_label ?? d.country}</Link>
             <span className={cn('text-xs', d.state !== 'ended' && 'text-accent')}>{d.state}</span>
-            <span className="text-dim num text-xs">last snapshot {d.last_seq ?? '∅'}</span>
+            {d.last_seq !== null && <Link className="linka text-xs" to={`/runs/${run}/snapshots/${d.last_seq}`}>Latest snapshot {d.last_seq}</Link>}
+            {d.last_action !== null && <Link className="linka text-xs" to={`/runs/${run}/actions/${d.last_action}`}>Latest action {d.last_action}</Link>}
             <Link className="linka text-xs" to={`/policy/runs/${run}`}>
               policy
             </Link>
+            <Link className="linka text-xs" to={`/policy/runs/${run}?view=picker`}>Action block rankings</Link>
           </div>
-          <Outcomes run={run} />
           <Tabs views={VIEWS} />
+          {view === 'overview' && <div className="space-y-6"><Section title="Recent actions"><DataGrid id="recent" url={`/api/runs/${run}/actions`} columns={['n', 'action', 'status', 'before_seq', 'after_seq']} limit={10} live /></Section><Section title="Outcomes"><Outcomes run={run} /></Section></div>}
           {view === 'record' && <RecordView run={run} />}
-          {view === 'actions' && <DataGrid id="actions" url={`/api/runs/${run}/actions`} live />}
+          {view === 'actions' && <DataGrid id="actions" url={`/api/runs/${run}/actions`} columns={['n', 'action', 'status', 'detail', 'before_seq', 'after_seq']} live />}
           {view === 'blocks' && <DataGrid id="blocks" url={`/api/runs/${run}/blocks`} live />}
           {view === 'snapshots' && <DataGrid id="snapshots" url="/api/meta/snapshot" fixed={[`run_id:${run}`]} initial={{ sort: 'seq', desc: true }} live />}
           {view === 'countries' && <DataGrid id="countries" url={`/api/runs/${run}/entities/country`} live />}
@@ -117,7 +119,14 @@ export function Run() {
               </Section>
             </div>
           )}
-          {view === 'entities' && <DataGrid id="kinds" url={`/api/runs/${run}/kinds`} limit={100} />}
+          {view === 'entities' && <Section title="Entity directory"><DataGrid id="kinds" url={`/api/runs/${run}/kinds`} limit={100} link={(col, cell, row) => {
+            const kind = row[0].text
+            if (col.name === 'present') return `/runs/${run}/entities/${kind}`
+            if (col.name === 'ever') return `/runs/${run}/entities/${kind}?gone=1`
+            if (col.name === 'tables') return `/runs/${run}?view=tables&tables.f=owner:${kind}`
+            if (col.kind === 'kind' && row[1].num === 0 && (row[2].num ?? 0) > 0) return `/runs/${run}/entities/${cell.text}?gone=1`
+            return undefined
+          }} /></Section>}
           {view === 'tables' && <DataGrid id="tables" url={`/api/runs/${run}/tables`} limit={500} />}
           {view === 'charts' && <Charts run={run} />}
           {view === 'timing' && (

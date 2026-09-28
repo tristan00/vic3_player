@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { cn } from '@/lib/format'
+import { cn, label } from '@/lib/format'
 
 export function Section({ title, right, children, className }: { title: ReactNode; right?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <section className={cn('min-w-0', className)}>
       <header className="mb-1.5 flex flex-wrap items-end justify-between gap-3">
-        <h2 className="text-sm font-semibold">{title}</h2>
+        <h2 className="text-base font-semibold">{typeof title === 'string' ? label(title) : title}</h2>
         {right && <div className="shrink-0">{right}</div>}
       </header>
       {children}
@@ -37,22 +37,24 @@ export function Loading<T>({ state, children }: { state: { data: T | null; error
   return <div className={cn(state.stale && 'stale')}>{children(state.data)}</div>
 }
 
-export function Tabs({ views, param = 'view' }: { views: string[]; param?: string }) {
+export function Tabs({ views, param = 'view', labels = {} }: { views: string[]; param?: string; labels?: Record<string, string> }) {
   const [params, setParams] = useSearchParams()
-  const active = params.get(param) ?? views[0]
+  const active = useTab(views, param)
   return (
     <div className="border-line mb-4 flex flex-wrap gap-1 border-b pb-1.5">
       {views.map((v) => (
         <button
           key={v}
           onClick={() => {
-            const next = new URLSearchParams()
+            const next = new URLSearchParams(params)
+            next.delete(param)
             if (v !== views[0]) next.set(param, v)
             setParams(next)
           }}
-          className={cn('rounded px-2.5 py-1 text-xs', active === v ? 'bg-raised text-fg font-semibold' : 'text-dim hover:text-fg')}
+          aria-current={active === v ? 'page' : undefined}
+          className={cn('rounded px-3 py-2 text-sm capitalize', active === v ? 'bg-accent-soft text-accent font-semibold' : 'text-dim hover:text-fg hover:bg-raised')}
         >
-          {v}
+          {labels[v] ?? label(v)}
         </button>
       ))}
     </div>
@@ -61,7 +63,8 @@ export function Tabs({ views, param = 'view' }: { views: string[]; param?: strin
 
 export function useTab(views: string[], param = 'view') {
   const [params] = useSearchParams()
-  return params.get(param) ?? views[0]
+  const requested = params.get(param)
+  return requested && views.includes(requested) ? requested : views[0]
 }
 
 export function Toggle({ on, onChange, children }: { on: boolean; onChange: (v: boolean) => void; children: ReactNode }) {
