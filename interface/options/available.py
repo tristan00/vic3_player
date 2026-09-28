@@ -1782,6 +1782,15 @@ def insurrectionary(s):
 
 
 @timed_often
+def party_blocs(s):
+    blocs={}
+    for group,party,governs in s.rows('interest_group','interest_group,party,in_government',country=s.player):
+        if party is not None:
+            blocs.setdefault(party,[]).append((group,governs))
+    return [([group for group,_ in found],any(governs for _,governs in found)) for _,found in sorted(blocs.items())]
+
+
+@timed_often
 def governing_count(s):
     return len(governing(s))
 
@@ -2164,9 +2173,12 @@ RULES={
                                                 if bloc_advantage(s,bloc,s.player)>=JOIN_LEVERAGE and below_leader(s,bloc)]),
     'kick_from_power_bloc':lambda s:product(country=[c for c in power_bloc_members(s) if not overlords(s,c)]) if bloc_leader(s) else [],
     'reform_government':lambda s:[{'interest_group':group,'mode':'Staged' if governs else 'Potential'}
-                                  for group,governs,influence in s.rows('interest_group','interest_group,in_government,influence_type',country=s.player)
-                                  if not law_flag(s,'country_block_government_reform_bool')
+                                  for group,governs,influence,party in s.rows('interest_group','interest_group,in_government,influence_type,party',country=s.player)
+                                  if party is None and not law_flag(s,'country_block_government_reform_bool')
                                   and group not in insurrectionary(s) and ((governs and governing_count(s)>1) or (not governs and influence!=MARGINALIZED))],
+    'reform_government_party':lambda s:[{'member':min(members),'mode':'Staged' if governs else 'Potential'}
+                                        for members,governs in party_blocs(s) if not law_flag(s,'country_block_government_reform_bool')
+                                        and not set(members)&insurrectionary(s) and (not governs or governing_count(s)>len(members))],
     'form_power_bloc':lambda s:[{'power_bloc_identity':identity,'power_bloc_principle':levels[0]} for identity in s.keys('power_bloc_identity') if may_found_bloc(s)
                                 and passes(s,'common/power_bloc_identities',identity,('visible','possible'),country_scope(s))
                                 for group in s.definitions('common/power_bloc_principle_groups')
