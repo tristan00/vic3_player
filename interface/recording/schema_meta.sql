@@ -143,7 +143,7 @@ create table budget_line (
 );
 
 create table run (
-  run_id int4 generated always as identity primary key,
+  run_id int4 primary key check (run_id > 0),
   kind text not null check (kind in ('mini', 'vanilla')),
   source_session text not null,
   started_at timestamptz not null,

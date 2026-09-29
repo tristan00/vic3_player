@@ -70,7 +70,8 @@ STEPS=[{'progress':0.1,'second':True,'head':1,'samples':[(1,0.5)]},
 def clean(connection):
     installed=connection.execute("select to_regclass('schema_digest') is not null").fetchone()[0]
     if installed and connection.execute('select digest from schema_digest').fetchone()==(digest(),):
-        connection.execute('select delete_run(run_id) from run')
+        for run, in connection.execute('select run_id from run order by run_id desc').fetchall():
+            connection.execute('select delete_run(%s)',(run,))
     else:
         install(connection)
 
@@ -286,6 +287,25 @@ class StoreTests(unittest.TestCase):
         other.connection.close()
         self.assertEqual(c.execute('select end_reason,ended_at=heartbeat_at from run where run_id=%s',(lost,)).fetchone(),('loop_lost',True))
         self.assertEqual(c.execute('select count(*) from run_lost').fetchone(),(0,))
+
+    def test_run_ids_count_from_one_without_a_gap_even_after_a_deletion(self):
+        c=self.store.connection
+        runs=[]
+        for _ in range(3):
+            self.store.begin_run(started_at=datetime(2026,9,23,tzinfo=timezone.utc),**RUN)
+            self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+            runs.append(self.store.run_id)
+        self.assertEqual(runs,[1,2,3])
+        laws=c.execute('select count(*) from law_history where run_id=3').fetchone()
+        c.execute('select delete_run(2)')
+        self.assertEqual(c.execute('select array_agg(run_id order by run_id) from run').fetchone(),([1,2],))
+        self.assertEqual(c.execute('select count(*) from law_history where run_id=2').fetchone(),laws)
+        with self.assertRaisesRegex(psycopg.errors.RaiseException,'without a gap'):
+            with c.transaction():
+                c.execute('set local session_replication_role=replica')
+                c.execute('delete from run where run_id=1')
+        clean(c)
+        self.store.run_id=None
 
     def test_samples_are_immutable(self):
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
