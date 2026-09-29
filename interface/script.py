@@ -181,6 +181,14 @@ def alerts(game,mods=()):
             yield name,scalar(text,'script_context'),body(inner['valid'])
 
 
+@timed
+def construction_costs(game,mods=()):
+    values={name:float(value) for path in script_files(game,'common/script_values',mods)
+            for name,value in re.findall(r'^(construction_cost_\w+)\s*=\s*([\d.]+)(?=\s|$)',clean(path),re.M)}
+    found={name:scalar(body(text),'required_construction') for name,text in read(game,'common/buildings',mods)}
+    return {name:values[cost] if cost in values else float(cost) for name,cost in found.items() if cost}
+
+
 @timed_often
 def building_methods(game,mods=()):
     groups={name:dict(fields(body(text))).get('production_methods',[]) for name,text in read(game,'common/production_method_groups',mods)}

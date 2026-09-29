@@ -1,5 +1,5 @@
-import { ArrowDown, ArrowUp, Filter, LineChart as PlotIcon, X } from 'lucide-react'
-import { Fragment, useState, type ReactNode } from 'react'
+import { ArrowDown, ArrowUp, ChevronDown, Filter, LineChart as PlotIcon, X } from 'lucide-react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Card, ErrorState } from '@/components/primitives'
 import { qs, useApi, type Cell, type Grid, type GridColumn } from '@/lib/api'
@@ -48,6 +48,75 @@ function filterValue(cell: Cell): string {
   if (cell.num !== null && cell.num !== undefined) return String(cell.num)
   if (cell.text !== null && cell.text !== undefined) return cell.text
   return '∅'
+}
+
+function columnValue(col: GridColumn, cell: Cell): string {
+  return col.kind === 'date' && cell.num != null ? String(cell.num) : filterValue(cell)
+}
+
+type Opened = { col: GridColumn; left: number; top: number }
+
+function ColumnMenu({ url, query, filters, opened, selected, sort, desc, onSort, onApply, onClose }: {
+  url: string
+  query: Record<string, string | number | boolean | null | undefined>
+  filters: string[]
+  opened: Opened
+  selected: string[]
+  sort: string | null
+  desc: boolean
+  onSort: (desc: boolean | null) => void
+  onApply: (values: string[]) => void
+  onClose: () => void
+}) {
+  const col = opened.col
+  const state = useApi<Grid>(`${url}${qs({ ...query, f: filters, values: col.name, limit: 1000 })}`)
+  const [search, setSearch] = useState('')
+  const [checked, setChecked] = useState<Set<string> | null>(null)
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const outside = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) onClose() }
+    const escape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('mousedown', outside)
+    document.addEventListener('keydown', escape)
+    return () => { document.removeEventListener('mousedown', outside); document.removeEventListener('keydown', escape) }
+  }, [onClose])
+  const values = state.data ? state.data.rows.map((row) => ({ key: columnValue(col, row[0]), text: cellText(row[0]), count: row[1].num ?? 0 })) : []
+  const current = checked ?? new Set(selected.length ? selected : values.map((v) => v.key))
+  const visible = values.filter((v) => v.text.toLowerCase().includes(search.toLowerCase()))
+  const everything = !!state.data && state.data.total === values.length && values.every((v) => current.has(v.key))
+  const toggle = (keys: string[], on: boolean) => {
+    const next = new Set(current)
+    keys.forEach((k) => (on ? next.add(k) : next.delete(k)))
+    setChecked(next)
+  }
+  return (
+    <div ref={box} style={{ left: Math.min(opened.left, window.innerWidth - 300), top: opened.top }} className="bg-surface border-line fixed z-50 w-72 space-y-2 rounded-md border p-2 text-xs shadow-lg">
+      <div className="flex gap-1">
+        <button type="button" className={cn('border-line rounded border px-2 py-0.5', sort === col.name && !desc && 'bg-accent-soft')} onClick={() => onSort(false)}>Sort ascending</button>
+        <button type="button" className={cn('border-line rounded border px-2 py-0.5', sort === col.name && desc && 'bg-accent-soft')} onClick={() => onSort(true)}>Sort descending</button>
+        {sort === col.name && <button type="button" className="linka px-1" onClick={() => onSort(null)}>Unsort</button>}
+      </div>
+      <input autoFocus aria-label="Search values" placeholder="Search" value={search} onChange={(e) => setSearch(e.target.value)} className="border-line w-full rounded border px-2 py-1" />
+      {state.error ? <ErrorState error={state.error} onRetry={state.reload} /> : !state.data ? <div className="bg-raised h-24 animate-pulse rounded" /> : <>
+        <label className="flex items-center gap-2 font-medium"><input type="checkbox" checked={visible.every((v) => current.has(v.key))} onChange={(e) => toggle(visible.map((v) => v.key), e.target.checked)} />Select all</label>
+        <div className="max-h-64 space-y-0.5 overflow-auto">
+          {visible.map((v) => (
+            <label key={v.key} className="flex items-center gap-2">
+              <input type="checkbox" checked={current.has(v.key)} onChange={(e) => toggle([v.key], e.target.checked)} />
+              <span className="truncate">{v.text}</span>
+              <span className="text-dim num ml-auto">{n(v.count)}</span>
+            </label>
+          ))}
+        </div>
+        {state.data.total > values.length && <p className="text-dim">first {n(values.length)} of {n(state.data.total)} values</p>}
+      </>}
+      <div className="flex justify-end gap-2">
+        {selected.length > 0 && <button type="button" className="linka mr-auto" onClick={() => onApply([])}>Clear filter</button>}
+        <button type="button" className="border-line rounded border px-2 py-0.5" onClick={onClose}>Cancel</button>
+        <button type="button" disabled={!state.data || current.size === 0} className="bg-accent-soft text-accent rounded px-2 py-0.5 font-semibold disabled:opacity-40" onClick={() => onApply(everything ? [] : values.filter((v) => current.has(v.key)).map((v) => v.key))}>Apply</button>
+      </div>
+    </div>
+  )
 }
 
 export function href(col: GridColumn, cell: Cell, run: number | null | undefined): string | null {
@@ -108,6 +177,8 @@ export function GridTable({
   sort,
   desc,
   onSort,
+  onHeader,
+  filtered = [],
   onFilter,
   onRow,
   plottable,
@@ -122,6 +193,8 @@ export function GridTable({
   sort?: string | null
   desc?: boolean
   onSort?: (name: string) => void
+  onHeader?: (col: GridColumn, rect: DOMRect) => void
+  filtered?: string[]
   onFilter?: (name: string, value: string) => void
   onRow?: (row: Cell[]) => void
   plottable?: boolean
@@ -162,6 +235,12 @@ export function GridTable({
                       </button>
                     ) : (
                       label(c.label)
+                    )}
+                    {onHeader && (
+                      <button type="button" aria-label={`filter menu ${c.name}`} onClick={(e) => onHeader(c, e.currentTarget.closest('th')!.getBoundingClientRect())}
+                        className={cn('border-line hover:text-fg hover:bg-raised rounded border', filtered.includes(c.name) && 'text-accent border-accent')}>
+                        {filtered.includes(c.name) ? <Filter className="size-3" /> : <ChevronDown className="size-3" />}
+                      </button>
                     )}
                     {plottable && onPlot && c.kind === 'number' && (
                       <button type="button" onClick={() => onPlot(c.name)} className="hover:text-fg opacity-60" aria-label={`plot ${c.name}`}>
@@ -267,8 +346,7 @@ export function DataGrid({
 }) {
   const g = useGridState(id, limit)
   const [search, setSearch] = useSearchParams()
-  const [filterColumn, setFilterColumn] = useState('')
-  const [filterText, setFilterText] = useState('')
+  const [opened, setOpened] = useState<Opened | null>(null)
   const group = search.get(`${id}.group`) ?? columnGroup ?? ''
   const setOption = (key: string, values: string[]) => {
     const next = new URLSearchParams(search)
@@ -288,20 +366,6 @@ export function DataGrid({
       <div className="flex flex-wrap items-center gap-2">
         {toolbar}
         {grid && !render && <>
-          <details className="grid-control">
-            <summary>Filter</summary>
-            <form className="control-panel flex flex-wrap gap-2" onSubmit={(e) => {
-              e.preventDefault()
-              if (!filterColumn || !filterText) return
-              g.update({ filters: [...g.filters.filter((f) => !f.startsWith(`${filterColumn}:`)), `${filterColumn}:${filterText}`] })
-              e.currentTarget.closest('details')?.removeAttribute('open')
-            }}>
-              <select aria-label="Filter column" value={filterColumn} onChange={(e) => setFilterColumn(e.target.value)}><option value="">Choose column</option>{grid.columns.map((c) => <option key={c.name} value={c.name}>{label(c.name)}</option>)}</select>
-              <input aria-label="Filter value" placeholder="Exact value or entity ID" value={filterText} onChange={(e) => setFilterText(e.target.value)} />
-              <button disabled={!filterColumn || !filterText}>Apply filter</button>
-              <p className="text-dim basis-full">Matches all rows, including other pages. Use an ID for entities, or ∅ for empty values.</p>
-            </form>
-          </details>
           <details className="grid-control">
             <summary>Columns</summary>
             <div className="control-panel max-h-80 overflow-auto space-y-2">
@@ -356,6 +420,8 @@ export function DataGrid({
             sort={sort}
             desc={desc}
             onSort={(name) => (sort !== name ? g.update({ sort: name, desc: false }) : desc ? g.update({ sort: null, desc: false }) : g.update({ sort: name, desc: true }))}
+            onHeader={(col, rect) => setOpened({ col, left: rect.left, top: rect.bottom + 4 })}
+            filtered={g.filters.map((f) => f.split(':')[0])}
             onFilter={(name, value) => g.update({ filters: [...g.filters.filter((f) => !f.startsWith(`${name}:`)), `${name}:${value}`] })}
             onRow={onRow ? (row) => onRow(row, grid) : undefined}
             plottable={pinned}
@@ -365,6 +431,21 @@ export function DataGrid({
             compactParams={search.get(`${id}.params`) !== 'columns'}
           />
         </div>
+      )}
+      {opened && (
+        <ColumnMenu
+          key={opened.col.name}
+          url={url}
+          query={query}
+          filters={filters}
+          opened={opened}
+          selected={g.filters.filter((f) => f.startsWith(`${opened.col.name}:`)).map((f) => f.slice(opened.col.name.length + 1))}
+          sort={sort}
+          desc={desc}
+          onSort={(d) => { g.update(d === null ? { sort: null, desc: false } : { sort: opened.col.name, desc: d }); setOpened(null) }}
+          onApply={(values) => { g.update({ filters: [...g.filters.filter((f) => !f.startsWith(`${opened.col.name}:`)), ...values.map((v) => `${opened.col.name}:${v}`)] }); setOpened(null) }}
+          onClose={() => setOpened(null)}
+        />
       )}
     </div>
   )

@@ -124,7 +124,7 @@ class RandomSmacWeightingTests(unittest.TestCase):
         self.assertLess(((x-1)**2).sum(),np.median(((X-1)**2).sum(1)))
 
     def test_the_proposal_learns_from_action_weights_alone(self):
-        from advisors.random_smac_weighting import GDP, HISTORY, HOURS_PER_YEAR, POPULATION, SOL, WEIGHTS, RandomSmacWeightingAdvisor
+        from advisors.random_smac_weighting import BUILDINGS, GDP, HISTORY, HOURS_PER_YEAR, OWNERS, PLAYERS, POPULATION, SNAPSHOTS, SOL, WEIGHTS, RandomSmacWeightingAdvisor
         class Result:
             def __init__(self,rows):
                 self.rows=rows
@@ -134,42 +134,115 @@ class RandomSmacWeightingTests(unittest.TestCase):
             def execute(self,sql,params):
                 return Result({HISTORY:[(1,0,2*HOURS_PER_YEAR),(2,0,2*HOURS_PER_YEAR)],POPULATION:[(1,0,100),(1,HOURS_PER_YEAR,110),(2,0,100),(2,2*HOURS_PER_YEAR,90)],
                                GDP:[(1,0,50),(1,HOURS_PER_YEAR,60),(2,0,50)],SOL:[(1,0,5),(2,0,5),(2,HOURS_PER_YEAR,6)],
-                               WEIGHTS:[(1,'build',3.0),(2,'build',1.5)]}[sql])
+                               WEIGHTS:[(1,'build',3.0),(2,'build',1.5)],PLAYERS:[(1,7),(2,7)],
+                               SNAPSHOTS:[(1,0,0),(1,1,HOURS_PER_YEAR),(1,2,2*HOURS_PER_YEAR),(2,0,0),(2,1,2*HOURS_PER_YEAR)],OWNERS:[(1,0,10,True,7),(2,0,10,True,7)],
+                               BUILDINGS:[(1,0,100,True,'building_port',10,1),(1,1,100,True,'building_port',10,2),(2,0,100,True,'building_port',10,1)]}[sql])
         class Store:
             connection=Connection()
         advisor=RandomSmacWeightingAdvisor(0)
-        weights=advisor.start_run(Store(),['build'],({'gdp':0.0,'population':1.0,'sol':0.0},0.0))
+        weights=advisor.start_run(Store(),['build'],({'gdp':0.0,'population':1.0,'sol':0.0,'stock':0.0},0.0))
         self.assertEqual([(run,round(reward,6)) for run,reward in advisor.proposal['observed']],[(1,2.0),(2,0.0)])
         self.assertEqual(advisor.proposal['reward'],'composite')
         self.assertEqual(set(weights),{'build'})
         self.assertEqual([name for name,_ in advisor.proposal['importance']],[])
 
-    def test_each_run_draws_weights_that_sum_to_one_and_an_alpha_in_the_unit_range(self):
+    def test_smac_learns_from_the_trailing_hundred_scored_runs_only(self):
+        import numpy as np
+        from unittest import mock
+        from advisors import random_smac_weighting
+        rng=np.random.default_rng(0)
+        X=rng.uniform(-2,2,(150,2))
+        advisor=random_smac_weighting.RandomSmacWeightingAdvisor(1)
+        with mock.patch.object(random_smac_weighting,'history',lambda connection,space,objective:(X,X[:,0],list(range(1,151)))):
+            advisor.start_run(type('Store',(),{'connection':None})(),['build','research'],None)
+        self.assertEqual([run for run,_ in advisor.proposal['observed']],list(range(51,151)))
+        self.assertEqual(advisor.proposal['observations'],100)
+
+    def test_a_component_equal_in_every_run_adds_nothing_instead_of_dividing_by_zero(self):
+        from advisors.random_smac_weighting import breakdown, combine
+        changes={1:(2.0,{'gdp':.5,'population':.1,'sol':.2,'stock':.3})}
+        objective=({'gdp':.25,'population':.25,'sol':.25,'stock':.25},0.0)
+        self.assertEqual(combine(changes,objective),{1:0.0})
+        self.assertEqual({part['contribution'] for part in breakdown(changes,objective,1)[1]},{0.0})
+        two={**changes,2:(2.0,{'gdp':.9,'population':.1,'sol':.2,'stock':.3})}
+        rewards=combine(two,objective)
+        self.assertGreater(rewards[2],rewards[1])
+
+    def test_rewards_are_normalized_by_rank_so_one_outlier_cannot_stretch_the_scale(self):
+        from advisors.random_smac_weighting import normalized
+        found=normalized([1.0,2.0,3.0,1000.0])
+        self.assertEqual(list(found.argsort()),[0,1,2,3])
+        self.assertAlmostEqual(found[3],-found[0])
+        self.assertAlmostEqual(float(sum(found)),0.0)
+
+    def test_svr_proposal_takes_each_weight_to_the_best_point_of_its_own_curve(self):
+        import numpy as np
+        from advisors.random_svr_weighting import best
+        found=best(np.array([1.0,-1.0,0.0,2.0]),np.array([0.0,0.0,-1.0,-1.0]),-2.0,2.0)
+        self.assertEqual(found.tolist(),[2.0,-2.0,0.0,1.0])
+
+    def test_svr_advisor_raises_weights_that_raise_the_reward_and_lowers_the_others(self):
+        import numpy as np
+        from unittest import mock
+        from advisors import random_svr_weighting
+        rng=np.random.default_rng(0)
+        X=rng.uniform(-2,2,(80,3))
+        y=X[:,0]-X[:,1]+rng.normal(0,.3,80)
+        advisor=random_svr_weighting.RandomSvrWeightingAdvisor(1,{'raise_queue_item':0})
+        advisor.random.random=lambda:1.0
+        with mock.patch.object(random_svr_weighting,'history',lambda connection,space,objective:(X,y,list(range(80)))):
+            weights=advisor.start_run(type('Store',(),{'connection':None})(),['build','downsize','research','raise_queue_item'],None)
+        self.assertEqual(weights['raise_queue_item'],0)
+        self.assertEqual(weights['build'],100.0)
+        self.assertEqual(weights['downsize'],0.01)
+        self.assertEqual(advisor.proposal['method'],'bootstrap_svr')
+        self.assertEqual(sum(count for *_,count in advisor.proposal['observed']),80)
+        self.assertEqual([name for name,*_ in advisor.proposal['coefficients']],['build','downsize','research'])
+
+    def test_each_run_draws_weights_that_sum_to_one_and_a_uniform_alpha(self):
         import random
         from advisors.random_smac_weighting import COMPONENTS, draw_objective
         weights,alpha=draw_objective(random.Random(3))
         self.assertEqual(set(weights),set(COMPONENTS))
         self.assertAlmostEqual(sum(weights.values()),1.0)
-        self.assertTrue(all(value>=0 for value in weights.values()) and 0<=alpha<=1)
+        self.assertTrue(all(value>=0 for value in weights.values()))
+        alphas=[draw_objective(random.Random(seed))[1] for seed in range(400)]
+        self.assertTrue(all(0<=alpha<=1 for alpha in alphas))
+        self.assertAlmostEqual(sum(alpha<.5 for alpha in alphas)/len(alphas),.5,delta=.07)
 
-    def test_rewards_discount_by_years_to_alpha_and_normalize_each_component(self):
+    def test_rewards_multiply_log_growth_by_years_to_alpha_and_normalize_each_component(self):
         from advisors.random_smac_weighting import combine
-        changes={1:(4.0,{'gdp':40.0,'population':4.0,'sol':1.0}),2:(0.5,{'gdp':0.0,'population':0.0,'sol':3.0})}
-        absolute=combine(changes,({'gdp':1.0,'population':0.0,'sol':0.0},0.0))
+        changes={1:(4.0,{'gdp':40.0,'population':4.0,'sol':1.0,'stock':2.0}),2:(0.5,{'gdp':0.0,'population':0.0,'sol':3.0,'stock':0.0})}
+        absolute=combine(changes,({'gdp':1.0,'population':0.0,'sol':0.0,'stock':0.0},0.0))
         self.assertAlmostEqual(absolute[1]-absolute[2],2.0)
-        yearly=combine(changes,({'gdp':1.0,'population':0.0,'sol':0.0},1.0))
+        yearly=combine(changes,({'gdp':1.0,'population':0.0,'sol':0.0,'stock':0.0},1.0))
         self.assertAlmostEqual(yearly[1]-yearly[2],2.0)
-        mixed=combine(changes,({'gdp':0.5,'population':0.5,'sol':0.0},0.0))
+        longer=combine({1:(4.0,{'gdp':1.0,'population':0.0,'sol':0.0,'stock':0.0}),2:(1.0,{'gdp':1.0,'population':0.0,'sol':0.0,'stock':0.0})},({'gdp':1.0,'population':0.0,'sol':0.0,'stock':0.0},.5))
+        self.assertAlmostEqual(longer[1],2*longer[2])
+        mixed=combine(changes,({'gdp':0.5,'population':0.5,'sol':0.0,'stock':0.0},0.0))
         self.assertAlmostEqual(mixed[1],0.5*40/20+0.5*4/2)
 
-    def test_change_is_the_trailing_year_peak_over_the_start(self):
-        from advisors.random_smac_weighting import HOURS_PER_YEAR as Y, change
-        self.assertAlmostEqual(change(0,3*Y,[(0,100),(Y,150),(int(1.5*Y),130)]),.3)
-        self.assertAlmostEqual(change(0,3*Y,[(0,100),(Y,150)]),.5)
-        self.assertAlmostEqual(change(0,Y//2,[(0,100),(Y//4,80)]),0.0)
-        self.assertAlmostEqual(change(0,Y//2,[(0,100),(Y//4,120)]),.2)
+    def test_built_stock_counts_levels_times_cost_in_states_the_player_holds(self):
+        from advisors.random_smac_weighting import built
+        events=[(0,0,10,7),(0,0,11,9),(0,1,1,(10,200.0)),(0,1,2,(11,400.0)),
+                (1,1,1,(10,400.0)),
+                (2,0,11,7),
+                (3,1,1,None),(3,1,3,(11,100.0)),
+                (4,0,10,9)]
+        self.assertEqual(built(events,7,{0:0,1:10,2:20,3:30,4:40}),[(0,200.0),(10,400.0),(20,800.0),(30,500.0),(40,500.0)])
+        self.assertEqual(built(events,7,{0:0,4:40}),[(0,200.0),(40,500.0)])
+
+    def test_growth_is_the_log_of_the_trailing_year_peak_over_the_start(self):
+        import math
+        from advisors.random_smac_weighting import HOURS_PER_YEAR as Y, growth
+        self.assertAlmostEqual(growth(0,3*Y,[(0,100),(Y,150),(int(1.5*Y),130)]),math.log(1.3))
+        self.assertAlmostEqual(growth(0,3*Y,[(0,100),(Y,150)]),math.log(1.5))
+        self.assertAlmostEqual(growth(0,Y//2,[(0,100),(Y//4,80)]),0.0)
+        self.assertAlmostEqual(growth(0,Y//2,[(0,100),(Y//4,120)]),math.log(1.2))
         with self.assertRaises(RuntimeError):
-            change(0,2*Y,[(5,100)])
+            growth(0,2*Y,[(5,100)])
+        with self.assertRaises(ValueError):
+            growth(0,3*Y,[(0,100),(Y,0)])
 
     def test_actions_weighted_zero_stay_excluded(self):
         from advisors import RandomSmacWeightingAdvisor
@@ -334,16 +407,33 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(found[INSTITUTION_TYPES.index('institution_schools')],2.0)
         self.assertEqual(sum(found),2.0)
 
-    def test_numbers_include_the_construction_queue_and_capacity(self):
+    def test_tariffs_fill_one_level_per_direction_and_good_with_no_tariff_when_unset(self):
+        from types import SimpleNamespace as Space
+        from advisors.features import GOODS, TARIFFS, HistoryLookup, tariffs
+        found=tariffs({('import','grain'):0,('export','grain'):6})
+        self.assertEqual(len(found),len(TARIFFS))
+        self.assertEqual((found[TARIFFS.index('tariff.import.grain')],found[TARIFFS.index('tariff.export.grain')]),(0.0,6.0))
+        self.assertEqual(sorted(set(found)),[0.0,3.0,6.0])
+        levels={('import','grain'):(1,),('export','iron'):None}
+        history=Space(player={1:7},terrain={1:{}},tariff_rows=Space(by_run={1:list(levels)},at=lambda run,key,seq:levels[key]))
+        found=HistoryLookup(history,1,5).tariffs
+        self.assertEqual((found[TARIFFS.index('tariff.import.grain')],found[len(GOODS)+GOODS.index('iron')]),(1.0,3.0))
+
+    def test_numbers_split_the_queue_by_owner_and_include_construction_use_and_yearly_balance_over_gdp(self):
         from types import SimpleNamespace as Space
         from advisors.features import NUMBERS, HistoryLookup
         at=lambda value:Space(at=lambda run,key_or_seq,seq=None:value)
         history=Space(player={1:7},terrain={1:{}},interest=10,treasury=at([100.0,50.0,-3.0]),population=at([10,20,30]),politics=at([4.0]),
-                      budget=at((2.0,)),sol=at((8.0,)),capacity=at((12.0,)),queue=Space(live=lambda run,seq:[(300.0,),(100.0,)]))
+                      budget=at((2.0,)),sol=at((8.0,)),construction=at((12.0,10.0,True)),gdp=at((5200.0,)),
+                      queue=Space(live=lambda run,seq:[(False,300.0,0,1,'a'),(False,100.0,1,1,'b'),(True,50.0,0,1,'a')]),army={5,6},military=at((20,0.25)),
+                      wars=Space(live=lambda run,seq:[(7,),(9,),(7,)]))
         numbers=HistoryLookup(history,1,5).numbers
         self.assertEqual(len(numbers),len(NUMBERS))
         self.assertEqual(dict(zip(NUMBERS,numbers)),{'treasury':100.0,'debt':50.0,'interest':2.0,'balance':-3.0,'population':60,'bureaucracy_available':4.0,
-                                                        'standard_of_living':8.0,'construction_queue_items':2,'construction_queue_left':400.0,'construction_capacity':12.0})
+                                                        'standard_of_living':8.0,'government_queue_items':2,'government_queue_left':400.0,'private_queue_items':1,
+                                                        'private_queue_left':50.0,'construction_capacity':12.0,'construction_used':10.0,'construction_paused':1.0,
+                                                        'balance_gdp':-0.03,'battalions':20,'mobilization_ratio':0.25,'wars':2,'army_spending':4.0,
+                                                        'army_spending_gdp':0.04})
 
     def test_fitting_reports_progress_every_iteration_so_the_stall_watchdog_stays_quiet(self):
         from advisors.pickers import Beat
@@ -357,17 +447,18 @@ class FeatureTests(unittest.TestCase):
         import numpy as np
         from unittest import mock
         from advisors import pickers
-        from advisors.features import GOODS, INSTITUTION_TYPES, LAW_GROUPS
+        from advisors.features import GOODS, INSTITUTION_TYPES, LAW_GROUPS, TARIFFS
         from advisors.histograms import BUILDINGS, Histograms
         seen=[]
         class Model:
             def predict(self,data):
                 return np.array([0.1,0.9,0.4])
         class Lookup(self.Lookup):
-            numbers=[1.0,0.0,0.0,0.0,100.0,5.0,20.0,2,300.0,10.0]
+            numbers=[1.0,0.0,0.0,0.0,100.0,5.0,20.0,2,300.0,0,0.0,10.0,10.0,0.0,-0.02,12,0.0,0,30.0,0.3]
             laws=['none']*len(LAW_GROUPS)
             prices=[1.0]*len(GOODS)
             institutions=[0.0]*len(INSTITUTION_TYPES)
+            tariffs=[3.0]*len(TARIFFS)
         picker=pickers.CatBoostPicker()
         picker.model=Model()
         picker.actions=Histograms([[('action','research',1),('research.technology','a',1)],[('action','enact_law',1)]])

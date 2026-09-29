@@ -27,8 +27,3 @@ No jsonb in the postgress db, use structured tables
 When you update a document, do not patch an update. wipe the full document, delete it. Then take the task of writing its updated replacement seriously. patch by patch documentation edits are not allowed.
 
 Actively keep an eye out for out of date docs to delete or replace.
-
-Don't read or search past transcripts unless explicitly asked to.
-
-
-do not push code under any circumstances 

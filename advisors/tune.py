@@ -12,12 +12,12 @@ from sklearn.model_selection import GroupKFold
 from interface.common import DEFAULT_DATA, timed, timed_often, write_json
 from interface.recording.store import DSN
 from . import pickers
-from .random_smac_weighting import RandomSmacWeightingAdvisor
+from .random_smac_weighting import COMPONENTS, RandomSmacWeightingAdvisor
 
 LOG=logging.getLogger('interface')
 OUT=DEFAULT_DATA.parent/'tuning'
 RESULTS=OUT/'results.jsonl'
-OBJECTIVE=({'gdp':1/3,'population':1/3,'sol':1/3},.5)
+OBJECTIVE=({component:1/len(COMPONENTS) for component in COMPONENTS},.5)
 FOLDS=4
 BATCH=30
 SAMPLED=300

@@ -13,9 +13,9 @@ import { num } from "@/lib/format";
 
 const PARTS: [keyof S["RewardPart"], string][] = [
   ["weight", "weight"],
-  ["gain", "gain"],
+  ["gain", "log gain"],
   ["years_alpha", "years^alpha"],
-  ["gain_per_years_alpha", "gain / years^alpha"],
+  ["gain_times_years_alpha", "log gain · years^alpha"],
   ["scale", "scale"],
   ["normalized", "normalized"],
   ["contribution", "weighted"],
@@ -88,6 +88,71 @@ function Reward({ reward }: { reward: S["RunReward"] }) {
 }
 
 const VIEWS = ["config", "initializer", "picker", "outcomes"];
+const INITIALIZER_VIEWS: Record<string, Record<string, string>> = {
+  random_smac_weighting: { weights: "Run weights", proposals: "SMAC proposal", candidates: "SMAC alternatives", importance: "SMAC importance", observations: "SMAC observations" },
+  random_svr_weighting: { weights: "Run weights", proposals: "SVR proposal", coefficients: "SVR effects", observations: "SVR observations" },
+};
+const INITIALIZER_TABLES: Record<string, Record<string, { table: string; title: string; initial?: { sort: string; desc: boolean } }>> = {
+  random_smac_weighting: {
+    proposals: { table: "smac_proposal", title: "How SMAC selected these weights" },
+    candidates: { table: "smac_candidate", title: "Alternative weight proposals", initial: { sort: "rank", desc: false } },
+    importance: { table: "smac_importance", title: "Action weight importance", initial: { sort: "importance", desc: true } },
+    observations: { table: "smac_observation", title: "Runs observed by SMAC" },
+  },
+  random_svr_weighting: {
+    proposals: { table: "svr_proposal", title: "SVR proposal" },
+    coefficients: { table: "svr_coefficient", title: "SVR effects", initial: { sort: "linear", desc: true } },
+    observations: { table: "svr_observation", title: "Runs observed by SVR" },
+  },
+};
+const WEIGHT_COLUMNS: Record<string, string[]> = {
+  random_smac_weighting: ["action", "weight", "method"],
+  random_svr_weighting: ["action", "weight", "method", "svr_linear", "svr_squared"],
+};
+
+export function Initializers({ only }: { only?: string | null }) {
+  const found = useApi<S["InitializerInfo"][]>("/api/policy/initializers");
+  return (
+    <Loading state={found}>
+      {(list) => (
+        <div className="grid gap-3 lg:grid-cols-3">
+          {list.filter((i) => !only || i.name === only).map((i) => (
+            <Card key={i.name} className="space-y-2 px-3 py-2 text-sm">
+              <div className="font-semibold">{i.title} <span className="text-dim font-mono text-xs">{i.name}</span></div>
+              <table className="text-xs">
+                <tbody>
+                  {i.settings.map((s) => (
+                    <tr key={s.name}>
+                      <td className="text-dim pr-3">{s.name}</td>
+                      <td className="num">{s.value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          ))}
+        </div>
+      )}
+    </Loading>
+  );
+}
+
+function Initializer({ run, name }: { run: number; name: string | null | undefined }) {
+  const labels = name ? INITIALIZER_VIEWS[name] : undefined;
+  const view = useTab(labels ? Object.keys(labels) : ["weights"], "initializer_view");
+  const shown = name ? INITIALIZER_TABLES[name]?.[view] : undefined;
+  return (
+    <>
+      <Initializers only={name} />
+      <p className="text-dim text-sm">These are the action sampling weights used by this run. Higher weights make eligible actions more likely to be proposed; zero disables an action.</p>
+      {name === "random" && <p className="text-dim text-sm">The table shows this run’s recorded weights, including uniform or disabled weights in older runs.</p>}
+      {labels && <Tabs views={Object.keys(labels)} param="initializer_view" labels={labels} />}
+      {shown
+        ? <Meta key={shown.table} title={shown.title} table={shown.table} run={run} initial={shown.initial} />
+        : <Section title="Run action weights"><DataGrid id="run_weights" url="/api/policy/weights" fixed={[`run:${run}`]} columns={(name && WEIGHT_COLUMNS[name]) || ["action", "weight"]} initial={{ sort: "weight", desc: true }} live /></Section>}
+    </>
+  );
+}
 
 function Meta({
   table,
@@ -197,7 +262,6 @@ export function PolicyRun() {
   const info = useApi<S["RunInfo"]>(`/api/runs/${run}`, { live: true });
   const record = useApi<Grid>(`/api/policy/runs/${run}`, { live: true });
   const view = useTab(VIEWS);
-  const initializerView = useTab(["weights", "proposals", "candidates", "importance", "observations"], "initializer_view");
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-baseline gap-3 text-sm">
@@ -225,7 +289,7 @@ export function PolicyRun() {
               <div className="space-y-4 text-sm">
                 <div><Link className="linka font-semibold" to={`?view=initializer`}>1. Initialize action weights</Link><p className="text-dim">{text(g, "initializer")} sets the weights used to sample actions into candidate blocks.</p></div>
                 <div><Link className="linka font-semibold" to={`?view=picker`}>2. Select an action block</Link><p className="text-dim">{text(g, "picker")} chooses which generated block to execute at each decision.</p></div>
-                <div><Link className="linka font-semibold" to={`?view=outcomes`}>3. Score the outcome</Link><p className="text-dim">The objective combines economic and population gains into a reward.</p></div>
+                <div><Link className="linka font-semibold" to={`?view=outcomes`}>3. Score the outcome</Link><p className="text-dim">The objective combines GDP, population, standard of living and built stock gains into a reward.</p></div>
               </div>
             </Section>}
             {view === "outcomes" && <>
@@ -234,14 +298,7 @@ export function PolicyRun() {
             </>}
             {view === "initializer" && <>
               <Section title="Weight initializer"><Record grid={only(g, "initializer")} /></Section>
-              <p className="text-dim text-sm">These are the action sampling weights used by this run. Higher weights make eligible actions more likely to be proposed; zero disables an action.</p>
-              {text(g, "initializer") === "random" && <p className="text-dim text-sm">The table shows this run’s recorded weights, including uniform or disabled weights in older runs.</p>}
-              {text(g, "initializer") === "random_smac_weighting" && <Tabs views={["weights", "proposals", "candidates", "importance", "observations"]} param="initializer_view" labels={{ weights: "Run weights", proposals: "SMAC proposal", candidates: "SMAC alternatives", importance: "SMAC importance", observations: "SMAC observations" }} />}
-              {(text(g, "initializer") !== "random_smac_weighting" || initializerView === "weights") && <Section title="Run action weights"><DataGrid id="run_weights" url="/api/policy/weights" fixed={[`run:${run}`]} columns={text(g, "initializer") === "random_smac_weighting" ? ['action', 'weight', 'method'] : ['action', 'weight']} initial={{ sort: "weight", desc: true }} live /></Section>}
-              {text(g, "initializer") === "random_smac_weighting" && initializerView === "proposals" && <Meta title="How SMAC selected these weights" table="smac_proposal" run={run} />}
-              {text(g, "initializer") === "random_smac_weighting" && initializerView === "candidates" && <Meta title="Alternative weight proposals" table="smac_candidate" run={run} initial={{ sort: "rank", desc: false }} />}
-              {text(g, "initializer") === "random_smac_weighting" && initializerView === "importance" && <Meta title="Action weight importance" table="smac_importance" run={run} initial={{ sort: "importance", desc: true }} />}
-              {text(g, "initializer") === "random_smac_weighting" && initializerView === "observations" && <Meta title="Runs observed by SMAC" table="smac_observation" run={run} />}
+              <Initializer run={run} name={text(g, "initializer")} />
             </>}
             {view === "picker" && (
               <>

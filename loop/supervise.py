@@ -10,6 +10,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from interface.common import DEFAULT_DATA
 from interface.runner.session import _spawn
+from loop.watch import roles
 
 LAUNCH=ROOT/'loop'/'launch.cmd'
 POLL=10
@@ -23,7 +24,7 @@ def note(log,text):
 
 
 def running():
-    return [p for p in psutil.process_iter(['name','cmdline']) if (p.info['name'] or '').lower()=='python.exe' and 'loop.run' in ' '.join(p.info['cmdline'] or [])]
+    return [process for kind,process in roles() if kind=='loop']
 
 
 def next_round():

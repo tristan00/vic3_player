@@ -1,10 +1,13 @@
+from itertools import groupby
 import logging
+import math
 
 import numpy as np
-from scipy.stats import norm
+from scipy.stats import norm, rankdata
 from sklearn.ensemble import RandomForestRegressor
 
-from interface.common import timed, timed_often
+from interface.common import DEFAULT_GAME, timed, timed_often
+from interface.script import construction_costs
 from interface.timing import current
 from .random_picker import HIGH, LOW, RandomAdvisor
 
@@ -12,6 +15,9 @@ LOG=logging.getLogger('loop')
 INITIAL=10
 RANDOM_SHARE=.2
 TREES=50
+LEAF=2
+FEATURES='sqrt'
+TRAILING=100
 CANDIDATES=2000
 STARTS=10
 NEIGHBOURS=50
@@ -47,8 +53,63 @@ from country_standard_of_living_report e join run r on r.run_id=e.run_id and e.c
 where e.run_id = any(%s) and e.present
 order by e.run_id,e.seq'''
 
-COMPONENTS={'gdp':GDP,'population':POPULATION,'sol':SOL}
+BUILDINGS='''select b.run_id,b.seq,b.building,b.present,t.name,b.state,b.levels
+from building_history b left join building_type t on t.building_type=b.building_type
+where b.run_id = any(%s)'''
+OWNERS='select run_id,seq,state,present,country from state_history where run_id = any(%s)'
+SNAPSHOTS='select run_id,seq,game_date from snapshot where run_id = any(%s)'
+PLAYERS='select run_id,player_country from run where run_id = any(%s)'
+COSTS=construction_costs(DEFAULT_GAME/'game')
 MIN_YEARS=1
+
+
+@timed_often
+def built(events,player,dates):
+    owner,value,placed,points={},{},{},[]
+    total=0.0
+    for seq,group in groupby(sorted(events,key=lambda event:event[:2]),key=lambda event:event[0]):
+        for _,kind,key,found in group:
+            if kind==0:
+                if (owner.get(key)==player)!=(found==player):
+                    total+=value.get(key,0.0) if found==player else -value.get(key,0.0)
+                owner[key]=found
+                continue
+            old=placed.pop(key,None)
+            if old:
+                value[old[0]]-=old[1]
+                total-=old[1] if owner.get(old[0])==player else 0.0
+            if found:
+                placed[key]=found
+                value[found[0]]=value.get(found[0],0.0)+found[1]
+                total+=found[1] if owner.get(found[0])==player else 0.0
+        if seq in dates:
+            points.append((dates[seq],total))
+    return points
+
+
+@timed
+def stock(connection,runs):
+    players=dict(connection.execute(PLAYERS,(runs,)).fetchall())
+    dates={}
+    for run_id,seq,date in connection.execute(SNAPSHOTS,(runs,)).fetchall():
+        dates.setdefault(run_id,{})[seq]=date
+    events={}
+    for run_id,seq,state,present,country in connection.execute(OWNERS,(runs,)).fetchall():
+        events.setdefault(run_id,[]).append((seq,0,state,country if present else None))
+    for run_id,seq,building,present,kind,state,levels in connection.execute(BUILDINGS,(runs,)).fetchall():
+        if present and kind not in COSTS:
+            continue
+        events.setdefault(run_id,[]).append((seq,1,building,(state,COSTS[kind]*levels) if present else None))
+    return {run_id:built(found,players[run_id],dates[run_id]) for run_id,found in events.items()}
+
+
+COMPONENTS={'gdp':GDP,'population':POPULATION,'sol':SOL,'stock':stock}
+
+
+
+@timed_often
+def normalized(y):
+    return norm.ppf((rankdata(y)-.5)/len(y))
 
 
 def peak(first,last,points):
@@ -58,11 +119,11 @@ def peak(first,last,points):
 
 
 @timed_often
-def change(first,last,points):
+def growth(first,last,points):
     start_date,start=points[0]
     if start_date!=first:
         raise RuntimeError(f'the value was not recorded at the first snapshot (hour {first})')
-    return peak(first,last,points)/start-1
+    return math.log(peak(first,last,points)/start)
 
 
 @timed_often
@@ -72,6 +133,8 @@ def scored_runs():
 
 @timed
 def series(connection,component,runs):
+    if callable(COMPONENTS[component]):
+        return COMPONENTS[component](connection,runs)
     points={}
     for run_id,date,value in connection.execute(COMPONENTS[component],(runs,)).fetchall():
         points.setdefault(run_id,[]).append((date,value))
@@ -85,13 +148,13 @@ def draw_objective(rng):
     return {component:value/total for component,value in draws.items()},rng.random()
 
 
-def discount(years,alpha):
-    return max(MIN_YEARS,years)**alpha
+def horizon(years,alpha):
+    return years**alpha
 
 
 @timed_often
-def discounted(changes,alpha):
-    return {run:{component:value/discount(years,alpha) for component,value in found.items()} for run,(years,found) in changes.items()}
+def lengthened(changes,alpha):
+    return {run:{component:value*horizon(years,alpha) for component,value in found.items()} for run,(years,found) in changes.items()}
 
 
 @timed_often
@@ -100,29 +163,34 @@ def scales(values):
 
 
 @timed_often
+def scaled(value,spread):
+    return value/spread if spread else 0.0
+
+
+@timed_often
 def combine(changes,objective):
     weights,alpha=objective
-    values=discounted(changes,alpha)
+    values=lengthened(changes,alpha)
     spread=scales(values)
-    return {run:sum(weights[component]*found[component]/spread[component] for component in COMPONENTS) for run,found in values.items()}
+    return {run:sum(weights[component]*scaled(found[component],spread[component]) for component in COMPONENTS) for run,found in values.items()}
 
 
 @timed_often
 def breakdown(changes,objective,run):
     weights,alpha=objective
-    values=discounted(changes,alpha)
+    values=lengthened(changes,alpha)
     spread=scales(values)
     years,raw=changes[run]
-    return years,[{'component':component,'weight':weights[component],'gain':raw[component],'years_alpha':discount(years,alpha),
-                   'gain_per_years_alpha':values[run][component],'scale':spread[component],'normalized':values[run][component]/spread[component],
-                   'contribution':weights[component]*values[run][component]/spread[component]} for component in COMPONENTS]
+    return years,[{'component':component,'weight':weights[component],'gain':raw[component],'years_alpha':horizon(years,alpha),
+                   'gain_times_years_alpha':values[run][component],'scale':spread[component],'normalized':scaled(values[run][component],spread[component]),
+                   'contribution':weights[component]*scaled(values[run][component],spread[component])} for component in COMPONENTS]
 
 
 @timed
 def outcomes(connection):
     found=connection.execute(HISTORY,scored_runs()).fetchall()
     points={component:series(connection,component,[row[0] for row in found]) for component in COMPONENTS}
-    return {run_id:((last-first)/HOURS_PER_YEAR,{component:change(first,last,points[component][run_id]) for component in COMPONENTS})
+    return {run_id:((last-first)/HOURS_PER_YEAR,{component:growth(first,last,points[component][run_id]) for component in COMPONENTS})
             for run_id,first,last in found if all(run_id in points[component] and points[component][run_id][0][1]>0 for component in COMPONENTS)}
 
 
@@ -186,7 +254,7 @@ class RandomSmacWeightingAdvisor(RandomAdvisor):
                 'expected_improvement':None,'beat_probability':None,'candidates':0,'candidate_rows':[],'importance':[]}
         forest=None
         if len(y)>=INITIAL:
-            forest=RandomForestRegressor(n_estimators=TREES,min_samples_leaf=2,max_features=5/6,random_state=int(rng.integers(2**31))).fit(X,y)
+            forest=RandomForestRegressor(n_estimators=TREES,min_samples_leaf=LEAF,max_features=FEATURES,random_state=int(rng.integers(2**31))).fit(X,y)
             record['importance']=[(name,float(value)) for name,value in zip(names,forest.feature_importances_)]
         if forest is None or self.random.random()<RANDOM_SHARE:
             x,method=rng.uniform(low,high),'random'
@@ -210,7 +278,9 @@ class RandomSmacWeightingAdvisor(RandomAdvisor):
     def start_run(self,store,actions,objective):
         space=[name for name in actions if name not in self.excluded]
         X,y,runs=history(store.connection,space,objective)
-        x,record=self.propose(X,y,np.full(len(space),LOW),np.full(len(space),HIGH),space)
+        X,y,runs=X[-TRAILING:],y[-TRAILING:],runs[-TRAILING:]
+        x,record=self.propose(X,normalized(y),np.full(len(space),LOW),np.full(len(space),HIGH),space)
+        record['initializer']=self.name
         record['reward']='composite'
         record['observed']=[(run_id,float(reward)) for run_id,reward in zip(runs,y)]
         record['seconds']=current().seconds

@@ -38,14 +38,26 @@ def events(lines):
     return found
 
 
+def role(name,arguments):
+    name=name.lower()
+    arguments=[argument.replace('\\','/') for argument in arguments]
+    if name=='python.exe' and any(argument.endswith('loop/supervise.py') for argument in arguments):
+        return 'supervisor'
+    if name=='cmd.exe' and any(argument.endswith('loop/launch.cmd') for argument in arguments):
+        return 'round'
+    if name=='python.exe' and 'loop.run' in arguments:
+        return 'loop'
+    if name=='victoria3.exe':
+        return 'game'
+    return None
+
+
+def roles():
+    return [(kind,process) for process in psutil.process_iter(['name','cmdline']) if (kind:=role(process.info['name'] or '',process.info['cmdline'] or []))]
+
+
 def loop_processes():
-    found=[]
-    for process in psutil.process_iter(['name','cmdline']):
-        name=(process.info['name'] or '').lower()
-        cmdline=' '.join(process.info['cmdline'] or [])
-        if (name=='python.exe' and 'loop.run' in cmdline) or name=='victoria3.exe':
-            found.append((name,process.pid))
-    return found
+    return [(process.info['name'].lower(),process.pid) for kind,process in roles() if kind in ('loop','game')]
 
 
 class Watch:

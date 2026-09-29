@@ -281,6 +281,23 @@ class RuleTests(unittest.TestCase):
         self.assertEqual(RULES['cancel_queue_item'](s),[{'state':PLAYER,'building_type':'building_mine'},{'state':OTHER,'building_type':'building_farm'}])
         self.assertEqual(RULES['raise_queue_item'](s),[{'state':OTHER,'building_type':'building_farm'}])
 
+    def test_build_is_not_offered_for_a_building_already_queued_in_the_state(self):
+        from unittest import mock
+        s=snapshot({'common/buildings':{'building_farm':{},'building_mine':{}}},state_history=[{'state':PLAYER,'country':PLAYER,'state_region':3}],
+                   player_construction_queue_item=[{'private':True,'position':0,'state':PLAYER,'building_type':'building_farm'}],player_treasury=[{'in_default':False}])
+        with mock.patch('interface.options.available.technologies',lambda s:(set(),set(),set(),set())):
+            self.assertEqual(RULES['build'](s),[{'state':PLAYER,'building_type':'building_mine'}])
+
+    def test_recruit_is_offered_only_in_barracks_states_without_a_queued_level(self):
+        from unittest import mock
+        s=snapshot(state_history=[{'state':PLAYER,'country':PLAYER},{'state':OTHER,'country':PLAYER}],
+                   building_history=[{'building':1,'building_type':'building_barrack','state':PLAYER,'levels':2},
+                                     {'building':2,'building_type':'building_barrack','state':OTHER,'levels':2}],
+                   player_construction_queue_item=[{'private':False,'position':0,'state':OTHER,'building_type':'building_barrack'}],
+                   formation_history=[{'formation':5,'country':PLAYER,'formation_type':0}],combat_unit_history=[{'combat_unit':9,'formation':5}])
+        with mock.patch('interface.options.available.barracks_cap',lambda s:5),mock.patch('interface.options.available.unit_types_unlocked',lambda s:['infantry']),             mock.patch('interface.options.available.unit_goods',lambda s,folder,kind:set()):
+            self.assertEqual(RULES['recruit'](s),[{'building':1,'military_formation':5,'combat_unit_type':'infantry'}])
+
     def test_borrow_settings_offer_unselected_positions_of_own_formations(self):
         s=snapshot(formation_history=[{'formation':5,'country':PLAYER},{'formation':6,'country':OTHER}],
                    formation_borrow_setting=[{'formation':5,'name':'Never','position':0,'selected':True},

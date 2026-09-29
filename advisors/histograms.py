@@ -3,7 +3,7 @@ import bisect
 import numpy as np
 
 from interface.common import timed, timed_often
-from .features import KINDS, Samples, Versions, resolve
+from .features import KINDS, Samples, Versions, queued, resolve
 
 ACTION='action'
 CHOICE='answers'
@@ -21,6 +21,10 @@ ROLES='player.character_roles'
 IDEOLOGIES='player.character_ideologies'
 PEOPLE='player.population_shares'
 COUNTRY=(CLOUT,APPROVAL,GOVERNING,ROLES,IDEOLOGIES,PEOPLE)
+QUEUE_POSITION='cancelled.queue_position'
+QUEUE_PROGRESS='cancelled.queue_progress'
+QUEUE=(QUEUE_POSITION,QUEUE_PROGRESS)
+CANCELLED={'cancel_queue_item':lambda params,lookup:(params['state'],params['building_type']),'cancel_construction':lambda params,lookup:lookup.place(params['building'])}
 SHARES=('lower_strata','middle_strata','upper_strata','radicals','loyalists')
 
 
@@ -34,6 +38,9 @@ def entries(batch,lookup):
             found+=[(CHOICE,name,1),(DEFAULT,str(default),1),(OFFERED,OFFERED,offered)]+[(EFFECT,effect,1) for effect,_ in effects]
             found+=[(DETAIL,f'{effect}={detail}',1) for effect,detail in effects if detail is not None]
         found+=[(f'{action}.{param}',str(resolve(param,kind,params[param],lookup)),1) for param,kind in KINDS[action] if param in params]
+        if action in CANCELLED:
+            position,progress=queued(lookup.queue,*CANCELLED[action](params,lookup))
+            found+=[(QUEUE_POSITION,action,position),(QUEUE_PROGRESS,action,progress)]
     return found
 
 

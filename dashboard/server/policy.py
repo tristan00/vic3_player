@@ -1,11 +1,18 @@
+import math
+
+from advisors import random_smac_weighting as smac, random_svr_weighting as svr
+from advisors.random_picker import HIGH, LOW
 from advisors.random_smac_weighting import COMPONENTS, DEBT_CAP_FROM_RUN, breakdown
 
 from . import db
 from .grid import Spec, grid, rows_source
 from .runs import STATE, goal, reward_changes
 
-PARTS=('gain','gain_per_years_alpha','normalized','contribution')
-LABELS={'gain':'gain','gain_per_years_alpha':'gain / years^alpha','normalized':'normalized','contribution':'weighted'}
+NAMES={'gdp':'GDP','population':'population','sol':'SoL','stock':'built stock'}
+PARTS=('gain','gain_times_years_alpha','normalized','contribution')
+LABELS={'gain':'log gain','gain_times_years_alpha':'log gain · years^alpha','normalized':'normalized','contribution':'weighted'}
+MEDIAN='percentile_cont(0.5) within group (order by {})'
+OBJECTIVES=','.join(f'objective_{c}' for c in (*COMPONENTS,'alpha'))
 INITIALIZER='(select a.name from run_advisor ra join advisor a using (advisor) where ra.run_id=r.run_id and ra.position=0)'
 
 
@@ -13,25 +20,38 @@ INITIALIZER='(select a.name from run_advisor ra join advisor a using (advisor) w
 def weights(filters,sort,desc,offset,limit):
     specs=[Spec('run','run','r.run_id'),Spec('action','action','a.name'),Spec('weight','number','w.weight'),
            Spec('initializer','text',INITIALIZER),
-           Spec('method','text',f"case when {INITIALIZER}='random_smac_weighting' then p.method end",label='SMAC selection')]
-    source='from run_weight w join run r using (run_id) join action a using (action) left join smac_proposal p using (run_id)'
+           Spec('method','text',f"case {INITIALIZER} when 'random_smac_weighting' then p.method when 'random_svr_weighting' then v.method end",label='Initializer selection'),
+           Spec('svr_linear','number','k.linear',label='SVR linear effect'),Spec('svr_squared','number','k.squared',label='SVR squared effect')]
+    source=('from run_weight w join run r using (run_id) join action a using (action) left join smac_proposal p using (run_id) left join svr_proposal v using (run_id) '
+            'left join svr_coefficient k on k.run_id=r.run_id and k.dimension=a.name')
     return grid(specs,source,{},filters,sort or 'run',True if sort is None else desc,offset,limit,None,['run','action'])
+
+
+@db.timed
+def initializers():
+    shared=[('weight range',f'10^{LOW:g} to 10^{HIGH:g}'),('random before',f'{smac.INITIAL} scored runs'),('random share',f'{smac.RANDOM_SHARE:.0%}')]
+    settings=lambda pairs:[{'name':name,'value':str(value)} for name,value in pairs]
+    return [{'name':'random','title':'Random','settings':settings(shared[:1])},
+            {'name':'random_smac_weighting','title':'SMAC',
+             'settings':settings([('trees',smac.TREES),('min runs per leaf',smac.LEAF),('features per split',smac.FEATURES),('trailing runs',smac.TRAILING),*shared])},
+            {'name':'random_svr_weighting','title':'SVR',
+             'settings':settings([('C',svr.C),('epsilon',svr.EPSILON),*shared])}]
 
 
 @db.timed
 def configs(filters,sort,desc,offset,limit):
     changes=reward_changes()
     scored=[]
-    for found in db.rows('select run_id,objective_gdp,objective_population,objective_sol,objective_alpha from run where run_id=any(%s)',(list(changes),)):
+    for found in db.rows(f'select run_id,{OBJECTIVES} from run where run_id=any(%s)',(list(changes),)):
         years,parts=breakdown(changes,goal(found),found['run_id'])
-        scored.append([found['run_id'],years,sum(p['contribution'] for p in parts),*[100*changes[found['run_id']][1][c] for c in COMPONENTS]])
-    performance,params=rows_source(['int4',*['float8']*5],scored)
+        scored.append([found['run_id'],years,sum(p['contribution'] for p in parts),*[100*math.expm1(changes[found['run_id']][1][c]) for c in COMPONENTS]])
+    performance,params=rows_source(['int4',*['float8']*(2+len(COMPONENTS))],scored)
     specs=[Spec('initializer','text',INITIALIZER),Spec('picker','text','r.picker'),Spec('runs','number','count(*)'),
            Spec('scored_runs','number','count(p.v0)',label='Scored runs'),
-           Spec('avg_reward','number','avg(p.v2)',label='Avg reward'),
-           *[Spec(f'avg_{c}_gain','number',f'avg(p.v{i+3})',label=f'Avg {label} gain (%)') for i,(c,label) in enumerate(zip(COMPONENTS,['GDP','population','SoL']))],
-           *[Spec(f'avg_{c}_gain_per_year','number',f'avg(p.v{i+3}/nullif(p.v1,0))',label=f'Avg {label} gain/year (%/yr)') for i,(c,label) in enumerate(zip(COMPONENTS,['GDP','population','SoL']))],
-           Spec('avg_years','number','avg(p.v1)',label='Avg years (scored)'),
+           Spec('median_reward','number',MEDIAN.format('p.v2'),label='Median reward'),
+           *[Spec(f'median_{c}_gain','number',MEDIAN.format(f'p.v{i+3}'),label=f'Median {NAMES[c]} gain (%)') for i,c in enumerate(COMPONENTS)],
+           *[Spec(f'median_{c}_gain_per_year','number',MEDIAN.format(f'p.v{i+3}/nullif(p.v1,0)'),label=f'Median {NAMES[c]} gain/year (%/yr)') for i,c in enumerate(COMPONENTS)],
+           Spec('median_years','number',MEDIAN.format('p.v1'),label='Median years (scored)'),
            Spec('open','number','count(*) filter (where r.ended_at is null)'),Spec('first_run','run','min(r.run_id)'),Spec('last_run','run','max(r.run_id)')]
     source=f'from run r left join (select * {performance}) p on p.v0=r.run_id where r.run_id>=%(first)s group by {INITIALIZER},r.picker'
     return grid(specs,source,{**params,'first':DEBT_CAP_FROM_RUN},filters,sort,desc,offset,limit,None,['initializer','picker'])
@@ -40,12 +60,11 @@ def configs(filters,sort,desc,offset,limit):
 @db.timed
 def run_policies(filters,sort,desc,offset,limit):
     changes=reward_changes()
-    found=db.rows(f'''select r.run_id,{STATE} as state,{INITIALIZER} as initializer,r.picker,r.candidates,r.objective_gdp,r.objective_population,r.objective_sol,
-                             r.objective_alpha from run r''')
+    found=db.rows(f'''select r.run_id,{STATE} as state,{INITIALIZER} as initializer,r.picker,r.candidates,{OBJECTIVES} from run r''')
     width=2+len(COMPONENTS)*len(PARTS)+1
     rows=[]
     for f in found:
-        policy=[f['run_id'],f['state'],f['initializer'],f['picker'],f['candidates'],f['objective_gdp'],f['objective_population'],f['objective_sol'],f['objective_alpha']]
+        policy=[f['run_id'],f['state'],f['initializer'],f['picker'],f['candidates'],*[f[f'objective_{c}'] for c in (*COMPONENTS,'alpha')]]
         if f['run_id'] not in changes:
             rows.append(policy+[None]*width)
             continue

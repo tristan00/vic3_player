@@ -60,8 +60,8 @@ def built(step):
 
 
 RUN={'kind':'mini','advisors':['random'],'tag':'AAA','world':'w','cli_seed':1,'run_seed':2,'years':1.0,'minutes':1.0,'profile':'actions','pool':0,'runs_requested':3,
-     'generated':{'seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5,'modernity':0.25,'copies':0.2,'diversity':0.5},'weights':{'build':3,'enact_law':2},
-     'picker':'first','candidates':1,'objective':({'gdp':0.0,'population':1.0,'sol':0.0},0.0)}
+     'generated':{'seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5,'modernity':0.25,'copies':0.2,'diversity':0.5,'military':0.75},'weights':{'build':3,'enact_law':2},
+     'picker':'first','candidates':1,'objective':({'gdp':0.0,'population':1.0,'sol':0.0,'stock':0.0},0.0)}
 STEPS=[{'progress':0.1,'second':True,'head':1,'samples':[(1,0.5)]},
        {'progress':0.2,'second':True,'head':2,'samples':[(1,0.5),(2,0.6)]},
        {'progress':0.2,'second':False,'head':2,'samples':[(2,0.6)]}]
@@ -231,7 +231,7 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(c.execute('select end_reason,ended_at is not null from run where run_id=%s',(run,)).fetchone(),('time',True))
 
     def test_a_policy_proposal_is_written_with_the_run(self):
-        self.store.pending['proposal']={'reward':'composite','method':'expected_improvement','observations':12,'best_reward':4.5,'predicted_reward':5.0,'uncertainty':.5,
+        self.store.pending['proposal']={'initializer':'random_smac_weighting','reward':'composite','method':'expected_improvement','observations':12,'best_reward':4.5,'predicted_reward':5.0,'uncertainty':.5,
                                         'expected_improvement':.7,'beat_probability':.8,'candidates':2,'seconds':.2,'observed':[],
                                         'candidate_rows':[(0,'local_search',5.0,.5,.7,.8),(1,'random',3.0,.2,.1,.1)],'importance':[('build',.6),('enact_law',.4)]}
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
@@ -240,6 +240,16 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(c.execute('select method,observations,predicted_reward,candidates from smac_proposal where run_id=%s',(run,)).fetchone(),('expected_improvement',12,5.0,2))
         self.assertEqual(c.execute('select rank,source from smac_candidate where run_id=%s order by rank',(run,)).fetchall(),[(0,'local_search'),(1,'random')])
         self.assertEqual(c.execute('select dimension,importance from smac_importance where run_id=%s order by dimension',(run,)).fetchall(),[('build',.6),('enact_law',.4)])
+        self.store.end_run('time')
+
+    def test_an_svr_proposal_is_written_with_its_observations_and_coefficients(self):
+        self.store.pending['proposal']={'initializer':'random_svr_weighting','method':'bootstrap_svr','observations':12,'c':.1,'epsilon':.5,'predicted_reward':1.2,
+                                        'bounded':1,'seconds':.3,'observed':[],'coefficients':[('build',.4,-.1,2.0),('enact_law',-.2,-.05,-2.0)]}
+        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+        c=self.store.connection
+        run=self.store.run_id
+        self.assertEqual(c.execute('select method,observations,predicted_reward,bounded from svr_proposal where run_id=%s',(run,)).fetchone(),('bootstrap_svr',12,1.2,1))
+        self.assertEqual(c.execute('select dimension,linear,chosen from svr_coefficient where run_id=%s order by dimension',(run,)).fetchall(),[('build',.4,2.0),('enact_law',-.2,-2.0)])
         self.store.end_run('time')
 
     def test_picks_record_every_candidate_with_its_actions_and_the_model_behind_them(self):

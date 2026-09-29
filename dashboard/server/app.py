@@ -14,8 +14,8 @@ from interface.recording.spec import ENTITIES, TABLE
 from interface.timing import COLUMNS, RECORDER, TRACE, span
 
 from . import actions, blocks, changes, db, meta, policy, runs, schema, tables
-from .grid import Spec, grid, parse_filters, rows_source
-from .models import ActionInfo, EntityInfo, Grid, OpenRun, RunInfo, RunReward, Series, SeriesChoice
+from .grid import VALUES, Spec, grid, parse_filters, rows_source
+from .models import ActionInfo, EntityInfo, Grid, InitializerInfo, OpenRun, RunInfo, RunReward, Series, SeriesChoice
 
 LOG=logging.getLogger('dashboard')
 DIST=Path(__file__).resolve().parents[1]/'ui'/'dist'
@@ -47,9 +47,11 @@ async def timing(request:Request,call_next):
     trace=[]
     with span(request.method,'dashboard',logging.DEBUG) as whole:
         token=TRACE.set(trace)
+        values=VALUES.set(request.query_params.get('values'))
         try:
             response=await call_next(request)
         finally:
+            VALUES.reset(values)
             TRACE.reset(token)
             whole.name=f'{request.method} {request.scope["route"].path}'
     ms=whole.ms
@@ -270,6 +272,11 @@ def get_configs(p:Page=Depends(page))->Grid:
 @app.get('/api/policy/runs')
 def get_run_policies(p:Page=Depends(page))->Grid:
     return policy.run_policies(*p.args())
+
+
+@app.get('/api/policy/initializers')
+def get_initializers()->list[InitializerInfo]:
+    return policy.initializers()
 
 
 @app.get('/api/policy/weights')

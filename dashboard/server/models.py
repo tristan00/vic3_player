@@ -44,6 +44,17 @@ class Grid(BaseModel):
     keys:list[str]|None=None
 
 
+class Setting(BaseModel):
+    name:str
+    value:str
+
+
+class InitializerInfo(BaseModel):
+    name:str
+    title:str
+    settings:list[Setting]
+
+
 class OpenRun(BaseModel):
     run:int
     country:str
@@ -55,7 +66,7 @@ class RewardPart(BaseModel):
     weight:float
     gain:float
     years_alpha:float
-    gain_per_years_alpha:float
+    gain_times_years_alpha:float
     scale:float
     normalized:float
     contribution:float

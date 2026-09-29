@@ -51,7 +51,7 @@ def open_runs():
 
 @db.timed
 def goal(found):
-    return {'gdp':found['objective_gdp'],'population':found['objective_population'],'sol':found['objective_sol']},found['objective_alpha']
+    return {component:found[f'objective_{component}'] for component in COMPONENTS},found['objective_alpha']
 
 
 @db.timed

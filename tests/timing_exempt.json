@@ -12,7 +12,7 @@
   "value_at": "hot"
  },
  "advisors/random_smac_weighting.py": {
-  "discount": "hot",
+  "horizon": "hot",
   "peak": "hot"
  },
  "dashboard/server/__main__.py": "monitor",
@@ -112,6 +112,7 @@
   "main": "loop",
   "targets": "hot"
  },
+ "loop/stop.py": "monitor",
  "loop/supervise.py": "monitor",
  "loop/watch.py": "monitor"
 }

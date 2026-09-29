@@ -41,8 +41,8 @@ QUICK='quick_decline_proposal'
 PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
 ANSWERS=(EVENT,QUICK,*(name for pair in PROPOSAL_ANSWERS for name in pair))
 WAIT='run_days'
-SLIDERS=('tech','pop','modernity','copies','diversity')
-PER_COUNTRY=('modernity','diversity')
+SLIDERS=('tech','pop','modernity','copies','diversity','military')
+PER_COUNTRY=('modernity','diversity','military')
 HOURS_PER_DAY=24
 ACTIONS=[name for name in BY_NAME if GROUP[name]!='time']
 CANDIDATES=(8,50)
@@ -586,14 +586,20 @@ TOP_PRESTIGE=('GBR','CHI','FRA','RUS','BIC','PRU','AUS','TUR','USA','EGY','JAP',
 RECENT_ROUNDS=5
 
 
+@timed_often
+def lineup(arguments,completed):
+    return (['random'],['first']) if completed<arguments.warmup else (arguments.advisors,arguments.pickers)
+
+
 @timed
-def session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,seconds):
+def session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,seconds,completed):
     RECORDER.reset()
     store=Store()
     objective=draw_objective(rng)
-    advisor=advisors[rng.choice(arguments.advisors)]
+    advisor_names,picker_names=lineup(arguments,completed)
+    advisor=advisors[rng.choice(advisor_names)]
     advisor.start_run(store,ACTIONS,objective)
-    picker=pickers[rng.choice(arguments.pickers)]
+    picker=pickers[rng.choice(picker_names)]
     candidates=1 if picker.name=='first' else rng.randint(*CANDIDATES)
     with ThreadPoolExecutor(1) as trainer:
         training=trainer.submit(picker.start_run,store,objective)
@@ -636,6 +642,7 @@ def main():
     parser.add_argument('--advisors',nargs='+',choices=sorted(ADVISORS),default=['random'])
     parser.add_argument('--pickers',nargs='+',choices=sorted(PICKERS),default=['first'])
     parser.add_argument('--runs',type=int,required=True)
+    parser.add_argument('--warmup',type=int,default=0)
     parser.add_argument('--years',type=float,default=100)
     parser.add_argument('--minutes',type=float,default=30)
     parser.add_argument('--seed',type=int,default=int(time.strftime('%Y%m%d%H%M%S')))
@@ -655,15 +662,15 @@ def main():
     watchdog.start()
     rng=random.Random(arguments.seed)
     weights={name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}
-    advisors={name:ADVISORS[name](rng.randrange(10**9),weights) for name in sorted(set(arguments.advisors))}
-    pickers={name:PICKERS[name]() for name in set(arguments.pickers)}
+    advisors={name:ADVISORS[name](rng.randrange(10**9),weights) for name in sorted(set(arguments.advisors)|{'random'})}
+    pickers={name:PICKERS[name]() for name in set(arguments.pickers)|{'first'}}
     worlds=Vanilla(rng) if arguments.vanilla else WorldPool(rng,arguments.pool,levels) if arguments.pool else Fresh(rng,levels)
     chosen=arguments.tag
     crashes=0
     completed=0
     while completed<arguments.runs:
         try:
-            counts=session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,arguments.minutes*60)
+            counts=session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,arguments.minutes*60,completed)
         except GameCrashed as error:
             crashes+=1
             LOG.error('GAME CRASHED (%d in a row): %s',crashes,error)

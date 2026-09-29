@@ -1,4 +1,3 @@
-import collections
 import re
 from functools import lru_cache
 
@@ -864,8 +863,8 @@ def recruit(s):
     supplies=state_supply(s)
     located=s.map('building','building,state')
     cap=barracks_cap(s)
-    queued=collections.Counter(state for state,kind in s.rows('player_construction_queue_item','state,building_type') if kind=='building_barrack')
-    barracks=[(ident,located.get(ident)) for ident,kind,levels in s.buildings() if kind=='building_barrack' and levels+queued[located.get(ident)]<cap]
+    queued={state for state,kind in s.rows('player_construction_queue_item','state,building_type') if kind=='building_barrack'}
+    barracks=[(ident,located.get(ident)) for ident,kind,levels in s.buildings() if kind=='building_barrack' and levels<cap and located.get(ident) not in queued]
     return [{'building':ident,'military_formation':formation,'combat_unit_type':kind}
             for ident,state in barracks for kind in unit_types_unlocked(s)
             if unit_goods(s,'common/combat_unit_types',kind)<=supplies.get(state,set())
@@ -933,6 +932,7 @@ def buildable(s):
     regions={ident:region for ident,region in s.rows('state','state,state_region',country=s.player)}
     arable={region:set(fields.get('arable_resources',())) for region,fields in s.definitions('map_data/state_regions').items()}
     limited={kind for fields in s.definitions('common/building_groups').values() for kind in fields.get('default_building',())}
+    queued=set(s.rows('player_construction_queue_item','state,building_type'))
     combos=[]
     for kind,fields in s.definitions('common/buildings').items():
         if fields.get('buildable')==['no'] or fields.get('recruits_combat_units')==['yes'] or not set(fields.get('unlocking_technologies',()))<=acquired:
@@ -943,6 +943,8 @@ def buildable(s):
             if kind in arable_kinds(s) and free_arable(s,state)<1:
                 continue
             if kind in capped and kind not in limited:
+                continue
+            if (state,kind) in queued:
                 continue
             if passes(s,'common/buildings',kind,('potential','possible','can_build','can_build_government'),Scope(s,'state',state)):
                 combos.append({'state':state,'building_type':kind})

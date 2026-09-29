@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from advisors import pickers
-from advisors.histograms import ACTION, APPROVAL, BUILDINGS, CLOUT, GOVERNING, IDEOLOGIES, METHODS, PEOPLE, ROLES, Histograms, Holdings, country, entries
+from advisors.histograms import ACTION, APPROVAL, BUILDINGS, CLOUT, GOVERNING, IDEOLOGIES, METHODS, PEOPLE, QUEUE, QUEUE_POSITION, QUEUE_PROGRESS, ROLES, Histograms, Holdings, country, entries
 from advisors.tune import decode, space
 
 LOOKUP=SimpleNamespace(player=1,terrain={},state=lambda state:(None,None),building=lambda ident:None,typed=lambda kind,ident:None,character=lambda ident:None,
@@ -25,6 +25,16 @@ class EntriesTests(unittest.TestCase):
         found=entries([('set_tax_level',{'level':'High'}),('set_tax_level',{'level':'Low'})],LOOKUP)
         self.assertEqual([name for name,_,_ in found],[ACTION,'set_tax_level.level',ACTION,'set_tax_level.level'])
         self.assertEqual(len({value for name,value,_ in found if name!=ACTION}),2)
+
+
+    def test_a_cancelled_queue_item_carries_its_queue_position_and_progress(self):
+        queue=[(True,50.0,0,4,'building_barrack'),(False,200.0,0,4,'building_port'),(False,25.0,1,4,'building_barrack'),(False,100.0,2,6,'building_barrack')]
+        lookup=SimpleNamespace(**vars(LOOKUP),queue=queue,place=lambda ident:{11:(6,'building_barrack')}[ident])
+        found=entries([('cancel_queue_item',{'state':4,'building_type':'building_barrack'}),('cancel_construction',{'building':11})],lookup)
+        self.assertEqual([entry for entry in found if entry[0] in QUEUE],
+                         [(QUEUE_POSITION,'cancel_queue_item',2),(QUEUE_PROGRESS,'cancel_queue_item',.75),
+                          (QUEUE_POSITION,'cancel_construction',3),(QUEUE_PROGRESS,'cancel_construction',0.0)])
+        self.assertTrue(all(name in pickers.SIZES for name in QUEUE))
 
 
 class AnswerTests(unittest.TestCase):

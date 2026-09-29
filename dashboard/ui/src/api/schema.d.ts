@@ -140,6 +140,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/policy/runs/{run_id}/pauses/{seq}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Candidates */
+        get: operations["get_candidates_api_policy_runs__run_id__pauses__seq__candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/policy/runs/{run_id}/reward": {
         parameters: {
             query?: never;
@@ -514,6 +531,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/policy/initializers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Initializers */
+        get: operations["get_initializers_api_policy_initializers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/policy/weights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Weights */
+        get: operations["get_weights_api_policy_weights_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/policy/picker-actions": {
         parameters: {
             query?: never;
@@ -667,6 +718,15 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** InitializerInfo */
+        InitializerInfo: {
+            /** Name */
+            name: string;
+            /** Title */
+            title: string;
+            /** Settings */
+            settings: components["schemas"]["Setting"][];
+        };
         /** OpenRun */
         OpenRun: {
             /** Run */
@@ -716,8 +776,8 @@ export interface components {
             gain: number;
             /** Years Alpha */
             years_alpha: number;
-            /** Gain Per Years Alpha */
-            gain_per_years_alpha: number;
+            /** Gain Times Years Alpha */
+            gain_times_years_alpha: number;
             /** Scale */
             scale: number;
             /** Normalized */
@@ -782,6 +842,13 @@ export interface components {
             table: string;
             /** Column */
             column: string;
+        };
+        /** Setting */
+        Setting: {
+            /** Name */
+            name: string;
+            /** Value */
+            value: string;
         };
         /** TableCount */
         TableCount: {
@@ -1044,6 +1111,44 @@ export interface operations {
             header?: never;
             path: {
                 run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_candidates_api_policy_runs__run_id__pauses__seq__candidates_get: {
+        parameters: {
+            query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                run_id: number;
+                seq: number;
             };
             cookie?: never;
         };
@@ -1825,6 +1930,61 @@ export interface operations {
         };
     };
     get_run_policies_api_policy_runs_get: {
+        parameters: {
+            query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_initializers_api_policy_initializers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InitializerInfo"][];
+                };
+            };
+        };
+    };
+    get_weights_api_policy_weights_get: {
         parameters: {
             query?: {
                 f?: string[];

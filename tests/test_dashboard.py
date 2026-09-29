@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import math
 import unittest
 from unittest.mock import patch
 
@@ -14,7 +15,7 @@ from interface.timing import RECORDER
 from tests.test_store import DSN, EFFECTS, ENUMS, LAW, MEMBERS, PLAYER, RUN, STEPS, built, clean
 
 AT=datetime(2026,9,23,tzinfo=timezone.utc)
-PROPOSAL={'reward':'composite','method':'expected_improvement','observations':12,'best_reward':4.5,'predicted_reward':5.0,'uncertainty':.5,'expected_improvement':.7,
+PROPOSAL={'initializer':'random_smac_weighting','reward':'composite','method':'expected_improvement','observations':12,'best_reward':4.5,'predicted_reward':5.0,'uncertainty':.5,'expected_improvement':.7,
           'beat_probability':.8,'candidates':3,'seconds':.2,'observed':[],'importance':[('build',.6),('enact_law',.4)],
           'candidate_rows':[(0,'local_search',5.0,.5,.7,.8),(1,'random',6.0,.1,.3,.6),(2,'random',3.0,.9,.1,.1)]}
 
@@ -63,6 +64,15 @@ class DashboardTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         db.close_pool()
+
+    def test_initializers_are_described_with_the_settings_the_advisors_use(self):
+        from advisors import ADVISORS, random_smac_weighting, random_svr_weighting
+        found={i['name']:i for i in policy.initializers()}
+        self.assertEqual(set(found),set(ADVISORS))
+        settings=lambda name:{s['name']:s['value'] for s in found[name]['settings']}
+        self.assertEqual(settings('random_smac_weighting')['trailing runs'],str(random_smac_weighting.TRAILING))
+        self.assertEqual(settings('random_smac_weighting')['features per split'],random_smac_weighting.FEATURES)
+        self.assertEqual(settings('random_svr_weighting')['C'],str(random_svr_weighting.C))
 
     def test_runs_list_counts_actions_and_status(self):
         found=runs.runs_grid([],None,False,0,100)
@@ -158,22 +168,22 @@ class DashboardTests(unittest.TestCase):
         self.assertAlmostEqual(offers['build']['chosen_share'],2/3)
         self.assertAlmostEqual(offers['build']['offered_share'],2/5)
 
-    def test_configuration_performance_uses_scored_runs_and_keeps_missing_averages_null(self):
-        changes={self.run_id:(2,{'gdp':0.2,'population':0.1,'sol':-0.05})}
+    def test_configuration_performance_uses_scored_runs_and_keeps_missing_medians_null(self):
+        changes={self.run_id:(2,{'gdp':math.log(1.2),'population':math.log(1.1),'sol':math.log(.95),'stock':math.log(1.3)})}
         with patch('dashboard.server.policy.reward_changes',return_value=changes), patch('dashboard.server.policy.breakdown',return_value=(2,[{'contribution':1.5},{'contribution':-0.5}])):
-            found=rows(policy.configs([],'avg_reward',True,0,100))[0]
-        self.assertEqual((found['runs'],found['scored_runs'],found['avg_reward'],found['avg_years']),(1,1,1,2))
-        self.assertEqual((found['avg_gdp_gain'],found['avg_population_gain'],found['avg_sol_gain']),(20,10,-5))
-        self.assertEqual((found['avg_gdp_gain_per_year'],found['avg_population_gain_per_year'],found['avg_sol_gain_per_year']),(10,5,-2.5))
+            found=rows(policy.configs([],'median_reward',True,0,100))[0]
+        self.assertEqual((found['runs'],found['scored_runs'],found['median_reward'],found['median_years']),(1,1,1,2))
+        self.assertEqual(tuple(round(found[f'median_{c}_gain'],9) for c in ('gdp','population','sol','stock')),(20,10,-5,30))
+        self.assertEqual(tuple(round(found[f'median_{c}_gain_per_year'],9) for c in ('gdp','population','sol')),(10,5,-2.5))
         with patch('dashboard.server.policy.reward_changes',return_value=changes), patch('dashboard.server.policy.breakdown',return_value=(0,[{'contribution':1}])):
-            zero=rows(policy.configs([],'avg_gdp_gain_per_year',True,0,100))[0]
-        self.assertIsNone(zero['avg_gdp_gain_per_year'])
+            zero=rows(policy.configs([],'median_gdp_gain_per_year',True,0,100))[0]
+        self.assertIsNone(zero['median_gdp_gain_per_year'])
         with patch('dashboard.server.policy.reward_changes',return_value={}):
             found=rows(policy.configs([],None,False,0,100))[0]
         self.assertEqual((found['runs'],found['scored_runs']),(1,0))
-        self.assertIsNone(found['avg_reward'])
-        self.assertIsNone(found['avg_gdp_gain'])
-        self.assertIsNone(found['avg_gdp_gain_per_year'])
+        self.assertIsNone(found['median_reward'])
+        self.assertIsNone(found['median_gdp_gain'])
+        self.assertIsNone(found['median_gdp_gain_per_year'])
 
     def test_random_initializer_weights_are_exposed_with_their_source(self):
         found=rows(policy.weights([('run',str(self.run_id))],'weight',True,0,100))
@@ -182,6 +192,18 @@ class DashboardTests(unittest.TestCase):
         response=TestClient(app).get(f'/api/policy/weights?f=run:{self.run_id}')
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json()['total'],2)
+
+    def test_a_column_lists_its_values_with_counts_and_several_values_of_one_column_match_any(self):
+        client=TestClient(app)
+        listed=client.get(f'/api/policy/weights?f=run:{self.run_id}&values=action').json()
+        self.assertEqual([(row[0]['text'],row[1]['num']) for row in listed['rows']],[('build',1.0),('enact_law',1.0)])
+        self.assertEqual(listed['total'],2)
+        narrowed=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:build&values=action').json()
+        self.assertEqual(narrowed['total'],2)
+        either=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:build&f=action:enact_law').json()
+        self.assertEqual(either['total'],2)
+        one=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:build&f=weight:3').json()
+        self.assertEqual(one['total'],1)
 
     def test_candidate_rank_and_gap_stay_global_when_filtered_or_paginated(self):
         ranked=rows(policy.candidates(self.run_id,1,[],None,False,0,100))

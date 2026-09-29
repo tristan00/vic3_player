@@ -285,7 +285,15 @@ def _armies(game,groups):
     caps={key:int(found[1]) for key,value in read(game,'common/laws') if (found:=re.search(r'state_building_barrack_max_level_add\s*=\s*(\d+)',value))}
     politics={key.removeprefix('effect_starting_politics_'):next(law for law in re.findall(r'law_type:(\w+)',value) if law in caps)
               for key,value in read(game,'common/scripted_effects') if key.startswith('effect_starting_politics_')}
-    return {'barracks_cap':caps,'politics_army':politics,'politics_laws':_politics_laws(game,groups)}
+    return {'barracks_cap':caps,'politics_army':politics,'politics_laws':_politics_laws(game,groups),'military_buildings':_military_buildings(game)}
+
+
+@timed_often
+def _military_buildings(game):
+    parents={key:scalar(value,'parent_group') for key,value in read(game,'common/building_groups')}
+    def military(group):
+        return group=='bg_military' or (group is not None and military(parents[group]))
+    return {key for key,value in read(game,'common/buildings') if military(scalar(value,'building_group'))}
 
 
 @timed_often

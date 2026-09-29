@@ -250,17 +250,17 @@ class Store:
         tag=self.names('country_definition',[pending['tag']])[0]
         run_id=cursor.execute('insert into run (run_id,kind,source_session,started_at,heartbeat_at,progress_at,progress_step,world_id,ruleset_id,player_country,'
                               'game_speed,first_start,custom_rng_seed,tag,world_file,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,'
-                              'world_seed,countries,states,tech,pop,modernity,copies,diversity,picker,candidates,objective_gdp,objective_population,objective_sol,objective_alpha) '
-                              'values ((select coalesce(max(run_id),0)+1 from run),%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
+                              'world_seed,countries,states,tech,pop,modernity,copies,diversity,military,picker,candidates,objective_gdp,objective_population,objective_sol,objective_alpha,objective_stock) '
+                              'values ((select coalesce(max(run_id),0)+1 from run),%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
                               (pending['kind'],self.session,pending['started_at'],'open_run',self.world_id,self.ruleset_id,constants['player_country'],
                                constants['game_speed'],constants['first_start'],constants['custom_rng_seed'],tag,pending['world'],pending['cli_seed'],
                                pending['run_seed'],pending['years'],pending['minutes'],pending['profile'],pending['pool'],pending['runs_requested'],
-                               *[None if pending['generated'] is None else pending['generated'][k] for k in ('seed','countries','states','tech','pop','modernity','copies','diversity')],pending['picker'],pending['candidates'],pending['objective'][0]['gdp'],pending['objective'][0]['population'],pending['objective'][0]['sol'],pending['objective'][1])).fetchone()[0]
+                               *[None if pending['generated'] is None else pending['generated'][k] for k in ('seed','countries','states','tech','pop','modernity','copies','diversity','military')],pending['picker'],pending['candidates'],pending['objective'][0]['gdp'],pending['objective'][0]['population'],pending['objective'][0]['sol'],pending['objective'][1],pending['objective'][0]['stock'])).fetchone()[0]
         names=sorted(pending['weights'])
         self.copy(cursor,'run_weight',('run_id','action','weight'),[(run_id,action,pending['weights'][name]) for name,action in zip(names,self.names('action',names))])
         self.copy(cursor,'run_advisor',('run_id','position','advisor'),enumerate_rows(run_id,self.names('advisor',pending['advisors'])))
         if pending['proposal'] is not None:
-            self.record_proposal(cursor,run_id,pending['proposal'])
+            {'random_smac_weighting':self.record_smac_proposal,'random_svr_weighting':self.record_svr_proposal}[pending['proposal']['initializer']](cursor,run_id,pending['proposal'])
         if pending['pick_model'] is not None:
             pauses,runs,seconds,params,importance=pending['pick_model']
             cursor.execute(f'insert into pick_model (run_id,pauses,runs,seconds,{",".join(params)}) values ({",".join(["%s"]*(4+len(params)))})',(run_id,pauses,runs,seconds,*params.values()))
@@ -280,7 +280,7 @@ class Store:
                       [(self.run_id,seq,index,position,next(codes)) for index,batch in enumerate(batches) for position,_ in enumerate(batch)])
 
     @timed
-    def record_proposal(self,cursor,run_id,proposal):
+    def record_smac_proposal(self,cursor,run_id,proposal):
         cursor.execute('insert into smac_proposal (run_id,reward,method,observations,best_reward,predicted_reward,uncertainty,expected_improvement,beat_probability,candidates,seconds) '
                        'values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                        (run_id,proposal['reward'],proposal['method'],proposal['observations'],proposal['best_reward'],proposal['predicted_reward'],proposal['uncertainty'],
@@ -289,6 +289,13 @@ class Store:
         self.copy(cursor,'smac_candidate',('run_id','rank','source','predicted_reward','uncertainty','expected_improvement','beat_probability'),
                   [(run_id,*row) for row in proposal['candidate_rows']])
         self.copy(cursor,'smac_importance',('run_id','dimension','importance'),[(run_id,name,value) for name,value in proposal['importance']])
+
+    @timed
+    def record_svr_proposal(self,cursor,run_id,proposal):
+        cursor.execute('insert into svr_proposal (run_id,method,observations,c,epsilon,predicted_reward,bounded,seconds) values (%s,%s,%s,%s,%s,%s,%s,%s)',
+                       (run_id,proposal['method'],proposal['observations'],proposal['c'],proposal['epsilon'],proposal['predicted_reward'],proposal['bounded'],proposal['seconds']))
+        self.copy(cursor,'svr_observation',('run_id','observed_run','reward','normalized_reward','draws'),[(run_id,*row) for row in proposal['observed']])
+        self.copy(cursor,'svr_coefficient',('run_id','dimension','linear','squared','chosen'),[(run_id,*row) for row in proposal['coefficients']])
 
     @timed_often
     def live(self,rows):

@@ -1,24 +1,22 @@
 from datetime import datetime, timezone
 import sys
 
-from interface.common import DEFAULT_DATA
 from interface.runner.session import _spawn
-from loop.watch import Watch, loop_processes, say
+from loop.supervise import next_round
+from loop.watch import loop_processes, say
 
 LAUNCHER='D:/vic3_agent/loop/launch.cmd'
 
 
 def main():
-    name,*arguments=sys.argv[1:]
     running=loop_processes()
     if running:
-        say(f'REFUSED: a round is still running {running}; kill it first')
+        say(f'REFUSED: a round is still running {running}; stop it with python -m loop.stop')
         sys.exit(2)
+    name=next_round()
     since=datetime.now(timezone.utc)
-    (DEFAULT_DATA/f'{name}.log').unlink(missing_ok=True)
-    process=_spawn(['cmd.exe','/c',LAUNCHER,name,*arguments],'D:/vic3_agent')
-    say(f'LAUNCHED {name} {" ".join(arguments)} pid {process.pid} since {since.isoformat()}')
-    sys.exit(Watch(name,since).wait())
+    process=_spawn(['cmd.exe','/c',LAUNCHER,name,*sys.argv[1:]],'D:/vic3_agent')
+    say(f'LAUNCHED {name} {" ".join(sys.argv[1:])} pid {process.pid}; follow it with python -m loop.watch {name} {since.isoformat()}')
 
 
 if __name__=='__main__':

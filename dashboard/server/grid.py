@@ -1,4 +1,5 @@
 from collections import defaultdict
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -10,6 +11,7 @@ from .names import game_date, labels
 
 NUMERIC={F,I2,I4,I8}
 TRUE={'yes','true','1'}
+VALUES=ContextVar('values',default=None)
 
 
 @dataclass
@@ -71,23 +73,26 @@ def typed(spec,value):
 @db.timed
 def where_clause(specs,filters):
     index={s.name:i for i,s in enumerate(specs)}
-    clauses,params=[],{}
+    chosen=defaultdict(list)
+    params={}
     for name,value in filters:
         if name not in index:
             raise ValueError(f'no column {name}')
-        spec=specs[index[name]]
-        converted=typed(spec,value)
+        converted=typed(specs[index[name]],value)
         if converted is None:
-            clauses.append(f'g.c{index[name]} is null')
+            chosen[name].append(f'g.c{index[name]} is null')
         else:
-            clauses.append(f'g.c{index[name]}=%(f{len(params)})s')
+            chosen[name].append(f'g.c{index[name]}=%(f{len(params)})s')
             params[f'f{len(params)}']=converted
+    clauses=[f'({" or ".join(found)})' for found in chosen.values()]
     return (' where '+' and '.join(clauses)) if clauses else '',params
 
 
 @db.timed
 def grid(specs,source,params,filters=(),sort=None,desc=False,offset=0,limit=100,run_id=None,order=None):
     inner=f'select {",".join(f"{s.sql} as c{i}" for i,s in enumerate(specs))} {source}'
+    if VALUES.get() is not None:
+        return distinct(specs,inner,params,filters,VALUES.get(),limit,run_id)
     where,extra=where_clause(specs,filters)
     names=[s.name for s in specs]
     if sort is not None and sort not in names:
@@ -100,6 +105,22 @@ def grid(specs,source,params,filters=(),sort=None,desc=False,offset=0,limit=100,
     shown=[i for i,s in enumerate(specs) if not s.hidden]
     return Grid(columns=[GridColumn(name=specs[i].name,label=specs[i].label or specs[i].name,kind=specs[i].kind,entity=specs[i].entity,group=specs[i].group) for i in shown],
                 rows=[[row[i] for i in shown] for row in cells(specs,[[f[f'c{i}'] for i in range(len(specs))] for f in found],run_id)],total=total,offset=offset,run=run_id)
+
+
+@db.timed
+def distinct(specs,inner,params,filters,column,limit,run_id):
+    names=[s.name for s in specs]
+    if column not in names:
+        raise ValueError(f'no column {column}')
+    at=names.index(column)
+    where,extra=where_clause(specs,[(name,value) for name,value in filters if name!=column])
+    grouped=f'select g.c{at} as value,count(*) as rows from ({inner}) g{where} group by 1'
+    bound={**params,**extra,'limit':limit}
+    total=db.value(f'select count(*) from ({grouped}) d',bound)
+    found=db.rows(f'select * from ({grouped}) d order by d.rows desc,d.value nulls first limit %(limit)s',bound)
+    count=Spec('rows','number','rows')
+    return Grid(columns=[GridColumn(name=column,label=specs[at].label or column,kind=specs[at].kind,entity=specs[at].entity),GridColumn(name='rows',label='rows',kind='number')],
+                rows=cells([specs[at],count],[[f['value'],f['rows']] for f in found],run_id),total=total,offset=0,run=run_id)
 
 
 @db.timed

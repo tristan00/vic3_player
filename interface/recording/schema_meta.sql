@@ -190,22 +190,25 @@ create table run (
   modernity float8,
   copies float8,
   diversity float8,
+  military float8,
   picker text not null check (picker in ('first', 'catboost')),
   candidates int2 not null check (candidates >= 1),
   objective_gdp float8 not null check (objective_gdp between 0 and 1),
   objective_population float8 not null check (objective_population between 0 and 1),
   objective_sol float8 not null check (objective_sol between 0 and 1),
   objective_alpha float8 not null check (objective_alpha between 0 and 1),
+  objective_stock float8 not null check (objective_stock between 0 and 1),
   check ((kind = 'mini') = (num_nonnulls(world_seed, countries, states, tech, pop) = 5)),
   check ((kind = 'vanilla') = (num_nulls(world_seed, countries, states, tech, pop) = 5)),
   check ((modernity is null) = (copies is null)),
   check (kind = 'mini' or modernity is null),
   check (kind = 'mini' or diversity is null),
+  check (kind = 'mini' or military is null),
   unique (run_id, world_id),
   check ((ended_at is null) = (end_reason is null)),
   check (end_detail is null or end_reason in ('loop_crashed', 'game_crashed', 'loop_stalled')),
   check ((longest_step is null) = (longest_step_ms is null)),
-  check (abs(objective_gdp + objective_population + objective_sol - 1) < 1e-9)
+  check (abs(objective_gdp + objective_population + objective_sol + objective_stock - 1) < 1e-9)
 );
 
 create table run_advisor (
@@ -304,6 +307,37 @@ create table pick_candidate_action (
   action int4 not null references action,
   primary key (run_id, seq, candidate, position),
   foreign key (run_id, seq, candidate) references pick_candidate
+);
+
+create table svr_proposal (
+  run_id int4 primary key references run,
+  method text not null check (method in ('random', 'bootstrap_svr')),
+  observations int4 not null,
+  c float8 not null,
+  epsilon float8 not null,
+  predicted_reward float8,
+  bounded int4,
+  seconds float8 not null,
+  check ((method = 'bootstrap_svr') = (predicted_reward is not null)),
+  check ((predicted_reward is null) = (bounded is null))
+);
+
+create table svr_observation (
+  run_id int4 not null references svr_proposal,
+  observed_run int4 not null references run,
+  reward float8 not null,
+  normalized_reward float8 not null,
+  draws int4 not null check (draws >= 0),
+  primary key (run_id, observed_run)
+);
+
+create table svr_coefficient (
+  run_id int4 not null references svr_proposal,
+  dimension text not null,
+  linear float8 not null,
+  squared float8 not null,
+  chosen float8 not null,
+  primary key (run_id, dimension)
 );
 
 create table smac_importance (

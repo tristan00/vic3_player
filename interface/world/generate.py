@@ -17,7 +17,7 @@ from ..script import clean, read, scalar
 from .vanilla import boxes, rasters, textures, vanilla
 from .nations import nations, word
 
-MAP={'states':(20,100),'country_share':(1/8,1/5),'tech':(.5,1.2),'pop':(.5,1.2),'modernity':(0,1),'copies':(0,1),'diversity':(0,1)}
+MAP={'states':(20,100),'country_share':(1/8,1/5),'tech':(.5,1.2),'pop':(.5,1.2),'modernity':(0,1),'copies':(0,1),'diversity':(0,1),'military':(0,1)}
 PROVINCE_PIXELS=2000
 SEA_ID=3000
 NAVAL=83886
@@ -570,13 +570,13 @@ def _network(cells,kinds,points,regions,state_neighbours,seas,borders,height,rng
 
 
 @timed
-def generate(seed,countries,states,tech,pop,modernity,copies,diversity,*,game_dir=DEFAULT_GAME,data_dir=DEFAULT_DATA):
+def generate(seed,countries,states,tech,pop,modernity,copies,diversity,military,*,game_dir=DEFAULT_GAME,data_dir=DEFAULT_DATA):
     if not 1<=countries<=states:
         raise ValueError('Need at least one country and no more countries than states')
     if not 0<=tech<=2 or not 0<=pop<=2:
         raise ValueError(f'tech and pop must be within 0..2, got {tech} and {pop}')
-    if not 0<=copies<=1 or not all(0<=low<=high<=1 for low,high in (modernity,diversity)):
-        raise ValueError(f'copies and the modernity and diversity ranges must be within 0..1, got {copies}, {modernity} and {diversity}')
+    if not 0<=copies<=1 or not all(0<=low<=high<=1 for low,high in (modernity,diversity,military)):
+        raise ValueError(f'copies and the modernity, diversity and military ranges must be within 0..1, got {copies}, {modernity}, {diversity} and {military}')
     game=Path(game_dir)/'game'
     out=Path(data_dir)/'worlds'/f'seed_{seed}_{countries}_{states}_tech{tech}_pop{pop}_copies{copies}'
     if out.exists():
@@ -671,7 +671,7 @@ def generate(seed,countries,states,tech,pop,modernity,copies,diversity,*,game_di
     ownership,capitals=_grow([s['id'] for s in regions],state_neighbours,state_centers,countries,[w/sum(weights)*states for w in weights],rng,False)
     _detach(rng,ownership,capitals,state_neighbours,{s['id'] for s in regions if s['coastal']},round(states*SECONDARY_SHARE+rng.random()-.5))
     groups=[[s['id'] for s in regions if ownership[s['id']]==i] for i in range(countries)]
-    world=nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop,modernity,copies,diversity)
+    world=nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop,modernity,copies,diversity,military)
     used=set()
     for state in regions:
         state['name']=word(rng,used)

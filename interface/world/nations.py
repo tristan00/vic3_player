@@ -211,7 +211,22 @@ def _pops(rng,state,culture,candidates,religions,mix,factor):
 
 
 @timed_often
-def _buildings(rng,tag,state,band,capital,overseas,population,center,military,allowed,owners,buildable):
+def _economic(state,population,permitted,buildable,military,armed):
+    per_pop=population/state['source']['population']
+    found={}
+    for kind,amount in sorted(state['source']['buildings'].items()):
+        if kind in SPECIAL or not amount or (kind in COASTAL and not state['coastal']) or kind not in permitted or not buildable(kind):
+            continue
+        level=round(max(1,round(amount*_scale(state)))*armed) if kind in military else round(amount*per_pop)
+        found[kind]=min(level,state['capped'][kind]) if kind in state['capped'] else level
+    arable=sum(level for kind,level in found.items() if kind in state['arable_resources'])
+    if arable>state['arable_land']:
+        found.update({kind:level*state['arable_land']//arable for kind,level in found.items() if kind in state['arable_resources']})
+    return {kind:level for kind,level in found.items() if level}
+
+
+@timed_often
+def _buildings(rng,tag,state,band,capital,overseas,population,center,forces,allowed,owners,buildable,military,armed):
     key=state['key']
     lines=[]
     produced=[]
@@ -225,13 +240,11 @@ def _buildings(rng,tag,state,band,capital,overseas,population,center,military,al
     if center:
         lines.append(_building(tag,'building_trade_center',center,key))
     local=set(state['arable_resources'])
-    levels={kind:level for kind,level in military.items() if level}
+    levels={kind:level for kind,level in forces.items() if level}
     lines+=[_building(tag,kind,level,key) for kind,level in levels.items()]
-    for kind,amount in sorted(state['source']['buildings'].items()):
-        if kind in SPECIAL or not amount or (kind in COASTAL and not state['coastal']) or kind not in local|allowed or not buildable(kind):
-            continue
-        levels[kind]=min(max(1,round(amount*_scale(state))),state['capped'].get(kind,amount*2))
-        lines.append(_building(tag,kind,levels[kind],key))
+    for kind,level in _economic(state,population,local|allowed,buildable,military,armed).items():
+        levels[kind]=level
+        lines.append(_building(tag,kind,level,key))
         produced.append(kind)
     if overseas and state['coastal'] and 'building_port' not in levels:
         lines.append(_building(tag,'building_port',1,key))
@@ -270,7 +283,7 @@ def _army(band,units):
 
 
 @timed
-def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop,modernity,copies,diversity):
+def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop,modernity,copies,diversity,military):
     low,mean,top=data['tech_range']
     tech_count=lambda base,target:round(low+(len(base)-low)*(target-low)/(mean-low)) if target<mean else round(len(base)+target-mean)
     crowding=sum(len(s['province_codes']) for s in regions)/sum(s['source']['population']*_scale(s) for s in regions)
@@ -317,7 +330,7 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
     for i,(tag,members) in enumerate(zip(tags,groups)):
         band=rng.choices(list(band_weights),weights=list(band_weights.values()))[0]
         pool=[p for p in data['profiles'] if p['band']==band]
-        modern,plural=round(rng.uniform(*modernity),2),round(rng.uniform(*diversity),2)
+        modern,plural,armed=round(rng.uniform(*modernity),2),round(rng.uniform(*diversity),2),round(military[0]+(military[1]-military[0])*rng.random()**2,2)
         near=_closeness(pool,level(modern,*data['progress_range']),data['progress_spread'])
         factor=level(_around(rng,pop),*data['province_population_range'])*crowding
         lean=level(plural,*data['diversity_range'])
@@ -386,18 +399,20 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
         if army_law is None or not _permitted(army_law,laws,data['law_rules'],techs):
             army_law=next(law for law in data['barracks_cap'] if _permitted(law,laws,data['law_rules'],techs))
         weights=[size for size,_,_ in populations]
-        garrison=_allot(trade['barracks'] if buildable('building_barrack') else 0,weights,data['barracks_cap'][army_law])
-        troops_by_state=_allot(trade['units'],weights,data['barracks_cap'][army_law])
+        garrison=_allot(round(trade['barracks']*armed) if buildable('building_barrack') else 0,weights,data['barracks_cap'][army_law])
+        troops_by_state=_allot(round(trade['units']*armed),weights,data['barracks_cap'][army_law])
         naval_home=max(coastal,key=lambda s:(s is capital,s['arable_land'])) if coastal else None
-        navy=trade['ships'] if naval_home and trade['naval'] and buildable('building_naval_administration') else 0
+        naval=round(trade['naval']*armed) if naval_home and buildable('building_naval_administration') else 0
+        navy=round(trade['ships']*armed) if naval else 0
         for state,(size,pops,homelands),troops,regiments in zip(states,populations,garrison,troops_by_state):
             state['country']=tag
             state_type='incorporated' if state['id'] in reachable else 'unincorporated'
             history['states'].append(f's:{state["key"]} = {{ create_state = {{ country = c:{tag} state_type = {state_type} '
                                      f'owned_provinces = {{ {" ".join(state["province_codes"])} }} }} {" ".join("add_homeland = cu:"+h for h in homelands)} }}')
             history['pops'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {pops} }} }}')
-            military={'building_barrack':troops,'building_naval_administration':trade['naval'] if state is naval_home and buildable('building_naval_administration') else 0}
-            buildings,made,levels=_buildings(rng,tag,state,band,state is capital,state['id'] not in reachable,size,centers.get(state['id']),military,data['allowed'][band],data['owners'],buildable)
+            forces={'building_barrack':troops,'building_naval_administration':naval if state is naval_home else 0}
+            buildings,made,levels=_buildings(rng,tag,state,band,state is capital,state['id'] not in reachable,size,centers.get(state['id']),forces,data['allowed'][band],data['owners'],buildable,
+                                             data['military_buildings'],armed)
             history['buildings'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {" ".join(buildings)} }} }}')
             holdings+=[(level,kind,state['key'],line,len(history['buildings'])-1) for kind,level in levels.items()
                        for line in buildings if f'building = "{kind}"' in line]
@@ -441,7 +456,7 @@ def nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop
         history['ai'].append(f'c:{tag} ?= {{ {" ".join("set_strategy = "+s for s in strategies)} }}')
         countries.append({'tag':tag,'name':name,'states':[s['key'] for s in states],'capital':capital['key'],'culture':culture['key'],
                           'religion':culture['religion'],'color':[int(c) for c in color.split()],'band':band,'technology_tier':technology,
-                          'country_type':country_type,'tier':tier,'politics':politics,'copy':source['tag'] if source else None,'modernity':modern,'diversity':plural,'laws':laws,'ruling':ruling,'produced':produced,'trade':trade,'holdings':holdings,'armed':bool(units),'army':sum(count for _,count in units),'navy':navy,'monarchs':monarchs,
+                          'country_type':country_type,'tier':tier,'politics':politics,'copy':source['tag'] if source else None,'modernity':modern,'diversity':plural,'military':armed,'laws':laws,'ruling':ruling,'produced':produced,'trade':trade,'holdings':holdings,'armed':bool(units),'army':sum(count for _,count in units),'navy':navy,'monarchs':monarchs,
                           'provinces':[p for s in states for p in s['province_codes']]})
     _diplomacy(rng,data,countries,neighbours,history,localization)
     _claims(rng,data,regions,state_neighbours,history,{c['tag'] for c in countries if c['country_type']=='decentralized'})
