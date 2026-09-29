@@ -67,6 +67,17 @@ create table event_definition_option (
   primary key (ruleset_id, event_type, option)
 );
 
+create table event_definition_option_effect (
+  ruleset_id int4 not null,
+  event_type int2 not null,
+  option int2 not null,
+  position int2 not null,
+  effect text not null,
+  detail text,
+  primary key (ruleset_id, event_type, option, position),
+  foreign key (ruleset_id, event_type, option) references event_definition_option
+);
+
 create table building_production_method (
   ruleset_id int4 not null references ruleset,
   building_type int2 not null references building_type,

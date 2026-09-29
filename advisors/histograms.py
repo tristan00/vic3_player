@@ -6,6 +6,12 @@ from interface.common import timed, timed_often
 from .features import KINDS, Samples, Versions, resolve
 
 ACTION='action'
+CHOICE='answers'
+DEFAULT='answers.default'
+OFFERED='answers.options_offered'
+EFFECT='answers.effects'
+DETAIL='answers.effect_details'
+ANSWER=(CHOICE,DEFAULT,OFFERED,EFFECT,DETAIL)
 BUILDINGS='player.buildings'
 METHODS='player.production_methods'
 CLOUT='player.interest_group_clout'
@@ -23,6 +29,10 @@ def entries(batch,lookup):
     found=[]
     for action,params in batch:
         found.append((ACTION,action,1))
+        if 'event' in params:
+            name,default,offered,effects=lookup.answer(params['event'],params['option'])
+            found+=[(CHOICE,name,1),(DEFAULT,str(default),1),(OFFERED,OFFERED,offered)]+[(EFFECT,effect,1) for effect,_ in effects]
+            found+=[(DETAIL,f'{effect}={detail}',1) for effect,detail in effects if detail is not None]
         found+=[(f'{action}.{param}',str(resolve(param,kind,params[param],lookup)),1) for param,kind in KINDS[action] if param in params]
     return found
 

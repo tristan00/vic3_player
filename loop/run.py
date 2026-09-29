@@ -26,7 +26,7 @@ from interface.options.stored import Shared, Stored
 LOG=logging.getLogger('loop')
 
 
-from interface.options.available import FASTEST_SPEED as FASTEST
+from interface.options.available import FASTEST_SPEED as FASTEST, event_options
 SETTLE=.25
 SETTLE_LIMIT=3
 TICK_LIMIT=5
@@ -36,10 +36,13 @@ ACTIONS_PER_PAUSE=(6,16)
 ENDS_PAUSE={'capitulate','back_down','white_peace','declare_bankruptcy','leave_power_bloc'}
 PARKED=set()
 RUN_DAYS=(10,90)
+EVENT='choose_event_option'
+QUICK='quick_decline_proposal'
+PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
+ANSWERS=(EVENT,QUICK,*(name for pair in PROPOSAL_ANSWERS for name in pair))
 WAIT='run_days'
 SLIDERS=('tech','pop','modernity','copies','diversity')
 PER_COUNTRY=('modernity','diversity')
-PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
 HOURS_PER_DAY=24
 ACTIONS=[name for name in BY_NAME if GROUP[name]!='time']
 CANDIDATES=(8,50)
@@ -92,6 +95,21 @@ def game_hours(snapshot):
     return snapshot.hours
 
 
+@timed_often
+def questions(options,links):
+    events=options.get(EVENT,[])
+    asked=[[(EVENT,combo,targets(EVENT,combo,links)) for combo in events if combo['event']==event] for event in sorted({combo['event'] for combo in events})]
+    for pair in PROPOSAL_ANSWERS:
+        for combo in sorted({tuple(combo.items()) for name in pair for combo in options.get(name,[])}):
+            asked.append([(name,dict(combo),targets(name,dict(combo),links)) for name in (*pair,QUICK) if dict(combo) in options.get(name,[])])
+    return asked
+
+
+@timed_often
+def unanswered(entry,events,proposers):
+    return entry['params']['event'] in events if entry['action']==EVENT else entry['action'] in ANSWERS and entry['params']['country'] in proposers
+
+
 class Drawer:
     @timed_often
     def __init__(self,advisor,options,snapshot,links,touched):
@@ -99,8 +117,9 @@ class Drawer:
         self.seq=snapshot.seq
         self.names,self.combos,self.targets,self.base=[],[],[],[]
         self.index={}
+        self.questions=questions(options,links)
         for name in sorted(options):
-            if name in TIME_CONTROL:
+            if name in TIME_CONTROL or name in ANSWERS:
                 continue
             kept=[(combo,found) for combo in options[name] if not (found:=targets(name,combo,links))&touched]
             if not kept:
@@ -120,12 +139,20 @@ class Drawer:
         count=[len(combos) for combos in self.combos]
         choose=self.advisor.random.choices
         batch=[]
+        for question in self.questions:
+            name,combo,found=choose(question,weights=[self.advisor.weights.get(name,1) for name,_,_ in question])[0]
+            batch.append((self.advisor,name,combo))
+            for item in found:
+                for other,slot in self.index.get(item,()):
+                    if alive[other][slot]:
+                        alive[other][slot]=False
+                        count[other]-=1
         for n in range(rng.randint(*ACTIONS_PER_PAUSE)):
             progress('sample_batch')
             weight={action:self.base[action] for action in range(len(self.names)) if count[action]}
             offered=[action for action,value in weight.items() if value>0]
             if not offered:
-                if not n:
+                if not batch:
                     raise GameCrashed(f'No selectable action during the pause at snapshot {self.seq}')
                 break
             action=choose(offered,weights=[weight[action] for action in offered])[0]
@@ -142,7 +169,6 @@ class Drawer:
         return batch+[(self.advisor,WAIT,{'days':rng.randint(*RUN_DAYS)})]
 
 
-ANSWERED={'choose_event_option','quick_decline_proposal',*(name for pair in PROPOSAL_ANSWERS for name in pair)}
 RECORDED='select a.name,w.weight from run_weight w join action a on a.action=w.action where w.run_id=%s'
 
 
@@ -159,7 +185,7 @@ def redraw(connection,run_id,seq,count,seed,weights=None):
     snapshot=Stored(connection,run_id,seq)
     advisor=RandomAdvisor(seed)
     advisor.weights=dict(connection.execute(RECORDED,(run_id,)).fetchall()) if weights is None else weights
-    options={name:combos for name,combos in available(snapshot).items() if name not in PARKED and name not in ANSWERED}
+    options={name:combos for name,combos in available(snapshot).items() if name not in PARKED}
     drawer=Drawer(advisor,options,snapshot,linked(snapshot),set())
     rng=random.Random(seed)
     return snapshot,[[(name,params) for _,name,params in drawer.draw(rng)] for _ in range(count)]
@@ -233,27 +259,9 @@ class Loop:
     @timed
     def turn_actions(self,snapshot):
         batch=[]
-        touched=set()
-        options=available(snapshot)
-        events=options['choose_event_option']
-        for event in sorted({combo['event'] for combo in events}):
-            name,params=self.advisors[0].choose({'choose_event_option':[combo for combo in events if combo['event']==event]})
-            touched|=targets(name,params)
-            self.perform(self.advisors[0].name,name,params,snapshot,batch)
-        if batch:
-            snapshot=self.snapshot('post_action')
-            options=available(snapshot)
-        options={name:combos for name,combos in options.items() if name not in PARKED and name!='choose_event_option'}
-        links=linked(snapshot)
-        answers={name:options.pop(name,[]) for pair in PROPOSAL_ANSWERS for name in pair}
-        quick=options.pop('quick_decline_proposal',[])
-        for pair in PROPOSAL_ANSWERS:
-            for combo in sorted({tuple(combo.items()) for name in pair for combo in answers[name]}):
-                choices={name:[dict(combo)] for name in pair if dict(combo) in answers[name]}
-                name,params=self.advisors[0].choose({**choices,**({'quick_decline_proposal':[dict(combo)]} if dict(combo) in quick else {})})
-                self.perform(self.advisors[0].name,name,params,snapshot,batch)
+        options={name:combos for name,combos in available(snapshot).items() if name not in PARKED}
         with span('loop.run.Loop.draw_candidates','loop'):
-            drawer=Drawer(self.advisors[0],options,snapshot,links,touched)
+            drawer=Drawer(self.advisors[0],options,snapshot,linked(snapshot),set())
             drawn=[drawer.draw(self.rng) for _ in range(self.candidates)]
         chosen,predictions=self.picker.pick(drawn,snapshot)
         if predictions is not None:
@@ -271,8 +279,13 @@ class Loop:
                 self.note({**entry,'status':'ui_leftover','detail':f'{"+".join(left)} open after the pause: {" ".join(item["action"] for item,_,_ in batch)}'},after)
             self.stuck(left)
             return after,wait
+        events={combo['event'] for combo in event_options(after)}
+        proposers={country for country, in after.rows('player_proposal','country')}
         for entry,_,_ in batch:
-            self.note({**entry,'status':'done'},after)
+            if unanswered(entry,events,proposers):
+                self.note({**entry,'status':'ui_leftover','detail':'still waiting for an answer after the pause'},after)
+            else:
+                self.note({**entry,'status':'done'},after)
         return after,wait
 
     @timed_often

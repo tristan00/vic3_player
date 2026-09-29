@@ -309,6 +309,36 @@ def event_options(game,mods=()):
     return [row for rows in events.values() for row in rows]
 
 
+EFFECTS=frozenset(json.loads(Path(__file__).parent.joinpath('recording/effects.json').read_text(encoding='utf-8')))
+CONDITIONS={'trigger','limit','ai_chance','show_as_unavailable'}
+CONTROL={'if','else','else_if','hidden_effect','custom_tooltip','show_as_tooltip','random','random_list','while','switch'}
+STATEMENT=r'(?<![\w:.@])([A-Za-z_][\w:.@]*)\s*\??=\s*("[^"]*"|[^\s{}]+)'
+
+
+def effects_in(text):
+    found=[]
+    rest=text
+    for key,block in blocks(text):
+        rest=rest.replace(block,' ',1)
+        if key in CONDITIONS:
+            continue
+        if key in EFFECTS-CONTROL:
+            found.append((key,scalar(block,'name') or scalar(block,'type') or scalar(block,'id')))
+        found+=effects_in(body(block))
+    return [(key,value.strip('"')) for key,value in re.findall(STATEMENT,rest) if key in EFFECTS-CONTROL]+found
+
+
+@timed
+def event_effects(game,mods=()):
+    rows={}
+    for path in script_files(game,'events',mods):
+        for key,value in blocks(clean(path)):
+            if re.fullmatch(r'[\w-]+\.\d+',key):
+                options=[option for kind,option in blocks(body(value)) if kind=='option']
+                rows[key]=[(key,index,position,effect,detail) for index,option in enumerate(options) for position,(effect,detail) in enumerate(effects_in(body(option)))]
+    return [row for found in rows.values() for row in found]
+
+
 def entries(game,folder):
     for root,outer in read(game,folder):
         for key,value in blocks(body(outer)):

@@ -137,7 +137,7 @@ class Store:
             self.enums[enum].update(fresh)
 
     @timed
-    def ruleset(self,identity,members,definitions,event_options,building_methods,dlc,gaps,enums,lines,effects):
+    def ruleset(self,identity,members,definitions,event_options,event_effects,building_methods,dlc,gaps,enums,lines,effects):
         found=self.connection.execute('select ruleset_id from ruleset where digest=%s',(identity,)).fetchone()
         self.members={}
         for vocabulary,folders in VOCABULARIES.items():
@@ -173,6 +173,8 @@ class Store:
             self.copy(cursor,'game_definition',('ruleset_id','folder','name','field','position','value'),[(ruleset_id,*row) for row in definitions])
             self.copy(cursor,'event_definition_option',('ruleset_id','event_type','option','name','has_trigger','default_option'),
                       [(ruleset_id,self.vocabulary['event_type'][event],option,name,bool(trigger),bool(default)) for event,option,name,trigger,default in event_options])
+            self.copy(cursor,'event_definition_option_effect',('ruleset_id','event_type','option','position','effect','detail'),
+                      [(ruleset_id,self.vocabulary['event_type'][event],option,position,effect,detail) for event,option,position,effect,detail in event_effects])
             self.copy(cursor,'building_production_method',('ruleset_id','building_type','production_method_group','production_method'),
                       [(ruleset_id,self.vocabulary['building_type'][b],self.vocabulary['production_method_group'][g],self.vocabulary['production_method'][m])
                        for b,g,m in building_methods])

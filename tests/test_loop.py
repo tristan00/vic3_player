@@ -242,9 +242,10 @@ class BatchSamplerTests(unittest.TestCase):
         class Connection:
             def execute(self,sql,arguments):
                 self.asked=arguments
-                return mock.Mock(fetchall=lambda:[('research',5.0),('enact_law',0.0),('build',2.0)])
+                return mock.Mock(fetchall=lambda:[('research',5.0),('enact_law',0.0),('build',2.0),('choose_event_option',50.0),('accept_treaty',50.0),('decline_treaty',50.0)])
         offered={'research':[{'technology':'a'},{'technology':'b'}],'enact_law':[{'law':1}],'build':[{'state':1,'building_type':'farm'}],
-                 'choose_event_option':[{'event':'x.1','option':0}],'accept_treaty':[{'treaty':1}],'quick_decline_proposal':[{'treaty':1}],'pause':[{}]}
+                 'choose_event_option':[{'event':'x.1','option':0},{'event':'x.1','option':1},{'event':'y.2','option':0}],
+                 'accept_treaty':[{'country':3}],'decline_treaty':[{'country':3}],'pause':[{}]}
         connection=Connection()
         with mock.patch.object(run,'Stored',lambda found,run_id,seq:Snapshot()),mock.patch.object(run,'available',lambda snapshot:offered):
             snapshot,blocks=run.redraw(connection,12,7,25,3)
@@ -254,12 +255,43 @@ class BatchSamplerTests(unittest.TestCase):
         self.assertEqual((connection.asked,snapshot.seq,len(blocks)),((12,),7,25))
         self.assertEqual(blocks,again)
         self.assertNotEqual(blocks,other)
+        seen=set()
         for block in blocks:
             self.assertEqual(block[-1][0],'run_days')
             self.assertTrue(run.RUN_DAYS[0]<=block[-1][1]['days']<=run.RUN_DAYS[1])
-            self.assertLessEqual({name for name,_ in block[:-1]},{'research','build'})
-            self.assertTrue(block[:-1])
-        self.assertEqual({name for block in chosen for name,_ in block[:-1]},{'enact_law'})
+            names=[name for name,_ in block[:-1]]
+            seen|=set(names)
+            self.assertLessEqual(set(names),{'research','build','choose_event_option','accept_treaty','decline_treaty'})
+            events=[params['event'] for name,params in block if name=='choose_event_option']
+            self.assertEqual(sorted(events),['x.1','y.2'])
+            self.assertEqual(names.count('accept_treaty')+names.count('decline_treaty'),1)
+            self.assertLessEqual(set(names[:3]),{'choose_event_option','accept_treaty','decline_treaty'})
+            self.assertLessEqual(set(names[3:]),{'research','build'})
+        self.assertLessEqual({'choose_event_option','accept_treaty','decline_treaty'},seen)
+        self.assertEqual({option for block in blocks for name,params in block if name=='choose_event_option' and params['event']=='x.1' for option in [params['option']]},{0,1})
+        self.assertEqual({name for block in blocks for name,_ in block if name.endswith('_treaty')},{'accept_treaty','decline_treaty'})
+        self.assertEqual({name for block in chosen for name,_ in block[3:-1]},{'enact_law'})
+        self.assertTrue(all(sorted(params['event'] for name,params in block if name=='choose_event_option')==['x.1','y.2'] for block in chosen))
+
+    def test_every_event_and_every_proposal_is_one_question_with_its_own_answers(self):
+        from loop.run import questions
+        options={'choose_event_option':[{'event':'x.1','option':0},{'event':'x.1','option':1},{'event':'y.2','option':0}],
+                 'accept_treaty':[{'country':3}],'decline_treaty':[{'country':3},{'country':4}],'reject_demand':[{'country':3}],'quick_decline_proposal':[{'country':4}],
+                 'research':[{'technology':'a'}]}
+        asked=[[(name,tuple(combo.items())) for name,combo,_ in question] for question in questions(options,{})]
+        self.assertEqual(asked,[[('choose_event_option',(('event','x.1'),('option',0))),('choose_event_option',(('event','x.1'),('option',1)))],
+                                [('choose_event_option',(('event','y.2'),('option',0)))],
+                                [('accept_treaty',(('country',3),)),('decline_treaty',(('country',3),))],
+                                [('decline_treaty',(('country',4),)),('quick_decline_proposal',(('country',4),))],
+                                [('reject_demand',(('country',3),))]])
+
+    def test_an_answer_whose_event_or_proposal_is_still_waiting_is_a_failure(self):
+        from loop.run import unanswered
+        self.assertTrue(unanswered({'action':'choose_event_option','params':{'event':'x.1','option':0}},{'x.1'},set()))
+        self.assertFalse(unanswered({'action':'choose_event_option','params':{'event':'x.1','option':0}},{'y.2'},{3}))
+        self.assertTrue(unanswered({'action':'decline_treaty','params':{'country':3}},set(),{3}))
+        self.assertFalse(unanswered({'action':'decline_treaty','params':{'country':3}},{'x.1'},{4}))
+        self.assertFalse(unanswered({'action':'research','params':{'technology':'a'}},{'x.1'},{3}))
 
     def test_pick_first_takes_the_first_batch(self):
         from advisors.pickers import PickFirst

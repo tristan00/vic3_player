@@ -22,7 +22,7 @@ export function Policy() {
         <Tabs views={['runs', 'configurations']} param="overview" />
         {overview === 'runs'
           ? <DataGrid id="runs" url="/api/policy/runs" columns={['run', 'state', 'initializer', 'picker', 'years', 'reward']} link={policyLink} live />
-          : <DataGrid id="configs" url="/api/policy/configs" link={policyLink} live />}
+          : <><p className="text-dim mb-3 text-sm">Averages use scored runs only, with equal weight per run. Gains compare the starting value with the peak in the final game year, matching run rewards. Gain/year divides each run’s percentage gain by its elapsed game years before averaging; it is not compounded growth and excludes zero-duration runs. Average reward uses each run’s own objective weights; raw gains help compare setups with different objectives. Unscored runs are excluded, not counted as zero.</p><DataGrid id="configs" url="/api/policy/configs" link={policyLink} live /></>}
       </Section>}
       {view === 'initializer' && <Section title="Action weights">
         <p className="text-dim mb-3 text-sm">Each run starts with an action weight vector from the random or SMAC initializer. These weights control action sampling while blocks are generated; they are separate from the objective weights.</p>

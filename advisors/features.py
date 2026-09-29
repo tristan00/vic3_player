@@ -51,6 +51,32 @@ def majority(rows):
     return {key:kind for key,(_,kind) in best.items()}
 
 
+DEFINED='''select et.name,d.option,d.name,e.effect,e.detail from event_definition_option d join event_type et on et.event_type=d.event_type
+left join event_definition_option_effect e on e.ruleset_id=d.ruleset_id and e.event_type=d.event_type and e.option=d.option
+where d.ruleset_id=%s and et.name = any(%s) order by 1,2,e.position'''
+
+
+@timed_often
+def defined(connection,ruleset,events):
+    found={}
+    for event,option,name,effect,detail in connection.execute(DEFINED,(ruleset,sorted(events))).fetchall():
+        effects=found.setdefault((event,option),(name,[]))[1]
+        if effect is not None:
+            effects.append((effect,detail))
+    return found
+
+
+@timed_often
+def answers(events,options,definitions):
+    found={}
+    for event,kind in events.items():
+        shown=[row for row in options if row[0]==event and row[2] is not None and row[4]]
+        for _,option,position,default,_ in shown:
+            name,effects=definitions[kind,option]
+            found[kind,position]=(name,default,len(shown),effects)
+    return found
+
+
 @timed
 def interest_line(connection):
     return connection.execute('select line from budget_line where direction=%s and name=%s',INTEREST).fetchone()[0]
@@ -85,6 +111,8 @@ class LiveLookup:
                 'laws':laws(law_type for law_type,country,active in s.rows('law','law_type,country,active') if country==s.player and active),
                 'prices':prices({goods:price for market,goods,price in s.rows('market_goods','market,goods,price') if market==s.map('country','country,market').get(s.player)}),
                 'institutions':institutions({kind:level for kind,country,level in s.rows('institution','institution_type,country,investment') if country==s.player}),
+                'answers':answers(s.map('event','event,event_type'),s.rows('event_option','event,option,visible_position,default_option,enabled'),
+                                  defined(s.connection,s.ruleset_id,set(s.map('event','event,event_type').values()))),
                 'numbers':[treasury['money'],treasury['principal'],
                            sum(amount for direction,found,amount in s.rows('player_budget_line','direction,line,amount') if direction==INTEREST[0] and found==line),
                            treasury['balance_trend_current'],population['lower_strata']+population['middle_strata']+population['upper_strata'],
@@ -110,6 +138,10 @@ class LiveLookup:
     @timed_often
     def country(self,ident):
         return self.countries.get(ident)
+
+    @timed_often
+    def answer(self,event,position):
+        return self.answers[event,position]
 
 
 class Versions:
@@ -181,6 +213,13 @@ class History:
         self.queue=load('player_construction_queue_item',['private','position'],['construction_left'])
         self.capacity=load('country_construction_report',['country'],['base_construction_speed'])
         self.institution_rows=load('institution_history',['institution'],['institution_type','country','investment'])
+        self.events=load('event_history',['event'],['event_type'])
+        self.options=load('event_option',['event','option'],['visible_position','default_option','enabled'])
+        self.rulesets=dict(connection.execute('select run_id,ruleset_id from run where run_id = any(%s)',(runs,)).fetchall())
+        seen={}
+        for (run,_),(_,states) in self.events.index.items():
+            seen.setdefault(self.rulesets[run],set()).update(state[0] for state in states if state is not None)
+        self.defined={ruleset:defined(connection,ruleset,events) for ruleset,events in seen.items()}
 
     @timed_often
     def at(self,run,seq):
@@ -251,6 +290,12 @@ class HistoryLookup:
     def country(self,ident):
         found=self.h.countries.at(self.run,(ident,),self.seq)
         return found[0] if found else None
+
+    @timed_often
+    def answer(self,event,position):
+        events={key[0]:now[0] for key in self.h.events.by_run.get(self.run,[]) if (now:=self.h.events.at(self.run,key,self.seq)) is not None}
+        options=[(*key,*now) for key in self.h.options.by_run.get(self.run,[]) if key[0] in events and (now:=self.h.options.at(self.run,key,self.seq)) is not None]
+        return answers(events,options,self.h.defined[self.h.rulesets[self.run]])[event,position]
 
 
 def resolve(param,kind,value,lookup):

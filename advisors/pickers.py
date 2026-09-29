@@ -12,15 +12,15 @@ from catboost import CatBoostRegressor, FeaturesData, Pool
 from interface.common import progress, timed, timed_often
 from interface.timing import current, span
 from .features import INSTITUTIONS, LAWS, NUMBERS, PRICES, History, LiveLookup
-from .histograms import COUNTRY, Histograms, Holdings, entries, live_holdings
+from .histograms import ANSWER, COUNTRY, Histograms, Holdings, entries, live_holdings
 from .random_smac_weighting import COMPONENTS, ENDED, HOURS_PER_YEAR, PLAYED, discount, peak, scored_runs, series
 
 LOG=logging.getLogger('loop')
-ANSWERS={'choose_event_option','quick_decline_proposal','accept_treaty','decline_treaty','accept_demand','reject_demand',
-         'accept_action_proposal','decline_action_proposal','accept_sway','reject_sway'}
+ANSWERS=('choose_event_option','quick_decline_proposal','accept_treaty','decline_treaty','accept_demand','reject_demand',
+         'accept_action_proposal','decline_action_proposal','accept_sway','reject_sway')
 MIN_PAUSES=200
 DESIGN=json.loads((Path(__file__).parent/'picker_design.json').read_text(encoding='utf-8'))
-SIZES={**DESIGN['sizes'],**{name:sys.maxsize for name in COUNTRY}}
+SIZES={**DESIGN['sizes'],**{name:sys.maxsize for name in COUNTRY},**{name:sys.maxsize for name in ANSWER}}
 PARAMS={**DESIGN['params'],'loss_function':'RMSE','random_seed':0,'thread_count':os.cpu_count()}
 BATCH_SIZE='batch_size'
 WAIT='run_days'
@@ -33,7 +33,7 @@ PAUSES='''select la.run_id,la.before_seq,s.game_date,la.n,ac.name,p.name,p.integ
 from loop_action la join advisor ad on ad.advisor=la.advisor join action ac on ac.action=la.action
 join snapshot s on s.run_id=la.run_id and s.seq=la.before_seq
 left join loop_action_param p on p.run_id=la.run_id and p.n=la.n
-where la.run_id = any(%s) and ad.name<>'loop' and ac.name <> all(%s)
+where la.run_id = any(%s) and ad.name<>'loop'
 order by la.run_id,la.before_seq,la.n'''
 
 
@@ -86,7 +86,7 @@ def training_data(connection,objective):
     points={component:series(connection,component,ids) for component in COMPONENTS}
     pauses={}
     dates={}
-    for run_id,seq,date,n,name,param,integer,text in connection.execute(PAUSES,(ids,sorted(ANSWERS))).fetchall():
+    for run_id,seq,date,n,name,param,integer,text in connection.execute(PAUSES,(ids,)).fetchall():
         dates[(run_id,seq)]=date
         actions=pauses.setdefault((run_id,seq),{})
         actions.setdefault(n,(name,{}))

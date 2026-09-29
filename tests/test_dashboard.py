@@ -42,7 +42,7 @@ class DashboardTests(unittest.TestCase):
         from interface.recording.spec import VOCABULARIES
         folders={folder for names in VOCABULARIES.values() if names for folder in names}
         store=Store(DSN)
-        store.ruleset(b'rules',{**{f:[] for f in folders},**MEMBERS},[],[],[],[],[],ENUMS,[('income',1,'income_taxes')],EFFECTS)
+        store.ruleset(b'rules',{**{f:[] for f in folders},**MEMBERS},[],[],[],[],[],[],ENUMS,[('income',1,'income_taxes')],EFFECTS)
         store.world('ab',[{'color':'x000001','region':'STATE_TEST','terrain':'plains','area_pixels':4,'x':1.0,'y':2.0}],[],{})
         store.session='test'
         store.begin_run(started_at=AT,**RUN)
@@ -157,6 +157,23 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual((offers['build']['offered'],offers['build']['chosen']),(2,2))
         self.assertAlmostEqual(offers['build']['chosen_share'],2/3)
         self.assertAlmostEqual(offers['build']['offered_share'],2/5)
+
+    def test_configuration_performance_uses_scored_runs_and_keeps_missing_averages_null(self):
+        changes={self.run_id:(2,{'gdp':0.2,'population':0.1,'sol':-0.05})}
+        with patch('dashboard.server.policy.reward_changes',return_value=changes), patch('dashboard.server.policy.breakdown',return_value=(2,[{'contribution':1.5},{'contribution':-0.5}])):
+            found=rows(policy.configs([],'avg_reward',True,0,100))[0]
+        self.assertEqual((found['runs'],found['scored_runs'],found['avg_reward'],found['avg_years']),(1,1,1,2))
+        self.assertEqual((found['avg_gdp_gain'],found['avg_population_gain'],found['avg_sol_gain']),(20,10,-5))
+        self.assertEqual((found['avg_gdp_gain_per_year'],found['avg_population_gain_per_year'],found['avg_sol_gain_per_year']),(10,5,-2.5))
+        with patch('dashboard.server.policy.reward_changes',return_value=changes), patch('dashboard.server.policy.breakdown',return_value=(0,[{'contribution':1}])):
+            zero=rows(policy.configs([],'avg_gdp_gain_per_year',True,0,100))[0]
+        self.assertIsNone(zero['avg_gdp_gain_per_year'])
+        with patch('dashboard.server.policy.reward_changes',return_value={}):
+            found=rows(policy.configs([],None,False,0,100))[0]
+        self.assertEqual((found['runs'],found['scored_runs']),(1,0))
+        self.assertIsNone(found['avg_reward'])
+        self.assertIsNone(found['avg_gdp_gain'])
+        self.assertIsNone(found['avg_gdp_gain_per_year'])
 
     def test_random_initializer_weights_are_exposed_with_their_source(self):
         found=rows(policy.weights([('run',str(self.run_id))],'weight',True,0,100))

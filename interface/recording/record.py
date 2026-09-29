@@ -14,7 +14,7 @@ from ..actions.catalogue import action_folders
 from ..common import DEFAULT_DATA, slot, timed, timed_often
 from ..runner.memory import LAYOUT, MONTH_STARTS
 from ..timing import span
-from ..script import alerts, blocks, body, building_methods, decisions, definitions, event_options, keys, method_effects, production_methods, read, scalar
+from ..script import alerts, blocks, body, building_methods, decisions, definitions, event_effects, event_options, keys, method_effects, production_methods, read, scalar
 from .capture import (ALERT_SCOPES, BORROW_MAPS, RELEASE_MAPS, FORMABLE_MAPS, GROUPS, MESSAGE_MAPS, METRICS, PART, PROPOSAL_MAPS, UI_CHECKS, evaluable, method_block, metric_map,
                       map_data, missing_references, plain, province_colors)
 from .geography import geometry, mini_world, vanilla_world
@@ -139,6 +139,7 @@ def register(game,session,world,store):
     mods=session['mods']
     manifest=json.loads(world.read_text(encoding='utf-8')) if world else None
     options=event_options(root,mods)
+    consequences=event_effects(root,mods)
     rows=definitions(root,mods)
     folders={folder for names in VOCABULARIES.values() if names for folder in names}|{folder for folder,*_ in rows}|set(action_folders().values())
     members={}
@@ -178,8 +179,8 @@ def register(game,session,world,store):
     enums['tariff_level']={int(value):name for value,name in LAYOUT['tariff_levels'].items()}
     lines=[(direction,line,name) for (direction,line),name in BUDGET_LINES.items()]
     effects=method_effects(root,mods)
-    identity=hashlib.sha256(repr((members,table,options,methods,dlc,gaps,effects)).encode('utf-8')).digest()
-    store.ruleset(identity,members,table,options,methods,dlc,gaps,enums,lines,effects)
+    identity=hashlib.sha256(repr((members,table,options,consequences,methods,dlc,gaps,effects)).encode('utf-8')).digest()
+    store.ruleset(identity,members,table,options,consequences,methods,dlc,gaps,enums,lines,effects)
     store.orders=members
     store.definitions=table
     store.methods=methods

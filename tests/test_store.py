@@ -116,7 +116,7 @@ class StoreTests(unittest.TestCase):
             still.start()
             self.addCleanup(still.stop)
         self.store=Store(DSN)
-        self.store.ruleset(b'rules',{folder:list(names) for folder,names in {**{f:[] for f in self.folders()},**MEMBERS}.items()},[],[],[],[],[],ENUMS,
+        self.store.ruleset(b'rules',{folder:list(names) for folder,names in {**{f:[] for f in self.folders()},**MEMBERS}.items()},[],[],[],[],[],[],ENUMS,
                              [('income',1,'income_taxes')],EFFECTS)
         self.store.world('ab',[{'color':'x000001','region':'STATE_TEST','terrain':'plains','area_pixels':4,'x':1.0,'y':2.0}],[],{})
         self.store.session='test'

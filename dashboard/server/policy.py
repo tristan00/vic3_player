@@ -20,10 +20,21 @@ def weights(filters,sort,desc,offset,limit):
 
 @db.timed
 def configs(filters,sort,desc,offset,limit):
+    changes=reward_changes()
+    scored=[]
+    for found in db.rows('select run_id,objective_gdp,objective_population,objective_sol,objective_alpha from run where run_id=any(%s)',(list(changes),)):
+        years,parts=breakdown(changes,goal(found),found['run_id'])
+        scored.append([found['run_id'],years,sum(p['contribution'] for p in parts),*[100*changes[found['run_id']][1][c] for c in COMPONENTS]])
+    performance,params=rows_source(['int4',*['float8']*5],scored)
     specs=[Spec('initializer','text',INITIALIZER),Spec('picker','text','r.picker'),Spec('runs','number','count(*)'),
+           Spec('scored_runs','number','count(p.v0)',label='Scored runs'),
+           Spec('avg_reward','number','avg(p.v2)',label='Avg reward'),
+           *[Spec(f'avg_{c}_gain','number',f'avg(p.v{i+3})',label=f'Avg {label} gain (%)') for i,(c,label) in enumerate(zip(COMPONENTS,['GDP','population','SoL']))],
+           *[Spec(f'avg_{c}_gain_per_year','number',f'avg(p.v{i+3}/nullif(p.v1,0))',label=f'Avg {label} gain/year (%/yr)') for i,(c,label) in enumerate(zip(COMPONENTS,['GDP','population','SoL']))],
+           Spec('avg_years','number','avg(p.v1)',label='Avg years (scored)'),
            Spec('open','number','count(*) filter (where r.ended_at is null)'),Spec('first_run','run','min(r.run_id)'),Spec('last_run','run','max(r.run_id)')]
-    source=f'from run r where r.run_id>=%(first)s group by {INITIALIZER},r.picker'
-    return grid(specs,source,{'first':DEBT_CAP_FROM_RUN},filters,sort,desc,offset,limit,None,['initializer','picker'])
+    source=f'from run r left join (select * {performance}) p on p.v0=r.run_id where r.run_id>=%(first)s group by {INITIALIZER},r.picker'
+    return grid(specs,source,{**params,'first':DEBT_CAP_FROM_RUN},filters,sort,desc,offset,limit,None,['initializer','picker'])
 
 
 @db.timed

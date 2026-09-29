@@ -27,6 +27,27 @@ class EntriesTests(unittest.TestCase):
         self.assertEqual(len({value for name,value,_ in found if name!=ACTION}),2)
 
 
+class AnswerTests(unittest.TestCase):
+    def test_an_event_answer_carries_the_option_its_effects_and_how_many_were_offered(self):
+        from advisors.features import answers
+        known=answers({5:'x.1',6:'y.2'},[(5,0,0,True,True),(5,1,None,False,True),(5,2,1,False,True),(5,3,2,False,False),(6,0,0,True,True)],
+                      {('x.1',0):('x.1.a',[('add_modifier','rich')]),('x.1',2):('x.1.c',[('add_radicals',None),('add_modifier','poor')]),('y.2',0):('y.2.a',[])})
+        self.assertEqual(known,{('x.1',0):('x.1.a',True,2,[('add_modifier','rich')]),('x.1',1):('x.1.c',False,2,[('add_radicals',None),('add_modifier','poor')]),
+                                ('y.2',0):('y.2.a',True,1,[])})
+        lookup=SimpleNamespace(answer=lambda event,position:known[event,position])
+        found=entries([('choose_event_option',{'event':'x.1','option':1})],lookup)
+        self.assertEqual(found[1:],[('choose_event_option.event','event=x.1',1),('choose_event_option.option','option=1',1)][:0]+found[1:])
+        self.assertEqual([entry for entry in found if entry[0].startswith('answers')],
+                         [('answers','x.1.c',1),('answers.default','False',1),('answers.options_offered','answers.options_offered',2),
+                          ('answers.effects','add_radicals',1),('answers.effects','add_modifier',1),('answers.effect_details','add_modifier=poor',1)])
+        self.assertTrue(all(name in pickers.SIZES for name,_,_ in found if name.startswith('answers')))
+
+    def test_effects_are_read_from_an_option_without_its_conditions(self):
+        from interface.script import effects_in
+        text='name = x.1.a trigger = { add_radicals = 1 } add_loyalists = { value = 0.1 } if = { limit = { add_radicals = 2 } add_modifier = { name = rich days = 5 } } ai_chance = { base = 1 }'
+        self.assertEqual(effects_in(text),[('add_loyalists',None),('add_modifier','rich')])
+
+
 class HoldingsTests(unittest.TestCase):
     def test_levels_are_counted_for_buildings_in_the_player_states_only(self):
         holdings=Holdings.__new__(Holdings)
