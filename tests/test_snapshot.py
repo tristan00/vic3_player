@@ -2,11 +2,11 @@ import struct
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from interface.options.available import RULES, barred_regions, capital_frontier, held_companies, months_later, repealable, trade_level
+from interface.options.available import RULES, barred_regions, capital_frontier, companies, held_companies, months_later, repealable, trade_level
 from tests.memory_stored import Memory
 from interface.runner.memory import Reader, HEAP_LOW, visible_columns
 from interface.script import event_options
@@ -254,6 +254,7 @@ class SnapshotTests(unittest.TestCase):
 
 PLAYER=(1<<24)|7
 OTHER=(2<<24)|8
+THIRD=(3<<24)|9
 
 
 def snapshot(definitions=None,**tables):
@@ -287,6 +288,49 @@ class RuleTests(unittest.TestCase):
                    player_construction_queue_item=[{'private':True,'position':0,'state':PLAYER,'building_type':'building_farm'}],player_treasury=[{'in_default':False}])
         with mock.patch('interface.options.available.technologies',lambda s:(set(),set(),set(),set())):
             self.assertEqual(RULES['build'](s),[{'state':PLAYER,'building_type':'building_mine'}])
+
+    def test_resource_buildings_are_offered_while_the_state_region_has_capacity_left(self):
+        from unittest import mock
+        s=snapshot({'common/buildings':{'building_mine':{'building_group':['bg_mining']},'building_camp':{'building_group':['bg_logging']}},
+                    'common/building_groups':{'bg_extraction':{'capped_by_resources':['yes']},'bg_mining':{'parent_group':['bg_extraction']},
+                                              'bg_logging':{'parent_group':['bg_extraction']}}},
+                   state_history=[{'state':PLAYER,'country':PLAYER,'state_region':'STATE_A'},{'state':OTHER,'country':PLAYER,'state_region':'STATE_B'}],
+                   state_region_resource=[{'state_region':'STATE_A','building_type':'building_mine','available_levels':2},
+                                          {'state_region':'STATE_B','building_type':'building_camp','available_levels':1}],
+                   building_history=[{'building':1,'building_type':'building_mine','state':PLAYER,'levels':1},
+                                     {'building':2,'building_type':'building_camp','state':OTHER,'levels':1}],player_treasury=[{'in_default':False}])
+        with mock.patch('interface.options.available.technologies',lambda s:(set(),set(),set(),set())):
+            self.assertEqual(RULES['build'](s),[{'state':PLAYER,'building_type':'building_mine'}])
+
+    def test_trade_centers_are_offered_in_every_state_and_farms_only_on_free_arable_land_of_their_region(self):
+        from unittest import mock
+        s=snapshot({'common/buildings':{'building_trade_center':{'building_group':['bg_trade']},'building_farm':{'building_group':['bg_farms']}},
+                    'common/building_groups':{'bg_farms':{'parent_group':['bg_agriculture']},'bg_agriculture':{'land_usage':['rural']}},
+                    'map_data/state_regions':{'STATE_A':{'arable_resources':['building_farm']},'STATE_B':{'arable_resources':['building_farm']},'STATE_C':{}}},
+                   state_history=[{'state':PLAYER,'country':PLAYER,'state_region':'STATE_A'},{'state':OTHER,'country':PLAYER,'state_region':'STATE_B'},
+                                  {'state':THIRD,'country':PLAYER,'state_region':'STATE_C'}],player_treasury=[{'in_default':False}])
+        with mock.patch('interface.options.available.technologies',lambda s:(set(),set(),set(),set())), \
+             mock.patch('interface.options.available.free_arable',lambda s,state:{PLAYER:3,OTHER:0,THIRD:9}[state]):
+            self.assertEqual(sorted(RULES['build'](s),key=lambda combo:(combo['building_type'],combo['state'])),
+                             [{'state':PLAYER,'building_type':'building_farm'},
+                              *({'state':state,'building_type':'building_trade_center'} for state in sorted((PLAYER,OTHER,THIRD)))])
+
+    def test_treaty_articles_follow_their_kind_inputs_technology_and_existing_articles(self):
+        from unittest import mock
+        articles={'trade_privilege':{'kind':['directed']},'transit_rights':{'kind':['directed']},'alliance':{'kind':['mutual']},
+                  'goods_transfer':{'kind':['directed'],'required_inputs':['quantity','goods']},'no_tariffs':{'kind':['directed'],'required_inputs':['goods'],
+                                                                                                    'unlocked_by_technologies':['international_trade']},
+                  'treaty_port':{'kind':['directed'],'required_inputs':['state']}}
+        s=snapshot({'common/treaty_articles':articles},player_diplomatic_option=[{'target_country':OTHER,'action_type':'rivalry','possible':True}],
+                   treaty_history=[{'treaty':1,'first_country':PLAYER,'second_country':OTHER,'withdrawn':False}],
+                   treaty_article_history=[{'treaty_article':1,'treaty':1,'treaty_article_type':'trade_privilege','source_country':PLAYER,'target_country':OTHER}])
+        with mock.patch('interface.options.available.technologies',lambda s:(set(),set(),set(),set())),mock.patch('interface.options.available.traded',lambda s:['grain','iron']):
+            self.assertEqual(RULES['offer_treaty_article'](s),[{'country':OTHER,'treaty_article':'transit_rights'}])
+            self.assertEqual(RULES['demand_treaty_article'](s),[{'country':OTHER,'treaty_article':'trade_privilege'},{'country':OTHER,'treaty_article':'transit_rights'}])
+            self.assertEqual(RULES['agree_treaty_article'](s),[{'country':OTHER,'treaty_article':'alliance'}])
+            self.assertEqual(RULES['offer_goods_treaty_article'](s),[{'country':OTHER,'treaty_article':'goods_transfer','goods':'grain'},
+                                                                     {'country':OTHER,'treaty_article':'goods_transfer','goods':'iron'}])
+            self.assertEqual(RULES['demand_goods_treaty_article'](s),RULES['offer_goods_treaty_article'](s))
 
     def test_recruit_is_offered_only_in_barracks_states_without_a_queued_level(self):
         from unittest import mock
@@ -450,6 +494,31 @@ class DecodeFilterTests(unittest.TestCase):
 
 
 class CompanyOptionTests(unittest.TestCase):
+    def test_company_creation_requires_attainable_trigger(self):
+        s=MagicMock()
+        s.player=PLAYER
+        s.rows.return_value=[]
+        s.keys.return_value=['company_example']
+        s.buildings.return_value=[(1,'building_textile_mill',5)]
+        folder='common/company_types'
+        fields={'building_types':['building_textile_mill'],'potential':['always = yes'],
+                'attainable':['always = no'],'possible':['always = yes']}
+        principles=set()
+        with patch('interface.options.available.metric',side_effect=lambda s,k:0 if k=='GetNumCompanies' else 5), \
+             patch('interface.options.available.technologies',return_value=(set(),None,None,None)), \
+             patch('interface.options.available.buildable',return_value=[]), \
+             patch('interface.options.available.recently_disbanded',return_value=set()), \
+             patch('interface.options.available.bloc_principles',return_value=principles), \
+             patch('interface.options.available.definition',side_effect=lambda s,f,n,k:fields.get(k,[]) if f==folder else []), \
+             patch('interface.options.available.company_levels',return_value=5):
+            self.assertEqual(companies(s),[])
+            fields['attainable']=['always = yes']
+            self.assertEqual(companies(s),['company_example'])
+            fields['unlocking_principles']=['principle_construction_3']
+            self.assertEqual(companies(s),[])
+            principles.add('principle_construction_3')
+            self.assertEqual(companies(s),['company_example'])
+
     def test_a_company_type_founded_abroad_stays_open_to_the_player(self):
         s=snapshot(company_history=[{'company':1,'country':PLAYER,'company_type':'company_basic_fishing'},
                                     {'company':2,'country':OTHER,'company_type':'company_basic_forestry'}])

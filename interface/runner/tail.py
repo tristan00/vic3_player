@@ -14,7 +14,7 @@ kernel=ctypes.WinDLL('kernel32',use_last_error=True)
 kernel.CreateFileW.restype=wintypes.HANDLE
 kernel.CreateFileW.argtypes=[wintypes.LPCWSTR,wintypes.DWORD,wintypes.DWORD,ctypes.c_void_p,wintypes.DWORD,wintypes.DWORD,wintypes.HANDLE]
 
-POLL=.002
+POLL=.05
 WINDOW=16<<20
 TRACE=256
 SETTLE=1
@@ -88,6 +88,7 @@ class LogTail:
             if 0 not in files:
                 return
             active,_,size=files[0]
+            data=shared_read(active,self.offset-len(self.last))
             chunks=[]
             if self.known is None:
                 chunks=[shared_read(files[index][0],0) for index in sorted(files,reverse=True) if index]
@@ -96,7 +97,7 @@ class LogTail:
                 fresh=sorted((index for index,(_,ident,_) in files.items() if index and ident not in self.known),reverse=True)
                 if fresh and files[fresh[-1]][2]==size:
                     return
-                if fresh or not self.continues(active,size):
+                if fresh or data[:len(self.last)]!=self.last:
                     if fresh and self.continues(*files[fresh[0]][::2]):
                         chunks=[shared_read(files[index][0],self.offset if index==fresh[0] else 0) for index in fresh]
                     elif self.unsettled is None or time.monotonic()-self.unsettled<SETTLE:
@@ -109,7 +110,8 @@ class LogTail:
                     self.known=self.rotated(files)
                     self.offset=0
                     self.last=b''
-            data=shared_read(active,self.offset)
+                    data=shared_read(active,0)
+            data=data[len(self.last):]
             self.offset+=len(data)
             self.last=(self.last+data)[-TRACE:]
             added=b''.join(chunk if chunk.endswith(b'\n') or not chunk else chunk+b'\n' for chunk in chunks)+data

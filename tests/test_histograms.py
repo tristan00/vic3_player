@@ -3,9 +3,9 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from advisors import pickers
-from advisors.histograms import ACTION, APPROVAL, BUILDINGS, CLOUT, GOVERNING, IDEOLOGIES, METHODS, PEOPLE, QUEUE, QUEUE_POSITION, QUEUE_PROGRESS, ROLES, Histograms, Holdings, country, entries
-from advisors.tune import decode, space
+from advisors.models.histogram import data as pickers
+from advisors.data.histograms import ACTION, APPROVAL, BUILDINGS, CLOUT, GOVERNING, IDEOLOGIES, METHODS, PEOPLE, QUEUE, QUEUE_POSITION, QUEUE_PROGRESS, ROLES, Histograms, Holdings, country, entries
+from advisors.models.histogram.tune import decode, initial, space
 
 LOOKUP=SimpleNamespace(player=1,terrain={},state=lambda state:(None,None),building=lambda ident:None,typed=lambda kind,ident:None,character=lambda ident:None,
                        country=lambda ident:None)
@@ -22,35 +22,33 @@ class Table:
 
 class EntriesTests(unittest.TestCase):
     def test_each_action_counts_its_type_and_each_parameter_it_carries(self):
-        found=entries([('set_tax_level',{'level':'High'}),('set_tax_level',{'level':'Low'})],LOOKUP)
-        self.assertEqual([name for name,_,_ in found],[ACTION,'set_tax_level.level',ACTION,'set_tax_level.level'])
+        found=entries([('raise_taxes',{'level':'high'}),('raise_taxes',{'level':'very_high'})],LOOKUP)
+        self.assertEqual([name for name,_,_ in found],[ACTION,'raise_taxes.level',ACTION,'raise_taxes.level'])
         self.assertEqual(len({value for name,value,_ in found if name!=ACTION}),2)
 
 
     def test_a_cancelled_queue_item_carries_its_queue_position_and_progress(self):
         queue=[(True,50.0,0,4,'building_barrack'),(False,200.0,0,4,'building_port'),(False,25.0,1,4,'building_barrack'),(False,100.0,2,6,'building_barrack')]
-        lookup=SimpleNamespace(**vars(LOOKUP),queue=queue,place=lambda ident:{11:(6,'building_barrack')}[ident])
-        found=entries([('cancel_queue_item',{'state':4,'building_type':'building_barrack'}),('cancel_construction',{'building':11})],lookup)
+        lookup=SimpleNamespace(**vars(LOOKUP),queue=queue)
+        found=entries([('cancel_construction',{'state':4,'building_type':'building_barrack'}),('cancel_construction',{'state':6,'building_type':'building_barrack'})],lookup)
         self.assertEqual([entry for entry in found if entry[0] in QUEUE],
-                         [(QUEUE_POSITION,'cancel_queue_item',2),(QUEUE_PROGRESS,'cancel_queue_item',.75),
+                         [(QUEUE_POSITION,'cancel_construction',2),(QUEUE_PROGRESS,'cancel_construction',.75),
                           (QUEUE_POSITION,'cancel_construction',3),(QUEUE_PROGRESS,'cancel_construction',0.0)])
-        self.assertTrue(all(name in pickers.SIZES for name in QUEUE))
 
 
 class AnswerTests(unittest.TestCase):
     def test_an_event_answer_carries_the_option_its_effects_and_how_many_were_offered(self):
-        from advisors.features import answers
+        from advisors.data.features import answers
         known=answers({5:'x.1',6:'y.2'},[(5,0,0,True,True),(5,1,None,False,True),(5,2,1,False,True),(5,3,2,False,False),(6,0,0,True,True)],
                       {('x.1',0):('x.1.a',[('add_modifier','rich')]),('x.1',2):('x.1.c',[('add_radicals',None),('add_modifier','poor')]),('y.2',0):('y.2.a',[])})
         self.assertEqual(known,{('x.1',0):('x.1.a',True,2,[('add_modifier','rich')]),('x.1',1):('x.1.c',False,2,[('add_radicals',None),('add_modifier','poor')]),
                                 ('y.2',0):('y.2.a',True,1,[])})
         lookup=SimpleNamespace(answer=lambda event,position:known[event,position])
-        found=entries([('choose_event_option',{'event':'x.1','option':1})],lookup)
-        self.assertEqual(found[1:],[('choose_event_option.event','event=x.1',1),('choose_event_option.option','option=1',1)][:0]+found[1:])
+        found=entries([('answer_event',{'event':'x.1','option':1})],lookup)
+        self.assertEqual(found[-2:],[('answer_event.event','event=x.1',1),('answer_event.option','option=1',1)])
         self.assertEqual([entry for entry in found if entry[0].startswith('answers')],
                          [('answers','x.1.c',1),('answers.default','False',1),('answers.options_offered','answers.options_offered',2),
                           ('answers.effects','add_radicals',1),('answers.effects','add_modifier',1),('answers.effect_details','add_modifier=poor',1)])
-        self.assertTrue(all(name in pickers.SIZES for name,_,_ in found if name.startswith('answers')))
 
     def test_effects_are_read_from_an_option_without_its_conditions(self):
         from interface.script import effects_in
@@ -73,10 +71,11 @@ class HoldingsTests(unittest.TestCase):
                                               (IDEOLOGIES,'royalist',1),(ROLES,'ruler',1),(ROLES,'general',1),
                                               (PEOPLE,'lower_strata',.6),(PEOPLE,'middle_strata',.3),(PEOPLE,'upper_strata',.1),(PEOPLE,'radicals',.2),(PEOPLE,'loyalists',.05)])
 
-    def test_the_country_histograms_are_included_whole_beside_the_tuned_design(self):
+    def test_country_histograms_obey_the_tuned_design(self):
         histograms=Histograms([country([('landowners',True,.6,5.0),('devout',False,.3,-2.0)],['royalist',None],['ruler'],[60,30,10,20,5])])
-        self.assertEqual(len(histograms.columns(pickers.SIZES)),2+2+2+2+1+5)
-        self.assertEqual(len(histograms.labels(pickers.SIZES)),14)
+        chosen={name:2 for name in (CLOUT,APPROVAL)}
+        self.assertEqual(len(histograms.columns(chosen)),4)
+        self.assertEqual(histograms.labels(chosen),[APPROVAL+'=devout',APPROVAL+'=landowners',CLOUT+'=devout',CLOUT+'=landowners'])
         self.assertEqual({name:size for name,size in pickers.SIZES.items() if name in pickers.DESIGN['sizes']},pickers.DESIGN['sizes'])
 
 
@@ -98,18 +97,18 @@ class HistogramTests(unittest.TestCase):
         self.assertEqual(self.histograms.columns(sizes),[0,1,2])
         self.assertEqual(self.histograms.labels(sizes),['a=x','a=y','b=p'])
 
-    def test_the_centre_of_the_space_is_production_settings_with_every_histogram_whole(self):
+    def test_initial_point_is_production_settings_with_every_histogram_whole(self):
         low,high,names=space(self.bins)
-        params,sizes=decode(np.zeros(len(low)),self.bins)
+        params,sizes=decode(initial(self.bins),self.bins)
         self.assertEqual(params,{name:pickers.PARAMS[name] for name in params})
         self.assertEqual(sizes,{'a':2,'b':1})
-        self.assertTrue((low<=0).all() and (high>=0).all())
+        self.assertTrue((low<=initial(self.bins)).all() and (high>=initial(self.bins)).all())
 
     def test_the_corners_of_the_space_decode_to_valid_settings(self):
         low,high,_=space(self.bins)
         self.assertEqual(decode(low,self.bins)[1],{})
         params,sizes=decode(high,self.bins)
-        self.assertEqual((params['depth'],params['iterations'],params['one_hot_max_size'],sizes),(10,400,32,{'a':2,'b':1}))
+        self.assertEqual((params['depth'],params['iterations'],params['one_hot_max_size'],sizes),(10,400,512,{'a':2,'b':1}))
 
 
 if __name__=='__main__':

@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 from ..common import timed, timed_often
 from ..script import event_namespaces, keys
@@ -138,8 +139,6 @@ def states(code,action,chain,index,values):
 
 @timed_often
 def wrap(code,action,chain,values,inner):
-    if not chain and not action.context:
-        return inner
     for datamodel,_ in reversed(chain):
         if datamodel.startswith('@'):
             inner=f'widget = {{ size = {{ 0 0 }} datacontext = "[{fill(datamodel[1:],values)}]"\n{inner}\n}}'
@@ -238,7 +237,7 @@ def key_widgets(table):
     widgets=[];offset=0
     for kind,names in table.items():
         for index,name in enumerate(names,offset+1):
-            widgets.append(f'widget = {{ size = {{ 0 0 }} state = {{ name = key_{index} trigger_when = "[{equal("interface_key",index)}]" '
+            widgets.append(f'widget = {{ size = {{ 0 0 }} state = {{ name = key_{index} trigger_when = "[{conjunction(equal("interface_key",index),equal("interface_mode",0))}]" '
                            f'on_start = "[GetVariableSystem.Set(\'interface_key\', \'{name}\')]" on_start = "[GetVariableSystem.Set(\'interface_key_ready\', \'1\')]" }} }}')
         offset+=len(names)
     return widgets
@@ -316,7 +315,9 @@ DEFERRED_CLEAN=('widget = { size = { 0 0 } '+STAGE_TIMERS+' '+deferred_state('al
 
 @timed
 def hud(game_dir,mods=()):
-    return 'widget = { name = interface_actions size = { 0 0 }\n'+'\n'.join([DEFERRED_CLEAN,*key_widgets(key_table(game_dir,mods)),*action_widgets(False),*start_widgets()])+'\n}\n'
+    return ('widget = { name = interface_actions size = { 0 0 } '
+            f'visible = "[GreaterThan_CFixedPoint({VAR.format("interface_action")}.GetValue, \'(CFixedPoint)0\')]"\n'
+            +'\n'.join([DEFERRED_CLEAN,*key_widgets(key_table(game_dir,mods)),*action_widgets(False),*start_widgets()])+'\n}\n')
 
 
 PROPOSAL_CAPTURE=('widget = { size = { 0 0 } state = { name = capture_message duration = 0.001 '
@@ -326,11 +327,12 @@ PROPOSAL_CAPTURE=('widget = { size = { 0 0 } state = { name = capture_message du
 
 
 @timed
-def windows(game_dir):
+def windows(game_dir,mods=()):
     injected={PROPOSALS:[PROPOSAL_CAPTURE],TRANSPORT_PLANNER:[TRANSPORT_WIDGET],SHIP_PAGES:[ship_navigation()]}
     for (path,anchor),inner in action_widgets(True):
         injected.setdefault((path,anchor),[]).append(inner)
-    files={}
+    files={'gui/'+path.relative_to(root/'gui').as_posix():path.read_text(encoding='utf-8-sig')
+           for root in map(Path,mods) for path in (root/'gui').rglob('*.gui')}
     for (path,anchor),inners in injected.items():
         text=files.get(path) or (game_dir/path).read_text(encoding='utf-8-sig')
         if anchor.startswith('name = ') or anchor.startswith('datacontext = '):

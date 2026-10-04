@@ -1,153 +1,72 @@
-# Loop speed
+# Quarterly collection
 
-This records what has been done to cut the time the loop spends on its own scaffolding, what each change measured, and the proof that runs are unchanged. How timing works is in `timing.md`.
+## Approved configuration
 
-Last update: 2026-09-27 14:10, covering runs 269 to 271.
+The batch uses `D:/vic3_data/interface/collection_d9690b4774954f66aa474465795a1325.json` and ends at 697 completed rounds. The October 3 extension added 500 rounds to the 197 already completed. The checkpoint counts completed rounds; database run IDs also include failed attempts.
 
-## State
+Each round independently draws uniformly from three initializers (`random`, `random_smac_weighting`, `random_svr_weighting`) and three pickers (`first`, `catboost`, `catboost_piecewise`). There is no additional warmup. Learned methods use the shared three-metric reward in `rewards.md`. Initializer baselines are the run opening; picker baselines are the pause's first snapshot. A selected learned picker fits a fresh estimator.
 
-All changes below are live since round collect_67, launched at 13:53:05. Runs 270 and 271 use them. Round collect_66 ran one hour earlier on a first version with slow validation, which run 269 used.
+```powershell
+.venv/Scripts/python.exe -m loop.launch --world-cache D:/vic3_data/interface/world_cache_politics_20260930 --runs 697 --minutes 12 --years 100 --advisors random random_smac_weighting random_svr_weighting --pickers first catboost catboost_piecewise --progress-file D:/vic3_data/interface/collection_d9690b4774954f66aa474465795a1325.json
+```
 
-| commit | content |
-| --- | --- |
-| 7be451d | spans on every function, coverage test, faster snapshot reading, validation, row building and offered actions |
-| 396e41c | validation uses index lookups |
-| bcc9ddb | faster log file listing, two hot helpers listed instead of timed |
+Rounds are limited to twelve minutes and one hundred game years. A checkpoint of 697 is normal completion. Preserve collected data and completed progress. Batch size, lineup, checkpoint resets, and deletion require the applicable user instruction. Superseded launch artifacts do not override this configuration.
 
-Earlier commits 7b49bf3, d6f8025 and 8f59257 are described at the end. Commit 8f59257, which launches the game while picker training finishes, went live with collect_66.
+## Timeouts and the latest restart
 
-## Measured live
+The game-clock tick limit and execution watchdog are both five seconds. Changing any timeout requires direct user approval, including during autonomous repair or monitoring.
 
-Mean per call over snapshots 2 to 98, on worlds of similar size.
+An hourly monitor previously increased the tick limit to thirty seconds without approval. The user stopped that collection and requested deletion of its runs. The database deletion utility removed the three affected runs and dependent records, restoring the checkpoint from 313 to 311. Filesystem cleanup was blocked, so old logs and saves may remain. Those files are not valid training records or evidence of the active batch.
 
-| span | run 248, 66 states, before any speedup | run 254, 63 states, earlier speedups | run 270, 70 states, now |
-| --- | --- | --- | --- |
-| whole snapshot, ms | 1039 | 909 | 821 |
-| wait for the game's capture, ms | 417 | 461 | 465 |
-| holder decode, ms | 104 | 88 | 17 |
-| snapshot write, ms | 333 | 173 | 137 |
-| validation, ms | 219 | 61 | 20 |
-| row building, ms | 113 | 121 | 129 |
-| offered actions per pause, ms | 268 | 225 | 120 |
-| action dispatch, ms | 368 | 378 | 365 |
+On October 3 at approximately 21:08 Pacific, the user explicitly approved restoring five seconds and restarting. `TICK_LIMIT` was restored to five, twelve focused checks passed in 0.085 seconds, and the detached supervisor relaunched from checkpoint 311. Subsequent run IDs may reuse the deleted tail IDs; identify historical runs by start time as well as ID.
 
-Row building did not improve live. Offline it fell from 45 to 32 ms on a 46 state capture. Run 270 builds more rows, and each builder now carries its own span, so the comparison is not like for like. Its breakdown is below.
+After unpausing, the loop reads native game time and reports progress until the next quarter. More than five seconds without a tick triggers a process-liveness check and `ClockStalled`. Defeat and target-date checks remain active. Clock failures preserve native log tails and session identity under `D:/vic3_data/interface/incidents`. Quarter-completion logs report the longest tick gap. Ordinary action pauses differ from mid-quarter clock stalls.
 
-Validation and offered actions used to grow during a run. Validation scanned every row the run had written to a table. Offered actions reread ruleset data on every pause. Neither does so now. Run 244 spent 380 ms per snapshot on validation over a full hour. An hour-long run on the new code has not finished yet, so the hourly figure is still open.
+CPU saturation was observed during the earlier recovery, but its relationship to the historical stalls remains unproven. The old thirty-second recovery report does not establish a resolved cause.
 
-## Where a snapshot goes now
+## Startup and supervision
 
-Run 270, mean per snapshot.
+The initializer-only transition began at run 213. The full lineup began after run 284 and checkpoint 276. Its original transition evidence is under `artifacts/full_mix_20261003`.
 
-| part | ms | whose time |
-| --- | --- | --- |
-| wait for the game's capture | 465 | the game |
-| memory snapshot decode | 50 | loop |
-| holder decode | 17 | loop |
-| row building | 129 | loop |
-| write: copy to the database | 39 | loop and database |
-| write: versions | 29 | loop |
-| write: resolve | 23 | loop |
-| write: validation | 20 | database |
-| write: timing rows | 13 | loop and database |
-| write: samples | 10 | loop |
+The first piecewise startup exposed a watchdog stall while training-data conversion overlapped opening-world checks. Startup runs model training, recording preparation, and game readiness concurrently. The main thread reports preparation progress while waiting; all three operations must finish within the existing 180-second preparation bound. The latest restart did not alter that bound.
 
-Inside row building the largest parts are ordering rows into column order at 35 ms, grouping child rows at 25 ms, and reading rows at 13 ms.
+The startup-fix reload under `artifacts/picker_startup_20261003` completed after run 285 and checkpoint 277. Run 286 selected `random_smac_weighting` and `catboost_piecewise`; advancing snapshots verified that transition.
 
-## Where an action goes now
+Arguments and loaded code remain fixed during a loop process. Changes take effect after a restart using the same checkpoint and cumulative target. The checkpoint is written after the game closes and before the next run opens. Launch uses the project's detached process broker, so collection survives the invoking terminal.
 
-Run 270, mean per action. These spans are new, so there is no earlier figure.
+Only one collection may run at once. The supervisor restarts failed collectors and stops after repeated rapid exits. Completed rounds update the checkpoint atomically. Crashes remain recorded and do not increment it. The next run marks an abandoned open run as lost.
 
-| part | ms | whose time |
-| --- | --- | --- |
-| pacing gap before the action | 46 | fixed by the transport |
-| prime delay | 100 | fixed by the transport |
-| wait for the game's answer | 292 | the game, including its fixed 100 ms cleanup delay |
+The hourly automation `keep-victoria-3-collection-running` is paused after the user's stop instruction. Restarting the detached collection supervisor does not re-enable that automation. Any future monitoring must preserve the approved configuration and obtain direct approval before changing timeouts.
 
-Actions take about 37 % of an hour of play. The fixed delays were raised on purpose. Commit ee93fb5 set the 300 ms cycle because faster commands were dropped by the game. They are left as they are.
+Verify a restart using process identities, database heartbeat, snapshots, and advancing game dates. Keep test invocations below twenty seconds. `python -m loop.stop` stops the supervisor, collector, and game. Explicit stop instructions take precedence over recovery behavior.
 
-## Changes
+## Quarterly decisions
 
-| change | before | after | measured on |
-| --- | --- | --- | --- |
-| Holder decode looks a token up in memory before reading the game | 104 ms | 17 ms | runs 248 and 270 |
-| Validation asks the database about the values just written, in one pipeline of prepared statements | 219 ms | 20 ms | runs 248 and 270 |
-| Offered actions load their tables over eight connections | 171 ms in sequence for 106 tables | about 130 ms, bounded by the largest table | run 260, snapshot 500, offline |
-| Ruleset data, table list and name tables are read once per run | reread on every snapshot | read once | offline |
-| A cached lookup no longer opens a span on every hit | about 130 ms per pause | 0 | run 260, 110000 calls per pause |
-| Rows are ordered by one prepared getter per row shape | 16 ms | 10 ms | capture of 39000 rows, offline |
-| Resolve visits only columns that need a check | 14 ms | 12 ms | offline |
-| The action answer is searched in the log text gained since the action started | whole 16 MB window decoded on every poll | only new text | not measured apart |
-| Log files are listed with one directory read | 0.39 ms | 0.065 ms | offline, 300 calls |
-| A span costs less | 1.2 µs | 0.8 µs | 300000 calls |
-| Test suite | 253 tests in 17.4 s | 267 tests in 14.7 s | full suite |
+The game pauses on January 1, April 1, July 1, and October 1. Decision blocks contain at most sixteen actions, including event and proposal answers. The sampled target ranges from six to sixteen and favors smaller blocks. Conflicts and pause-ending actions can shorten a block. Pending answers take priority and count toward the cap.
 
-## Proof that runs are unchanged
+Time advancement is infrastructure, never a selectable candidate or action-block feature, and creates no synthetic action row. Speed and unpause commands remain recorded under the loop advisor. The calendar has 365 days; quarters span 90, 91, 92, and 92 days.
 
-| change | evidence |
-| --- | --- |
-| offered actions | 40 stored snapshots from 8 runs give the same 56568 offered combinations on old and new code |
-| row building | two captures read from the running game give identical rows on old and new code |
-| snapshot write and validation | eight writes of those captures leave 88799 rows with the same digest on old and new code |
-| holder decode | five back-to-back reads of the running game are equal between old and new code |
-| world and control mod | 764 generated files are identical; the HUD differs only by its random token |
-| live action status | runs 269 to 271: 1688 done and 2 invalid, no action without a game object |
-| round logs | collect_66 and collect_67 hold no traceback, stall, crash or block |
+A monthly pulse restricted to quarter-start months triggers the native pause handler. The loop waits for the quarter, lets the clock settle, and captures the observation. A pause outside the first day raises an error. Cadence evidence is in `artifacts/quarterly_cadence/probe_result.json` and the optimization probes.
 
-Validation changed what it asks. It used to look for rows of the snapshot whose target is missing. It now checks that every value written has its target. Only `Store.write` writes those rows, so both catch the same fault. A test writes a value without a target and confirms the refusal.
+`--advisors` and `--pickers` define available methods. `--warmup N` forces random initialization and the first candidate while fewer than N rounds are complete; the current launch does not request warmup.
 
-## The slow validation in collect_66
+## Cached worlds
 
-The first version kept a setting that disabled nested loops inside the snapshot transaction. With the new checks that forced a scan of whole target tables, and validation took 1060 ms per snapshot in run 269. The run is otherwise normal and its data is valid. The setting is removed in 396e41c.
+`D:/vic3_data/interface/world_cache_politics_20260930` contains the completed politics and culture cache. Collection samples worlds uniformly with replacement, chooses a playable country, and starts from original generated files. Opening buildings and relationships are checked after loading.
 
-## Rollovers
+```powershell
+.venv/Scripts/python.exe -m interface.world.cache status --directory D:/vic3_data/interface/world_cache_politics_20260930
+.venv/Scripts/python.exe -m interface.world.cache build --directory D:/vic3_data/interface/world_cache_politics_20260930 --count 1000 --workers 12 --seed 2026093001
+```
 
-Both restarts happened between runs, so no run was lost.
+Cache construction uses the detached broker, an exclusive lock, and independent workers. Resume reuses audited worlds. Changing the seed, generator fingerprint, or executable requires a new cache. Manifests contain absolute paths. Collection requires at least one thousand complete, compatible, distinct manifests. Missing or incompatible inputs raise an error. Cache mode cannot combine with sliders, a fixed tag, vanilla mode, or a generation pool. The cache survives temporary-world cleanup.
 
-| time | what |
-| --- | --- |
-| 13:34:42 | run 268 ended; collect_65 stopped during its next setup; collect_66 launched at 13:34:48 |
-| 13:52:59 | run 269 ended; collect_66 stopped during its next setup; collect_67 launched at 13:53:05 |
+## Performance
 
-## Setup
+The game retains its 120 FPS cap. Controlled comparisons found no simulation-speed gain from 240 FPS on the same fifteen-country, ninety-five-state world. Repeated 120 FPS baselines measured approximately 13.1 to 13.2 game days per second; world size and competing workload affect throughput.
 
-| step | seconds | can it shrink |
-| --- | --- | --- |
-| game launch and load | 33 | no, it is the game |
-| picker training | 34, overlapped | it holds nothing up unless it outlasts world and game together |
-| world generation | 15 to 40 | `--pool 1` builds the next world during play; the supervisor arguments are the owner's choice |
-| first snapshot with statistics refresh | 9 | the refresh is bounded by its largest table |
-| registration | 3 | small |
+Execution retains its 100 ms prime interval and native completion checks, with the former inter-action gap and minimum cycle removed. Key callbacks reset so identical consecutive commands can complete. See `action_verification.md`.
 
-## Looked at and left alone
+Inactive action widgets are hidden. Training, recording preparation, and game readiness overlap during loading. Cached inputs remove generation from transitions. Defeat checks read owned-state counts; each simulation poll reads one date. Background log polling uses fifty milliseconds, with more frequent foreground acknowledgement polling.
 
-| item | finding |
-| --- | --- |
-| transport delays | see above; raised on purpose in ee93fb5 |
-| frame rate cap of 30 | the transport advances once per frame, so a higher cap would shorten every action and capture; the GPU sits at 12 to 19 % and the guard kills the game above 50 %, so the cap is the owner's protection |
-| skipping log reads when the file size is unchanged | Windows reported a stale size for a full 25 s while new data was readable, so the read is required |
-| one copy statement per table | 290 statements cost 39 ms per snapshot; batching small tables as inserts would add a second write path |
-| pop needs table | its read scans every version a run has written and bounds the parallel load at 80 to 120 ms late in a run; a filter on the player's states was slower |
-| statistics refresh in the background | the first offered actions would be planned without statistics on multi-gigabyte tables |
-| picker training rows | 6 s of Python with 10 million calls to one lookup; it no longer holds anything up |
-
-## Earlier changes
-
-| commit | change | before | after |
-| --- | --- | --- | --- |
-| 7b49bf3 | statistics refresh over eight connections | 17.7 to 21.6 s | 5.1 to 8.8 s |
-| 7b49bf3 | picker training runs while the world generates | 25 s after the game loaded | overlapped |
-| d6f8025 | world generation, three seeds | 95.0 s | 64.3 s |
-| 8f59257 | the game launches as soon as the world is ready | waited 7 to 18 s for training | no wait |
-
-Commit 7b49bf3 moved two random draws, so a round replayed with the same `--seed` draws different values than before it.
-
-## Simplifications and fallbacks noticed
-
-| where | note |
-| --- | --- |
-| `loop.run.build` | a one-line pass to `generate`; the pool and the tests could call `generate` directly |
-| `Fresh.take` and `session` | both start a one-worker pool and poll it once a second to stamp progress; one helper could serve both |
-| `LogTail.poll` | swallows `PermissionError` and `FileNotFoundError`; a missing log directory is hidden until the log goes quiet |
-| `record._event_options` | retries `OSError` for a second before raising |
-| `tests/timing_exempt.json` | `Reader.tokens` is listed as hot; after the token lookup it runs far less and could be timed |
+Optimization measurements are under `artifacts/loop_optimization`: `collection_baseline.json`, `results.json`, `candidate120.json`, and `report.json`. Native acknowledgement latency differs from complete snapshot capture and database writing. Concurrent and nested spans must not be summed as independent elapsed time. See `timing.md`.

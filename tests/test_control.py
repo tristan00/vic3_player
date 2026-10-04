@@ -26,11 +26,69 @@ def event_widget():
 
 
 class StartupTests(unittest.TestCase):
+    def test_world_hud_survives_control_mod_generation(self):
+        from tempfile import TemporaryDirectory
+        from interface.runner.control import prepare
+        from interface.runner.session import GameInterface
+        with TemporaryDirectory() as directory:
+            game=GameInterface('probe',data_dir=directory,quarterly_pause=True)
+            root=Path(directory)/'world'
+            (root/'gui').mkdir(parents=True)
+            (root/'map_data').mkdir()
+            for name in ('province_terrains.txt','default.map'):
+                (root/'map_data'/name).write_text('')
+            source=(GAME/'gui/ingame_hud.gui').read_text(encoding='utf-8-sig')
+            source=source.replace('name = "ingame_hud"','name = "ingame_hud" widget = { name = interface_uniform_offer size = { 0 0 } }',1)
+            (root/'gui/ingame_hud.gui').write_text(source,encoding='utf-8')
+            mod=prepare(game,'XAA',{'mod':str(root),'width':100,'height':100,'countries':[],'states':[],'seas':[]})
+            text=(mod/'gui/ingame_hud.gui').read_text(encoding='utf-8-sig')
+            self.assertIn('name = interface_uniform_offer',text)
+            self.assertIn('name = interface_ctrl',text)
+            self.assertIn('name = interface_quarterly_pause',text)
+            pulse=(mod/'common/on_actions/interface_quarterly.txt').read_text(encoding='utf-8-sig')
+            self.assertIn('on_monthly_pulse',pulse)
+            self.assertIn('OR = { month = 0 month = 3 month = 6 month = 9 }',pulse)
+            scripted=(mod/'common/scripted_guis/interface.txt').read_text(encoding='utf-8-sig')
+            self.assertIn('if = { limit = { NOT = { has_variable = interface_quarterly_pause } }',scripted)
+
+    def test_loading_can_be_quiet_until_the_requested_startup_timeout(self):
+        import json
+        from tempfile import TemporaryDirectory
+        from unittest.mock import MagicMock
+        import numpy as np
+        from interface.runner.session import GameInterface
+        with TemporaryDirectory() as directory:
+            game=GameInterface('probe',data_dir=directory)
+            token=Path(directory)/'control/probe/session.json'
+            token.parent.mkdir(parents=True)
+            token.write_text(json.dumps({'startup_token':'ready'}))
+            game._running=MagicMock()
+            game.log=MagicMock()
+            game.tail=MagicMock(fatal=None)
+            game.tail.quiet.return_value=45
+            reader=MagicMock()
+            reader.table.return_value=({'id':np.array([1]),'country_definition':np.array([1])},None)
+            reader.player.return_value=1
+            reader.names=[(0,'GBR')]
+            game._started=MagicMock(return_value=(reader,'1836.1.1'))
+            game._wait=MagicMock()
+            game.session=MagicMock(return_value={'started':0})
+            self.assertTrue(game.ready('GBR',timeout=180)['ready'])
+
     def test_a_console_command_is_followed_by_a_long_gap(self):
         import re
         from interface.runner.control import CONSOLE_GAP, widget
         delays = [float(d) for d in re.findall(r'duration = ([\d.]+)', widget(['a', "ExecuteConsoleCommand('x')", 'b']))]
-        self.assertGreaterEqual(delays[2] - delays[1], CONSOLE_GAP)
+        self.assertGreaterEqual(delays[2], CONSOLE_GAP)
+
+    def test_startup_commands_cannot_expire_together_during_a_loading_frame(self):
+        from interface.runner.control import widget
+        text=widget(["ExecuteConsoleCommand('a')", "ExecuteConsoleCommand('b')", 'c'])
+        self.assertEqual(text.count('trigger_on_create = yes'),1)
+        names=re.findall(r'name = (interface_execute_\w+)',text)
+        triggered=re.findall(r"PdxGuiTriggerAllAnimations\('([^']+)'\)",text)
+        self.assertEqual(triggered,names[1:])
+        self.assertTrue(set(names).isdisjoint(re.findall(r'name = (interface_execute_\w+)',widget(['d']))))
 
 
 class DecisionBlockTests(unittest.TestCase):

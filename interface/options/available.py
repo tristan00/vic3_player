@@ -377,13 +377,15 @@ def companies(s):
         return []
     acquired,_,_,_=technologies(s)
     held=held_companies(s)
+    principles=bloc_principles(s)
     potential={combo['building_type'] for combo in buildable(s)}|{kind for _,kind,_ in s.buildings()}
     scope=country_scope(s)
     return [name for name in s.keys('company_type') if name not in held and name not in recently_disbanded(s)
+            and (not definition(s,'common/company_types',name,'unlocking_principles') or set(definition(s,'common/company_types',name,'unlocking_principles'))&principles)
             and any(set(definition(s,'common/buildings',kind,'unlocking_technologies'))<=acquired and kind in potential
                     for block in definition(s,'common/company_types',name,'building_types') for kind in block.split())
             and company_levels(s,{kind for block in definition(s,'common/company_types',name,'building_types') for kind in block.split()})>=COMPANY_MIN_LEVELS
-            and passes(s,'common/company_types',name,('potential','possible'),scope)]
+            and passes(s,'common/company_types',name,('potential','attainable','possible'),scope)]
 
 
 COMPANY_MIN_LEVELS=5
@@ -549,11 +551,6 @@ def monopolizable(s):
 
 MONOPOLY_COST=100
 MAX_MONOPOLIES=5
-
-
-@timed_often
-def arable_kinds(s):
-    return s.memo('arable_kinds',lambda:{kind for fields in s.definitions('map_data/state_regions').values() for kind in fields.get('arable_resources',())})
 
 
 @timed_often
@@ -926,23 +923,35 @@ def researchable_kind(s,name):
 
 
 @timed_often
+def group_kinds(s,field,value):
+    groups=s.definitions('common/building_groups')
+    def marked(group):
+        while group is not None:
+            fields=groups.get(group,{})
+            if fields.get(field)==[value]:
+                return True
+            group=next(iter(fields.get('parent_group',())),None)
+        return False
+    return s.memo(('group_kinds',field,value),lambda:{kind for kind,fields in s.definitions('common/buildings').items() if marked(next(iter(fields.get('building_group',())),None))})
+
+
+@timed_often
 def buildable(s):
     acquired,_,_,_=technologies(s)
-    capped={kind for kind, in s.rows('state_region_resource','building_type')}
+    capacity={(region,kind):levels for region,kind,levels in s.rows('state_region_resource','state_region,building_type,available_levels')}
+    built={(state,kind):levels for kind,state,levels in s.rows('building','building_type,state,levels')}
     regions={ident:region for ident,region in s.rows('state','state,state_region',country=s.player)}
     arable={region:set(fields.get('arable_resources',())) for region,fields in s.definitions('map_data/state_regions').items()}
-    limited={kind for fields in s.definitions('common/building_groups').values() for kind in fields.get('default_building',())}
     queued=set(s.rows('player_construction_queue_item','state,building_type'))
     combos=[]
     for kind,fields in s.definitions('common/buildings').items():
         if fields.get('buildable')==['no'] or fields.get('recruits_combat_units')==['yes'] or not set(fields.get('unlocking_technologies',()))<=acquired:
             continue
         for state,region in regions.items():
-            if kind in limited and kind not in arable.get(region,set()):
-                continue
-            if kind in arable_kinds(s) and free_arable(s,state)<1:
-                continue
-            if kind in capped and kind not in limited:
+            if kind in group_kinds(s,'land_usage','rural'):
+                if kind not in arable.get(region,set()) or free_arable(s,state)<1:
+                    continue
+            elif kind in group_kinds(s,'capped_by_resources','yes') and capacity.get((region,kind),0)<=built.get((state,kind),0):
                 continue
             if (state,kind) in queued:
                 continue
@@ -2001,8 +2010,48 @@ def enforced_on_player(s):
     return set(s.rows('player_treaty_enforced','first_country,second_country'))
 
 
+GOODS_INPUTS=({'goods'},{'goods','quantity'})
+
+
+@timed_often
+def treaty_partners(s):
+    return sorted({country for country,_ in diplomatic_shown(s)})
+
+
+@timed_often
+def articles_between(s):
+    def compute():
+        sides={treaty:(first,second) for treaty,first,second,withdrawn in s.rows('treaty','treaty,first_country,second_country,withdrawn') if not withdrawn}
+        return {(source,target,kind) for treaty,kind,source,target in s.rows('treaty_article','treaty,treaty_article_type,source_country,target_country') if treaty in sides}
+    return s.memo('articles_between',compute)
+
+
+@timed_often
+def treaty_articles(s,kind,offered,goods):
+    acquired=technologies(s)[0]
+    combos=[]
+    for article,fields in s.definitions('common/treaty_articles').items():
+        inputs=set(fields.get('required_inputs',()))
+        if fields.get('kind')!=[kind] or (inputs not in GOODS_INPUTS if goods else inputs) or not set(fields.get('unlocked_by_technologies',()))<=acquired:
+            continue
+        for country in treaty_partners(s):
+            source,target=(s.player,country) if offered else (country,s.player)
+            if not passes(s,'common/treaty_articles',article,('visible','possible'),country_scope(s,source,other_country=('country',target))):
+                continue
+            if goods:
+                combos+=[{'country':country,'treaty_article':article,'goods':item} for item in traded(s)]
+            elif (source,target,article) not in articles_between(s):
+                combos.append({'country':country,'treaty_article':article})
+    return combos
+
+
 RULES={
     'build':lambda s:[] if in_default(s) else buildable(s),
+    'offer_treaty_article':lambda s:treaty_articles(s,'directed',True,False),
+    'demand_treaty_article':lambda s:treaty_articles(s,'directed',False,False),
+    'agree_treaty_article':lambda s:treaty_articles(s,'mutual',True,False),
+    'offer_goods_treaty_article':lambda s:treaty_articles(s,'directed',True,True),
+    'demand_goods_treaty_article':lambda s:treaty_articles(s,'directed',False,True),
     'cancel_construction':lambda s:product(building=queued_buildings(s)),
     'downsize':lambda s:[] if revolution_brewing(s) else product(building=sorted(set(owned_of(s,building_kinds(s,downsizeable=True)))&government_owned(s)-set(queued_buildings(s)))),
     'pause_construction':lambda s:[{}] if not construction_paused(s) else [],

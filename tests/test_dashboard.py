@@ -6,7 +6,7 @@ from unittest.mock import patch
 import psycopg
 from fastapi.testclient import TestClient
 
-from advisors.pickers import PARAMS
+from advisors.models.histogram.data import PARAMS
 from dashboard.server import actions, changes, db, meta, policy, runs, tables
 from dashboard.server.app import app
 from dashboard.server.grid import Spec, cells
@@ -51,11 +51,12 @@ class DashboardTests(unittest.TestCase):
         store.pending['pick_model']=(1049,29,4.5,PARAMS,[('treasury',60.0),('action1.type',40.0)])
         for step in STEPS:
             store.write(built(step),'post_action',AT,1.0)
-        store.record_pick(0,[['build','research'],['enact_law']],[1.5,-2.0],0)
-        store.record_pick(1,[['research'],['build']],[0.5,3.0],1)
-        store.log_action({'turn':1,'seq':1,'advisor':'random','action':'enact_law','params':{'law':LAW},'snapshot':0,'status':'done','ms':5},1)
+        store.record_pick(0,[['expand_port','research_production'],['enact_trade_policy']],[1.5,-2.0],0)
+        store.record_pick(1,[['research_production'],['expand_port']],[0.5,3.0],1)
+        store.log_action({'turn':1,'seq':1,'advisor':'random','action':'enact_law','params':{'law':LAW},'snapshot':0,'status':'done','ms':5,
+                          'decision':('enact_trade_policy',{'law':LAW})},1)
         store.log_action({'turn':1,'seq':2,'advisor':'random','action':'research','params':{'technology':'cotton_gin'},'snapshot':0,'status':'invalid',
-                          'detail':'not researchable'},None)
+                          'detail':'not researchable','decision':('research_production',{'technology':'cotton_gin'})},None)
         store.end_run('time')
         cls.run_id=store.run_id
         store.connection.close()
@@ -66,12 +67,13 @@ class DashboardTests(unittest.TestCase):
         db.close_pool()
 
     def test_initializers_are_described_with_the_settings_the_advisors_use(self):
-        from advisors import ADVISORS, random_smac_weighting, random_svr_weighting
+        from advisors.initializers import ADVISORS
+        from advisors.models import forest, svr as random_svr_weighting
         found={i['name']:i for i in policy.initializers()}
         self.assertEqual(set(found),set(ADVISORS))
         settings=lambda name:{s['name']:s['value'] for s in found[name]['settings']}
-        self.assertEqual(settings('random_smac_weighting')['trailing runs'],str(random_smac_weighting.TRAILING))
-        self.assertEqual(settings('random_smac_weighting')['features per split'],random_smac_weighting.FEATURES)
+        self.assertEqual(settings('random_smac_weighting')['run history'],'All scored runs')
+        self.assertEqual(settings('random_smac_weighting')['features per split'],forest.FEATURES)
         self.assertEqual(settings('random_svr_weighting')['C'],str(random_svr_weighting.C))
 
     def test_runs_list_counts_actions_and_status(self):
@@ -123,8 +125,8 @@ class DashboardTests(unittest.TestCase):
     def test_the_run_records_the_parameters_that_launched_it(self):
         found=db.row('select runs_requested,world_seed,countries,states,tech,pop from run where run_id=%s',(self.run_id,))
         self.assertEqual(found,{'runs_requested':3,'world_seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5})
-        weights=db.rows('select a.name,w.weight from run_weight w join action a using (action) where w.run_id=%s order by 1',(self.run_id,))
-        self.assertEqual([(w['name'],w['weight']) for w in weights],[('build',3.0),('enact_law',2.0)])
+        weights=db.rows('select a.name,w.weight from run_weight w join advisor_action a using (advisor_action) where w.run_id=%s order by 1',(self.run_id,))
+        self.assertEqual([(w['name'],w['weight']) for w in weights],[('enact_trade_policy',2.0),('expand_port',3.0)])
 
     def test_production_method_effects_are_stored_typed(self):
         ruleset=db.value('select ruleset_id from run where run_id=%s',(self.run_id,))
@@ -164,31 +166,51 @@ class DashboardTests(unittest.TestCase):
 
     def test_picker_offers_count_every_candidate_action(self):
         offers={r['action']:r for r in rows(policy.picker_actions([],None,False,0,100))}
-        self.assertEqual((offers['build']['offered'],offers['build']['chosen']),(2,2))
-        self.assertAlmostEqual(offers['build']['chosen_share'],2/3)
-        self.assertAlmostEqual(offers['build']['offered_share'],2/5)
+        self.assertEqual((offers['expand_port']['offered'],offers['expand_port']['chosen']),(2,2))
+        self.assertAlmostEqual(offers['expand_port']['chosen_share'],2/3)
+        self.assertAlmostEqual(offers['expand_port']['offered_share'],2/5)
+
+    def test_picker_filters_apply_to_offers_models_and_importance(self):
+        for table in ('pick_model','pick_importance'):
+            matching=meta.meta_grid(table,[('picker','first')],None,False,0,100)
+            self.assertGreater(matching.total,0)
+            self.assertTrue(all(row['picker']=='first' for row in rows(matching)))
+            self.assertEqual(meta.meta_grid(table,[('picker','catboost_piecewise')],None,False,0,100).total,0)
+        matching=policy.picker_actions([('picker','first')],None,False,0,100)
+        self.assertAlmostEqual(sum(row['offered_share'] for row in rows(matching)),1)
+        self.assertEqual(policy.picker_actions([('picker','catboost')],None,False,0,100).total,0)
 
     def test_configuration_performance_uses_scored_runs_and_keeps_missing_medians_null(self):
-        changes={self.run_id:(2,{'gdp':math.log(1.2),'population':math.log(1.1),'sol':math.log(.95),'stock':math.log(1.3)})}
-        with patch('dashboard.server.policy.reward_changes',return_value=changes), patch('dashboard.server.policy.breakdown',return_value=(2,[{'contribution':1.5},{'contribution':-0.5}])):
+        scores={self.run_id:{'years':2,'score':1.,'parts':[{'component':name,'end_ratio':ending,'recent_change':recent}
+                                                       for name,ending,recent in [('stock',1.3,.15),('population',1.1,.04),('gdp',1.2,.03)]]}}
+        with patch('dashboard.server.policy.reward_scores',return_value=scores):
             found=rows(policy.configs([],'median_reward',True,0,100))[0]
         self.assertEqual((found['runs'],found['scored_runs'],found['median_reward'],found['median_years']),(1,1,1,2))
-        self.assertEqual(tuple(round(found[f'median_{c}_gain'],9) for c in ('gdp','population','sol','stock')),(20,10,-5,30))
-        self.assertEqual(tuple(round(found[f'median_{c}_gain_per_year'],9) for c in ('gdp','population','sol')),(10,5,-2.5))
-        with patch('dashboard.server.policy.reward_changes',return_value=changes), patch('dashboard.server.policy.breakdown',return_value=(0,[{'contribution':1}])):
-            zero=rows(policy.configs([],'median_gdp_gain_per_year',True,0,100))[0]
-        self.assertIsNone(zero['median_gdp_gain_per_year'])
-        with patch('dashboard.server.policy.reward_changes',return_value={}):
+        self.assertEqual(tuple(round(found[f'median_{c}_gain'],9) for c in ('stock','population','gdp')),(30,10,20))
+        self.assertEqual(tuple(round(found[f'median_{c}_recent_change'],9) for c in ('stock','population','gdp')),(15,4,3))
+        self.assertNotIn('median_sol_gain',found)
+        with patch('dashboard.server.policy.reward_scores',return_value={}):
             found=rows(policy.configs([],None,False,0,100))[0]
         self.assertEqual((found['runs'],found['scored_runs']),(1,0))
         self.assertIsNone(found['median_reward'])
         self.assertIsNone(found['median_gdp_gain'])
-        self.assertIsNone(found['median_gdp_gain_per_year'])
+        self.assertIsNone(found['median_gdp_recent_change'])
+
+    def test_policy_grid_uses_the_shared_fixed_reward_and_component_contributions(self):
+        from advisors.data.endgame import COMPONENTS, HOURS_PER_YEAR, breakdown
+        result=breakdown(0,2*HOURS_PER_YEAR,dict.fromkeys(COMPONENTS,100),{name:[(0,100),(HOURS_PER_YEAR,120),(2*HOURS_PER_YEAR,150)] for name in COMPONENTS})
+        with patch('dashboard.server.policy.reward_scores',return_value={self.run_id:result}):
+            grid=policy.run_policies([],None,False,0,100)
+        found=next(r for r in rows(grid) if r['run']==self.run_id)
+        self.assertAlmostEqual(found['reward'],result['score'])
+        self.assertAlmostEqual(sum(found[f'{c}.contribution'] for c in COMPONENTS),found['reward'])
+        self.assertEqual([found[f'{c}.alpha'] for c in COMPONENTS],[.5,1.,-.5])
+        self.assertFalse(any(c.name.startswith('objective_') or c.name.startswith('sol.') for c in grid.columns))
 
     def test_random_initializer_weights_are_exposed_with_their_source(self):
         found=rows(policy.weights([('run',str(self.run_id))],'weight',True,0,100))
-        self.assertEqual([(r['initializer'],r['method'],r['action'],r['weight']) for r in found],
-                         [('random',None,'build',3),('random',None,'enact_law',2)])
+        self.assertEqual([(r['initializer'],r['method'],r['domain'],r['action'],r['weight']) for r in found],
+                         [('random',None,'construction','expand_port',3),('random',None,'laws','enact_trade_policy',2)])
         response=TestClient(app).get(f'/api/policy/weights?f=run:{self.run_id}')
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json()['total'],2)
@@ -196,22 +218,31 @@ class DashboardTests(unittest.TestCase):
     def test_a_column_lists_its_values_with_counts_and_several_values_of_one_column_match_any(self):
         client=TestClient(app)
         listed=client.get(f'/api/policy/weights?f=run:{self.run_id}&values=action').json()
-        self.assertEqual([(row[0]['text'],row[1]['num']) for row in listed['rows']],[('build',1.0),('enact_law',1.0)])
+        self.assertEqual([(row[0]['text'],row[1]['num']) for row in listed['rows']],[('enact_trade_policy',1.0),('expand_port',1.0)])
         self.assertEqual(listed['total'],2)
-        narrowed=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:build&values=action').json()
+        narrowed=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:expand_port&values=action').json()
         self.assertEqual(narrowed['total'],2)
-        either=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:build&f=action:enact_law').json()
+        either=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:expand_port&f=action:enact_trade_policy').json()
         self.assertEqual(either['total'],2)
-        one=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:build&f=weight:3').json()
+        one=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:expand_port&f=weight:3').json()
         self.assertEqual(one['total'],1)
+
+    def test_the_catalogue_lists_every_advisor_action_with_the_commands_that_carried_it(self):
+        from advisors.catalogue import NAMES
+        found=rows(policy.catalogue([],None,False,0,1000))
+        self.assertEqual([row['action'] for row in found],list(NAMES))
+        enacted=next(row for row in found if row['action']=='enact_trade_policy')
+        self.assertEqual((enacted['domain'],enacted['parameters'],enacted['commands'],enacted['executions'],enacted['runs']),('laws','law','enact_law',1,1))
+        self.assertEqual(next(row for row in found if row['action']=='raise_taxes')['executions'],0)
+        self.assertEqual(TestClient(app).get('/api/policy/catalogue').status_code,200)
 
     def test_candidate_rank_and_gap_stay_global_when_filtered_or_paginated(self):
         ranked=rows(policy.candidates(self.run_id,1,[],None,False,0,100))
         self.assertEqual([(r['rank'],r['candidate'],r['chosen'],r['predicted_change'],r['gap'],r['block']) for r in ranked],
-                         [(1,1,'yes',3,0,'build'),(2,0,'no',0.5,2.5,'research')])
+                         [(1,1,'yes',3,0,'expand_port'),(2,0,'no',0.5,2.5,'research_production')])
         self.assertEqual(rows(policy.candidates(self.run_id,1,[],None,False,1,1)),ranked[1:])
         self.assertEqual(rows(policy.candidates(self.run_id,1,[('candidate','0')],None,False,0,100)),ranked[1:])
-        self.assertEqual(rows(policy.candidates(self.run_id,0,[],None,False,0,100))[0]['block'],'build → research')
+        self.assertEqual(rows(policy.candidates(self.run_id,0,[],None,False,0,100))[0]['block'],'expand_port → research_production')
         response=TestClient(app).get(f'/api/policy/runs/{self.run_id}/pauses/1/candidates')
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json()['total'],2)
@@ -234,6 +265,13 @@ class DashboardTests(unittest.TestCase):
                          {'GET /api/runs/{run_id}/snapshots/{seq}/tables/{table}':1,'GET /api/runs/{run_id}/series':1,'GET /api/runs/{run_id}/entities/{kind}':1,
                           'GET /api/actions':1,'GET /api/runs':1,'GET /api/meta/{table}':1,'GET /api/{path:path}':1,'POST /api/{path:path}':1})
         self.assertGreaterEqual(counted['dashboard.server.db.rows'],1)
+
+    def test_live_stamp_finishes_without_holding_a_stream_open(self):
+        response=TestClient(app).get('/api/stamp')
+        self.assertEqual(response.status_code,200)
+        self.assertIsInstance(response.json(),str)
+        self.assertEqual(response.headers['cache-control'],'no-store')
+        self.assertIn('Server-Timing',response.headers)
 
 
 if __name__=='__main__':

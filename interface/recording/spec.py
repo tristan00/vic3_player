@@ -32,7 +32,7 @@ VOCABULARIES={
     'strait_definition':('common/strait_definitions',),'strategic_region':('common/strategic_regions',),'technology':('common/technology/technologies',),
     'terrain':('common/terrain',),'treaty_article_type':('common/treaty_articles',),'veterancy_level':('common/combat_unit_experience_levels',),
     'war_goal_type':('common/war_goal_types',),'game_rule_setting':('common/game_rules',),
-    'localization_key':None,'scope_name':None,'ui_window':None,'antagonize_reason':None,'advisor':None,'action':None}
+    'localization_key':None,'scope_name':None,'ui_window':None,'antagonize_reason':None,'advisor':None,'action':None,'advisor_action':None}
 
 ENUMS=('ai_attitude','approval_state','battle_status','battle_type','civil_war_side','civil_war_type','event_status','formation_flag',
        'formation_type','hq_type','influence_type','influence_type_reason','law_checkpoint_result','law_phase','managed_status','play_side','privatization_request',

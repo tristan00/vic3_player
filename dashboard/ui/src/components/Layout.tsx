@@ -5,9 +5,11 @@ import { useApi, useConnected, type S } from '@/lib/api'
 import { cn } from '@/lib/format'
 
 const NAV = [
+  { to: '/worlds', label: 'Worlds', end: false },
   { to: '/', label: 'Runs', end: true },
   { to: '/actions', label: 'Actions', end: false },
   { to: '/policy', label: 'Policy', end: false },
+  { to: '/tuning', label: 'Tuning', end: false },
   { to: '/schema', label: 'Schema', end: false },
 ]
 

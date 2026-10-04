@@ -41,7 +41,7 @@ def events(lines):
 def role(name,arguments):
     name=name.lower()
     arguments=[argument.replace('\\','/') for argument in arguments]
-    if name=='python.exe' and any(argument.endswith('loop/supervise.py') for argument in arguments):
+    if name=='python.exe' and ('loop.supervise' in arguments or any(argument.endswith('loop/supervise.py') for argument in arguments)):
         return 'supervisor'
     if name=='cmd.exe' and any(argument.endswith('loop/launch.cmd') for argument in arguments):
         return 'round'

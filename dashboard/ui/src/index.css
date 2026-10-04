@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+.world-table td { padding: 0.5rem 0.75rem; border-top: 1px solid var(--line); vertical-align: top; }
+.world-table tbody tr:hover { background: var(--raised); }
+
 @theme {
   --font-ui: system-ui, 'Segoe UI Variable Text', 'Segoe UI', -apple-system, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Code', 'Cascadia Mono', SFMono-Regular, Consolas, monospace;

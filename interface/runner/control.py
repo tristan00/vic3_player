@@ -1,5 +1,6 @@
 import shutil
 import uuid
+from pathlib import Path
 
 from ..actions import gui as action_gui
 from ..common import timed, write_json, write_script, timed_often
@@ -45,6 +46,13 @@ READ_TRIGGER="EqualTo_CFixedPoint(GetPlayer.MakeScope.Var('interface_capture').G
 
 
 SAVE_TRIGGER="EqualTo_CFixedPoint(GetPlayer.MakeScope.Var('interface_capture').GetValue, '(CFixedPoint)2')"
+
+
+QUARTERLY_WIDGET=('widget = { size = { 0 0 } state = { name = interface_quarterly_pause '
+                'trigger_when = "[And(GreaterThan_CFixedPoint(GetPlayer.MakeScope.Var(\'interface_quarterly_pause\').GetValue, \'(CFixedPoint)0\'), '
+                'And(TimeKeeper.CanTogglePause, Not(TimeKeeper.IsPaused)))]" '
+                'on_start = "[TimeKeeper.TogglePause]" '
+                'on_start = "[GetScriptedGui(\'interface_quarterly_paused\').Execute(GuiScope.SetRoot(GetPlayer.MakeScope).End)]" } }\n')
 
 
 CAPTURE_WIDGET=lambda tag:('widget = { size = { 0 0 } state = { name = capture_pause '
@@ -104,13 +112,15 @@ CONSOLE_GAP=2
 
 @timed_often
 def widget(actions):
-    timed=[]
-    delay=.15
-    for action in actions:
-        timed.append((round(delay,2),action))
-        delay+=CONSOLE_GAP if 'ExecuteConsoleCommand' in action else .5
-    timed+=[(delay,START) for delay in RESTARTS if START in actions]
-    states='\n'.join(f'widget = {{ state = {{ name = execute trigger_on_create = yes duration = {delay} on_finish = "[{action}]" }} }}' for delay,action in timed)
+    prefix='interface_execute_'+uuid.uuid4().hex
+    states=[]
+    for index,action in enumerate(actions):
+        delay=.15 if index==0 else CONSOLE_GAP if 'ExecuteConsoleCommand' in actions[index-1] else .05
+        trigger='trigger_on_create = yes' if index==0 else ''
+        following=f'on_finish = "[PdxGuiTriggerAllAnimations(\'{prefix}_{index+1}\')]"' if index+1<len(actions) else ''
+        states.append(f'widget = {{ state = {{ name = {prefix}_{index} {trigger} duration = {delay} on_finish = "[{action}]" {following} }} }}')
+    states.extend(f'widget = {{ state = {{ name = execute trigger_on_create = yes duration = {delay} on_finish = "[{START}]" }} }}' for delay in RESTARTS if START in actions)
+    states='\n'.join(states)
     return f'widget = {{ name = interface_ctrl size = {{ 100% 100% }} layer = top alwaystransparent = yes\n{states}\n}}\n'
 
 
@@ -136,9 +146,12 @@ def prepare(game,tag,world,extra=()):
                 f"ExecuteConsoleCommand('Camera.SetTransform {width/2} 0 {height/2} {max(width*.65,height*1.2)} 85 0')"]
     actions=[START,'MapListPanelManager.ToggleFailedOptions','MapListPanelManager.ToggleInvalidOptions',f"TimeKeeper.SetGameSpeed('(int32){SPEED-1}')"]+camera+list(extra)+request(tag,token)
     gui=game.game_dir/'game/gui'
-    hud=(gui/'ingame_hud.gui').read_text(encoding='utf-8-sig')
+    for path,text in action_gui.windows(game.game_dir/'game',[world['mod']] if world else []).items():
+        write_script(mod/path,text)
+    hud=(Path(world['mod'])/'gui/ingame_hud.gui' if world and (Path(world['mod'])/'gui/ingame_hud.gui').is_file() else gui/'ingame_hud.gui').read_text(encoding='utf-8-sig')
     write_script(mod/'gui/ingame_hud.gui',hud.replace('name = "ingame_hud"','name = "ingame_hud"\n'+widget(actions)+CAPTURE_WIDGET(tag)+UI_WIDGET+capture_widgets()+event_capture_widget(game.game_dir,[world['mod']] if world else [])
-                                                                          +action_gui.hud(game.game_dir/'game',[world['mod']] if world else []),1))
+                                                                          +action_gui.hud(game.game_dir/'game',[world['mod']] if world else [])
+                                                                          +(QUARTERLY_WIDGET if game.quarterly_pause else ''),1))
     write_script(mod/'gui/scripted_widgets/interface.txt','gui/interface_ctrl.gui = interface_ctrl\n')
     write_script(mod/'gui/interface_ctrl.gui',widget([]))
     for filename,animation,command in [('frontend_ingame_menu.gui','interface_open_save','PauseMenu.Save'),
@@ -146,14 +159,17 @@ def prepare(game,tag,world,extra=()):
         source=(gui/'frontend'/filename).read_text(encoding='utf-8-sig')
         index=source.index('window = {')+len('window = {')
         write_script(mod/'gui/frontend'/filename,source[:index]+f'\n state = {{ name = {animation} duration = 0.1 on_finish = "[{command}]" }}\n'+source[index:])
-    for path,text in action_gui.windows(game.game_dir/'game').items():
-        write_script(mod/path,text)
     feed=(gui/'notifications.gui').read_text(encoding='utf-8-sig')
     write_script(mod/'gui/notifications.gui',feed.replace('name = "message_feed_widget"','name = "message_feed_widget"\n'+MESSAGE_WIDGET,1))
     injected=mod/'gui/map_markers.gui'
     markers=(injected if injected.is_file() else gui/'map_markers.gui').read_text(encoding='utf-8-sig')
     write_script(mod/'gui/map_markers.gui',markers.replace('name = "event_marker"','name = "event_marker"\nstate = { name = capture_pending_event duration = 0.001 on_finish = "[PopupManager.OpenEvent(EventMarker.AccessAnyEvent)]" }',1))
     write_script(mod/'events/interface.txt',DUMP)
+    if game.quarterly_pause:
+        write_script(mod/'common/on_actions/interface_quarterly.txt',
+                     'on_monthly_pulse = { on_actions = { interface_quarterly_pause } }\n'
+                     'interface_quarterly_pause = { trigger = { OR = { month = 0 month = 3 month = 6 month = 9 } } effect = { every_country = { limit = { is_player = yes } '
+                     'set_variable = { name = interface_quarterly_pause value = 1 } } } }\n')
     body=capture_body(game.game_dir,tag,world)
     write_script(mod/'events/c.txt','namespace = interface_capture\ninterface_capture.1 = { type = country_event hidden = yes immediate = {\n'
                  +body+'set_variable = { name = interface_capture_done value = 1 } set_variable = { name = interface_capture value = 0 }\n} }\n')
@@ -161,7 +177,10 @@ def prepare(game,tag,world,extra=()):
                  'if = { limit = { NOT = { has_variable = interface_capture } } '
                  'set_variable = { name = interface_capture value = 0 } set_variable = { name = interface_capture_done value = 0 } } '
                  'if = { limit = { NOT = { has_variable = interface_capture_seq } } '
-                 'set_variable = { name = interface_capture_seq value = 0 } } '+action_gui.START+' } }\n'
+                 'set_variable = { name = interface_capture_seq value = 0 } } '
+                 'if = { limit = { NOT = { has_variable = interface_quarterly_pause } } '
+                 'set_variable = { name = interface_quarterly_pause value = 0 } } '+action_gui.START+' } }\n'
+                 'interface_quarterly_paused = { scope = country effect = { set_variable = { name = interface_quarterly_pause value = 0 } } }\n'
                  'interface_state = { scope = country effect = { debug_log = "INTERFACE|paused|[GetVariableSystem.Get(\'interface_request\')]|[TimeKeeper.IsPaused]"\n'+PAD+'\n} }\n'
                  +capture_guis()+TRANSPORT_GUI+action_gui.DONE
                  +'interface_save_ready = { scope = country effect = { set_variable = { name = interface_capture value = 0 } set_variable = { name = interface_capture_done value = 2 } } }\n'

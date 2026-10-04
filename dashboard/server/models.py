@@ -63,12 +63,13 @@ class OpenRun(BaseModel):
 
 class RewardPart(BaseModel):
     component:str
+    start_value:float
+    end_ratio:float
+    recent_change:float
+    part:float
     weight:float
-    gain:float
-    years_alpha:float
-    gain_times_years_alpha:float
-    scale:float
-    normalized:float
+    alpha:float
+    duration_factor:float
     contribution:float
 
 
@@ -85,7 +86,13 @@ class RunInfo(BaseModel):
 
 
 class RunReward(BaseModel):
+    name:str
     years:float|None
+    window_years:float|None
+    baseline_seq:int|None
+    score:float|None
+    defeated:bool
+    unavailable_reason:str|None=None
     parts:list[RewardPart]
 
 

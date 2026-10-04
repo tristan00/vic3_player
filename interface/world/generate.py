@@ -13,11 +13,15 @@ from scipy.sparse.csgraph import dijkstra
 from scipy.spatial import cKDTree
 
 from ..common import DEFAULT_DATA, DEFAULT_GAME, timed, write_json, write_script, timed_often
-from ..script import clean, read, scalar
-from .vanilla import boxes, rasters, textures, vanilla
-from .nations import nations, word
+from ..script import blocks, body, clean, read, scalar
+from .vanilla import rasters, textures, vanilla
+from .nations import word
+from .project import nations
+from .source import assignments, select_regions
+from .audit import audit
 
-MAP={'states':(20,100),'country_share':(1/8,1/5),'tech':(.5,1.2),'pop':(.5,1.2),'modernity':(0,1),'copies':(0,1),'diversity':(0,1),'military':(0,1)}
+MAP={'states':(20,100),'country_share':(1/8,1/5),'tech':.5,'ideology_uniformity':0,'primary_culture_share':None,'copies':0,
+     'tech_variation':1,'country_economy':1,'local_economy':1,'source_regions':1}
 PROVINCE_PIXELS=2000
 SEA_ID=3000
 NAVAL=83886
@@ -203,10 +207,14 @@ def _components(nodes,neighbours):
 
 
 @timed_often
-def _grow(nodes,neighbours,centers,count,weights,rng,every=True):
+def _grow(nodes,neighbours,centers,count,weights,rng,every=True,candidates=None):
     components=sorted(_components(nodes,neighbours),key=len,reverse=True)
     seeds=[]
-    for members,n in zip(components,_split(count,[len(c) for c in components],every)):
+    pools=components if candidates is None else [[m for m in c if m in candidates] for c in components]
+    pools=[p for p in pools if p]
+    for members,n in zip(pools,_split(count,[len(c) for c in pools],every)):
+        if n>len(members):
+            raise ValueError('Not enough compatible provinces to seed the requested states')
         chosen=[rng.choice(members)] if n else []
         while len(chosen)<n:
             chosen.append(max(members,key=lambda m:min(np.hypot(*(centers[m]-centers[c])) for c in chosen)))
@@ -356,14 +364,16 @@ def _enclosing(text,position):
 SKIPPED=('common/history/','common/country_definitions/','common/strategic_regions/','common/geographic_regions/','common/strait_definitions/')
 
 
-@timed
+@timed_often
 def _absent(text,tags):
     text=re.sub(r'\bexists\s*=\s*c:([A-Z0-9]{3})(?![\w.:])',lambda m:m[0] if m[1] in tags else 'always = no',text)
+    text=re.sub(r'\bwas_formed_from\s*=\s*([A-Z0-9]{3})(?![\w.:])',lambda m:m[0] if m[1] in tags else 'always = no',text)
     return re.sub(r'\bc:([A-Z0-9]{3})\s*\??=\s*(?=[\w:.])([\w:.]+)',lambda m:m[0] if m[1] in tags else 'always = no',text)
 
 
 @timed
-def _rewrites(game,states,strategic,regions,tags):
+def _rewrites(game,states,strategic,regions,tags,tag_map=None):
+    tag_map={} if tag_map is None else tag_map
     state_map={}
     for state in states:
         state_map.setdefault(state['template'],set()).add(state['key'])
@@ -384,9 +394,13 @@ def _rewrites(game,states,strategic,regions,tags):
         if name.startswith(SKIPPED):
             continue
         original=path.read_text(encoding='utf-8-sig',errors='replace')
-        if not re.search(r's:STATE_|sr:region_|\bc:[A-Z0-9]{3}\b',original):
+        if not re.search(r's:STATE_|sr:region_|\bc:[A-Z0-9]{3}\b|preferred_headquarters|home_region',original):
             continue
         cleaned=text=clean(path)
+        text=re.sub(r'\bc:([A-Z0-9]{3})\b',lambda m:'c:'+tag_map.get(m[1],m[1]),text)
+        text=re.sub(r'\bhome_region\s*=\s*(?:s:)?STATE_\w+','home_region = random',text)
+        text=re.sub(r'\bpreferred_headquarters\s*=\s*\{([^{}]*)\}',
+                    lambda m:'preferred_headquarters = { '+' '.join(sorted({key for source in re.findall(r'\bSTATE_\w+',m[1]) for key in state_map.get(source,())}))+' }',text)
         for literal,pattern,replace in (('s:STATE_',r'([\w:.@]+)\s*=\s*s:(STATE_\w+)(?![\w.:])',swap(state_map,'s:')),
                                         ('sr:region_',r'([\w:.@]+)\s*=\s*sr:(region_\w+)(?![\w.:])',swap(region_map,'sr:')),
                                         ('STATE_',r'\b('+BARE_STATE+r')\s*=\s*(STATE_\w+)(?![\w.:])',swap(state_map,'')),
@@ -399,9 +413,24 @@ def _rewrites(game,states,strategic,regions,tags):
                                         ('c:',r'\bc:([A-Z0-9]{3})\s*=\s*\{',lambda m:m[0] if m[1] in tags else f'c:{m[1]} ?= {{')):
             if literal in text:
                 text=re.sub(pattern,replace,text)
+        if name.startswith('common/company_types/'):
+            text=_company_scopes(text,state_map)
         if text!=cleaned:
             files[name]=text
     return files
+
+
+@timed_often
+def _company_scopes(text,states):
+    for key,record in list(blocks(text)):
+        inner=_company_scopes(body(record),states)
+        if key.startswith('s:STATE_'):
+            targets=sorted(states.get(key[2:],()))
+            replacement='OR = { '+' '.join(f's:{target} = {{ {inner} }}' for target in targets)+' }' if targets else 'always = no'
+        else:
+            replacement=record[:record.index('{')+1]+inner+'}'
+        text=text.replace(record,replacement,1)
+    return text
 
 
 @timed_often
@@ -425,26 +454,6 @@ def _detach(rng,ownership,capitals,neighbours,coastal,count):
             return
         state,receiver,_=rng.choices(options,weights=[w for *_,w in options])[0]
         ownership[state]=receiver
-
-
-@timed_often
-def _latitudes(game,templates):
-    found=boxes(game)
-    height=rasters(game)['provinces'].shape[0]
-    return [np.mean([(found[p][0].start+found[p][0].stop)/2/height for p in t['provinces']]) for t in templates]
-
-
-@timed_often
-def _templates(rng,states,templates,latitudes,height):
-    used=set()
-    for state in sorted(states,key=lambda s:s['center'][1]):
-        target=state['center'][1]/height
-        if len(used)==len(templates):
-            used.clear()
-        pool=sorted((i for i in range(len(templates)) if i not in used),key=lambda i:abs(latitudes[i]-target))
-        choice=rng.choice(pool[:10])
-        used.add(choice)
-        state['source']=templates[choice]
 
 
 @timed_often
@@ -570,15 +579,21 @@ def _network(cells,kinds,points,regions,state_neighbours,seas,borders,height,rng
 
 
 @timed
-def generate(seed,countries,states,tech,pop,modernity,copies,diversity,military,*,game_dir=DEFAULT_GAME,data_dir=DEFAULT_DATA):
+def generate(seed,countries,states,tech=.5,ideology_uniformity=0,copies=0,tech_variation=1,country_economy=1,local_economy=1,source_regions=1,primary_culture_share=None,
+             *,game_dir=DEFAULT_GAME,data_dir=DEFAULT_DATA,region_keys=None,source_data=None):
     if not 1<=countries<=states:
         raise ValueError('Need at least one country and no more countries than states')
-    if not 0<=tech<=2 or not 0<=pop<=2:
-        raise ValueError(f'tech and pop must be within 0..2, got {tech} and {pop}')
-    if not 0<=copies<=1 or not all(0<=low<=high<=1 for low,high in (modernity,diversity,military)):
-        raise ValueError(f'copies and the modernity, diversity and military ranges must be within 0..1, got {copies}, {modernity}, {diversity} and {military}')
+    if not 0<=tech<=1 or not 0<=copies<=1 or any(not 0<=v<=2 for v in (tech_variation,country_economy,local_economy)):
+        raise ValueError('tech/copies must be within 0..1 and variation multipliers within 0..2')
+    for name,value in (('ideology_uniformity',ideology_uniformity),('primary_culture_share',primary_culture_share)):
+        if value is None and name=='primary_culture_share':
+            continue
+        if not (0<=value<=1 if isinstance(value,(int,float)) else isinstance(value,(tuple,list)) and len(value)==2 and 0<=value[0]<=value[1]<=1):
+            raise ValueError(f'{name} must be within 0..1')
+    if not isinstance(source_regions,int) or not 1<=source_regions<=states:
+        raise ValueError('source_regions must be an integer between one and the state count')
     game=Path(game_dir)/'game'
-    out=Path(data_dir)/'worlds'/f'seed_{seed}_{countries}_{states}_tech{tech}_pop{pop}_copies{copies}'
+    out=Path(data_dir)/'worlds'/f'seed_{seed}_{countries}_{states}'
     if out.exists():
         raise FileExistsError(out)
     work=out.with_name(out.name+'.building')
@@ -586,7 +601,8 @@ def generate(seed,countries,states,tech,pop,modernity,copies,diversity,military,
     mod=work/'mod'
     rng=random.Random(seed)
     nrng=np.random.default_rng(seed)
-    data=vanilla(game)
+    data=vanilla(game) if source_data is None else source_data[0]
+    sources=select_regions(rng,data,source_regions,region_keys)
     targets=[rng.randint(5,15) for _ in range(states)]
     width,height,fraction=_size(rng,sum(targets))
     domain=_domains(nrng,width,height,fraction,states)
@@ -606,13 +622,25 @@ def generate(seed,countries,states,tech,pop,modernity,copies,diversity,military,
     linked={p:{q for q in neighbours[p] if kinds[q]==LAND} for p in land}
     for strait in straits:
         linked[strait['from']].add(strait['to']);linked[strait['to']].add(strait['from'])
-    owner,_=_grow(land,linked,centers,states,targets,rng)
+    coast_seeds={p for p in land if any(kinds[q]==OCEAN for q in neighbours[p])} if all(s['coastal'] for pool in sources.values() for s in pool) else None
+    owner,_=_grow(land,linked,centers,states,targets,rng,candidates=coast_seeds)
     regions=[{'id':i+1,'key':f'STATE_INTERFACE_{i+1}','provinces':[]} for i in range(states)]
     for p in land:
         regions[owner[p]]['provinces'].append(p)
     for state in regions:
         state['center']=centers[state['provinces']].mean(0)
-    _templates(rng,regions,data['templates'],_latitudes(game,data['templates']),height)
+        state['coastal']=any(kinds[q]==OCEAN for p in state['provinces'] for q in neighbours[p])
+    state_neighbours={s['id']:set() for s in regions}
+    state_of={p:s['id'] for s in regions for p in s['provinces']}
+    for p in land:
+        for q in linked[p]:
+            if state_of[q]!=state_of[p]:
+                state_neighbours[state_of[p]].add(state_of[q])
+    state_centers={s['id']:s['center'] for s in regions}
+    grouping,seeds=_grow(list(state_centers),state_neighbours,state_centers,source_regions,[states/source_regions]*source_regions,rng,False)
+    strategic=[{'key':f'region_interface_{i+1}','source_region':key,'states':[s for s in regions if grouping[s['id']]==i],
+                'name':word(rng)+' Region'} for i,key in enumerate(sources)]
+    assignments(rng,strategic,sources)
     colors=np.array([(0,0,0)]+[(v>>16,(v>>8)&255,v&255) for v in rng.sample(range(0x100000,0xEFFFFF),total)],dtype=np.uint8)
     codes=['x'+bytes(c).hex().upper() for c in colors]
     (mod/'map_data').mkdir(parents=True)
@@ -624,7 +652,8 @@ def generate(seed,countries,states,tech,pop,modernity,copies,diversity,military,
     for state in regions:
         mask=np.isin(cells,state['provinces'])
         sy,sx=np.nonzero(mask)
-        fields=textures(game,state['source']['provinces'],(sx-sx.min())/(np.ptp(sx)+1),(sy-sy.min())/(np.ptp(sy)+1))
+        fields=textures(game,state['source']['provinces'],(sx-sx.min())/(np.ptp(sx)+1),(sy-sy.min())/(np.ptp(sy)+1),
+                        None if source_data is None else source_data[1:])
         origin=fields.pop('provinces')
         for key,values in fields.items():
             geography.setdefault(key,np.zeros(cells.shape+values.shape[1:],dtype=values.dtype))[sy,sx]=values
@@ -650,28 +679,19 @@ def generate(seed,countries,states,tech,pop,modernity,copies,diversity,military,
         state['hubs']={kind:codes[p] for kind,p in hubs.items()}
         state['province_ids']=ids
         state['province_codes']=[codes[p] for p in ids]
-        capped={k:v for k,v in source['capped'].items() if coastal or k not in {'building_fishing_wharf','building_whaling_station'}}
-        state['arable_land']=max(5,round(source['arable_land']*rng.uniform(.7,1.3)))
+        capped=dict(source['capped'])
+        state['arable_land']=source['arable_land']
         state['arable_resources']=source['arable_resources']
         state['capped']=capped
         state['resources']=source['resources']
         state['traits']=source['traits']
         state['subsistence']=source['subsistence']
         state['template']=source['key']
-    state_neighbours={s['id']:set() for s in regions}
-    state_of={p:s['id'] for s in regions for p in s['provinces']}
-    for p in land:
-        for q in linked[p]:
-            if state_of[q]!=state_of[p]:
-                state_neighbours[state_of[p]].add(state_of[q])
-    state_centers={s['id']:s['center'] for s in regions}
-    grouping,seeds=_grow([s['id'] for s in regions],state_neighbours,state_centers,max(1,round(states/5)),[5]*max(1,round(states/5)),rng)
-    strategic=[{'key':f'region_interface_{i+1}','states':[s for s in regions if grouping[s['id']]==i],'name':word(rng)+' Region'} for i in range(len(seeds))]
     weights=[rng.lognormvariate(0,.7) for _ in range(countries)]
     ownership,capitals=_grow([s['id'] for s in regions],state_neighbours,state_centers,countries,[w/sum(weights)*states for w in weights],rng,False)
     _detach(rng,ownership,capitals,state_neighbours,{s['id'] for s in regions if s['coastal']},round(states*SECONDARY_SHARE+rng.random()-.5))
     groups=[[s['id'] for s in regions if ownership[s['id']]==i] for i in range(countries)]
-    world=nations(rng,data,regions,groups,capitals,state_neighbours,strategic,tech,pop,modernity,copies,diversity,military)
+    world=nations(rng,data,regions,groups,capitals,strategic,sources,tech,ideology_uniformity,copies,tech_variation,country_economy,local_economy,primary_culture_share)
     used=set()
     for state in regions:
         state['name']=word(rng,used)
@@ -738,8 +758,10 @@ def generate(seed,countries,states,tech,pop,modernity,copies,diversity,military,
                                        f'NEconomy = {{ WORLD_MARKET_LOCATION = "{codes[ocean[0]]}" }}',
         'localization/english/interface_l_english.yml':'\n'.join(localization+world['localization'])}
     tags={c['tag'] for c in world['countries']}
-    files.update(_rewrites(game,regions,strategic,data['regions'],tags))
+    files.update(_rewrites(game,regions,strategic,data['regions'],tags,{c['source']:c['tag'] for c in world['countries']}))
     files.update({path:_absent(text,tags) if path.startswith('common/history/') else text for path,text in world['files'].items()})
+    from .characters import scripts
+    scripts(game,files)
     for source in [game/'gfx/map/map_object_data/layers.txt',*sorted((game/'gfx/map/map_object_data').glob('papermap_*.txt'))]:
         files[source.relative_to(game).as_posix()]=source.read_text(encoding='utf-8-sig')
     for kind,instances in locators.items():
@@ -760,12 +782,18 @@ def generate(seed,countries,states,tech,pop,modernity,copies,diversity,military,
             write_script(mod/path/'interface_empty.txt','')
     write_json(mod/'.metadata/metadata.json',{'name':f'Interface world {seed} {countries} {states}','id':f'local.interface.world.{seed}.{countries}.{states}','version':'1',
         'supported_game_version':'1.13.*','short_description':'Random miniature world','tags':[],'relationships':[],'game_custom_data':{'replace_paths':replace}})
-    manifest={'seed':seed,'tech':tech,'pop':pop,'copies':copies,'width':width,'height':height,'mod':str((out/'mod').resolve()),'countries':world['countries'],
+    manifest={'seed':seed,'tech':tech,'ideology_uniformity':ideology_uniformity,'primary_culture_share':primary_culture_share,'copies':copies,'tech_variation':tech_variation,
+              'country_economy':country_economy,'local_economy':local_economy,'source_regions':source_regions,
+              'source_region_keys':list(sources),'tech_reference':world['tech_reference'],'economy_reference':world['economy_reference'],
+              'strategic_regions':[{'key':r['key'],'source_region':r['source_region'],'states':[s['key'] for s in r['states']]} for r in strategic],
+              'width':width,'height':height,'mod':str((out/'mod').resolve()),'countries':world['countries'],
               'states':[{'id':s['id'],'key':s['key'],'name':s['name'],'country':s['country'],'provinces':s['province_codes'],'coastal':s['coastal'],
-                         'hubs':s['hubs'],'template':s['template']} for s in regions],
+                         'hubs':s['hubs'],'template':s['template'],'source_region':s['source_region'],
+                         'economic_scale':s['economic_scale'],'buildings':s['buildings'],'excluded_buildings':s['excluded_buildings']} for s in regions],
               'seas':[{'id':s['id'],'key':s['key'],'name':s['name'],'province':codes[s['province']]} for s in seas],
               'lakes':[codes[p] for p in lakes],
               'straits':[{'from':codes[s['from']],'to':codes[s['to']]} for s in chokepoints]}
+    write_json(work/'audit.json',audit(regions,files))
     write_json(work/'manifest.json',manifest)
     work.rename(out)
     return out/'manifest.json'

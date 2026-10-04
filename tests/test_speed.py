@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import tempfile
+import struct
 import time
 import unittest
 from pathlib import Path
@@ -10,7 +11,7 @@ from interface.actions import execute
 from interface.options.stored import Shared, Stored, Vocabulary
 from interface.recording.spec import TABLE
 from interface.recording.tables import ordered
-from interface.runner.memory import Reader
+from interface.runner.memory import HEAP_LOW, LAYOUT, Reader
 from interface.runner.tail import LogTail
 from interface.timing import RECORDER
 from tests import test_store
@@ -41,6 +42,88 @@ class TokenTests(unittest.TestCase):
         reader.tokens.assert_not_called()
         self.assertEqual(reader.item(3,9),('flag','first'))
         reader.tokens.assert_called_once()
+
+
+class AliveTests(unittest.TestCase):
+    def reader(self,count=2,identity=7,capacity=3):
+        import numpy as np
+        reader=Reader.__new__(Reader)
+        reader.tables=LAYOUT['tables']
+        reader.player=mock.Mock(return_value=7)
+        address=HEAP_LOW+4096
+        reader.objects=mock.Mock(return_value=(0,np.array([7]),np.array([address])))
+        offset=reader.tables['country']['vectors']['country_states'][0]
+        memory={(address+24,4):struct.pack('<I',identity),
+                (address+offset,16):struct.pack('<Qii',address+8192,capacity,count)}
+        reader.read=mock.Mock(side_effect=lambda address,size:memory[address,size])
+        return reader
+
+    def test_owned_states_are_read_without_decoding_the_world(self):
+        reader=self.reader(identity=0x1000007)
+        self.assertTrue(reader.alive())
+        self.assertEqual(sum(call.args[1] for call in reader.read.call_args_list),20)
+        self.assertFalse(self.reader(count=0).alive())
+
+    def test_missing_country_is_defeated_and_reused_slot_waits_for_confirmation(self):
+        reader=self.reader()
+        reader.player.return_value=8
+        self.assertFalse(reader.alive())
+        reader.read.assert_not_called()
+        self.assertTrue(self.reader(identity=8).alive())
+
+    def test_invalid_owned_state_count_is_rejected(self):
+        for count in (-1,4):
+            with self.assertRaisesRegex(RuntimeError,'Invalid country_states'):
+                self.reader(count=count).alive()
+
+
+class DaysTests(unittest.TestCase):
+    def test_tick_advances_within_the_five_second_limit(self):
+        from loop.run import Loop
+        clock=[0.0]
+        reader=mock.Mock()
+        reader.date.side_effect=lambda:(24,'target') if clock[0]>=4 else (0,'start')
+        reader.alive.return_value=True
+        def advance(seconds):
+            clock[0]+=1
+        with mock.patch('loop.run.time.monotonic',side_effect=lambda:clock[0]),mock.patch('loop.run.time.sleep',side_effect=advance):
+            Loop.__new__(Loop).days(reader,24)
+        self.assertEqual(clock[0],4)
+        reader.check.assert_not_called()
+
+    def test_clock_wait_remains_bounded_when_the_date_never_moves(self):
+        from loop.run import ClockStalled, Loop, TICK_LIMIT
+        clock=[0.0]
+        reader=mock.Mock()
+        reader.date.return_value=(0,'start')
+        reader.alive.return_value=True
+        def advance(seconds):
+            clock[0]+=1
+        with mock.patch('loop.run.time.monotonic',side_effect=lambda:clock[0]),mock.patch('loop.run.time.sleep',side_effect=advance):
+            with self.assertRaises(ClockStalled):
+                Loop.__new__(Loop).days(reader,24)
+        self.assertEqual(clock[0],TICK_LIMIT+1)
+        reader.check.assert_called_once()
+
+    def test_each_poll_uses_one_date_and_stops_at_the_target(self):
+        from loop.run import Loop
+        reader=mock.Mock()
+        reader.date.side_effect=[(0,'start'),(6,'middle'),(24,'target')]
+        reader.alive.return_value=True
+        with mock.patch('loop.run.time.sleep'):
+            Loop.__new__(Loop).days(reader,24)
+        self.assertEqual(reader.date.call_count,3)
+        reader.alive.assert_called_once()
+
+    def test_stalled_ticks_still_check_the_process_and_raise(self):
+        from loop.run import Loop
+        reader=mock.Mock()
+        reader.date.return_value=(0,'start')
+        reader.alive.return_value=True
+        with mock.patch('loop.run.TICK_LIMIT',-1):
+            with self.assertRaisesRegex(RuntimeError,'date stopped'):
+                Loop.__new__(Loop).days(reader,24)
+        reader.check.assert_called_once()
 
 
 class MarkTests(unittest.TestCase):
@@ -74,13 +157,13 @@ class AnswerTests(unittest.TestCase):
         found.game=game
         return found
 
-    def test_the_answer_is_the_first_text_that_holds_the_token(self):
-        executor=self.executor(side_effect=['','other|1|','INTERFACE|action|5|1|'])
+    def test_the_answer_waits_for_a_complete_matching_record(self):
+        executor=self.executor(side_effect=['','INTERFACE|action|4|1|\n','INTERFACE|action|5|','INTERFACE|action|5|1|','INTERFACE|action|5|1|\n'])
         reader=mock.Mock()
         with mock.patch.object(execute,'POLL',0):
-            self.assertEqual(executor.answer(reader,3,'INTERFACE|action|5|',execute.time.monotonic()),'INTERFACE|action|5|1|')
-        self.assertEqual(executor.game.log_since.call_args_list,[mock.call(3)]*3)
-        self.assertEqual(reader.check.call_count,3)
+            self.assertEqual(executor.answer(reader,3,'INTERFACE|action|5|',execute.time.monotonic()),'INTERFACE|action|5|1|\n')
+        self.assertEqual(executor.game.log_since.call_args_list,[mock.call(3)]*5)
+        self.assertEqual(reader.check.call_count,5)
 
     def test_no_answer_within_the_limit_gives_nothing(self):
         executor=self.executor(return_value='')

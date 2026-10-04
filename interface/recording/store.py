@@ -219,6 +219,13 @@ class Store:
         return world_id
 
     @timed
+    def world_reports(self,world):
+        for name in ('opening_buildings.json','opening_relationships.json'):
+            content=(world.parent/name).read_bytes()
+            self.connection.execute('insert into world_asset (world_id,name,data) values (%s,%s,%s) on conflict (world_id,name) do update set data=excluded.data',
+                                    (self.world_id,name,content))
+
+    @timed
     def recent_tags(self,count):
         return [name for name, in self.connection.execute('select d.name from run r join country_definition d on d.country_definition=r.tag order by run_id desc limit %s',(count,))]
 
@@ -255,9 +262,13 @@ class Store:
                               (pending['kind'],self.session,pending['started_at'],'open_run',self.world_id,self.ruleset_id,constants['player_country'],
                                constants['game_speed'],constants['first_start'],constants['custom_rng_seed'],tag,pending['world'],pending['cli_seed'],
                                pending['run_seed'],pending['years'],pending['minutes'],pending['profile'],pending['pool'],pending['runs_requested'],
-                               *[None if pending['generated'] is None else pending['generated'][k] for k in ('seed','countries','states','tech','pop','modernity','copies','diversity','military')],pending['picker'],pending['candidates'],pending['objective'][0]['gdp'],pending['objective'][0]['population'],pending['objective'][0]['sol'],pending['objective'][1],pending['objective'][0]['stock'])).fetchone()[0]
+                               *[None if pending['generated'] is None else pending['generated'].get(k) for k in ('seed','countries','states','tech','pop','modernity','copies','diversity','military')],pending['picker'],pending['candidates'],pending['objective'][0]['gdp'],pending['objective'][0]['population'],pending['objective'][0]['sol'],pending['objective'][1],pending['objective'][0]['stock'])).fetchone()[0]
         names=sorted(pending['weights'])
-        self.copy(cursor,'run_weight',('run_id','action','weight'),[(run_id,action,pending['weights'][name]) for name,action in zip(names,self.names('action',names))])
+        if pending['generated'] is not None:
+            values=pending['generated']
+            cursor.execute('update run set tech_variation=%s,country_economy=%s,local_economy=%s,source_regions=%s,ideology_uniformity=%s,primary_culture_share=%s where run_id=%s',
+                           (*[values.get(key) for key in ('tech_variation','country_economy','local_economy','source_regions','ideology_uniformity','primary_culture_share')],run_id))
+        self.copy(cursor,'run_weight',('run_id','advisor_action','weight'),[(run_id,action,pending['weights'][name]) for name,action in zip(names,self.names('advisor_action',names))])
         self.copy(cursor,'run_advisor',('run_id','position','advisor'),enumerate_rows(run_id,self.names('advisor',pending['advisors'])))
         if pending['proposal'] is not None:
             {'random_smac_weighting':self.record_smac_proposal,'random_svr_weighting':self.record_svr_proposal}[pending['proposal']['initializer']](cursor,run_id,pending['proposal'])
@@ -275,8 +286,8 @@ class Store:
             self.copy(cursor,'pick_candidate',('run_id','seq','candidate','actions','predicted_change','chosen'),
                       [(self.run_id,seq,index,len(batch),predicted,index==chosen) for index,(batch,predicted) in enumerate(zip(batches,predictions))])
             names=[name for batch in batches for name in batch]
-            codes=iter(self.names('action',names))
-            self.copy(cursor,'pick_candidate_action',('run_id','seq','candidate','position','action'),
+            codes=iter(self.names('advisor_action',names))
+            self.copy(cursor,'pick_candidate_action',('run_id','seq','candidate','position','advisor_action'),
                       [(self.run_id,seq,index,position,next(codes)) for index,batch in enumerate(batches) for position,_ in enumerate(batch)])
 
     @timed
@@ -528,31 +539,32 @@ class Store:
         if broken:
             raise RuntimeError(f'Snapshot {seq} breaks foreign keys: {broken[:5]}')
 
-    @timed
-    def catalogue(self,names):
-        codes=self.names('action',list(names))
-        self.connection.execute('delete from catalogue_action where action <> all(%s::int4[])',(codes,))
-        self.connection.execute('insert into catalogue_action (action) select unnest(%s::int4[]) on conflict do nothing',(codes,))
+    @timed_often
+    def parameters(self,cursor,vocabulary,code,label,params):
+        kinds={name:'integer' if isinstance(value,int) else 'text' for name,value in params.items()}
+        known=self.actions.setdefault((vocabulary,code),dict(cursor.execute(f'select name,value_kind from {vocabulary}_parameter where {vocabulary}=%s',(code,)).fetchall()))
+        for name,kind in kinds.items():
+            if known.get(name,kind)!=kind:
+                raise RuntimeError(f'{label}.{name} is {known[name]}, not {kind}')
+            if name not in known:
+                cursor.execute(f'insert into {vocabulary}_parameter ({vocabulary},name,value_kind) values (%s,%s,%s)',(code,name,kind))
+                known[name]=kind
+        return [(name,value if kinds[name]=='integer' else None,None if kinds[name]=='integer' else str(value)) for name,value in params.items()]
 
     @timed
     def log_action(self,entry,after):
         action=self.names('action',[entry['action']])[0]
         advisor=self.names('advisor',[entry['advisor']])[0]
-        kinds={name:'integer' if isinstance(value,int) else 'text' for name,value in entry['params'].items()}
+        decision=entry['decision']
+        chosen=None if decision is None else self.names('advisor_action',[decision[0]])[0]
         with self.connection.transaction(),self.connection.cursor() as cursor:
-            known=self.actions.setdefault(action,dict(cursor.execute('select name,value_kind from action_parameter where action=%s',(action,)).fetchall()))
-            for name,kind in kinds.items():
-                if known.get(name,kind)!=kind:
-                    raise RuntimeError(f'{entry["action"]}.{name} is {known[name]}, not {kind}')
-                if name not in known:
-                    cursor.execute('insert into action_parameter (action,name,value_kind) values (%s,%s,%s)',(action,name,kind))
-                    known[name]=kind
-            cursor.execute('insert into loop_action (run_id,n,turn,advisor,action,before_seq,after_seq,status,detail,ms,logged_at) '
-                           'values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now())',
-                           (self.run_id,entry['seq'],entry['turn'],advisor,action,entry['snapshot'],after,entry['status'],entry.get('detail'),entry.get('ms')))
-            self.copy(cursor,'loop_action_param',('run_id','n','action','name','integer_value','text_value'),
-                      [(self.run_id,entry['seq'],action,name,value if kinds[name]=='integer' else None,None if kinds[name]=='integer' else str(value))
-                       for name,value in entry['params'].items()])
+            params=self.parameters(cursor,'action',action,entry['action'],entry['params'])
+            decided=[] if decision is None else self.parameters(cursor,'advisor_action',chosen,decision[0],decision[1])
+            cursor.execute('insert into loop_action (run_id,n,turn,advisor,action,advisor_action,before_seq,after_seq,status,detail,ms,logged_at) '
+                           'values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now())',
+                           (self.run_id,entry['seq'],entry['turn'],advisor,action,chosen,entry['snapshot'],after,entry['status'],entry.get('detail'),entry.get('ms')))
+            self.copy(cursor,'loop_action_param',('run_id','n','action','name','integer_value','text_value'),[(self.run_id,entry['seq'],action,*row) for row in params])
+            self.copy(cursor,'loop_decision_param',('run_id','n','advisor_action','name','integer_value','text_value'),[(self.run_id,entry['seq'],chosen,*row) for row in decided])
 
     @timed_often
     def start_heartbeat(self):

@@ -7,3 +7,8 @@ __pycache__/
 node_modules/
 dashboard/ui/dist/
 catboost_info/
+
+artifacts/world_fidelity/worlds/
+artifacts/world_fidelity/*.log
+artifacts/company_probe/
+artifacts/company_probe_final/

@@ -20,7 +20,7 @@ Never  move on from a failing test. Never bother me about tests failing, debug i
 Tests are for you not me. But I won't allow you to leave broken garbage 
 in my project or have long running test suites of 20+ seconds. 
 
-never launch long running tasks as your own child process. They cannot die when you do. 
+Child processes are allowed. Long-running jobs must continue running if the agent, task, or terminal exits. Launch those jobs through the project's detached process broker.
 
 No jsonb in the postgress db, use structured tables
 

@@ -1,0 +1,19 @@
+{
+  "iterations": 50,
+  "depth": 9,
+  "learning_rate": 0.009747527543307113,
+  "l2_leaf_reg": 0.15268297759253796,
+  "rsm": 0.2716657665885749,
+  "random_strength": 2.055984045203786,
+  "one_hot_max_size": 8,
+  "max_ctr_complexity": 3,
+  "boosting_type": "Plain",
+  "bootstrap_type": "Bayesian",
+  "bagging_temperature": 0.9264842193248449,
+  "border_count": 128,
+  "leaf_estimation_iterations": 3,
+  "grow_policy": "Depthwise",
+  "min_data_in_leaf": 5,
+  "counter_calc_method": "SkipTest",
+  "thread_count": 8
+}

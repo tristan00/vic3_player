@@ -12,12 +12,16 @@ import { Runs } from '@/routes/Runs'
 import { Schema } from '@/routes/Schema'
 import { Snapshot } from '@/routes/Snapshot'
 import { Table } from '@/routes/Table'
+import { Worlds, WorldDetail } from '@/routes/Worlds'
+import { Tuning } from '@/routes/Tuning'
 
 export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<Runs />} />
+        <Route path="/worlds" element={<Worlds />} />
+        <Route path="/worlds/:world" element={<WorldDetail />} />
         <Route path="/runs/:run" element={<Run />} />
         <Route path="/runs/:run/actions/:n" element={<Action />} />
         <Route path="/runs/:run/snapshots/:seq" element={<Snapshot />} />
@@ -27,6 +31,7 @@ export default function App() {
         <Route path="/actions" element={<Actions />} />
         <Route path="/actions/:name" element={<ActionType />} />
         <Route path="/policy" element={<Policy />} />
+        <Route path="/tuning" element={<Tuning />} />
         <Route path="/policy/runs/:run" element={<PolicyRun />} />
         <Route path="/schema" element={<Schema />} />
         <Route path="*" element={<Navigate to="/" replace />} />

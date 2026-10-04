@@ -10,6 +10,7 @@ from scipy import ndimage
 
 from ..common import timed, timed_often
 from ..script import blocks, body, clean, entries, keys, read, scalar, script_files
+from .source import reference
 
 
 COUNTRY_HISTORY=['countries','population','characters','military_formations','governments','government_setup','production_methods','ai','political_movements']
@@ -351,8 +352,9 @@ def _law_rules(game):
             eras=set(re.findall(r'add_era_researched\s*=\s*(\w+)',value))
             tiers[int(found[1])]={tech for tech,(era,_) in techs.items() if era in eras}|set(re.findall(r'add_technology_researched\s*=\s*(\w+)',value))
     buildings={key:listed(value,'unlocking_technologies') for key,value in read(game,'common/buildings')}
+    parents={key:scalar(value,'parent') for key,value in read(game,'common/laws') if scalar(value,'parent')}
     laws={key:(listed(value,'disallowing_laws'),listed(value,'unlocking_laws'),listed(value,'unlocking_technologies')) for key,value in read(game,'common/laws')}
-    return {'law_rules':laws,'tier_techs':tiers,'building_techs':buildings,'tech_requires':{tech:needs for tech,(_,needs) in techs.items()}}
+    return {'law_rules':laws,'law_parents':parents,'tier_techs':tiers,'building_techs':buildings,'tech_requires':{tech:needs for tech,(_,needs) in techs.items()}}
 
 
 @timed_often
@@ -430,7 +432,9 @@ def vanilla(game):
     for mix in settled:
         homes[mix['tag']].append(1-mix['primary'])
     density=np.sort(np.repeat([t['population']/len(t['provinces']) for t in templates],[len(t['provinces']) for t in templates]))
-    return {'templates':templates,'seas_per_state':_seas(game)/len(every),'straits_per_crossing':_straits(game),'crossings_per_state':_crossings(game)/len(every),'trade':trade,'profiles':profiles,'amendments':amendments,'allowed':allowed,'owners':owners,'law_groups':groups,'cultures':cultures,'religions':religions,
+    linked=reference(game,templates,rules)
+    counts=[len(c['techs']) for c in linked['source_countries'].values() if c['type'] in ('recognized','unrecognized')]
+    return {**linked,'templates':templates,'seas_per_state':_seas(game)/len(every),'straits_per_crossing':_straits(game),'crossings_per_state':_crossings(game)/len(every),'trade':trade,'profiles':profiles,'amendments':amendments,'allowed':allowed,'owners':owners,'law_groups':groups,'cultures':cultures,'religions':religions,
             'companies':_companies(game),**_rates(game),**_natives(game),**mixes,**people,**_armies(game,groups),**rules,**_relations(game),
             'governments':governments,'diversity_range':(mixed[int(len(mixed)*TRIM)],sum(mixed)/len(mixed),mixed[len(mixed)-1-int(len(mixed)*TRIM)]),'diversity_within':float(np.std([share-sum(found)/len(found) for found in homes.values() for share in found])),
             'culture_religion':{key:scalar(value,'religion') for key,value in read(game,'common/cultures')},
@@ -474,9 +478,9 @@ def boxes(game):
 
 
 @timed
-def textures(game,provinces,u,v):
-    source=rasters(game)
-    spans=[boxes(game)[p] for p in provinces]
+def textures(game,provinces,u,v,sources=None):
+    source,bounds=(rasters(game),boxes(game)) if sources is None else sources
+    spans=[bounds[p] for p in provinces]
     box=tuple(slice(min(s[axis].start for s in spans),max(s[axis].stop for s in spans)) for axis in range(2))
     mask=np.isin(source['provinces'][box],[int(p[1:],16) for p in provinces])
     nearest=ndimage.distance_transform_edt(~mask,return_distances=False,return_indices=True)

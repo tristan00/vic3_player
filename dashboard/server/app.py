@@ -1,25 +1,22 @@
-import asyncio
 import contextlib
 from dataclasses import dataclass
 import logging
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from interface.recording.spec import ENTITIES, TABLE
 from interface.timing import COLUMNS, RECORDER, TRACE, span
 
-from . import actions, blocks, changes, db, meta, policy, runs, schema, tables
+from . import actions, blocks, changes, db, graph_tuning, meta, policy, runs, schema, tables, tuning, worlds
 from .grid import VALUES, Spec, grid, parse_filters, rows_source
 from .models import ActionInfo, EntityInfo, Grid, InitializerInfo, OpenRun, RunInfo, RunReward, Series, SeriesChoice
 
 LOG=logging.getLogger('dashboard')
 DIST=Path(__file__).resolve().parents[1]/'ui'/'dist'
-STAMP_EVERY=1.0
 
 
 @contextlib.asynccontextmanager
@@ -35,6 +32,36 @@ app=FastAPI(title='vic3 dashboard',version='2',lifespan=lifespan)
 app.add_middleware(GZipMiddleware,minimum_size=2048)
 
 
+@app.get('/api/worlds')
+def world_inventory():
+    return worlds.inventory()
+
+
+@app.get('/api/tuning/world')
+def graph_tuning_results()->graph_tuning.GraphTracking:
+    return graph_tuning.results()
+
+
+@app.get('/api/tuning/{model}')
+def tuning_results(model:tuning.Literal['histogram','row'])->tuning.Results:
+    return tuning.results(model)
+
+
+@app.get('/tuning/world/{asset:path}',include_in_schema=False)
+def world_graph_asset(asset:str):
+    return FileResponse(tuning.graph_asset(asset),headers={'Cache-Control':'no-cache'})
+
+
+@app.get('/api/worlds/{key}')
+def world_detail(key:str,run:int|None=None):
+    return found(worlds.detail(key,run),'world')
+
+
+@app.get('/api/runs/{run_id}/world')
+def run_world(run_id:int):
+    return {'key':str(found(db.value('select world_id from run where run_id=%s',(run_id,)),'run'))}
+
+
 @app.exception_handler(ValueError)
 async def bad_request(_request,error):
     return JSONResponse(status_code=400,content={'detail':str(error)})
@@ -42,7 +69,7 @@ async def bad_request(_request,error):
 
 @app.middleware('http')
 async def timing(request:Request,call_next):
-    if not request.url.path.startswith('/api/') or request.url.path=='/api/events':
+    if not request.url.path.startswith('/api/'):
         return await call_next(request)
     trace=[]
     with span(request.method,'dashboard',logging.DEBUG) as whole:
@@ -159,8 +186,8 @@ def get_candidates(run_id:int,seq:int,p:Page=Depends(page))->Grid:
 
 
 @app.get('/api/policy/runs/{run_id}/reward')
-def get_reward(run_id:int)->RunReward:
-    return found(runs.run_reward(run_id),f'run {run_id}')
+def get_reward(run_id:int,seq:int|None=Query(None,ge=0))->RunReward:
+    return found(runs.run_reward(run_id,seq),f'run or snapshot in run {run_id}')
 
 
 @app.get('/api/runs/{run_id}/groups')
@@ -284,6 +311,11 @@ def get_weights(p:Page=Depends(page))->Grid:
     return policy.weights(*p.args())
 
 
+@app.get('/api/policy/catalogue')
+def get_catalogue(p:Page=Depends(page))->Grid:
+    return policy.catalogue(*p.args())
+
+
 @app.get('/api/policy/picker-actions')
 def get_picker_actions(p:Page=Depends(page))->Grid:
     return policy.picker_actions(*p.args())
@@ -301,17 +333,9 @@ def get_timing(p:Page=Depends(page))->Grid:
     return grid(specs,source,params,*p.args(),None,['span'])
 
 
-@app.get('/api/events')
-async def events(request:Request):
-    async def stream():
-        last=None
-        while not await request.is_disconnected():
-            current=await run_in_threadpool(schema.stamp)
-            if current!=last:
-                last=current
-                yield f'event: stamp\ndata: {current}\n\n'
-            await asyncio.sleep(STAMP_EVERY)
-    return StreamingResponse(stream(),media_type='text/event-stream',headers={'cache-control':'no-cache'})
+@app.get('/api/stamp')
+def get_stamp()->str:
+    return JSONResponse(schema.stamp(),headers={'Cache-Control':'no-store'})
 
 
 @app.api_route('/api/{path:path}',methods=['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS'],include_in_schema=False)

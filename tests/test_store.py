@@ -5,7 +5,7 @@ from unittest import mock
 
 import psycopg
 
-from advisors.pickers import PARAMS
+from advisors.models.histogram.data import PARAMS
 from interface.options.stored import Stored
 from interface.recording.store import Store, digest, install
 from interface.recording.spec import TABLES
@@ -60,7 +60,7 @@ def built(step):
 
 
 RUN={'kind':'mini','advisors':['random'],'tag':'AAA','world':'w','cli_seed':1,'run_seed':2,'years':1.0,'minutes':1.0,'profile':'actions','pool':0,'runs_requested':3,
-     'generated':{'seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5,'modernity':0.25,'copies':0.2,'diversity':0.5,'military':0.75},'weights':{'build':3,'enact_law':2},
+     'generated':{'seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5,'modernity':0.25,'copies':0.2,'diversity':0.5,'military':0.75},'weights':{'expand_port':3,'enact_trade_policy':2},
      'picker':'first','candidates':1,'objective':({'gdp':0.0,'population':1.0,'sol':0.0,'stock':0.0},0.0)}
 STEPS=[{'progress':0.1,'second':True,'head':1,'samples':[(1,0.5)]},
        {'progress':0.2,'second':True,'head':2,'samples':[(1,0.5),(2,0.6)]},
@@ -137,6 +137,12 @@ class StoreTests(unittest.TestCase):
     def write_all(self):
         for step in STEPS:
             self.store.write(built(step),'post_action',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+
+    def test_world_controls_are_recorded_with_source_government_default(self):
+        self.store.pending['generated']={**RUN['generated'],'modernity':None,'ideology_uniformity':.4,'primary_culture_share':.7,'tech_variation':1.2,'country_economy':.8,'local_economy':1.1,'source_regions':2}
+        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+        row=self.store.connection.execute('select ideology_uniformity,primary_culture_share,copies,tech_variation,country_economy,local_economy,source_regions from run where run_id=%s',(self.store.run_id,)).fetchone()
+        self.assertEqual(row,(.4,.7,.2,1.2,.8,1.1,2))
 
     def test_versions_tombstones_and_query_layer(self):
         self.write_all()
@@ -252,18 +258,45 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(c.execute('select dimension,linear,chosen from svr_coefficient where run_id=%s order by dimension',(run,)).fetchall(),[('build',.4,2.0),('enact_law',-.2,-2.0)])
         self.store.end_run('time')
 
+    def test_an_executed_decision_is_stored_with_its_advisor_action_and_parameters_beside_the_command(self):
+        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+        self.store.log_action({'turn':1,'seq':1,'advisor':'random','action':'set_tax_level','params':{'level':'High'},'snapshot':0,'status':'done','ms':5,
+                               'decision':('raise_taxes',{'level':'high'})},None)
+        self.store.log_action({'turn':1,'seq':2,'advisor':'loop','action':'unpause','params':{},'snapshot':0,'status':'done','ms':5,'decision':None},None)
+        c=self.store.connection
+        run=self.store.run_id
+        self.assertEqual(c.execute('select l.n,a.name,d.name from loop_action l join action a using (action) left join advisor_action d using (advisor_action) '
+                                   'where l.run_id=%s order by 1',(run,)).fetchall(),[(1,'set_tax_level','raise_taxes'),(2,'unpause',None)])
+        self.assertEqual(c.execute('select n,name,text_value from loop_decision_param where run_id=%s',(run,)).fetchall(),[(1,'level','high')])
+        self.assertEqual(c.execute('select n,name,text_value from loop_action_param where run_id=%s',(run,)).fetchall(),[(1,'level','High')])
+        self.store.end_run('time')
+
     def test_picks_record_every_candidate_with_its_actions_and_the_model_behind_them(self):
         self.store.pending['pick_model']=(1049,29,4.5,PARAMS,[('treasury',60.0),('action1.type',40.0)])
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
-        self.store.record_pick(0,[['build','research'],['enact_law']],[1.5,-2.0],0)
+        self.store.record_pick(0,[['expand_port','research_production'],['enact_trade_policy']],[1.5,-2.0],0)
         c=self.store.connection
         run=self.store.run_id
         self.assertEqual(c.execute('select pauses,runs from pick_model where run_id=%s',(run,)).fetchone(),(1049,29))
         self.assertEqual(c.execute('select feature,importance from pick_importance where run_id=%s order by 1',(run,)).fetchall(),[('action1.type',40.0),('treasury',60.0)])
         self.assertEqual(c.execute('select candidate,actions,predicted_change,chosen from pick_candidate where run_id=%s order by candidate',(run,)).fetchall(),
                          [(0,2,1.5,True),(1,1,-2.0,False)])
-        self.assertEqual(c.execute('select p.candidate,p.position,a.name from pick_candidate_action p join action a using (action) where run_id=%s order by 1,2',(run,)).fetchall(),
-                         [(0,0,'build'),(0,1,'research'),(1,0,'enact_law')])
+        self.assertEqual(c.execute('select p.candidate,p.position,a.name from pick_candidate_action p join advisor_action a using (advisor_action) where run_id=%s order by 1,2',(run,)).fetchall(),
+                         [(0,0,'expand_port'),(0,1,'research_production'),(1,0,'enact_trade_policy')])
+        self.store.end_run('time')
+
+    def test_row_model_records_its_own_parameters_and_training_row_count(self):
+        from advisors.models.row.model import Model
+        params={key:value for key,value in Model().params.items() if key!='allow_writing_files'}
+        params.update(model_kind='row',training_rows=1234,grow_policy='Lossguide',min_data_in_leaf=20,max_leaves=32,
+                      bootstrap_type='Bayesian',bagging_temperature=1.5,border_count=64,leaf_estimation_iterations=3)
+        self.store.pending['picker']='catboost_piecewise'
+        self.store.pending['pick_model']=(100,12,.5,params,[('action',100.)])
+        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.)
+        row=self.store.connection.execute('select r.picker,m.model_kind,m.training_rows,m.max_ctr_complexity,m.bootstrap_type,'
+                                          'm.grow_policy,m.min_data_in_leaf,m.max_leaves,m.bagging_temperature,m.border_count,m.leaf_estimation_iterations '
+                                          'from run r join pick_model m using(run_id) where run_id=%s',(self.store.run_id,)).fetchone()
+        self.assertEqual(row,('catboost_piecewise','row',1234,params.get('max_ctr_complexity'),'Bayesian','Lossguide',20,32,1.5,64,3))
         self.store.end_run('time')
 
     def test_a_stalled_run_is_listed_and_the_watchdog_flag_ends_it(self):

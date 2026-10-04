@@ -46,6 +46,7 @@ KEYS={
     'charter':'common/company_charter_types',
     'power_bloc_identity':'common/power_bloc_identities',
     'ship_modification':'common/ship_modifications',
+    'treaty_article':'common/treaty_articles',
 }
 
 
@@ -191,6 +192,32 @@ REFORM=('@PoliticsPanel.AccessReformGovernment','')
 PLAY_CONFIRMATION=('gui/popups.gui','name = "diplomatic_play_confirmation"')
 DESIGNER=('gui/ship_designer_popup.gui','name = ship_designer_popup')
 TEMPLATE_ITEM=(('ShipTemplateList.GetTemplatesOfType({ship_type}.Self)','EqualTo_int32(PdxGuiWidget.AccessParent.GetIndexInDataModel, {index})'),)
+
+
+TREATY_DRAFT=('gui/treaty_draft_panel.gui','name = "treaty_draft_panel"')
+ARTICLE_INPUT=('gui/right_click_menu.gui','name = "article_input_right_click_menu_left"')
+DRAFT=('@TreatyDraftPanel.GetDraft','')
+OPEN_DRAFT=(('InformationPanelBar.OpenTreatyDraftPanelForNewDraft(GetPlayer.Self, {country}.Self)',),((),))
+TREATY_SIDES=(('offer','Offers','Left'),('demand','Demands','Right'),('agree','MutualAgreements','Left'))
+ARTICLE_MENU="RightClickMenuManager.ToggleArticleTypeInput(TreatyDraft.Self, ArticleType.Self, Country.Self, PdxGuiWidget.AccessSelf, 'article_input_right_click_menu_left')"
+
+
+def potential(listing,holder):
+    return (DRAFT,(f'@TreatyDraft.Get{holder}Country',''),(f'TreatyDraft.GetPotential{listing}','ArticleType.HasType({treaty_article})'))
+
+
+def treaty(name,listing,holder):
+    return Action(name,('country','treaty_article'),'TreatyDraft.SendProposal',datamodels=(DRAFT,),window=TREATY_DRAFT,start=OPEN_DRAFT,cleanup=('InformationPanelBar.ClosePanel',),
+                  stages=((TREATY_DRAFT,potential(listing,holder),
+                           lambda values:['TreatyDraft.AddArticle(ArticleType.Self, Country.Self, TreatyDraft.GetOtherCountry(Country.Self).Self)']),))
+
+
+def goods_treaty(name,listing,holder):
+    return Action(name,('country','treaty_article','goods'),'TreatyDraft.SendProposal',datamodels=(DRAFT,),window=TREATY_DRAFT,start=OPEN_DRAFT,
+                  cleanup=('RightClickMenuManager.Close','InformationPanelBar.ClosePanel'),
+                  stages=((TREATY_DRAFT,potential(listing,holder),lambda values:[ARTICLE_MENU]),
+                          (ARTICLE_INPUT,(('ArticleDraft.GetValidGoods','ObjectsEqual(Goods.Self, {goods}.Self)'),),lambda values:['ArticleDraft.SetGood(Goods.Self)']),
+                          (ARTICLE_INPUT,(),lambda values:['TreatyDraft.AddArticleDraft(ArticleDraft.Self)','RightClickMenuManager.Close'])))
 
 
 PROPOSAL_KINDS=(('treaty','GetTreaty','Proposal.GetTreaty.IsValid',(('accept','AcceptTreatyProposal'),('decline','DeclineTreatyProposal'))),
@@ -425,6 +452,8 @@ ACTIONS=(
                   ((('AccessPlayer.AccessActiveDiplomaticPlays','ObjectsEqual(DiplomaticPlay.Self, {diplomatic_play}.Self)'),),)),
            stages=((ADD_WAR_GOAL_PANEL,(('AddWarGoalPanel.AccessShownWarGoalTypes','ObjectsEqual(WarGoalType.Self, {war_goal_type}.Self)'),),
                     lambda values:['AddWarGoalPanel.SetSelectedWarGoalType(WarGoalType.Self)']),)),
+    *(treaty(f'{verb}_treaty_article',listing,holder) for verb,listing,holder in TREATY_SIDES),
+    *(goods_treaty(f'{verb}_goods_treaty_article',listing,holder) for verb,listing,holder in TREATY_SIDES[:2]),
     act('withdraw_treaty','treaty','Treaty.WithdrawFromTreaty',datamodels=(('AccessPlayer.GetInForceTreaties','ObjectsEqual(Treaty.Self, {treaty}.Self)'),)),
     Action('form_power_bloc',('power_bloc_identity','power_bloc_principle'),'PowerBlocFormationPanel.GetPowerBlocFormation.Confirm',
            window=BLOC_FORMATION,start=(('InformationPanelBar.OpenPowerBlocFormationPanel',),((),)),
@@ -496,7 +525,8 @@ GROUPS={
     'navy':('recall_fleet','raise_ship_item','lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item','set_default_construction_fleet','clear_default_construction_fleet','decommission_ship','build_ship','build_ship_for','cancel_ship','start_naval_mission','end_naval_mission','start_naval_mission_selected','end_naval_mission_selected','pause_ship_construction','resume_ship_construction','set_supply_ship_construction','design_ship_template','edit_ship_template','retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all',
             'set_default_ship_template','set_fleet_ship_template','delete_ship_template'),
     'characters':('commander_order','hire_commander','hire_commander_for','promote_commander','assign_commander','unassign_commander','character_interaction'),
-    'diplomacy':('diplomatic_action','diplomatic_action_obligation','start_play_confirmed','withdraw_treaty','accept_treaty','decline_treaty','accept_demand','reject_demand','accept_action_proposal',
+    'diplomacy':('diplomatic_action','diplomatic_action_obligation','start_play_confirmed','withdraw_treaty','offer_treaty_article','demand_treaty_article','agree_treaty_article',
+                 'offer_goods_treaty_article','demand_goods_treaty_article','accept_treaty','decline_treaty','accept_demand','reject_demand','accept_action_proposal',
                  'decline_action_proposal','quick_decline_proposal','request_join_power_bloc','form_power_bloc','kick_from_power_bloc','leave_power_bloc','upgrade_principle','pick_principle'),
     'plays':('start_play_country','start_play_state','support_initiator','support_target','lean_initiator','lean_target','stay_on_fence',
              'declare_neutrality','back_down','accept_sway','reject_sway','toggle_press_war_goal','make_primary_demand','add_war_goal'),

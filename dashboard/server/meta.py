@@ -58,7 +58,9 @@ def specs(table):
 
 @db.timed
 def meta_grid(table,filters,sort,desc,offset,limit,run_id=None):
-    found=specs(table)
+    found=list(specs(table))
+    if table in ('pick_model','pick_importance'):
+        found.insert(1,Spec('picker','text','(select r.picker from run r where r.run_id=t.run_id)'))
     keys=db.rows('''select a.attname as name from pg_index i join pg_attribute a on a.attrelid=i.indrelid and a.attnum=any(i.indkey)
                     where i.indrelid=%s::regclass and i.indisprimary''',(table,))
     order=[k['name'] for k in keys] or [found[0].name]
@@ -66,9 +68,10 @@ def meta_grid(table,filters,sort,desc,offset,limit,run_id=None):
 
 
 RUN_GROUPS={'lifecycle':['kind','started_at','heartbeat_at','progress_at','progress_step','longest_step','longest_step_ms','ended_at','end_reason','end_detail','game_exited_at'],
-            'world':['tag','player_country','world_file','world_id','world_seed','countries','states','tech','pop','modernity','copies','diversity','military','ruleset_id','first_start'],
+            'world':['tag','player_country','world_file','world_id','world_seed','countries','states','tech','pop','modernity','copies','diversity','military','ideology_uniformity','primary_culture_share','tech_variation','country_economy','local_economy',
+                     'source_regions','ruleset_id','first_start'],
             'launch':['cli_seed','run_seed','runs_requested','years','minutes','game_speed','profile','pool','custom_rng_seed','source_session']}
-POLICY_GROUPS={'config':['objective_gdp','objective_population','objective_sol','objective_stock','objective_alpha'],'picker':['picker','candidates']}
+POLICY_GROUPS={'legacy':['objective_gdp','objective_population','objective_sol','objective_stock','objective_alpha'],'picker':['picker','candidates']}
 INITIALIZER=Spec('initializer','text','(select a.name from run_advisor ra join advisor a using (advisor) where ra.run_id=t.run_id and ra.position=0)',group='initializer')
 
 

@@ -63,8 +63,7 @@ def record(game,store,phase):
     if store.session!=identity:
         if store.run_id is not None:
             raise RuntimeError('The game session changed within a run')
-        store.session=identity
-        register(game,session,world,store)
+        prepare(game,store,world)
     reader=game.reader()
     with span('interface.recording.record.read','interface') as reading:
         nonce=random.randrange(1,10**6)
@@ -131,6 +130,13 @@ def rule_settings(root,mods):
 @timed_often
 def message_groups(root,mods):
     return list(dict.fromkeys(group for _,text in read(root,'common/messages',mods) if (group:=scalar(text,'group'))))
+
+
+@timed
+def prepare(game,store,world):
+    session=game.session()
+    register(game,session,world,store)
+    store.session=f'{session["pid"]}:{session["created"]}'
 
 
 @timed

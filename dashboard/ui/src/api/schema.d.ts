@@ -4,6 +4,91 @@
  */
 
 export interface paths {
+    "/api/worlds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** World Inventory */
+        get: operations["world_inventory_api_worlds_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tuning/world": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Graph Tuning Results */
+        get: operations["graph_tuning_results_api_tuning_world_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tuning/{model}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tuning Results */
+        get: operations["tuning_results_api_tuning__model__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/worlds/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** World Detail */
+        get: operations["world_detail_api_worlds__key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/world": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run World */
+        get: operations["run_world_api_runs__run_id__world_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/open": {
         parameters: {
             query?: never;
@@ -616,15 +701,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/events": {
+    "/api/stamp": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Events */
-        get: operations["events_api_events_get"];
+        /** Get Stamp */
+        get: operations["get_stamp_api_stamp_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -676,6 +761,107 @@ export interface components {
             hours: number;
             /** Text */
             text: string;
+        };
+        /** GraphEpoch */
+        GraphEpoch: {
+            /** Epoch */
+            epoch: number;
+            /** Training Mse */
+            training_mse: number;
+            /** Validation Sequence Nrmse */
+            validation_sequence_nrmse: number;
+            /** Seconds */
+            seconds: number;
+        };
+        /** GraphRun */
+        GraphRun: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Graph Version */
+            graph_version: number;
+            /** State */
+            state: string;
+            /** Phase */
+            phase: string;
+            /** Requested */
+            requested: number;
+            /** Completed */
+            completed: number;
+            /** Failed */
+            failed: number;
+            /** Selected */
+            selected?: string | null;
+            /** Evaluating */
+            evaluating?: string | null;
+            /** Updated At */
+            updated_at: string;
+            /** Error */
+            error?: string | null;
+            /** Trials */
+            trials: components["schemas"]["GraphTrial"][];
+        };
+        /** GraphScores */
+        GraphScores: {
+            /** Score */
+            score?: number | null;
+            /** Sequence Nrmse */
+            sequence_nrmse?: number | null;
+            /** Reward Loss */
+            reward_loss?: number | null;
+            /** Mean Pause Entropy */
+            mean_pause_entropy?: number | null;
+            /** Normalized Candidate Std */
+            normalized_candidate_std?: number | null;
+        };
+        /** GraphTracking */
+        GraphTracking: {
+            /** Current Graph Version */
+            current_graph_version: number;
+            /** Updated At */
+            updated_at: string;
+            /** Runs */
+            runs: components["schemas"]["GraphRun"][];
+        };
+        /** GraphTrial */
+        GraphTrial: {
+            /** Name */
+            name: string;
+            /** State */
+            state: string;
+            /** Phase */
+            phase: string;
+            /** Epoch */
+            epoch: number;
+            /** Epoch Limit */
+            epoch_limit: number;
+            /**
+             * Done
+             * @default 0
+             */
+            done: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /** Best Epoch */
+            best_epoch?: number | null;
+            /** Params */
+            params: {
+                [key: string]: number | string;
+            };
+            /** Epochs */
+            epochs: components["schemas"]["GraphEpoch"][];
+            validation?: components["schemas"]["GraphScores"] | null;
+            test?: components["schemas"]["GraphScores"] | null;
+            /** Seconds */
+            seconds?: number | null;
+            /** Gpu Peak Bytes */
+            gpu_peak_bytes?: number | null;
+            /** Error */
+            error?: string | null;
         };
         /** Grid */
         Grid: {
@@ -766,22 +952,69 @@ export interface components {
             /** Rows */
             rows: number;
         };
+        /** Results */
+        Results: {
+            /** Model */
+            model: string;
+            /** Title */
+            title: string;
+            /** Search */
+            search: string;
+            /** Phase */
+            phase: string;
+            /** State */
+            state: string;
+            /** Finished */
+            finished: number;
+            /** Requested */
+            requested: number;
+            /** Completed */
+            completed: number;
+            /** Timeouts */
+            timeouts: number;
+            /** Best */
+            best: number | null;
+            /** Installed */
+            installed: number | null;
+            /** Baseline */
+            baseline: number;
+            /** Seconds Limit */
+            seconds_limit: number;
+            /** Reward Weight */
+            reward_weight: number;
+            /** Entropy Weight */
+            entropy_weight: number;
+            /** Ranges */
+            ranges: {
+                [key: string]: (number | string)[] | number;
+            };
+            /** Updated At */
+            updated_at: string;
+            /** Trials */
+            trials: components["schemas"]["Trial"][];
+            /** Best Sizes */
+            best_sizes?: {
+                [key: string]: number;
+            } | null;
+        };
         /** RewardPart */
         RewardPart: {
             /** Component */
             component: string;
+            /** Start Value */
+            start_value: number;
+            /** End Ratio */
+            end_ratio: number;
+            /** Recent Change */
+            recent_change: number;
+            /** Part */
+            part: number;
             /** Weight */
             weight: number;
-            /** Gain */
-            gain: number;
-            /** Years Alpha */
-            years_alpha: number;
-            /** Gain Times Years Alpha */
-            gain_times_years_alpha: number;
-            /** Scale */
-            scale: number;
-            /** Normalized */
-            normalized: number;
+            /** Alpha */
+            alpha: number;
+            /** Duration Factor */
+            duration_factor: number;
             /** Contribution */
             contribution: number;
         };
@@ -811,8 +1044,20 @@ export interface components {
         };
         /** RunReward */
         RunReward: {
+            /** Name */
+            name: string;
             /** Years */
             years: number | null;
+            /** Window Years */
+            window_years: number | null;
+            /** Baseline Seq */
+            baseline_seq: number | null;
+            /** Score */
+            score: number | null;
+            /** Defeated */
+            defeated: boolean;
+            /** Unavailable Reason */
+            unavailable_reason?: string | null;
             /** Parts */
             parts: components["schemas"]["RewardPart"][];
         };
@@ -863,6 +1108,33 @@ export interface components {
             /** Rows */
             rows: number;
         };
+        /** Trial */
+        Trial: {
+            /** Trial */
+            trial: number;
+            /** State */
+            state: string;
+            /** Score */
+            score?: number | null;
+            /** Reward Loss */
+            reward_loss?: number | null;
+            /** Rmse */
+            rmse?: number | null;
+            /** Entropy */
+            entropy?: number | null;
+            /** Entropy Loss */
+            entropy_loss?: number | null;
+            /** Seconds */
+            seconds: number;
+            /** Params */
+            params: {
+                [key: string]: number | string;
+            };
+            /** Histograms */
+            histograms?: number | null;
+            /** Bins */
+            bins?: number | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -885,6 +1157,141 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    world_inventory_api_worlds_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    graph_tuning_results_api_tuning_world_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GraphTracking"];
+                };
+            };
+        };
+    };
+    tuning_results_api_tuning__model__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                model: "histogram" | "row";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Results"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    world_detail_api_worlds__key__get: {
+        parameters: {
+            query?: {
+                run?: number | null;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_world_api_runs__run_id__world_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_open_api_open_get: {
         parameters: {
             query?: never;
@@ -1176,7 +1583,9 @@ export interface operations {
     };
     get_reward_api_policy_runs__run_id__reward_get: {
         parameters: {
-            query?: never;
+            query?: {
+                seq?: number | null;
+            };
             header?: never;
             path: {
                 run_id: number;
@@ -2124,7 +2533,7 @@ export interface operations {
             };
         };
     };
-    events_api_events_get: {
+    get_stamp_api_stamp_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2139,7 +2548,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": string;
                 };
             };
         };

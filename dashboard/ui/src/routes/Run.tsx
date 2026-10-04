@@ -76,6 +76,7 @@ export function Run() {
   const run = Number(useParams().run)
   const view = useTab(VIEWS)
   const info = useApi<S['RunInfo']>(`/api/runs/${run}`, { live: true })
+  const world = useApi<{ key: string }>(`/api/runs/${run}/world`)
   return (
     <Loading state={info}>
       {(d) => (
@@ -86,12 +87,13 @@ export function Run() {
             </Neighbors>
             <Link className="linka" to={`/runs/${run}/entities/country/${d.player}`}>{d.player_label ?? d.country}</Link>
             <span className={cn('text-xs', d.state !== 'ended' && 'text-accent')}>{d.state}</span>
+            {world.data && <Link className="linka text-xs" to={`/worlds/${world.data.key}?run=${run}`}>World {world.data.key}</Link>}
             {d.last_seq !== null && <Link className="linka text-xs" to={`/runs/${run}/snapshots/${d.last_seq}`}>Latest snapshot {d.last_seq}</Link>}
             {d.last_action !== null && <Link className="linka text-xs" to={`/runs/${run}/actions/${d.last_action}`}>Latest action {d.last_action}</Link>}
             <Link className="linka text-xs" to={`/policy/runs/${run}`}>
               policy
             </Link>
-            <Link className="linka text-xs" to={`/policy/runs/${run}?view=picker`}>Action block rankings</Link>
+            <Link className="linka text-xs" to={`/policy/runs/${run}?view=picker`}>Block selection & picker</Link>
           </div>
           <Tabs views={VIEWS} />
           {view === 'overview' && <div className="space-y-6"><Section title="Recent actions"><DataGrid id="recent" url={`/api/runs/${run}/actions`} columns={['n', 'action', 'status', 'before_seq', 'after_seq']} limit={10} live /></Section><Section title="Outcomes"><Outcomes run={run} /></Section></div>}

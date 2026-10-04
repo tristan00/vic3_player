@@ -1,6 +1,8 @@
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { DataGrid, Record } from "@/components/DataGrid";
 import { Neighbors } from "@/components/Neighbors";
+import { Pickers, PICKERS } from "@/components/Pickers";
+import { Reward, RewardFormula } from "@/components/Reward";
 import { Card, Loading, Section, Tabs, useTab } from "@/components/primitives";
 import {
   useApi,
@@ -9,17 +11,6 @@ import {
   type GridColumn,
   type S,
 } from "@/lib/api";
-import { num } from "@/lib/format";
-
-const PARTS: [keyof S["RewardPart"], string][] = [
-  ["weight", "weight"],
-  ["gain", "log gain"],
-  ["years_alpha", "years^alpha"],
-  ["gain_times_years_alpha", "log gain · years^alpha"],
-  ["scale", "scale"],
-  ["normalized", "normalized"],
-  ["contribution", "weighted"],
-];
 
 export function policyLink(col: GridColumn, cell: Cell) {
   return col.kind === "run" && cell.ref
@@ -40,51 +31,6 @@ function only(grid: Grid, group: string): Grid {
 
 function text(grid: Grid, name: string): string | null | undefined {
   return grid.rows[0]?.[grid.columns.findIndex((c) => c.name === name)]?.text;
-}
-
-function Reward({ reward }: { reward: S["RunReward"] }) {
-  if (!reward.parts.length)
-    return <Card className="text-dim w-fit px-3 py-2 text-xs">not scored</Card>;
-  const total = reward.parts.reduce((a, p) => a + p.contribution, 0);
-  return (
-    <Card className="w-fit max-w-full overflow-hidden">
-      <table className="text-xs">
-        <thead>
-          <tr className="border-line text-dim border-b">
-            <th className="px-2 py-1 text-left font-medium">component</th>
-            <th className="px-2 py-1 text-right font-medium">years</th>
-            {PARTS.map(([k, label]) => (
-              <th key={k} className="px-2 py-1 text-right font-medium">
-                {label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {reward.parts.map((p) => (
-            <tr key={p.component} className="border-line/60 border-b">
-              <td className="px-2 py-0.5">{p.component}</td>
-              <td className="num px-2 py-0.5 text-right">
-                {num(reward.years as number)}
-              </td>
-              {PARTS.map(([k]) => (
-                <td key={k} className="num px-2 py-0.5 text-right">
-                  {num(p[k] as number)}
-                </td>
-              ))}
-            </tr>
-          ))}
-          <tr>
-            <td className="px-2 py-0.5">reward</td>
-            <td colSpan={PARTS.length} />
-            <td className="num px-2 py-0.5 text-right font-semibold">
-              {num(total)}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </Card>
-  );
 }
 
 const VIEWS = ["config", "initializer", "picker", "outcomes"];
@@ -184,7 +130,8 @@ function Meta({
   );
 }
 
-function Picker({ run }: { run: number }) {
+function Picker({ run, name }: { run: number; name: 'catboost' | 'catboost_piecewise' }) {
+  const picker = PICKERS[name];
   const view = useTab(["decisions", "model", "importance"], "picker_view");
   const [params, setParams] = useSearchParams();
   const pause = params.get("pause");
@@ -200,15 +147,16 @@ function Picker({ run }: { run: number }) {
   return (
     <>
       <Tabs views={["decisions", "model", "importance"]} param="picker_view" />
-      {view === "model" && <Meta title="CatBoost model" table="pick_model" run={run} />}
+      <p className="text-dim text-sm">{picker.score}. Saved predictions, model settings and importance remain as recorded for this run.</p>
+      {view === "model" && <Meta title={`${picker.title} model`} table="pick_model" run={run} />}
       {view === "importance" && <Meta
-        title="CatBoost feature importance"
+        title={`${picker.title} feature importance`}
         table="pick_importance"
         run={run}
         initial={{ sort: "importance", desc: true }}
       />}
       {view === "decisions" && pause === null && <Section title="Decision snapshots">
-        <p className="text-dim mb-3 text-xs">Inspect a decision snapshot to compare every action block CatBoost scored, ranked best first.</p>
+        <p className="text-dim mb-3 text-xs">Inspect a decision snapshot to compare the blocks scored by {picker.title}, ranked best first.</p>
         <DataGrid
           id="pauses"
           url={`/api/policy/runs/${run}/pauses`}
@@ -224,8 +172,13 @@ function Picker({ run }: { run: number }) {
         {candidate !== null && <><button className="linka" onClick={() => set({ candidate: null })}>All candidates</button><span>Candidate {candidate}</span></>}
       </nav>}
       {view === "decisions" && pause !== null && (
+        <div className="space-y-5">
+        <Section title="Current reward from this pause">
+          <p className="text-dim mb-3 text-xs">Recalculated from the pause’s first snapshot through the run’s end. Earlier models may have used a different reward; their saved predictions are preserved below.</p>
+          <Reward run={run} seq={Number(pause)} />
+        </Section>
         <Section title="Ranked action blocks">
-        <p className="text-dim mb-3 text-xs">Higher predicted scores rank first. Chosen marks the block selected for execution; tied scores share a rank. Arrows show action order, including repeats. Saved alternatives contain action names only, without target parameters.</p>
+        <p className="text-dim mb-3 text-xs">{name === 'catboost_piecewise' ? 'The current picker averages action predictions, including repeated actions and event answers. Historical runs before the averaging change recorded sums. Individual action scores were not recorded.' : 'Each score is a prediction for the whole block. Decisions occur quarterly, with at most sixteen actions.'} Higher scores rank first; tied scores share a rank. Chosen marks the selected block. Arrows show action order, including repeats. Saved alternatives contain action names only, without target parameters.</p>
         <DataGrid
           key={`c${pause}`}
           id={`candidate_blocks.${pause}`}
@@ -240,6 +193,7 @@ function Picker({ run }: { run: number }) {
           }
         />
         </Section>
+        </div>
       )}
       {view === "decisions" && pause !== null && candidate !== null && (
         <Meta
@@ -256,9 +210,6 @@ function Picker({ run }: { run: number }) {
 
 export function PolicyRun() {
   const run = Number(useParams().run);
-  const reward = useApi<S["RunReward"]>(`/api/policy/runs/${run}/reward`, {
-    live: true,
-  });
   const info = useApi<S["RunInfo"]>(`/api/runs/${run}`, { live: true });
   const record = useApi<Grid>(`/api/policy/runs/${run}`, { live: true });
   const view = useTab(VIEWS);
@@ -281,7 +232,7 @@ export function PolicyRun() {
           run page
         </Link>
       </div>
-      <Tabs views={VIEWS} labels={{ config: "Overview", initializer: "Action weights", picker: "Block selection", outcomes: "Objectives & outcomes" }} />
+      <Tabs views={VIEWS} labels={{ config: "Overview", initializer: "Action weights", picker: "Block selection", outcomes: "Rewards & outcomes" }} />
       <Loading state={record}>
         {(g) => (
           <div className="space-y-4">
@@ -289,12 +240,13 @@ export function PolicyRun() {
               <div className="space-y-4 text-sm">
                 <div><Link className="linka font-semibold" to={`?view=initializer`}>1. Initialize action weights</Link><p className="text-dim">{text(g, "initializer")} sets the weights used to sample actions into candidate blocks.</p></div>
                 <div><Link className="linka font-semibold" to={`?view=picker`}>2. Select an action block</Link><p className="text-dim">{text(g, "picker")} chooses which generated block to execute at each decision.</p></div>
-                <div><Link className="linka font-semibold" to={`?view=outcomes`}>3. Score the outcome</Link><p className="text-dim">The objective combines GDP, population, standard of living and built stock gains into a reward.</p></div>
+                <div><Link className="linka font-semibold" to={`?view=outcomes`}>3. Score the outcome</Link><p className="text-dim">The current reward combines building stock, population and GDP. Initializers start at the run opening; pickers start at the pause’s first snapshot.</p></div>
               </div>
             </Section>}
             {view === "outcomes" && <>
-              <Section title="Objective weights"><Record grid={only(g, "config")} /></Section>
-              <Section title="Measured reward"><Loading state={reward}>{(r) => <Reward reward={r} />}</Loading></Section>
+              <Section title="Three-metric reward"><RewardFormula /></Section>
+              <Section title="Current reward from the run opening"><Reward run={run} /></Section>
+              <details className="text-dim text-xs"><summary className="cursor-pointer">Legacy recorded objective</summary><p className="my-2">These historical four-component weights are retained in the run record. They do not control the current learned-model reward.</p><Record grid={only(g, "legacy")} /></details>
             </>}
             {view === "initializer" && <>
               <Section title="Weight initializer"><Record grid={only(g, "initializer")} /></Section>
@@ -303,9 +255,13 @@ export function PolicyRun() {
             {view === "picker" && (
               <>
                 <Section title="Block picker"><Record grid={only(g, "picker")} /></Section>
-                <p className="text-dim text-sm">The picker selects a block after the initializer’s weighted sampling generates the alternatives.</p>
-                {text(g, "picker") === "first" && <p className="text-dim text-sm">This picker executes the first generated block without model scoring.</p>}
-                {text(g, "picker") === "catboost" && <Picker run={run} />}
+                <Pickers only={text(g, "picker")} />
+                {text(g, "picker") === "first" && <Section title="Executed blocks">
+                  <p className="text-dim mb-3 text-sm">Each decision executes the first sampled block. There are no model predictions or ranked alternatives. Open a snapshot to inspect the recorded actions.</p>
+                  <DataGrid id="first_picker_blocks" url={`/api/runs/${run}/blocks`} live />
+                </Section>}
+                {text(g, "picker") === "catboost" && <Picker run={run} name="catboost" />}
+                {text(g, "picker") === "catboost_piecewise" && <Picker run={run} name="catboost_piecewise" />}
               </>
             )}
           </div>

@@ -44,6 +44,7 @@ def param_columns(matched,params):
 def action_grid(where,params,filters,sort,desc,offset,limit,run_id=None):
     base=([Spec('run','run','l.run_id')] if run_id is None else [])+[
         Spec('n','n','l.n',run=None if run_id else 'run'),Spec('turn','number','l.turn'),Spec('game_date','date','s.game_date'),Spec('action','action','a.name'),
+        Spec('advisor_action','text','(select d.name from advisor_action d where d.advisor_action=l.advisor_action)',label='Advisor action'),
         Spec('group','text','grp.grp'),Spec('status','text','l.status'),Spec('detail','text','l.detail'),Spec('ms','number','l.ms'),
         Spec('before_seq','seq','l.before_seq',run=None if run_id else 'run'),Spec('after_seq','seq','l.after_seq',run=None if run_id else 'run'),
         Spec('logged_at','time','l.logged_at')]

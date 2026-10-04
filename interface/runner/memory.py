@@ -9,6 +9,7 @@ import time
 import weakref
 
 import numpy as np
+import psutil
 
 from ..common import DEFAULT_GAME, GameCrashed, progress, timed, timed_often
 from ..script import read, scalar
@@ -137,6 +138,10 @@ class Reader:
         self.handle=self.process.handle
         self.base=self.process.base
         self.tables=LAYOUT['tables']
+        for table,vtable in LAYOUT['database_vtable'].items():
+            database=self.word(self.base+self.tables[table]['rva'])
+            if self.word(database)-self.base!=vtable:
+                raise RuntimeError(f'Unsupported game build: {table} database signature differs from layout {LAYOUT["version"]}')
         self.keys={}
         self.names=[]
         self.key_columns=set()
@@ -154,10 +159,6 @@ class Reader:
             start=len(self.names)+1
             self.names.extend((kind,name) for name in definitions)
             self.scope_definition_codes[int(scope)]=np.arange(start,start+len(definitions),dtype=np.int32)
-        for table,vtable in LAYOUT['database_vtable'].items():
-            database=self.word(self.base+self.tables[table]['rva'])
-            if self.word(database)-self.base!=vtable:
-                raise RuntimeError(f'Unsupported game build: {table} database signature differs from layout {LAYOUT["version"]}')
 
     @timed_often
     def close(self):
@@ -333,6 +334,16 @@ class Reader:
         return {name:address+24 for name,address in self.variables(CONTROL_VARIABLES).items()}
 
     @timed_often
+    def write_variables(self,writes):
+        process=psutil.Process(self.pid)
+        process.suspend()
+        try:
+            addresses=self.variables(tuple(dict.fromkeys(name for name,_,_ in writes)))
+            self.write([(addresses[name]+offset,data) for name,offset,data in writes])
+        finally:
+            process.resume()
+
+    @timed_often
     def write(self,writes):
         handle=kernel.OpenProcess(0x28,False,self.pid)
         if not handle:
@@ -352,10 +363,9 @@ class Reader:
         events,_=self.table('event')
         if any(not key or not self.names[int(key)-1][1] for key in events['event_event']):
             raise RuntimeError('Pending event has no loaded definition')
-        targets=self.control_targets()
-        self.write([(targets[name],struct.pack('<q',value)) for name,value in
+        self.write_variables([(name,24,struct.pack('<q',value)) for name,value in
                     (('interface_capture_seq',nonce*SCALE),('interface_capture_done',0),('interface_capture',200000 if save else 100000))])
-        self.captured(targets,time.monotonic()+timeout)
+        self.captured(self.control_targets(),time.monotonic()+timeout)
 
     @timed_often
     def captured(self,targets,deadline):
@@ -798,13 +808,21 @@ class Reader:
 
     @timed_often
     def alive(self):
-        try:
-            rows,_=self.table('state',{'state':set(self.tables['state']['fields'])-{'country'}})
-        except RuntimeError as error:
-            if 'does not hold the slot' in str(error):
-                return True
-            raise
-        return self.player() in {int(country)&0xffffff for country in rows['country'].tolist()}
+        player=self.player()
+        spec=self.tables['country']
+        _,slots,addresses=self.objects(spec['rva'])
+        found=addresses[slots==player]
+        if not len(found):
+            return False
+        address=int(found[0])
+        identity=struct.unpack('<I',self.read(address+IDENTITY_OFFSETS['country'],4))[0]
+        if identity&0xffffff!=player:
+            return True
+        offset,count_offset,*_=spec['vectors']['country_states']
+        pointer,capacity,count=struct.unpack('<Qii',self.read(address+offset,count_offset+4-offset))
+        if count<0 or count>capacity or count and not HEAP_LOW<pointer<HEAP_HIGH:
+            raise RuntimeError(f'Invalid country_states container for object {player}')
+        return count>0
 
     @timed_often
     def _decode(self,roots,visible=None):

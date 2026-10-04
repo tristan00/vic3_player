@@ -1,24 +1,18 @@
 {
- "advisors/features.py": {
+ "advisors/data/features.py": {
   "Samples.at": "hot",
   "Versions.at": "hot",
   "Versions.live": "hot",
   "resolve": "hot"
  },
- "advisors/histograms.py": {
+ "advisors/data/histograms.py": {
   "Latest.at": "hot"
- },
- "advisors/pickers.py": {
-  "value_at": "hot"
- },
- "advisors/random_smac_weighting.py": {
-  "horizon": "hot",
-  "peak": "hot"
  },
  "dashboard/server/__main__.py": "monitor",
  "dashboard/server/grid.py": {
   "cell": "hot"
  },
+ "advisors/catalogue.py": "declaration",
  "interface/actions/catalogue.py": "declaration",
  "interface/common.py": {
   "progress": "timer",
@@ -114,5 +108,22 @@
  },
  "loop/stop.py": "monitor",
  "loop/supervise.py": "monitor",
- "loop/watch.py": "monitor"
+ "loop/watch.py": "monitor",
+ "advisors/models/entity_graph/graph.py": {
+  "Builder.node": "hot",
+  "Builder.edge": "hot",
+  "Builder.find": "hot"
+ },
+ "advisors/models/entity_graph/world.py": {
+  "WorldBuilder.definition": "hot",
+  "WorldBuilder.endpoint": "hot",
+  "WorldBuilder.attach": "hot"
+ },
+ "advisors/models/entity_graph/spatial.py": {
+  "point": "hot",
+  "displacement": "hot"
+ },
+ "advisors/models/entity_graph/source.py": {
+  "keys": "hot"
+ }
 }

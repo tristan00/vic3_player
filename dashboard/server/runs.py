@@ -2,24 +2,29 @@ from interface.actions.catalogue import GROUP
 from interface.common import STALL_LIMIT
 from interface.recording.spec import F, I2, I4, I8, TABLE
 from psycopg.rows import tuple_row
+from threading import Lock
 
-from advisors.random_smac_weighting import COMPONENTS, breakdown, outcomes
-from advisors.random_smac_weighting import series as component_series
+from advisors.data.endgame import COMPONENTS, HISTORY, NAME, Trajectories, outcomes, scored_runs
+from advisors.data.rewards import series as component_series
 
 from . import db
 from .grid import Spec, grid
-from .models import OpenRun, RewardPart, RunInfo, RunReward, Series, SeriesChoice
+from .models import OpenRun, RunInfo, RunReward, Series, SeriesChoice
 from .names import LAYOUTS, labels
 
 LOST_AFTER=.5
 STATUSES=('done','invalid','raced','no_object','ui_leftover')
 END_REASONS=('time','years','defeated','debt_cap','ui_stuck','game_crashed','loop_crashed','loop_lost','loop_stalled')
 PLAYER_OWNED=('country',)
-LOOP_PARAMS={'run_days':('days:int',),'diplomatic_action_state':('country','diplomatic_action','state','side:choice')}
-GROUPS={**GROUP,'run_days':'time','diplomatic_action_state':'diplomacy'}
+LOOP_PARAMS={'diplomatic_action_state':('country','diplomatic_action','state','side:choice')}
+GROUPS={**GROUP,'diplomatic_action_state':'diplomacy'}
 STATE=(f"case when r.ended_at is not null then 'ended' when extract(epoch from now()-r.heartbeat_at)>{LOST_AFTER} then 'lost' "
        f"when extract(epoch from now()-r.progress_at)>{STALL_LIMIT} then 'stalled' else 'running' end")
 RUN_FROM='from run r join country_definition d on d.country_definition=r.tag'
+REWARD_LOCK=Lock()
+REWARD_POOL=None
+REWARD_VERSIONS={}
+REWARD_SCORES={}
 
 
 @db.timed
@@ -50,14 +55,19 @@ def open_runs():
 
 
 @db.timed
-def goal(found):
-    return {component:found[f'objective_{component}'] for component in COMPONENTS},found['objective_alpha']
-
-
-@db.timed
-def reward_changes():
-    with db.POOL.connection() as connection:
-        return outcomes(connection.cursor(row_factory=tuple_row))
+def reward_scores():
+    global REWARD_POOL,REWARD_VERSIONS,REWARD_SCORES
+    with REWARD_LOCK:
+        with db.POOL.connection() as connection:
+            cursor=connection.cursor(row_factory=tuple_row)
+            versions={row[0]:tuple(row[1:]) for row in cursor.execute(HISTORY,scored_runs()).fetchall()}
+            previous=REWARD_VERSIONS if REWARD_POOL is db.POOL else {}
+            changed=[run for run,version in versions.items() if previous.get(run)!=version]
+            scores={run:score for run,score in REWARD_SCORES.items() if run in versions and run not in changed and run in previous}
+            if changed:
+                scores.update(outcomes(cursor,changed))
+            REWARD_POOL,REWARD_VERSIONS,REWARD_SCORES=db.POOL,versions,scores
+            return scores
 
 
 @db.timed
@@ -72,13 +82,32 @@ def run_info(run_id):
 
 
 @db.timed
-def run_reward(run_id):
-    found=db.row('select * from run where run_id=%s',(run_id,))
+def run_reward(run_id,seq=None):
+    found=db.row('select ended_at,end_reason from run where run_id=%s',(run_id,))
     if found is None:
         return None
-    changes=reward_changes()
-    years,parts=breakdown(changes,goal(found),run_id) if run_id in changes else (None,[])
-    return RunReward(years=years,parts=[RewardPart(**part) for part in parts])
+    date=None if seq is None else db.value('select game_date from snapshot where run_id=%s and seq=%s',(run_id,seq))
+    if seq is not None and date is None:
+        return None
+    empty=RunReward(name=NAME,years=None,window_years=None,baseline_seq=None,score=None,defeated=found['end_reason']=='defeated',parts=[],
+                    unavailable_reason='Reward is available after the run ends.' if found['ended_at'] is None else 'This run has no eligible scoring interval.')
+    with db.POOL.connection() as connection:
+        cursor=connection.cursor(row_factory=tuple_row)
+        bounds=[row for row in cursor.execute(HISTORY,scored_runs()).fetchall() if row[0]==run_id]
+        if not bounds:
+            return empty
+        _,first,last,reason=bounds[0]
+        start=first if date is None else date
+        history=Trajectories(cursor,[run_id])
+        baseline=history.baseline(run_id,start)
+        omitted=history.reason(run_id,start,last,baseline)
+        if omitted is not None:
+            empty.unavailable_reason={'no_future_duration':'No game time remains after this snapshot.',
+                                      'missing_start_measurement':'A starting metric was not recorded.',
+                                      'nonpositive_baseline':'All three starting metrics must be positive and finite.'}[omitted]
+            return empty
+        result=history.breakdown(run_id,start,last,baseline,reason=='defeated')
+    return RunReward(name=NAME,**result)
 
 
 @db.timed

@@ -2,6 +2,7 @@ import re
 import sys
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from interface.actions import gui
@@ -60,6 +61,19 @@ class GeneratedGuiTests(unittest.TestCase):
     def test_key_codes_are_unique_and_dense(self):
         codes=gui.key_codes(gui.key_table(DEFAULT_GAME/'game',()))
         self.assertEqual(sorted(codes.values()),list(range(1,len(codes)+1)))
+
+    def test_control_windows_keep_world_character_offer_hooks(self):
+        with TemporaryDirectory() as directory:
+            root=Path(directory)
+            path=root/'gui/generate_character.gui'
+            path.parent.mkdir()
+            text=(DEFAULT_GAME/'game/gui/generate_character.gui').read_text(encoding='utf-8-sig')
+            anchor='datacontext = "[Character.GetCountry]"'
+            text=text.replace(anchor,anchor+' widget = { name = interface_uniform_offer size = { 0 0 } }',1)
+            path.write_text(text,encoding='utf-8')
+            generated=gui.windows(DEFAULT_GAME/'game',[root])['gui/generate_character.gui']
+            self.assertIn('name = interface_uniform_offer',generated)
+            self.assertIn('name = interface_probe',generated)
 
 
 class DataTypeTests(unittest.TestCase):

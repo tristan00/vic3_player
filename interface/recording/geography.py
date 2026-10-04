@@ -39,7 +39,14 @@ def mini_world(path):
     manifest=json.loads(raw)
     files=assets(Path(manifest['mod'])/'map_data')
     regions={normal(color):state['key'] for state in manifest['states'] for color in state['provinces']}
-    return identity(files,raw),files,regions,{**files,'manifest.json':raw}
+    archived={**files,'manifest.json':raw}
+    for history in sorted((Path(manifest['mod'])/'common/history').glob('*/interface.txt')):
+        archived[f'history/{history.parent.name}.txt']=history.read_bytes()
+    for name in ('audit.json','opening_buildings.json','opening_relationships.json'):
+        report=path.parent/name
+        if report.exists():
+            archived[name]=report.read_bytes()
+    return identity(files,raw),files,regions,archived
 
 
 @timed_often

@@ -2,7 +2,9 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+from interface.runner import tail as tail_module
 from interface.runner.tail import LogTail
 
 
@@ -29,6 +31,20 @@ class TailTests(unittest.TestCase):
         self.assertEqual(self.tail.lost,0)
         os.replace(self.logs/'moving.log',self.logs/'debug.1.log')
         self.tail.step()
+        self.assertEqual(bytes(self.tail.buffer),b'a\nb\nc\n')
+        self.assertEqual(self.tail.lost,0)
+
+    def test_appends_need_one_read_and_do_not_depend_on_cached_file_size(self):
+        self.write('a\n')
+        self.tail.step()
+        files=self.tail.files()
+        self.write('b\n')
+        with mock.patch.object(self.tail,'files',return_value=files),mock.patch.object(tail_module,'shared_read',wraps=tail_module.shared_read) as read:
+            self.tail.step()
+            self.assertEqual(read.call_count,1)
+            self.write('c\n')
+            self.tail.step()
+            self.assertEqual(read.call_count,2)
         self.assertEqual(bytes(self.tail.buffer),b'a\nb\nc\n')
         self.assertEqual(self.tail.lost,0)
 

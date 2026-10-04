@@ -14,10 +14,7 @@ import psutil
 from ..common import DEFAULT_DATA, DEFAULT_GAME, GameCrashed, progress, timed, write_json, write_script, timed_often
 from .tail import LogTail
 
-STARTUP_QUIET=30
-
-
-FAST={'Graphics':{'quality':'low','resolution':'1280x720','display_mode':'windowed','setting_framerate_cap':'30','vsync':False,
+FAST={'Graphics':{'quality':'low','resolution':'1280x720','display_mode':'windowed','setting_framerate_cap':'120','vsync':False,
                   'shader_quality':'low','texture_quality':'low','texture_streaming':False,'shadowmap_resolution':'disabled','anti_aliasing':'DISABLED',
                   'anisotropic_filtering':'DISABLED','refraction_quality':'disabled','mapobject_quality':'low','buildings_cutoff':True,'mesh_lod_bias':'low',
                   'mesh_lod_fade':False,'bloom_quality':'low','animated_portraits':False,'portraits_ssao':False,
@@ -96,7 +93,7 @@ def _patch_harvest(pid):
 
 class GameInterface:
     @timed_often
-    def __init__(self,profile='default',game_dir=DEFAULT_GAME,data_dir=DEFAULT_DATA):
+    def __init__(self,profile='default',game_dir=DEFAULT_GAME,data_dir=DEFAULT_DATA,quarterly_pause=False):
         self.game_dir=Path(game_dir).resolve()
         self.data_dir=Path(data_dir).resolve()
         self.profile=self.data_dir/'profiles'/profile
@@ -104,6 +101,7 @@ class GameInterface:
         self.session_file=self.profile/'interface_session.json'
         self.saves=self.profile/'save games'
         self.since=''
+        self.quarterly_pause=quarterly_pause
 
     @timed_often
     def session(self):
@@ -222,7 +220,7 @@ class GameInterface:
         deadline=time.monotonic()+timeout
         while time.monotonic()<deadline:
             progress('_wait')
-            self.check(STARTUP_QUIET)
+            self.check(timeout)
             if text in self.log():
                 return
             time.sleep(.2)
@@ -296,11 +294,31 @@ class GameInterface:
         manifest=json.loads(Path(world).read_text(encoding='utf-8')) if world else None
         if manifest and tag not in {c['tag'] for c in manifest['countries']}:
             raise ValueError('The requested country is absent from the world')
+        if manifest and any('buildings' not in state for state in manifest['states']):
+            raise ValueError('Regenerate this world: its manifest has no opening building expectations')
         mods=([manifest['mod']] if manifest else [])+[prepare(self,tag,manifest,actions)]
         session=self.launch(mods,['-start_tag='+tag],debug)
         if not wait:
             return {**session,'ready':False}
-        return {**session,**self.ready(tag,timeout)}
+        return {**session,**self.campaign_ready(tag,world,timeout)}
+
+    @timed
+    def campaign_ready(self,tag,world=None,timeout=180):
+        manifest=json.loads(Path(world).read_text(encoding='utf-8')) if world else None
+        ready=self.ready(tag,timeout)
+        if manifest:
+            from ..world.buildings import loaded
+            from ..world.relationships import loaded as relationships
+            fidelity=loaded(self.reader(),manifest)
+            write_json(Path(world).parent/'opening_buildings.json',fidelity)
+            if fidelity['differences']:
+                raise RuntimeError(f'Opening buildings differ from requested levels: {fidelity["differences"]}')
+            links=relationships(self.reader(),manifest)
+            write_json(Path(world).parent/'opening_relationships.json',links)
+            if links['errors']:
+                raise RuntimeError(f'Opening relationships are inconsistent: {links["errors"]}')
+            ready['building_levels']=fidelity['actual_levels']
+        return ready
 
     @timed
     def _started(self):
@@ -317,7 +335,7 @@ class GameInterface:
         reason=None
         while True:
             progress('ready')
-            self.check(STARTUP_QUIET)
+            self.check(timeout)
             try:
                 started=self._started()
             except (OSError,RuntimeError,IndexError) as error:
