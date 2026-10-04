@@ -1,4 +1,4 @@
-from advisors.catalogue import ACTIONS
+from advisors.catalogue import ACTIONS, LEVERS
 from advisors.models import forest, svr
 from advisors.initializers.random import HIGH, LOW
 from advisors.data.endgame import COMPONENTS
@@ -14,14 +14,14 @@ LABELS={'end_ratio':'Ending / start','recent_change':'Final-year change / yr','p
         'alpha':'T exponent','duration_factor':'Time factor','contribution':'Contribution'}
 MEDIAN='percentile_cont(0.5) within group (order by {})'
 INITIALIZER='(select a.name from run_advisor ra join advisor a using (advisor) where ra.run_id=r.run_id and ra.position=0)'
-DOMAINS='(values '+','.join(f"('{action.name}','{action.domain}')" for action in ACTIONS)+') d(name,domain)'
-CATALOGUE='(values '+','.join(f"({position},'{action.name}','{action.domain}','{' '.join(param if param==kind else f'{param}:{kind}' for param,kind in action.params)}')"
+DOMAINS='(values '+','.join(f"('{lever.name}','{lever.domain}')" for lever in LEVERS)+') d(name,domain)'
+CATALOGUE='(values '+','.join(f"({position},'{action.name}','{action.lever}','{' '.join(param if param==kind else f'{param}:{kind}' for param,kind in action.params)}')"
                               for position,action in enumerate(ACTIONS))+') d(position,name,domain,params)'
 
 
 @db.timed
 def weights(filters,sort,desc,offset,limit):
-    specs=[Spec('run','run','r.run_id'),Spec('domain','text','d.domain'),Spec('action','text','a.name',label='Advisor action'),Spec('weight','number','w.weight'),
+    specs=[Spec('run','run','r.run_id'),Spec('domain','text','d.domain',label='Kind'),Spec('action','text','a.name',label='Lever'),Spec('weight','number','w.weight'),
            Spec('initializer','text',INITIALIZER),
            Spec('method','text',f"case {INITIALIZER} when 'random_smac_weighting' then p.method when 'random_svr_weighting' then v.method end",label='Initializer selection'),
            Spec('svr_linear','number','k.linear',label='SVR linear effect'),Spec('svr_squared','number','k.squared',label='SVR squared effect')]
@@ -33,7 +33,7 @@ def weights(filters,sort,desc,offset,limit):
 
 @db.timed
 def catalogue(filters,sort,desc,offset,limit):
-    specs=[Spec('position','number','d.position'),Spec('domain','text','d.domain'),Spec('action','text','d.name',label='Advisor action'),Spec('parameters','text','d.params'),
+    specs=[Spec('position','number','d.position'),Spec('domain','text','d.domain',label='Lever'),Spec('action','text','d.name',label='Act'),Spec('parameters','text','d.params'),
            Spec('commands','text',"string_agg(distinct i.name,', ')",label='Interface commands executed'),Spec('executions','number','count(l.n)'),
            Spec('runs','number','count(distinct l.run_id)')]
     source=(f'from {CATALOGUE} left join advisor_action a on a.name=d.name left join loop_action l on l.advisor_action=a.advisor_action '

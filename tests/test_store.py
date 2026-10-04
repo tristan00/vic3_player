@@ -60,7 +60,7 @@ def built(step):
 
 
 RUN={'kind':'mini','advisors':['random'],'tag':'AAA','world':'w','cli_seed':1,'run_seed':2,'years':1.0,'minutes':1.0,'profile':'actions','pool':0,'runs_requested':3,
-     'generated':{'seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5,'modernity':0.25,'copies':0.2,'diversity':0.5,'military':0.75},'weights':{'expand_port':3,'enact_trade_policy':2},
+     'generated':{'seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5,'modernity':0.25,'copies':0.2,'diversity':0.5,'military':0.75},'weights':{'construct_infrastructure':3,'laws_economy':2},
      'picker':'first','candidates':1,'objective':({'gdp':0.0,'population':1.0,'sol':0.0,'stock':0.0},0.0)}
 STEPS=[{'progress':0.1,'second':True,'head':1,'samples':[(1,0.5)]},
        {'progress':0.2,'second':True,'head':2,'samples':[(1,0.5),(2,0.6)]},
@@ -260,21 +260,21 @@ class StoreTests(unittest.TestCase):
 
     def test_an_executed_decision_is_stored_with_its_advisor_action_and_parameters_beside_the_command(self):
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
-        self.store.log_action({'turn':1,'seq':1,'advisor':'random','action':'set_tax_level','params':{'level':'High'},'snapshot':0,'status':'done','ms':5,
-                               'decision':('raise_taxes',{'level':'high'})},None)
+        self.store.log_action({'turn':1,'seq':1,'advisor':'random','action':'set_import_tariff','params':{'goods':'grain','level':'High'},'snapshot':0,'status':'done','ms':5,
+                               'decision':('raise_import_tariff',{'goods':'grain'})},None)
         self.store.log_action({'turn':1,'seq':2,'advisor':'loop','action':'unpause','params':{},'snapshot':0,'status':'done','ms':5,'decision':None},None)
         c=self.store.connection
         run=self.store.run_id
         self.assertEqual(c.execute('select l.n,a.name,d.name from loop_action l join action a using (action) left join advisor_action d using (advisor_action) '
-                                   'where l.run_id=%s order by 1',(run,)).fetchall(),[(1,'set_tax_level','raise_taxes'),(2,'unpause',None)])
-        self.assertEqual(c.execute('select n,name,text_value from loop_decision_param where run_id=%s',(run,)).fetchall(),[(1,'level','high')])
-        self.assertEqual(c.execute('select n,name,text_value from loop_action_param where run_id=%s',(run,)).fetchall(),[(1,'level','High')])
+                                   'where l.run_id=%s order by 1',(run,)).fetchall(),[(1,'set_import_tariff','raise_import_tariff'),(2,'unpause',None)])
+        self.assertEqual(c.execute('select n,name,text_value from loop_decision_param where run_id=%s',(run,)).fetchall(),[(1,'goods','grain')])
+        self.assertEqual(c.execute('select n,name,text_value from loop_action_param where run_id=%s order by 2',(run,)).fetchall(),[(1,'goods','grain'),(1,'level','High')])
         self.store.end_run('time')
 
     def test_picks_record_every_candidate_with_its_actions_and_the_model_behind_them(self):
         self.store.pending['pick_model']=(1049,29,4.5,PARAMS,[('treasury',60.0),('action1.type',40.0)])
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
-        self.store.record_pick(0,[['expand_port','research_production'],['enact_trade_policy']],[1.5,-2.0],0)
+        self.store.record_pick(0,[['construct_infrastructure','research_production_technology'],['enact_economy_law']],[1.5,-2.0],0)
         c=self.store.connection
         run=self.store.run_id
         self.assertEqual(c.execute('select pauses,runs from pick_model where run_id=%s',(run,)).fetchone(),(1049,29))
@@ -282,7 +282,7 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(c.execute('select candidate,actions,predicted_change,chosen from pick_candidate where run_id=%s order by candidate',(run,)).fetchall(),
                          [(0,2,1.5,True),(1,1,-2.0,False)])
         self.assertEqual(c.execute('select p.candidate,p.position,a.name from pick_candidate_action p join advisor_action a using (advisor_action) where run_id=%s order by 1,2',(run,)).fetchall(),
-                         [(0,0,'expand_port'),(0,1,'research_production'),(1,0,'enact_trade_policy')])
+                         [(0,0,'construct_infrastructure'),(0,1,'research_production_technology'),(1,0,'enact_economy_law')])
         self.store.end_run('time')
 
     def test_row_model_records_its_own_parameters_and_training_row_count(self):

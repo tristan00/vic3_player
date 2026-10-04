@@ -1,6 +1,6 @@
-# Diplomatic play target features
+# Demand target features
 
-Blocks containing `start_diplomatic_play`, `make_diplomatic_demand` or `start_diplomatic_play_for_state` carry features of the target. Country actions use their country parameter. The state action uses the owner of its target state at the block's starting snapshot.
+Blocks containing `demand_of_country` or `demand_for_state` carry features of the target. `demand_of_country` uses its country parameter. `demand_for_state` uses the owner of its state at the block's starting snapshot. These are the catalogue's `PLAY_ACTIONS`.
 
 | Feature | Value |
 | --- | --- |
@@ -16,7 +16,7 @@ Blocks containing `start_diplomatic_play`, `make_diplomatic_demand` or `start_di
 | `play.pacts` | Pact types between player and target, with direction |
 | `play.treaty_articles` | Article types of their active treaties, with direction |
 
-Each column carries the advisor action, for example `play.land_border=start_diplomatic_play_for_state` and `play.pacts=start_diplomatic_play.outgoing.rivalry`. Which columns reach the model is decided by the installed histogram sizes.
+Each column carries the act, for example `play.land_border=demand_for_state` and `play.pacts=demand_of_country.outgoing.rivalry`. Which columns reach the model is decided by the installed histogram sizes.
 
 Missing metrics and zero denominators are numeric missing values. A known country without a relation record has neutral relations. Land adjacency comes from `world_adjacency` province edges combined with province ownership at the snapshot. Withdrawn treaties and treaties not yet in force are excluded.
 

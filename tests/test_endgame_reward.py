@@ -62,8 +62,8 @@ class TrainingRewardTests(unittest.TestCase):
                      endgame.POPULATION:[(1,i,v) for i,v in enumerate([100,200,300,400])],
                      endgame.PLAYERS:[(1,7)],endgame.OWNERS:[(1,0,10,True,7)],
                      endgame.BUILDINGS:[(1,i,100,True,'building_x',10,v) for i,v in enumerate([100,200,300,400])],
-                     row.ACTIONS:[(1,1,2,4*Y,'raise_taxes','level',None,'high')],
-                     histogram.PAUSES:[(1,2,4*Y,1,'raise_taxes','level',None,'high')]}
+                     row.ACTIONS:[(1,1,2,4*Y,'raise_consumption_taxes','goods',None,'grain')],
+                     histogram.PAUSES:[(1,2,4*Y,1,'raise_consumption_taxes','goods',None,'grain')]}
         self.connection=SimpleNamespace(info=SimpleNamespace(dsn='reward_test'),execute=Mock(side_effect=lambda sql,params:Mock(fetchall=Mock(return_value=self.tables[sql]))))
         self.costs=patch.object(endgame,'COSTS',{'building_x':1})
         self.costs.start()
@@ -86,7 +86,7 @@ class TrainingRewardTests(unittest.TestCase):
             states.return_value.at.return_value=lookup
             holdings.return_value.at.return_value=[]
             whole=histogram.training_data(self.connection)
-        with patch.object(row,'Historical') as states,patch.object(row,'context',return_value={'treasury':1.}),patch.object(row,'action_features',return_value={'action':'raise_taxes'}):
+        with patch.object(row,'Historical') as states,patch.object(row,'context',return_value={'treasury':1.}),patch.object(row,'action_features',return_value={'action':'raise_consumption_taxes'}):
             states.return_value.at.return_value=point
             actions=row.load(self.connection)
         expected=(2*math.sqrt(.5)+6+4/math.sqrt(.5))/9

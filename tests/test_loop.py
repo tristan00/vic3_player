@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from advisors.catalogue import LEVER
 from advisors.initializers import ADVISORS, RandomAdvisor
 from loop.translate import Choice
 
@@ -65,11 +66,11 @@ class DebtCapTests(unittest.TestCase):
 class RandomAdvisorTests(unittest.TestCase):
     def test_every_weight_is_drawn_over_the_search_range_except_those_switched_off(self):
         from advisors.initializers.random import HIGH, LOW
-        advisor=RandomAdvisor(1,{'expand_port':3,'cancel_construction':0})
-        actions=['expand_port','cancel_construction','research_production']
+        advisor=RandomAdvisor(1,{'construct_infrastructure':3,'cancel_queued_construction':0})
+        actions=['construct_infrastructure','cancel_queued_construction','research_production']
         weights=advisor.start_run(None,actions,None)
-        self.assertEqual(weights['cancel_construction'],0)
-        drawn=[advisor.start_run(None,actions,None)[name] for _ in range(200) for name in ('expand_port','research_production')]
+        self.assertEqual(weights['cancel_queued_construction'],0)
+        drawn=[advisor.start_run(None,actions,None)[name] for _ in range(200) for name in ('construct_infrastructure','research_production')]
         self.assertTrue(all(10**LOW<=weight<=10**HIGH for weight in drawn))
         self.assertEqual(len(set(drawn)),len(drawn))
         self.assertLess(min(drawn),.1)
@@ -248,8 +249,8 @@ class RandomSmacWeightingTests(unittest.TestCase):
 
     def test_actions_weighted_zero_stay_excluded(self):
         from advisors.initializers import RandomSmacWeightingAdvisor
-        advisor=RandomSmacWeightingAdvisor(0,{'cancel_construction':0,'expand_port':3})
-        self.assertEqual(advisor.excluded,{'cancel_construction'})
+        advisor=RandomSmacWeightingAdvisor(0,{'cancel_queued_construction':0,'construct_infrastructure':3})
+        self.assertEqual(advisor.excluded,{'cancel_queued_construction'})
 
 class WorldPoolTests(unittest.TestCase):
     def test_automatic_world_ranges_and_four_run_warmup(self):
@@ -291,7 +292,7 @@ class WorldPoolTests(unittest.TestCase):
 
 def weighted(offered,weights=None):
     advisor=RandomAdvisor(0)
-    advisor.weights={name:1. for name in offered}|(weights or {})
+    advisor.weights={LEVER[name]:1. for name in offered}|(weights or {})
     return advisor
 
 
@@ -303,28 +304,31 @@ def technologies(*names):
     return [Choice({'technology':name},[('research',{'technology':name})]) for name in names]
 
 
+def event(name,option):
+    return Choice({'event':name,'option':option},[('choose_event_option',{'event':name,'option':option})])
+
+
 class BatchSamplerTests(unittest.TestCase):
     def test_a_batch_never_touches_one_object_twice_and_stops_at_a_pause_ending_action(self):
         import random
         from loop.run import Drawer
         class Snapshot:
             seq=1
-        offered={'enact_trade_policy':laws(1,2),'research_production':technologies('a','b')}
+        offered={'enact_economy_law':laws(1,2),'research_production_technology':technologies('a','b')}
         batch=Drawer(weighted(offered),offered,Snapshot(),{}).draw(random.Random(1))
         picked=[(decision.action,tuple(decision.params.items())) for decision in batch]
         self.assertEqual(len(picked),len(set(picked)))
         self.assertTrue(all(decision.command[1]==decision.params for decision in batch))
-        offered={'capitulate':[Choice({'war':5},[('capitulate',{'war':5})])],'research_production':technologies('a')}
+        offered={'surrender_war':[Choice({'war':5},[('capitulate',{'war':5})])],'research_production_technology':technologies('a')}
         ending=Drawer(weighted(offered),offered,Snapshot(),{}).draw(random.Random(3))
         names=[decision.action for decision in ending]
-        self.assertTrue('capitulate' not in names or names[-1]=='capitulate')
+        self.assertTrue('surrender_war' not in names or names[-1]=='surrender_war')
 
     def test_batches_contain_only_actions_and_count_answers_toward_the_sixteen_action_cap(self):
         import random
         from types import SimpleNamespace
         from loop.run import Drawer
-        offered={'answer_event':[Choice({'event':f'e.{i}','option':0},[('choose_event_option',{'event':f'e.{i}','option':0})]) for i in range(20)],
-                 'research_production':technologies('a')}
+        offered={'answer_event':[event(f'e.{i}',0) for i in range(20)],'research_production_technology':technologies('a')}
         drawer=Drawer(weighted(offered),offered,SimpleNamespace(seq=1),{})
         batches=[drawer.draw(random.Random(seed)) for seed in range(40)]
         self.assertTrue(all(len(batch)==16 for batch in batches))
@@ -335,9 +339,9 @@ class BatchSamplerTests(unittest.TestCase):
         from collections import Counter
         from types import SimpleNamespace
         from loop.run import Drawer
-        offered={'subsidize_building':[Choice({'building':1},[('subsidies_on',{'building':1}),('subset_subsidies_on_state',{'building_type':'building_x','state':9,'ownership':'any'}),
-                                                              ('subset_subsidies_on_state',{'building_type':'building_x','state':9,'ownership':'owned_private'})]),
-                                       Choice({'building':2},[('subsidies_on',{'building':2})])]}
+        offered={'raise_subsidies':[Choice({'building':1},[('subsidies_on',{'building':1}),('subset_subsidies_on_state',{'building_type':'building_x','state':9,'ownership':'any'}),
+                                                           ('subset_subsidies_on_state',{'building_type':'building_x','state':9,'ownership':'owned_private'})]),
+                                    Choice({'building':2},[('subsidies_on',{'building':2})])]}
         advisor=weighted(offered)
         drawer=Drawer(advisor,offered,SimpleNamespace(seq=1),{})
         first=[drawer.draw(random.Random(seed))[0] for seed in range(4000)]
@@ -345,6 +349,28 @@ class BatchSamplerTests(unittest.TestCase):
         commands=Counter(decision.command[0] for decision in first if decision.params['building']==1)
         self.assertAlmostEqual(buildings[1]/4000,.5,delta=.03)
         self.assertAlmostEqual(commands['subsidies_on']/buildings[1],1/3,delta=.04)
+
+    def test_a_lever_is_drawn_by_weight_then_one_of_its_acts_evenly_whatever_their_target_counts(self):
+        import random
+        from collections import Counter
+        from types import SimpleNamespace
+        from loop.run import Drawer
+        offered={'bolster_movement':[Choice({'political_movement':ident},[('toggle_bolster_movement',{'political_movement':ident})]) for ident in range(1,10)],
+                 'stop_suppressing_movement':[Choice({'political_movement':20},[('toggle_suppress_movement',{'political_movement':20})])],
+                 'raise_tax_level':[Choice({},[('set_tax_level',{'level':'High'})])]}
+        drawer=Drawer(weighted(offered,{'raise_political_movements':3.}),offered,SimpleNamespace(seq=1),{})
+        first=Counter(drawer.draw(random.Random(seed))[0].action for seed in range(4000))
+        movements=first['bolster_movement']+first['stop_suppressing_movement']
+        self.assertAlmostEqual(movements/4000,.75,delta=.03)
+        self.assertAlmostEqual(first['bolster_movement']/movements,.5,delta=.04)
+
+    def test_weights_must_name_levers_and_cannot_switch_off_both_answers_to_a_proposal(self):
+        import contextlib
+        import io
+        from loop.run import main
+        for weights in (['accept_offers=0','decline_offers=0'],['concede_demand=0','refuse_demand=0'],['agree_to_treaty=0']):
+            with self.assertRaises(SystemExit),contextlib.redirect_stderr(io.StringIO()):
+                main(['--runs','1','--weight',*weights])
 
     def test_small_batches_are_favoured_with_a_maximum_of_sixteen(self):
         import random
@@ -373,20 +399,19 @@ class BatchSamplerTests(unittest.TestCase):
         class Connection:
             def execute(self,sql,arguments):
                 self.asked=arguments
-                return mock.Mock(fetchall=lambda:[('research_production',5.0),('enact_trade_policy',0.0),('expand_port',2.0),('answer_event',50.0),('accept_treaty',50.0),('decline_treaty',50.0)])
-        def event(name,option):
-            return Choice({'event':name,'option':option},[('choose_event_option',{'event':name,'option':option})])
-        offered={'research_production':technologies('a','b'),'enact_trade_policy':laws(1),'expand_port':[Choice({'state':1},[('build',{'state':1,'building_type':'building_port'})])],
+                return mock.Mock(fetchall=lambda:[('research_production',5.0),('laws_economy',0.0),('construct_infrastructure',2.0),('accept_offers',50.0),('decline_offers',50.0)])
+        offered={'research_production_technology':technologies('a','b'),'enact_economy_law':laws(1),
+                 'construct_infrastructure':[Choice({'state':1,'building_type':'building_port'},[('build',{'state':1,'building_type':'building_port'})])],
                  'answer_event':[event('x.1',0),event('x.1',1),event('y.2',0)],
-                 'accept_treaty':[Choice({'country':3},[('accept_treaty',{'country':3})])],
-                 'decline_treaty':[Choice({'country':3},[('decline_treaty',{'country':3}),('quick_decline_proposal',{'country':3})])]}
+                 'agree_to_treaty':[Choice({'country':3},[('accept_treaty',{'country':3})])],
+                 'refuse_treaty':[Choice({'country':3},[('decline_treaty',{'country':3}),('quick_decline_proposal',{'country':3})])]}
         connection=Connection()
         with mock.patch.object(run,'Stored',lambda found,run_id,seq:Snapshot()),mock.patch.object(run,'available',lambda snapshot:{}), \
              mock.patch.object(run,'offer',lambda snapshot,options:offered):
             snapshot,blocks=run.redraw(connection,12,7,25,3)
             again=run.redraw(connection,12,7,25,3)[1]
             other=run.redraw(connection,12,7,25,4)[1]
-            chosen=run.redraw(connection,12,7,25,3,{'enact_trade_policy':1.0,'research_production':0.0,'expand_port':0.0,'answer_event':1.0,'accept_treaty':1.0,'decline_treaty':1.0})[1]
+            chosen=run.redraw(connection,12,7,25,3,{'laws_economy':1.0,'research_production':0.0,'construct_infrastructure':0.0,'accept_offers':1.0,'decline_offers':1.0})[1]
         self.assertEqual((connection.asked,snapshot.seq,len(blocks)),((12,),7,25))
         self.assertEqual(blocks,again)
         self.assertNotEqual(blocks,other)
@@ -395,31 +420,31 @@ class BatchSamplerTests(unittest.TestCase):
             self.assertLessEqual(len(block),16)
             names=[name for name,_ in block]
             seen|=set(names)
-            self.assertLessEqual(set(names),{'research_production','expand_port','answer_event','accept_treaty','decline_treaty'})
+            self.assertLessEqual(set(names),{'research_production_technology','construct_infrastructure','answer_event','agree_to_treaty','refuse_treaty'})
             events=[params['event'] for name,params in block if name=='answer_event']
             self.assertEqual(sorted(events),['x.1','y.2'])
-            self.assertEqual(names.count('accept_treaty')+names.count('decline_treaty'),1)
-            self.assertLessEqual(set(names[:3]),{'answer_event','accept_treaty','decline_treaty'})
-            self.assertLessEqual(set(names[3:]),{'research_production','expand_port'})
-        self.assertLessEqual({'answer_event','accept_treaty','decline_treaty'},seen)
+            self.assertEqual(names.count('agree_to_treaty')+names.count('refuse_treaty'),1)
+            self.assertLessEqual(set(names[:3]),{'answer_event','agree_to_treaty','refuse_treaty'})
+            self.assertLessEqual(set(names[3:]),{'research_production_technology','construct_infrastructure'})
+        self.assertLessEqual({'answer_event','agree_to_treaty','refuse_treaty'},seen)
         self.assertEqual({option for block in blocks for name,params in block if name=='answer_event' and params['event']=='x.1' for option in [params['option']]},{0,1})
-        self.assertEqual({name for block in blocks for name,_ in block if name.endswith('_treaty')},{'accept_treaty','decline_treaty'})
-        self.assertEqual({name for block in chosen for name,_ in block[3:]},{'enact_trade_policy'})
+        self.assertEqual({name for block in blocks for name,_ in block if name.endswith('_treaty')},{'agree_to_treaty','refuse_treaty'})
+        self.assertEqual({name for block in chosen for name,_ in block[3:]},{'enact_economy_law'})
         self.assertTrue(all(sorted(params['event'] for name,params in block if name=='answer_event')==['x.1','y.2'] for block in chosen))
 
     def test_every_event_and_every_proposal_is_one_question_with_its_own_answers(self):
         from loop.run import questions
-        def answer(name,country):
-            return Choice({'country':country},[(name,{'country':country})])
-        offered={'answer_event':[Choice({'event':'x.1','option':0}),Choice({'event':'x.1','option':1}),Choice({'event':'y.2','option':0})],
-                 'accept_treaty':[answer('accept_treaty',3)],'decline_treaty':[answer('decline_treaty',3),answer('decline_treaty',4)],'reject_demand':[answer('reject_demand',3)],
-                 'research_production':technologies('a')}
+        def answer(command,country):
+            return Choice({'country':country},[(command,{'country':country})])
+        offered={'answer_event':[event('x.1',0),event('x.1',1),event('y.2',0)],
+                 'agree_to_treaty':[answer('accept_treaty',3)],'refuse_treaty':[answer('decline_treaty',3),answer('decline_treaty',4)],'refuse_demand':[answer('reject_demand',3)],
+                 'research_production_technology':technologies('a')}
         asked=[[(name,tuple(choice.params.items())) for name,choice in question] for question in questions(offered)]
         self.assertEqual(asked,[[('answer_event',(('event','x.1'),('option',0))),('answer_event',(('event','x.1'),('option',1)))],
                                 [('answer_event',(('event','y.2'),('option',0)))],
-                                [('accept_treaty',(('country',3),)),('decline_treaty',(('country',3),))],
-                                [('decline_treaty',(('country',4),))],
-                                [('reject_demand',(('country',3),))]])
+                                [('agree_to_treaty',(('country',3),)),('refuse_treaty',(('country',3),))],
+                                [('refuse_treaty',(('country',4),))],
+                                [('refuse_demand',(('country',3),))]])
 
     def test_an_answer_whose_event_or_proposal_is_still_waiting_is_a_failure(self):
         from loop.run import unanswered
@@ -527,18 +552,18 @@ class FeatureTests(unittest.TestCase):
             tariffs=[3.0]*len(TARIFFS)
         picker=pickers.CatBoostPicker()
         picker.model=Model()
-        actions=Histograms([[('action','research_production',1),('research_production.technology','a',1)],[('action','enact_trade_policy',1)]])
+        actions=Histograms([[('action','research_production_technology',1),('research_production_technology.technology','a',1)],[('action','enact_economy_law',1)]])
         held=Histograms([[(BUILDINGS,'farm',2)]])
-        candidates=[[('research_production',{'technology':'a'})],[('research_production',{'technology':'b'})],
-                    [('enact_trade_policy',{'law':3})]]
-        sizes={'action':2,'research_production.technology':1,BUILDINGS:1}
+        candidates=[[('research_production_technology',{'technology':'a'})],[('research_production_technology',{'technology':'b'})],
+                    [('enact_economy_law',{'law':3})]]
+        sizes={'action':2,'research_production_technology.technology':1,BUILDINGS:1}
         picker.encoder=data.Encoder(actions,held,sizes)
         with mock.patch.object(data,'LiveLookup',lambda snapshot:Lookup()),mock.patch.object(data,'live_holdings',lambda snapshot:[(BUILDINGS,'farm',5),(BUILDINGS,'mine',1)]),mock.patch.object(data,'frame',lambda *parts:seen.append(parts)):
             chosen,predictions=picker.pick(candidates,None)
         self.assertEqual(chosen,1)
         self.assertEqual([round(value,6) for value in predictions],[0.1,0.9,0.4])
         state,laws,held,batch,actions,names=seen[0]
-        self.assertEqual(names[-5:],['player.buildings=farm','batch_size','action=enact_trade_policy','action=research_production','research_production.technology=a'])
+        self.assertEqual(names[-5:],['player.buildings=farm','batch_size','action=enact_economy_law','action=research_production_technology','research_production_technology.technology=a'])
         self.assertEqual(np.hstack([held,batch,actions]).tolist(),[[5,1,0,1,1],[5,1,0,1,0],[5,1,1,0,0]])
         self.assertEqual((state.shape,laws.shape),((3,len(names)-5),(3,len(LAW_GROUPS))))
 

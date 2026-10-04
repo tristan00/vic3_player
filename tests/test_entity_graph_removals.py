@@ -82,7 +82,7 @@ class RemovalTests(unittest.TestCase):
                 np.testing.assert_allclose(actual[key],expected[key],err_msg=name+' '+key)
 
     def test_candidate_delta_matches_full_rebuild(self):
-        actions=[('create_army',{'option':60})]
+        actions=[('form_army',{'option':60})]
         delta=action_graph(self.graph,self.data,actions)
         survey=Survey()
         survey.add(self.graph)

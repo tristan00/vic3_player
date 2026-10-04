@@ -76,7 +76,7 @@ class QuarterlyTests(unittest.TestCase):
     def test_histogram_training_keeps_an_action_block_without_a_duration_row(self):
         from advisors.models.histogram import data
         connection=Mock()
-        connection.execute.return_value.fetchall.return_value=[(1,0,0,1,'raise_taxes','level',None,'high')]
+        connection.execute.return_value.fetchall.return_value=[(1,0,0,1,'raise_consumption_taxes','goods',None,'grain')]
         lookup=SimpleNamespace(numbers=[1.]*len(data.NUMBERS),prices=[],institutions=[],tariffs=[],laws=[])
         with patch.object(data,'Trajectories') as outcomes,patch.object(data,'History') as history,patch.object(data,'Holdings') as holdings:
             outcomes.return_value.reason.return_value=None
@@ -86,7 +86,7 @@ class QuarterlyTests(unittest.TestCase):
             rows=data.training_rows(connection,{1:(0,8760,'years')})
         self.assertEqual(len(rows[1]),1)
         self.assertEqual(rows[1][0][4],[1])
-        self.assertIn(('action','raise_taxes',1),rows[1][0][2])
+        self.assertIn(('action','raise_consumption_taxes',1),rows[1][0][2])
 
 
 if __name__=='__main__':

@@ -36,7 +36,7 @@ def fixture():
     snap={name:table(name,values) for name,values in rows.items()}
     data={'run':1,'player':1,'dates':{0:0,2:24},'states':{0:snap,2:copy.deepcopy(snap)},
           'geography':{'provinces':[(101,1,'plains',20,10,20),(102,2,'hills',30,20,30)],'adjacency':[(101,102,4)]}}
-    task={'run':1,'seq':2,'hour':24,'history':[0,2],'actions':[('subsidize_building',{'building':21}),('create_army',{'option':30})]}
+    task={'run':1,'seq':2,'hour':24,'history':[0,2],'actions':[('raise_subsidies',{'building':21}),('form_army',{'option':30})]}
     vocabulary={'pop_type':{3:'laborers'},'religion':{4:'test_religion'},'goods':{5:'grain'}}
     return data,task,vocabulary
 

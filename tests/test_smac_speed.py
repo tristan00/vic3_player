@@ -24,7 +24,7 @@ class SmacPredictionTests(unittest.TestCase):
         runs=list(range(1,151))
         record={'method':'expected_improvement','best_reward':1.,'predicted_reward':.5}
         with patch('advisors.initializers.smac.history',return_value=(X,y,runs)), patch.object(advisor,'propose',return_value=(np.zeros(1),record)) as propose:
-            advisor.start_run(Mock(),['expand_port'],None)
+            advisor.start_run(Mock(),['construct_infrastructure'],None)
         np.testing.assert_array_equal(propose.call_args.args[0],X)
         self.assertEqual(len(propose.call_args.args[1]),150)
         self.assertEqual(advisor.proposal['observed'],list(zip(runs,y)))

@@ -119,16 +119,15 @@ class FullWorldTests(unittest.TestCase):
         graph,summary=build_world(data,actions)
         self.assertEqual(summary['opaque_scope_targets'],[])
 
-    def test_strait_parameters_link_entities_and_decree_parameters_keep_named_types(self):
+    def test_formation_parameters_link_entities_and_decree_parameters_keep_named_types(self):
         data,actions=world_fixture()
-        data['states'][2]['strait_history']=[{**r,'seq':2} for r in records({'strait_history':table('strait_history',[{'strait':70}])},'strait_history')]
-        actions=[('raise_strait_toll',{'strait':70,'level':'low'}),('issue_decree',{'state':11,'decree':'road_maintenance'}),('create_army',{'option':30})]
+        actions=[('set_army_supply_priority',{'military_formation':41,'level':'low'}),('raise_state_decrees',{'state':11,'decree':'road_maintenance'}),('form_army',{'option':30})]
         graph,summary=build_world(data,actions)
-        toll=next(n for n in graph.nodes if n['kind']=='action' and n['key']==0)
+        supply=next(n for n in graph.nodes if n['kind']=='action' and n['key']==0)
         decree=next(n for n in graph.nodes if n['kind']=='action' and n['key']==1)
-        self.assertNotIn('parameter.strait',toll['attrs'])
-        self.assertEqual(toll['parameters'],{'strait':70,'level':'low'})
-        self.assertIn('action.parameter.strait',summary['relations'])
+        self.assertNotIn('parameter.military_formation',supply['attrs'])
+        self.assertEqual(supply['parameters'],{'military_formation':41,'level':'low'})
+        self.assertIn('action.parameter.military_formation',summary['relations'])
         self.assertEqual(decree['attrs']['parameter.decree'],'road_maintenance')
 
 

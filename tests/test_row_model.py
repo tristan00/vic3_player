@@ -42,7 +42,7 @@ class RowTests(unittest.TestCase):
 
     def test_event_ordinary_and_army_actions_are_single_rows_without_weights(self):
         point=SimpleNamespace()
-        actions=[('answer_event',{'event':'event.1','option':0}),('raise_taxes',{'level':'high'}),('create_army',{'option':30})]
+        actions=[('answer_event',{'event':'event.1','option':0}),('raise_consumption_taxes',{'goods':'grain'}),('form_army',{'option':30})]
         rows=features.frame([features.action_features(name,params,point) for name,params in actions])
         self.assertEqual(rows.action.tolist(),[name for name,_ in actions])
         self.assertEqual(pool(rows,np.array([2.,2.,2.])).get_weight(),[1.,1.,1.])
@@ -52,12 +52,12 @@ class RowTests(unittest.TestCase):
     def test_individual_traits_are_not_one_category_for_a_combination(self):
         trait=features.TRAITS[0]
         point=SimpleNamespace(hours=0,entity=lambda table,ident:None,traits=lambda character:[trait])
-        row=features.action_features('promote_commander',{'character':1},point)
+        row=features.action_features('take_away_command',{'character':1},point)
         self.assertEqual(row[f'target_character.trait.{trait}'],1)
         self.assertEqual(sum(row[f'target_character.trait.{name}'] for name in features.TRAITS),1)
 
     def test_predictions_preserve_rows_and_can_run_without_a_picker(self):
-        rows=features.frame([{'action':'create_army','parameter.option.int':float(i)} for i in range(12)])
+        rows=features.frame([{'action':'form_army','parameter.option.int':float(i)} for i in range(12)])
         targets=np.arange(12,dtype=float)
         model=Model({'iterations':5,'depth':2,'thread_count':1}).fit(rows,targets)
         together=model.predict(rows)
@@ -78,9 +78,9 @@ class RowTests(unittest.TestCase):
 
     def test_picker_averages_predictions_including_repeats_events_and_armies(self):
         from advisors.pickers import piecewise
-        candidates=[[('answer_event',{'event':'x','option':0}),('create_army',{'option':30})],
-                    [('research_production',{'technology':'a'}),('research_production',{'technology':'a'}),('create_army',{'option':60})],
-                    [('create_army',{'option':10})]]
+        candidates=[[('answer_event',{'event':'x','option':0}),('form_army',{'option':30})],
+                    [('research_production_technology',{'technology':'a'}),('research_production_technology',{'technology':'a'}),('form_army',{'option':60})],
+                    [('form_army',{'option':10})]]
         picker=piecewise.CatBoostPiecewisePicker()
         picker.model=Mock(predict=Mock(return_value=np.array([1.,2.,3.,-1.,4.])))
         with patch.object(piecewise,'live',return_value='rows') as encode:
@@ -90,7 +90,7 @@ class RowTests(unittest.TestCase):
         picker.model.predict.assert_called_once_with('rows')
 
     def test_categorical_encoding_preserves_model_predictions_and_missing_values(self):
-        rows=[{'action':'create_army','parameter.option.int':float(i%5)} for i in range(20)]
+        rows=[{'action':'form_army','parameter.option.int':float(i%5)} for i in range(20)]
         encoded=features.frame(rows)
         original=pd.DataFrame(rows).reindex(columns=features.NUMERIC+features.CATEGORICAL)
         original[features.NUMERIC]=original[features.NUMERIC].astype(np.float32)
@@ -204,7 +204,7 @@ class RowTuningTests(unittest.TestCase):
 
     def test_trial_retains_fifty_trees_even_when_validation_stops_improving(self):
         from advisors.models.row import tune
-        rows=features.frame([{'action':'create_army','parameter.option.int':float(i)} for i in range(24)])
+        rows=features.frame([{'action':'form_army','parameter.option.int':float(i)} for i in range(24)])
         targets=np.linspace(-1,1,24)
         params=tune.initial()[0]
         metric=tune.Validation(targets,-targets,pd.DataFrame({'run':np.repeat([1,2],12),'before_seq':0}))

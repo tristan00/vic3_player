@@ -8,8 +8,7 @@ import numpy as np
 import psycopg
 import torch
 
-from interface.common import time
-from types import SimpleNamespaced
+from interface.common import timed
 from interface.recording.store import DSN
 from .inference import Forecaster
 from .source import candidates

@@ -20,7 +20,7 @@ class ActionHistoryTests(unittest.TestCase):
         torch.manual_seed(41)
         self.data,self.actions=world_fixture()
         self.raw,self.audit=build_world(self.data)
-        self.alternative=[('create_army',{'option':90})]
+        self.alternative=[('form_army',{'option':90})]
         deltas=[action_graph(self.raw,self.data,actions) for actions in (self.actions,self.alternative)]
         survey=Survey()
         for graph in (self.raw,*deltas):
@@ -35,10 +35,10 @@ class ActionHistoryTests(unittest.TestCase):
     def test_recorded_blocks_use_decision_cutoff_without_outcome_filters(self):
         connection=Mock()
         connection.execute.return_value.fetchall.return_value=[
-            (1,8,'build_monument','building_type',None,'building_eiffel_tower'),
-            (1,8,'build_monument','state',11,None),
-            (1,9,'create_army','option',30,None)]
-        self.assertEqual(blocks(connection,7,1,2),{1:[['build_monument',{'building_type':'building_eiffel_tower','state':11}],['create_army',{'option':30}]]})
+            (1,8,'construct_infrastructure','building_type',None,'building_port'),
+            (1,8,'construct_infrastructure','state',11,None),
+            (1,9,'form_army','option',30,None)]
+        self.assertEqual(blocks(connection,7,1,2),{1:[['construct_infrastructure',{'building_type':'building_port','state':11}],['form_army',{'option':30}]]})
         sql,args=connection.execute.call_args.args
         self.assertEqual(args,[7,1,2])
         self.assertIn('la.before_seq>=%s',sql)

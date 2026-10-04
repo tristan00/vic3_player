@@ -95,7 +95,7 @@ class GraphCreationTests(unittest.TestCase):
         reader.run=1
         reader.player=2
         reader.dates={0:0,1:0,2:24,3:24,4:48,5:48,6:72}
-        reader.actions={seq:[('create_army',{'option':1})] for seq in (0,2,4,6)}
+        reader.actions={seq:[('form_army',{'option':1})] for seq in (0,2,4,6)}
         reader.geography=reader.vocabulary=reader.enums={}
         reader.snapshot=Mock(side_effect=lambda seq:{'seq':seq})
         first=reader.read(4)
@@ -116,7 +116,7 @@ class GraphCreationTests(unittest.TestCase):
         self.assertFalse(labels(1,dates,series)[2].any())
 
     def test_source_retains_every_pause_including_all_masked_decisions(self):
-        actions={seq:[('create_army',{'option':30})] for seq in range(24)}
+        actions={seq:[('form_army',{'option':30})] for seq in range(24)}
         connection=Mock()
         connection.execute.return_value.fetchall.return_value=[(1,1)]
         dates={seq:seq*24 for seq in actions}
@@ -154,7 +154,7 @@ class GraphCreationTests(unittest.TestCase):
             source.mkdir()
             output.mkdir()
             save(source/'run_1.pkl.gz',{'tasks':tasks})
-            with patch('advisors.models.entity_graph.world_data.psycopg.connect'),patch('advisors.models.entity_graph.world_data.ReplayReader',return_value=reader),patch('advisors.models.entity_graph.world_data.Shared'),patch('advisors.models.entity_graph.world_data.ReplaySnapshot'),patch('advisors.models.entity_graph.world_data.candidates',return_value=[actions,[('create_army',{'option':60})]]),patch('builtins.print'):
+            with patch('advisors.models.entity_graph.world_data.psycopg.connect'),patch('advisors.models.entity_graph.world_data.ReplayReader',return_value=reader),patch('advisors.models.entity_graph.world_data.Shared'),patch('advisors.models.entity_graph.world_data.ReplaySnapshot'),patch('advisors.models.entity_graph.world_data.candidates',return_value=[actions,[('form_army',{'option':60})]]),patch('builtins.print'):
                 partition=extract_run((source,output,1))
             self.assertEqual(len(partition['rows']),2)
             self.assertEqual([r['seq'] for r in partition['frames']],[0,1,2])

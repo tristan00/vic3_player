@@ -78,7 +78,7 @@ def accessibility(data,actions):
     original=row['x']
     row['x']=original+min(20.,width/20) if original<width/2 else original-min(20.,width/20)
     worlds=[build_world(source)[0] for source in (data,moved)]
-    changed_actions=[('raise_taxes',{'level':'very_high'})] if actions!=[('raise_taxes',{'level':'very_high'})] else [('lower_taxes',{'level':'very_low'})]
+    changed_actions=[('raise_tax_level',{})] if actions!=[('raise_tax_level',{})] else [('lower_tax_level',{})]
     proposals=[action_graph(graph,source,actions) for graph,source in zip(worlds,(data,moved))]
     proposals.append(action_graph(worlds[0],data,changed_actions))
     survey=Survey()

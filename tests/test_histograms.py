@@ -22,18 +22,18 @@ class Table:
 
 class EntriesTests(unittest.TestCase):
     def test_each_action_counts_its_type_and_each_parameter_it_carries(self):
-        found=entries([('raise_taxes',{'level':'high'}),('raise_taxes',{'level':'very_high'})],LOOKUP)
-        self.assertEqual([name for name,_,_ in found],[ACTION,'raise_taxes.level',ACTION,'raise_taxes.level'])
+        found=entries([('raise_consumption_taxes',{'goods':'grain'}),('raise_consumption_taxes',{'goods':'tools'})],LOOKUP)
+        self.assertEqual([name for name,_,_ in found],[ACTION,'raise_consumption_taxes.goods',ACTION,'raise_consumption_taxes.goods'])
         self.assertEqual(len({value for name,value,_ in found if name!=ACTION}),2)
 
 
     def test_a_cancelled_queue_item_carries_its_queue_position_and_progress(self):
         queue=[(True,50.0,0,4,'building_barrack'),(False,200.0,0,4,'building_port'),(False,25.0,1,4,'building_barrack'),(False,100.0,2,6,'building_barrack')]
         lookup=SimpleNamespace(**vars(LOOKUP),queue=queue)
-        found=entries([('cancel_construction',{'state':4,'building_type':'building_barrack'}),('cancel_construction',{'state':6,'building_type':'building_barrack'})],lookup)
+        found=entries([('cancel_queued_construction',{'state':4,'building_type':'building_barrack'}),('cancel_queued_construction',{'state':6,'building_type':'building_barrack'})],lookup)
         self.assertEqual([entry for entry in found if entry[0] in QUEUE],
-                         [(QUEUE_POSITION,'cancel_construction',2),(QUEUE_PROGRESS,'cancel_construction',.75),
-                          (QUEUE_POSITION,'cancel_construction',3),(QUEUE_PROGRESS,'cancel_construction',0.0)])
+                         [(QUEUE_POSITION,'cancel_queued_construction',2),(QUEUE_PROGRESS,'cancel_queued_construction',.75),
+                          (QUEUE_POSITION,'cancel_queued_construction',3),(QUEUE_PROGRESS,'cancel_queued_construction',0.0)])
 
 
 class AnswerTests(unittest.TestCase):

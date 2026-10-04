@@ -15,7 +15,7 @@ class PlayFeaturesTests(unittest.TestCase):
                                play=Mock(return_value=[-50,2.,.5]),context=Mock(return_value=([1,10,20,1,2,0],[('play.pacts','outgoing.non_aggression')])) )
         for action in PLAY_ACTIONS:
             with self.subTest(action=action):
-                params={'state':12} if action=='start_diplomatic_play_for_state' else {'country':7}
+                params={'state':12} if action=='demand_for_state' else {'country':7}
                 params['diplomatic_play_type']='dp_conquer_state'
                 found=entries([(action,params)],lookup)
                 self.assertEqual([row for row in found if row[0] in PLAY],[(PLAY[0],action,-50),(PLAY[1],action,2.),(PLAY[2],action,.5)])
@@ -29,7 +29,7 @@ class PlayFeaturesTests(unittest.TestCase):
 
     def test_other_actions_do_not_read_target_features(self):
         lookup=SimpleNamespace(play=Mock(side_effect=AssertionError('not a play')))
-        found=entries([('raise_taxes',{'level':'high'})],lookup)
+        found=entries([('raise_consumption_taxes',{'goods':'grain'})],lookup)
         self.assertFalse(any(name in PLAY for name,_,_ in found))
 
     def test_ratios_are_player_over_target_and_unknown_values_remain_missing(self):

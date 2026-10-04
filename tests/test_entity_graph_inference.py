@@ -41,7 +41,7 @@ class RecurrentInferenceTests(unittest.TestCase):
             self.forecaster=Forecaster('unused','unused','cpu')
         self.reader=Mock()
         self.reader.dates={0:0,1:0,2:24}
-        self.reader.actions={0:self.actions,2:[('create_army',{'option':900})]}
+        self.reader.actions={0:self.actions,2:[('form_army',{'option':900})]}
         self.reader.read.side_effect=lambda seq:self.cases[seq]
 
     def test_replayed_live_predictions_match_chronological_offline_predictions(self):

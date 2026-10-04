@@ -15,7 +15,6 @@ from interface.recording.spec import ENTITIES, TABLE
 from interface.recording.store import DSN
 from loop.run import redraw
 from .graph import Builder, Graph, audit
-from ...catalogue import BY_NAME
 from .schema import FULL_WORLD, GRAPH_VERSION, OMIT, PARAMETERS
 from .source import blocks, geography, keys, save
 from .spatial import add_spatial
@@ -249,11 +248,8 @@ class WorldBuilder(Builder):
             if kind=='building_production_method_active' and buildings.get(key[0]) in owned:
                 index['production_method',attrs.get('building_production_method_active.production_method')].append((i,'action.affects_production_method',None))
             if kind=='formation' and key in formations:
-                for name in ('mobilize_all_armies','demobilize_all_armies','upgrade_all_units'):
+                for name in ('mobilise_all_armies','demobilise_all_armies','upgrade_every_unit'):
                     index['action',name].append((i,'action.affects_formation',None))
-            if kind=='player_construction_queue_item':
-                for name in ('pause_construction','resume_construction'):
-                    index['action',name].append((i,'action.affects_queue',None))
         return index
 
     @timed
@@ -261,8 +257,7 @@ class WorldBuilder(Builder):
         if seq not in self.semantics:
             self.semantics[seq]=self.semantic_index(seq,player)
         index=self.semantics[seq]
-        built=[('building_type',BY_NAME[name].subject)] if BY_NAME[name].domain=='construction' and BY_NAME[name].subject else []
-        targets=[item for key,value in [('action',name),*built,*params.items()] for item in index.get((key,value),())
+        targets=[item for key,value in [('action',name),*params.items()] for item in index.get((key,value),())
                  if item[2] is None or 'state' not in params or item[2]==params['state']]
         for target,relation,state in sorted(targets):
             self.edge(node,target,relation)

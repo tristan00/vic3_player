@@ -22,7 +22,7 @@ def dataset():
     data=SimpleNamespace(y=np.array([-3.,-1.,1.,3.,-4.,-2.,2.,4.]),runs=np.repeat(np.arange(4),2),played=4,
                          state=np.zeros((8,len(histogram.STATE)),np.float32),laws=np.full((8,len(histogram.LAWS)),'law',object),
                          sizes=np.array([[index+1] for index in range(8)],np.float32),
-                         actions=Histograms([[('action','create_army',index+1)] for index in range(8)]),held=Histograms([[] for _ in range(8)]),
+                         actions=Histograms([[('action','form_army',index+1)] for index in range(8)]),held=Histograms([[] for _ in range(8)]),
                          pauses=np.array([(run,seq) for run in range(4) for seq in (0,2)]),metric=METRIC.copy(),
                          sampling={'candidates':4,'seed':0},folds=[])
     for train,test in ((np.arange(4),np.arange(4,8)),(np.arange(4,8),np.arange(4))):
@@ -97,9 +97,9 @@ class HistogramPreparationTests(unittest.TestCase):
         def redraw(found,run,seq,count,seed):
             self.assertIs(found,connection)
             rng=np.random.default_rng(seed)
-            return SimpleNamespace(run=run,seq=seq),[[('create_army',{'option':int(rng.integers(1,100))})] for _ in range(count)]
+            return SimpleNamespace(run=run,seq=seq),[[('form_army',{'option':int(rng.integers(1,100))})] for _ in range(count)]
         with patch.object(preparation,'redraw',side_effect=redraw) as draw, patch.object(preparation,'LiveLookup',side_effect=lambda snapshot:snapshot), \
-             patch.object(preparation,'entries',side_effect=lambda actions,lookup:[('action','create_army',actions[0][1]['option'])]):
+             patch.object(preparation,'entries',side_effect=lambda actions,lookup:[('action','form_army',actions[0][1]['option'])]):
             data=preparation.prepare(connection,dataset(),2,2,4,19)
             calls=draw.call_args_list.copy()
             same=preparation.prepare(connection,dataset(),2,2,4,19)

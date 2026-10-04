@@ -39,7 +39,7 @@ class TrainingCacheTests(unittest.TestCase):
         self.assertEqual(self.cache.versions,{})
 
     def test_fixed_rewards_and_histograms_keep_all_training_rows(self):
-        rows={run:[([float(run)]*len(pickers.STATE),['law']*len(pickers.LAWS),[('action','expand_port',run)],[],[run],float(run),
+        rows={run:[([float(run)]*len(pickers.STATE),['law']*len(pickers.LAWS),[('action','construct_infrastructure',run)],[],[run],float(run),
                     {name:float(run)**(index+1) for index,name in enumerate(pickers.COMPONENTS)},run*2)] for run in (1,2,3)}
         self.connection.execute.return_value.fetchall.return_value=[(run,0,run*100,'years') for run in rows]
         with patch.object(pickers,'training_rows',return_value=rows) as load:

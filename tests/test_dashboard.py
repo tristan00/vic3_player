@@ -51,12 +51,12 @@ class DashboardTests(unittest.TestCase):
         store.pending['pick_model']=(1049,29,4.5,PARAMS,[('treasury',60.0),('action1.type',40.0)])
         for step in STEPS:
             store.write(built(step),'post_action',AT,1.0)
-        store.record_pick(0,[['expand_port','research_production'],['enact_trade_policy']],[1.5,-2.0],0)
-        store.record_pick(1,[['research_production'],['expand_port']],[0.5,3.0],1)
+        store.record_pick(0,[['construct_infrastructure','research_production_technology'],['enact_economy_law']],[1.5,-2.0],0)
+        store.record_pick(1,[['research_production_technology'],['construct_infrastructure']],[0.5,3.0],1)
         store.log_action({'turn':1,'seq':1,'advisor':'random','action':'enact_law','params':{'law':LAW},'snapshot':0,'status':'done','ms':5,
-                          'decision':('enact_trade_policy',{'law':LAW})},1)
+                          'decision':('enact_economy_law',{'law':LAW})},1)
         store.log_action({'turn':1,'seq':2,'advisor':'random','action':'research','params':{'technology':'cotton_gin'},'snapshot':0,'status':'invalid',
-                          'detail':'not researchable','decision':('research_production',{'technology':'cotton_gin'})},None)
+                          'detail':'not researchable','decision':('research_production_technology',{'technology':'cotton_gin'})},None)
         store.end_run('time')
         cls.run_id=store.run_id
         store.connection.close()
@@ -126,7 +126,7 @@ class DashboardTests(unittest.TestCase):
         found=db.row('select runs_requested,world_seed,countries,states,tech,pop from run where run_id=%s',(self.run_id,))
         self.assertEqual(found,{'runs_requested':3,'world_seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5})
         weights=db.rows('select a.name,w.weight from run_weight w join advisor_action a using (advisor_action) where w.run_id=%s order by 1',(self.run_id,))
-        self.assertEqual([(w['name'],w['weight']) for w in weights],[('enact_trade_policy',2.0),('expand_port',3.0)])
+        self.assertEqual([(w['name'],w['weight']) for w in weights],[('construct_infrastructure',3.0),('laws_economy',2.0)])
 
     def test_production_method_effects_are_stored_typed(self):
         ruleset=db.value('select ruleset_id from run where run_id=%s',(self.run_id,))
@@ -166,9 +166,9 @@ class DashboardTests(unittest.TestCase):
 
     def test_picker_offers_count_every_candidate_action(self):
         offers={r['action']:r for r in rows(policy.picker_actions([],None,False,0,100))}
-        self.assertEqual((offers['expand_port']['offered'],offers['expand_port']['chosen']),(2,2))
-        self.assertAlmostEqual(offers['expand_port']['chosen_share'],2/3)
-        self.assertAlmostEqual(offers['expand_port']['offered_share'],2/5)
+        self.assertEqual((offers['construct_infrastructure']['offered'],offers['construct_infrastructure']['chosen']),(2,2))
+        self.assertAlmostEqual(offers['construct_infrastructure']['chosen_share'],2/3)
+        self.assertAlmostEqual(offers['construct_infrastructure']['offered_share'],2/5)
 
     def test_picker_filters_apply_to_offers_models_and_importance(self):
         for table in ('pick_model','pick_importance'):
@@ -210,7 +210,7 @@ class DashboardTests(unittest.TestCase):
     def test_random_initializer_weights_are_exposed_with_their_source(self):
         found=rows(policy.weights([('run',str(self.run_id))],'weight',True,0,100))
         self.assertEqual([(r['initializer'],r['method'],r['domain'],r['action'],r['weight']) for r in found],
-                         [('random',None,'construction','expand_port',3),('random',None,'laws','enact_trade_policy',2)])
+                         [('random',None,'construct','construct_infrastructure',3),('random',None,'single','laws_economy',2)])
         response=TestClient(app).get(f'/api/policy/weights?f=run:{self.run_id}')
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json()['total'],2)
@@ -218,31 +218,31 @@ class DashboardTests(unittest.TestCase):
     def test_a_column_lists_its_values_with_counts_and_several_values_of_one_column_match_any(self):
         client=TestClient(app)
         listed=client.get(f'/api/policy/weights?f=run:{self.run_id}&values=action').json()
-        self.assertEqual([(row[0]['text'],row[1]['num']) for row in listed['rows']],[('enact_trade_policy',1.0),('expand_port',1.0)])
+        self.assertEqual([(row[0]['text'],row[1]['num']) for row in listed['rows']],[('construct_infrastructure',1.0),('laws_economy',1.0)])
         self.assertEqual(listed['total'],2)
-        narrowed=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:expand_port&values=action').json()
+        narrowed=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:construct_infrastructure&values=action').json()
         self.assertEqual(narrowed['total'],2)
-        either=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:expand_port&f=action:enact_trade_policy').json()
+        either=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:construct_infrastructure&f=action:laws_economy').json()
         self.assertEqual(either['total'],2)
-        one=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:expand_port&f=weight:3').json()
+        one=client.get(f'/api/policy/weights?f=run:{self.run_id}&f=action:construct_infrastructure&f=weight:3').json()
         self.assertEqual(one['total'],1)
 
     def test_the_catalogue_lists_every_advisor_action_with_the_commands_that_carried_it(self):
-        from advisors.catalogue import NAMES
+        from advisors.catalogue import ACTIONS
         found=rows(policy.catalogue([],None,False,0,1000))
-        self.assertEqual([row['action'] for row in found],list(NAMES))
-        enacted=next(row for row in found if row['action']=='enact_trade_policy')
-        self.assertEqual((enacted['domain'],enacted['parameters'],enacted['commands'],enacted['executions'],enacted['runs']),('laws','law','enact_law',1,1))
-        self.assertEqual(next(row for row in found if row['action']=='raise_taxes')['executions'],0)
+        self.assertEqual([row['action'] for row in found],[action.name for action in ACTIONS])
+        enacted=next(row for row in found if row['action']=='enact_economy_law')
+        self.assertEqual((enacted['domain'],enacted['parameters'],enacted['commands'],enacted['executions'],enacted['runs']),('laws_economy','law','enact_law',1,1))
+        self.assertEqual(next(row for row in found if row['action']=='raise_tax_level')['executions'],0)
         self.assertEqual(TestClient(app).get('/api/policy/catalogue').status_code,200)
 
     def test_candidate_rank_and_gap_stay_global_when_filtered_or_paginated(self):
         ranked=rows(policy.candidates(self.run_id,1,[],None,False,0,100))
         self.assertEqual([(r['rank'],r['candidate'],r['chosen'],r['predicted_change'],r['gap'],r['block']) for r in ranked],
-                         [(1,1,'yes',3,0,'expand_port'),(2,0,'no',0.5,2.5,'research_production')])
+                         [(1,1,'yes',3,0,'construct_infrastructure'),(2,0,'no',0.5,2.5,'research_production_technology')])
         self.assertEqual(rows(policy.candidates(self.run_id,1,[],None,False,1,1)),ranked[1:])
         self.assertEqual(rows(policy.candidates(self.run_id,1,[('candidate','0')],None,False,0,100)),ranked[1:])
-        self.assertEqual(rows(policy.candidates(self.run_id,0,[],None,False,0,100))[0]['block'],'expand_port → research_production')
+        self.assertEqual(rows(policy.candidates(self.run_id,0,[],None,False,0,100))[0]['block'],'construct_infrastructure → research_production_technology')
         response=TestClient(app).get(f'/api/policy/runs/{self.run_id}/pauses/1/candidates')
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json()['total'],2)

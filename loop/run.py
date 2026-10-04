@@ -11,7 +11,7 @@ import sys
 import threading
 import time
 
-from advisors.catalogue import ANSWERS as ANSWER_ACTIONS, NAMES
+from advisors.catalogue import ANSWERS as ANSWER_ACTIONS, LEVER, NAMES, PROPOSALS
 from advisors.initializers import ADVISORS, RandomAdvisor
 from advisors.pickers import PICKERS
 from advisors.data.rewards import draw_objective
@@ -46,7 +46,6 @@ EVENT='choose_event_option'
 QUICK='quick_decline_proposal'
 PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
 ANSWERS=(EVENT,QUICK,*(name for pair in PROPOSAL_ANSWERS for name in pair))
-QUESTIONS=(('accept_treaty','decline_treaty'),('accept_demand','reject_demand'),('accept_action_proposal','decline_action_proposal'),('accept_sway','reject_sway'))
 HOURS_PER_DAY=24
 Decision=namedtuple('Decision','action params command')
 CANDIDATES=(8,50)
@@ -122,7 +121,7 @@ def questions(offered):
     for choice in offered.get('answer_event',[]):
         events.setdefault(choice.params['event'],[]).append(('answer_event',choice))
     asked=[events[event] for event in sorted(events)]
-    for pair in QUESTIONS:
+    for pair in PROPOSALS:
         for country in sorted({choice.params['country'] for name in pair for choice in offered.get(name,[])}):
             asked.append([(name,choice) for name in pair for choice in offered.get(name,[]) if choice.params['country']==country])
     return asked
@@ -142,15 +141,17 @@ class Drawer:
         self.names,self.base,self.choices,self.commands,self.targets=[],[],[],[],[]
         self.index={}
         self.questions=questions(offered)
+        levers={}
         for name in sorted(offered):
-            if name in ANSWER_ACTIONS:
-                continue
+            if name not in ANSWER_ACTIONS:
+                levers.setdefault(LEVER[name],[]).extend((name,choice) for choice in offered[name])
+        for lever in sorted(levers):
             action=len(self.names)
-            self.names.append(name)
-            self.base.append(advisor.weights[name])
-            self.choices.append(offered[name])
-            self.commands.append([choice.commands for choice in offered[name]])
-            self.targets.append([[targets(*command,links) for command in choice.commands] for choice in offered[name]])
+            self.names.append(lever)
+            self.base.append(advisor.weights[lever])
+            self.choices.append(levers[lever])
+            self.commands.append([choice.commands for _,choice in levers[lever]])
+            self.targets.append([[targets(*command,links) for command in choice.commands] for _,choice in levers[lever]])
             for position,found in enumerate(self.targets[action]):
                 for slot,items in enumerate(found):
                     for item in items:
@@ -173,7 +174,7 @@ class Drawer:
                             count[action]-=1
         for question in self.questions[:ACTIONS_PER_PAUSE[1]]:
             names=list(dict.fromkeys(name for name,_ in question))
-            name=pick.choices(names,weights=[self.advisor.weights[name] for name in names])[0]
+            name=names[0] if len(names)==1 else pick.choices(names,weights=[self.advisor.weights[LEVER[name]] for name in names])[0]
             choice=pick.choice([choice for found,choice in question if found==name])
             command=pick.choice(choice.commands)
             batch.append(Decision(name,choice.params,command))
@@ -186,10 +187,12 @@ class Drawer:
                     raise GameCrashed(f'No selectable action during the pause at snapshot {self.seq}')
                 break
             action=pick.choices(offered,weights=[self.base[action] for action in offered])[0]
-            position=pick.choice([position for position,live in enumerate(left[action]) if live])
+            open_=[position for position,live in enumerate(left[action]) if live]
+            name=pick.choice(sorted({self.choices[action][position][0] for position in open_}))
+            position=pick.choice([position for position in open_ if self.choices[action][position][0]==name])
             slot=pick.choice([slot for slot,live in enumerate(alive[action][position]) if live])
             command=self.commands[action][position][slot]
-            batch.append(Decision(self.names[action],self.choices[action][position].params,command))
+            batch.append(Decision(name,self.choices[action][position][1].params,command))
             claim(self.targets[action][position][slot])
             if command[0] in ENDS_PAUSE:
                 break
@@ -688,6 +691,12 @@ def main(argv=None):
         parser.error('world sliders only apply to generated mini worlds')
     if arguments.world_cache and (arguments.vanilla or arguments.pool or arguments.tag or any(value is not None for value in levels)):
         parser.error('--world-cache requires random players and cannot be combined with --vanilla, --pool, --tag or world sliders')
+    weights={name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}
+    if set(weights)-set(NAMES):
+        parser.error(f'--weight takes lever names; unknown: {sorted(set(weights)-set(NAMES))}')
+    silenced=sorted({(LEVER[accept],LEVER[decline]) for accept,decline in PROPOSALS if weights.get(LEVER[accept])==0 and weights.get(LEVER[decline])==0})
+    if silenced:
+        parser.error(f'--weight cannot switch off both answers to a proposal: {silenced}')
     log_timings()
     supervisor=None
     if arguments.supervisor:
@@ -698,9 +707,6 @@ def main(argv=None):
     watchdog=Watchdog(game,supervisor)
     watchdog.start()
     rng=random.Random(arguments.seed)
-    weights={name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}
-    if set(weights)-set(NAMES):
-        parser.error(f'--weight takes advisor action names; unknown: {sorted(set(weights)-set(NAMES))}')
     advisors={name:ADVISORS[name](rng.randrange(10**9),weights) for name in sorted(set(arguments.advisors)|{'random'})}
     pickers={name:PICKERS[name]() for name in set(arguments.pickers)|{'first'}}
     worlds=Cached(arguments.world_cache,rng) if arguments.world_cache else Vanilla(rng) if arguments.vanilla else WorldPool(rng,arguments.pool,levels) if arguments.pool else Fresh(rng,levels)

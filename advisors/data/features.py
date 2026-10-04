@@ -186,14 +186,13 @@ class Leaders:
     def at(self,action,params):
         groups=set()
         if action in LAW_ACTIONS:
-            target=self.laws.get(params['law']) if 'law' in params else self.player
+            target=self.laws.get(params['law'])
             groups={group for group,(country,_,_) in self.groups.items() if country==target}
         elif action in PARTY_ACTIONS:
-            member=params['member']
+            member=params['interest_group']
             if member in self.groups:
                 country,party,_=self.groups[member]
-                if party is not None:
-                    groups={group for group,(owner,other,_) in self.groups.items() if (owner,other)==(country,party)}
+                groups={member} if party is None else {group for group,(owner,other,_) in self.groups.items() if (owner,other)==(country,party)}
         else:
             for param,kind in KINDS[action]:
                 if param not in params:
