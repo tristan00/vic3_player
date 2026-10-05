@@ -2030,7 +2030,13 @@ def articles_between(s):
 @lru_cache(maxsize=None)
 @timed
 def ratification():
-    return {name:' '.join(dict(fields(body(text))).get('can_ratify',())) for name,text in read(DEFAULT_GAME/'game','common/treaty_articles')}
+    terms={}
+    for name,text in read(DEFAULT_GAME/'game','common/treaty_articles'):
+        found=list(fields(body(text)))
+        terms[name]=' '.join([' '.join(values) for field,values in found if field=='can_ratify']
+                             +[' '.join(trigger) for field,values in found if field=='requirement_to_maintain'
+                               for kind,trigger in fields(' '.join(values)) if kind=='trigger'])
+    return terms
 
 
 @timed_often
