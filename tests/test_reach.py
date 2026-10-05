@@ -159,6 +159,22 @@ class RatificationTests(unittest.TestCase):
             self.assertEqual(RULES['offer_treaty_article'](s),[{'country':OTHER,'treaty_article':'ratified'},{'country':OTHER,'treaty_article':'unknown'}])
             self.assertEqual(RULES['demand_treaty_article'](s),RULES['offer_treaty_article'](s))
 
+    def test_a_strait_article_needs_the_giver_to_border_a_strait(self):
+        articles={'no_tolls':{'kind':['directed'],'visible':['has_any_strait_province = scope:source_country'],
+                              'possible':['has_any_strait_province = scope:source_country has_any_strait_control = scope:source_country']}}
+        option=[{'target_country':OTHER,'action_type':'rivalry','possible':True}]
+        states=[{'state':1,'country':PLAYER},{'state':2,'country':OTHER},{'state':3,'country':THIRD}]
+        strait=[{'strait':5,'strait_definition':'a'}]
+        cases=(({},[],[]),
+               ({'strait_history':strait,'strait_endpoint':[{'strait':5,'first_state':1,'second_state':3}]},[{'country':OTHER,'treaty_article':'no_tolls'}],[]),
+               ({'strait_history':strait,'strait_endpoint':[{'strait':5,'first_state':2,'second_state':3}]},[],[{'country':OTHER,'treaty_article':'no_tolls'}]),
+               ({'strait_history':strait},[{'country':OTHER,'treaty_article':'no_tolls'}],[{'country':OTHER,'treaty_article':'no_tolls'}]))
+        for tables,offered,demanded in cases:
+            s=snapshot({'common/treaty_articles':articles},player_diplomatic_option=option,state_history=states,**tables)
+            with patch.object(available,'technologies',lambda s:(set(),set(),set(),set())),patch.object(available,'ratification',lambda:{'no_tolls':''}):
+                self.assertEqual(RULES['offer_treaty_article'](s),offered,tables)
+                self.assertEqual(RULES['demand_treaty_article'](s),demanded,tables)
+
     def test_every_article_of_the_installed_game_has_ratification_terms(self):
         from interface.script import read
         from interface.common import DEFAULT_GAME

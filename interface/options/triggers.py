@@ -907,6 +907,15 @@ def country_test(key,operator,value,scope):
         return (s.map('country','country,power_bloc').get(country) is not None)==yes(value)
     if key=='is_power_bloc_leader':
         return bool(s.map('country','country,bloc_leader').get(country))==yes(value)
+    if key in ('has_any_strait_province','has_any_strait_control'):
+        listed=s.rows('strait_endpoint','strait,first_state,second_state')
+        if {ident for ident, in s.rows('strait','strait')}-{strait for strait,_,_ in listed}:
+            raise Unknown(f'{key}: a strait has no recorded endpoints')
+        owners=s.map('state','state,country')
+        held=resolve(scope,value) in {owners.get(state) for _,first,second in listed for state in (first,second)}
+        if held and key=='has_any_strait_control':
+            raise Unknown(f'{key} of a country that borders a strait')
+        return held
     if key=='is_in_same_power_bloc':
         other=target(scope,value)
         blocs=s.map('country','country,power_bloc')
@@ -1001,6 +1010,7 @@ HANDLED={'AND','OR','NOT','NOR','NAND','any_scope_war','calc_true_if','amount','
          'is_subject','is_subject_of','is_at_war','has_journal_entry','is_diplomatic_play_enemy_of','this','has_modifier','is_country_type','has_government_type','game_date','liberty_desire',
          'any_scope_treaty','any_scope_article','country_rank','is_revolutionary','is_insurrectionary','has_war_with','has_diplomatic_pact',
          'is_in_power_bloc','is_direct_subject_of','ruler_can_have_command','can_form_nation','exists','is_power_bloc_leader','is_in_same_power_bloc',
+         'has_any_strait_province','has_any_strait_control',
          'has_diplomatic_relevance','is_adjacent_to_country','has_diplomats_expelled',
          'aggressive_diplomatic_plays_permitted','has_interest_marker_in_region',
          'country_has_primary_culture','country_has_state_religion','can_increase_autonomy','strategic_region','law','owns_entire_state_region','country_or_subject_owns_entire_state_region'}|set(METRIC_KEYS)|SCOPES|{key for table in HANDLERS.values() for key in table}

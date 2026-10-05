@@ -2040,9 +2040,13 @@ def ratification():
 
 
 @timed_often
+def parties(s,source,target):
+    return country_scope(s,source,other_country=('country',target),source_country=('country',source),target_country=('country',target))
+
+
+@timed_often
 def ratifiable(s,article,source,target):
-    scope=country_scope(s,source,other_country=('country',target),source_country=('country',source),target_country=('country',target))
-    return evaluate(parsed(ratification()[article]),scope) is not False
+    return evaluate(parsed(ratification()[article]),parties(s,source,target)) is not False
 
 
 @timed_often
@@ -2055,7 +2059,7 @@ def treaty_articles(s,kind,offered,goods):
             continue
         for country in treaty_partners(s):
             source,target=(s.player,country) if offered else (country,s.player)
-            if not passes(s,'common/treaty_articles',article,('visible','possible'),country_scope(s,source,other_country=('country',target))):
+            if not passes(s,'common/treaty_articles',article,('visible','possible'),parties(s,source,target)):
                 continue
             if not ratifiable(s,article,source,target):
                 continue
