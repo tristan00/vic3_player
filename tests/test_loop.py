@@ -260,7 +260,7 @@ class WorldPoolTests(unittest.TestCase):
         rng=random.Random(42)
         rows=[world_size(rng,[None]*len(SLIDERS)) for _ in range(200)]
         for _,countries,states,*values in rows:
-            self.assertTrue(20<=states<=100)
+            self.assertTrue(20<=states<=50)
             self.assertTrue(max(2,states//8)<=countries<=states//5)
             for name,value in zip(SLIDERS,values):
                 if name in ('ideology_uniformity','primary_culture_share'):
@@ -314,7 +314,7 @@ class BatchSamplerTests(unittest.TestCase):
         from loop.run import Drawer
         class Snapshot:
             seq=1
-        offered={'enact_economy_law':laws(1,2),'research_production_technology':technologies('a','b')}
+        offered={'enact_new_law':laws(1,2),'research_production_technology':technologies('a','b')}
         batch=Drawer(weighted(offered),offered,Snapshot(),{}).draw(random.Random(1))
         picked=[(decision.action,tuple(decision.params.items())) for decision in batch]
         self.assertEqual(len(picked),len(set(picked)))
@@ -399,8 +399,8 @@ class BatchSamplerTests(unittest.TestCase):
         class Connection:
             def execute(self,sql,arguments):
                 self.asked=arguments
-                return mock.Mock(fetchall=lambda:[('research_production',5.0),('laws_economy',0.0),('construct_infrastructure',2.0),('accept_offers',50.0),('decline_offers',50.0)])
-        offered={'research_production_technology':technologies('a','b'),'enact_economy_law':laws(1),
+                return mock.Mock(fetchall=lambda:[('research_production',5.0),('laws',0.0),('construct_infrastructure',2.0),('accept_offers',50.0),('decline_offers',50.0)])
+        offered={'research_production_technology':technologies('a','b'),'enact_new_law':laws(1),
                  'construct_infrastructure':[Choice({'state':1,'building_type':'building_port'},[('build',{'state':1,'building_type':'building_port'})])],
                  'answer_event':[event('x.1',0),event('x.1',1),event('y.2',0)],
                  'agree_to_treaty':[Choice({'country':3},[('accept_treaty',{'country':3})])],
@@ -411,7 +411,7 @@ class BatchSamplerTests(unittest.TestCase):
             snapshot,blocks=run.redraw(connection,12,7,25,3)
             again=run.redraw(connection,12,7,25,3)[1]
             other=run.redraw(connection,12,7,25,4)[1]
-            chosen=run.redraw(connection,12,7,25,3,{'laws_economy':1.0,'research_production':0.0,'construct_infrastructure':0.0,'accept_offers':1.0,'decline_offers':1.0})[1]
+            chosen=run.redraw(connection,12,7,25,3,{'laws':1.0,'research_production':0.0,'construct_infrastructure':0.0,'accept_offers':1.0,'decline_offers':1.0})[1]
         self.assertEqual((connection.asked,snapshot.seq,len(blocks)),((12,),7,25))
         self.assertEqual(blocks,again)
         self.assertNotEqual(blocks,other)
@@ -429,7 +429,7 @@ class BatchSamplerTests(unittest.TestCase):
         self.assertLessEqual({'answer_event','agree_to_treaty','refuse_treaty'},seen)
         self.assertEqual({option for block in blocks for name,params in block if name=='answer_event' and params['event']=='x.1' for option in [params['option']]},{0,1})
         self.assertEqual({name for block in blocks for name,_ in block if name.endswith('_treaty')},{'agree_to_treaty','refuse_treaty'})
-        self.assertEqual({name for block in chosen for name,_ in block[3:]},{'enact_economy_law'})
+        self.assertEqual({name for block in chosen for name,_ in block[3:]},{'enact_new_law'})
         self.assertTrue(all(sorted(params['event'] for name,params in block if name=='answer_event')==['x.1','y.2'] for block in chosen))
 
     def test_every_event_and_every_proposal_is_one_question_with_its_own_answers(self):
@@ -552,10 +552,10 @@ class FeatureTests(unittest.TestCase):
             tariffs=[3.0]*len(TARIFFS)
         picker=pickers.CatBoostPicker()
         picker.model=Model()
-        actions=Histograms([[('action','research_production_technology',1),('research_production_technology.technology','a',1)],[('action','enact_economy_law',1)]])
+        actions=Histograms([[('action','research_production_technology',1),('research_production_technology.technology','a',1)],[('action','enact_new_law',1)]])
         held=Histograms([[(BUILDINGS,'farm',2)]])
         candidates=[[('research_production_technology',{'technology':'a'})],[('research_production_technology',{'technology':'b'})],
-                    [('enact_economy_law',{'law':3})]]
+                    [('enact_new_law',{'law':3})]]
         sizes={'action':2,'research_production_technology.technology':1,BUILDINGS:1}
         picker.encoder=data.Encoder(actions,held,sizes)
         with mock.patch.object(data,'LiveLookup',lambda snapshot:Lookup()),mock.patch.object(data,'live_holdings',lambda snapshot:[(BUILDINGS,'farm',5),(BUILDINGS,'mine',1)]),mock.patch.object(data,'frame',lambda *parts:seen.append(parts)):
@@ -563,7 +563,7 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(chosen,1)
         self.assertEqual([round(value,6) for value in predictions],[0.1,0.9,0.4])
         state,laws,held,batch,actions,names=seen[0]
-        self.assertEqual(names[-5:],['player.buildings=farm','batch_size','action=enact_economy_law','action=research_production_technology','research_production_technology.technology=a'])
+        self.assertEqual(names[-5:],['player.buildings=farm','batch_size','action=enact_new_law','action=research_production_technology','research_production_technology.technology=a'])
         self.assertEqual(np.hstack([held,batch,actions]).tolist(),[[5,1,0,1,1],[5,1,0,1,0],[5,1,1,0,0]])
         self.assertEqual((state.shape,laws.shape),((3,len(names)-5),(3,len(LAW_GROUPS))))
 

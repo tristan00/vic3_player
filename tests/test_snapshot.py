@@ -324,7 +324,8 @@ class RuleTests(unittest.TestCase):
         s=snapshot({'common/treaty_articles':articles},player_diplomatic_option=[{'target_country':OTHER,'action_type':'rivalry','possible':True}],
                    treaty_history=[{'treaty':1,'first_country':PLAYER,'second_country':OTHER,'withdrawn':False}],
                    treaty_article_history=[{'treaty_article':1,'treaty':1,'treaty_article_type':'trade_privilege','source_country':PLAYER,'target_country':OTHER}])
-        with mock.patch('interface.options.available.technologies',lambda s:(set(),set(),set(),set())),mock.patch('interface.options.available.traded',lambda s:['grain','iron']):
+        with (mock.patch('interface.options.available.technologies',lambda s:(set(),set(),set(),set())),mock.patch('interface.options.available.traded',lambda s:['grain','iron']),
+              mock.patch('interface.options.available.ratification',lambda:dict.fromkeys(articles,''))):
             self.assertEqual(RULES['offer_treaty_article'](s),[{'country':OTHER,'treaty_article':'transit_rights'}])
             self.assertEqual(RULES['demand_treaty_article'](s),[{'country':OTHER,'treaty_article':'trade_privilege'},{'country':OTHER,'treaty_article':'transit_rights'}])
             self.assertEqual(RULES['agree_treaty_article'](s),[{'country':OTHER,'treaty_article':'alliance'}])

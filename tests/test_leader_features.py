@@ -24,10 +24,10 @@ class LeaderFeaturesTests(unittest.TestCase):
         return [row for row in entries(batch,self.lookup) if row[0] in LEADERS]
 
     def test_group_actions_read_the_target_leader_and_keep_action_types_separate(self):
-        found=self.political([('negotiate_economy_law',{'interest_group':1}),('negotiate_human_rights_law',{'interest_group':2})])
-        self.assertEqual(found,[(LEADER_IDEOLOGIES,'negotiate_economy_law.royalist',1),(LEADER_TRAITS,'negotiate_economy_law.ambitious',1),
-                                (LEADER_TRAITS,'negotiate_economy_law.charismatic',1),
-                                (LEADER_IDEOLOGIES,'negotiate_human_rights_law.reformer',1),(LEADER_TRAITS,'negotiate_human_rights_law.charismatic',1)])
+        found=self.political([('negotiate_over_law',{'interest_group':1}),('interact_with_character',{'character':12,'interaction':'grant_leadership'})])
+        self.assertEqual(found,[(LEADER_IDEOLOGIES,'negotiate_over_law.royalist',1),(LEADER_TRAITS,'negotiate_over_law.ambitious',1),
+                                (LEADER_TRAITS,'negotiate_over_law.charismatic',1),
+                                (LEADER_IDEOLOGIES,'interact_with_character.reformer',1),(LEADER_TRAITS,'interact_with_character.charismatic',1)])
 
     def test_government_reform_includes_every_party_member_but_no_foreign_party_and_an_unaffiliated_group_alone(self):
         for action in PARTY_ACTIONS:
@@ -58,7 +58,7 @@ class LeaderFeaturesTests(unittest.TestCase):
 
     def test_shared_leaders_and_repeated_traits_count_once_per_action(self):
         leaders=Leaders(7,{**self.groups,7:(7,None,11)},self.characters,self.traits+[(11,'ambitious')],[],{50:7})
-        self.assertEqual(leaders.at('enact_economy_law',{'law':50}),self.leaders.at('enact_economy_law',{'law':50}))
+        self.assertEqual(leaders.at('enact_new_law',{'law':50}),self.leaders.at('enact_new_law',{'law':50}))
 
     def test_movement_actions_include_only_its_player_group_supporters(self):
         for action in ('bolster_movement','stop_bolstering_movement','suppress_movement','stop_suppressing_movement'):
@@ -79,10 +79,10 @@ class LeaderFeaturesTests(unittest.TestCase):
 
     def test_missing_leaders_and_ideologies_do_not_invent_bins_or_lose_known_traits(self):
         for group in (5,99):
-            self.assertEqual(self.political([('negotiate_economy_law',{'interest_group':group})]),[])
-        self.assertEqual(self.political([('negotiate_economy_law',{'interest_group':6})]),[(LEADER_TRAITS,'negotiate_economy_law.brave',1)])
+            self.assertEqual(self.political([('negotiate_over_law',{'interest_group':group})]),[])
+        self.assertEqual(self.political([('negotiate_over_law',{'interest_group':6})]),[(LEADER_TRAITS,'negotiate_over_law.brave',1)])
         del self.characters[11]
-        self.assertEqual(self.political([('negotiate_economy_law',{'interest_group':1})]),[])
+        self.assertEqual(self.political([('negotiate_over_law',{'interest_group':1})]),[])
 
     def test_unrelated_actions_do_not_load_leaders(self):
         lookup=SimpleNamespace(leaders=Mock(side_effect=AssertionError('unrelated action')))
@@ -90,16 +90,16 @@ class LeaderFeaturesTests(unittest.TestCase):
         self.assertNotIn('raise_consumption_taxes',LEADER_ACTIONS)
 
     def test_repeated_actions_sum_and_selected_leader_bins_reach_catboost(self):
-        batch=[('negotiate_economy_law',{'interest_group':1})]
-        acted=[self.political(batch),self.political(batch*2),self.political([('negotiate_economy_law',{'interest_group':2})]),[]]
+        batch=[('negotiate_over_law',{'interest_group':1})]
+        acted=[self.political(batch),self.political(batch*2),self.political([('negotiate_over_law',{'interest_group':2})]),[]]
         actions=Histograms(acted)
         sizes={name:len(bins) for name,bins in actions.bins.items()}
         selected=actions.selected(sizes)
         self.assertEqual(len(selected),actions.total)
         np.testing.assert_array_equal(actions.count(acted,selected),actions.counts)
-        self.assertEqual(actions.counts[1,actions.column[LEADER_IDEOLOGIES,'negotiate_economy_law.royalist']],2)
+        self.assertEqual(actions.counts[1,actions.column[LEADER_IDEOLOGIES,'negotiate_over_law.royalist']],2)
         self.assertFalse(actions.counts[-1].any())
-        self.assertFalse(actions.count([[(LEADER_TRAITS,'negotiate_economy_law.unseen',1)]],selected).any())
+        self.assertFalse(actions.count([[(LEADER_TRAITS,'negotiate_over_law.unseen',1)]],selected).any())
         data=SimpleNamespace(state=np.zeros((4,len(pickers.STATE)),np.float32),laws=np.full((4,len(pickers.LAWS)),'none',object),
                              sizes=np.ones((4,1),np.float32),actions=actions,held=Histograms([[],[],[],[]]))
         rows=np.arange(4)
@@ -123,8 +123,8 @@ class LeaderHistoryTests(unittest.TestCase):
                                 traits=self.versions({(11,'ambitious'):[(1,()),(4,None)],(11,'brave'):[(4,())],(12,'charismatic'):[(5,())],(13,'cautious'):[(1,())]}),
                                 movements=self.versions({(1,30):[(1,(.1,)),(3,(0.,)),(5,(.1,)),(6,None)],(2,30):[(1,(.2,))]}),
                                 law_rows=self.versions({(50,):[(1,('serfdom',7,False))]}))
-        batches=[[('negotiate_economy_law',{'interest_group':1})],[('raise_government',{'interest_group':1})],
-                 [('enact_economy_law',{'law':50})],[('suppress_movement',{'political_movement':30})],[('give_order',{'character':11,'commander_order_type':'defend'})]]
+        batches=[[('negotiate_over_law',{'interest_group':1})],[('raise_government',{'interest_group':1})],
+                 [('enact_new_law',{'law':50})],[('suppress_movement',{'political_movement':30})],[('give_order',{'character':11,'commander_order_type':'defend'})]]
         expected={0:[],1:[('royalist',['ambitious'])],4:[('royalist',['brave'])],5:[('reformer',['charismatic'])],7:[('reformer',['charismatic'])],8:[('reformer',['charismatic'])],9:[]}
         for seq,wanted in expected.items():
             with self.subTest(seq=seq):
@@ -142,7 +142,7 @@ class LeaderHistoryTests(unittest.TestCase):
                 live.snapshot=snapshot
                 live.characters=snapshot.map('character','character,ideology')
                 live.typed=past.typed=lambda kind,ident:f'{kind}_{ident}'
-                self.assertEqual(past.leaders('negotiate_economy_law',{'interest_group':1}),wanted)
+                self.assertEqual(past.leaders('negotiate_over_law',{'interest_group':1}),wanted)
                 self.assertIs(live.leadership,live.leadership)
                 self.assertIs(past.leadership,past.leadership)
                 for batch in batches:

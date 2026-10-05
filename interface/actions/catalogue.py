@@ -77,6 +77,8 @@ class Action:
     cleanup: tuple=()
     transport: bool=False
     overseas: tuple=()
+    absent: tuple=()
+    admit: str=''
 
 
 FORMATION=tuple(((f'AccessPlayer.GetMilitaryFormations{kind}','ObjectsEqual(MilitaryFormation.Self, {military_formation}.Self)'),) for kind in ('Army','Fleet'))
@@ -194,30 +196,63 @@ DESIGNER=('gui/ship_designer_popup.gui','name = ship_designer_popup')
 TEMPLATE_ITEM=(('ShipTemplateList.GetTemplatesOfType({ship_type}.Self)','EqualTo_int32(PdxGuiWidget.AccessParent.GetIndexInDataModel, {index})'),)
 
 
+EMBARK_FLEETS=('gui/right_click_menu.gui','datamodel = "[MilitaryFormationWrapped.GetFleetsSortedByMarineCapacity]"')
+INVASION_PLANNER=('gui/invasion_planner.gui','name = "invasion_planner_popup"')
+INVADING_ARMY=(('AccessPlayer.GetMilitaryFormationsArmy','ObjectsEqual(MilitaryFormation.Self, {military_formation}.Self)'),)
+INVADING_FLEET=(('InvasionPlannerPopup.GetSortedFleets','ObjectsEqual(MilitaryFormation.Self, {fleet}.Self)'),)
+SWAY_PANEL=('gui/sway_country_panel.gui','name = "sway_country_panel"')
+SWAY='SwayCountryPanel.AccessDiplomaticPlay.CreateSway(GetPlayer.Self, SwayCountryPanel.GetCountry, SwayOffer.Self)'
+
+
+def invasion(name,params,stages):
+    return Action(name,tuple(params.split()),'InvasionPlannerPopup.StartInvasion',window=INVASION_PLANNER,
+                  start=(('PopupManager.HideInvasionPlannerPopup','PopupManager.ShowInvasionPlannerPopup({state}.Self)'),((),)),cleanup=('PopupManager.HideInvasionPlannerPopup',),
+                  stages=tuple((INVASION_PLANNER,chain,lambda values,call=call:[call]) for chain,call in stages))
+
+
+def principle(name,command='PowerBlocPrincipleSelectionWindow.SubmitPrincipleSelection'):
+    return Action(name,('slot:int','power_bloc_principle'),command,window=PRINCIPLE_WINDOW,
+                  start=(('InformationPanelBar.OpenPowerBlocPanel(GetPlayer.GetPowerBloc.Self)',),((),)),
+                  cleanup=('PopupManager.HidePowerBlocPrincipleSelectionWindow','InformationPanelBar.ClosePanel'),
+                  stages=((BLOC_PANEL,(('@PowerBlocPanel.GetPrincipleSlot({slot})',''),),lambda values:['PowerBlocPanel.ToggleSelectionWindow(PowerBlocPrincipleSlot.AccessSelf)']),
+                          (PRINCIPLE_WINDOW,(('PowerBlocPrincipleSelectionWindow.GetAvailableGroups',''),('PowerBlocPrincipleGroup.GetLevels','ObjectsEqual(PowerBlocPrinciple.Self, {power_bloc_principle}.Self)')),
+                           lambda values:['PowerBlocPrincipleSelectionWindow.TogglePrincipleSelection(PowerBlocPrinciple.Self)'])))
+
+
 TREATY_DRAFT=('gui/treaty_draft_panel.gui','name = "treaty_draft_panel"')
-ARTICLE_INPUT=('gui/right_click_menu.gui','name = "article_input_right_click_menu_left"')
+ARTICLE_CONFIRM=('gui/right_click_menu.gui','onclick = "[TreatyDraft.AddArticleDraft(ArticleDraft.Self)]"')
 DRAFT=('@TreatyDraftPanel.GetDraft','')
 OPEN_DRAFT=(('InformationPanelBar.OpenTreatyDraftPanelForNewDraft(GetPlayer.Self, {country}.Self)',),((),))
 TREATY_SIDES=(('offer','Offers','Left'),('demand','Demands','Right'),('agree','MutualAgreements','Left'))
-ARTICLE_MENU="RightClickMenuManager.ToggleArticleTypeInput(TreatyDraft.Self, ArticleType.Self, Country.Self, PdxGuiWidget.AccessSelf, 'article_input_right_click_menu_left')"
+ARTICLE_MENU="RightClickMenuManager.ToggleArticleTypeInput(TreatyDraft.Self, ArticleType.Self, Country.Self, PdxGuiWidget.AccessSelf, 'article_input_right_click_menu_right')"
+
+
+ADMITTED="EqualTo_string(GetVariableSystem.Get('interface_admit'), '1')"
+
+
+def includable(holder):
+    draft='TreatyDraftPanel.GetDraft'
+    country=f'{draft}.Get{holder}Country'
+    return f'{draft}.CanIncludeArticleType(GetArticleType({{treaty_article}}).Self, {country}.Self, {draft}.GetOtherCountry({country}.Self).Self)'
 
 
 def potential(listing,holder):
-    return (DRAFT,(f'@TreatyDraft.Get{holder}Country',''),(f'TreatyDraft.GetPotential{listing}','ArticleType.HasType({treaty_article})'))
+    return ((DRAFT[0],ADMITTED),(f'@TreatyDraft.Get{holder}Country',''),(f'TreatyDraft.GetPotential{listing}','ArticleType.HasType({treaty_article})'))
 
 
 def treaty(name,listing,holder):
     return Action(name,('country','treaty_article'),'TreatyDraft.SendProposal',datamodels=(DRAFT,),window=TREATY_DRAFT,start=OPEN_DRAFT,cleanup=('InformationPanelBar.ClosePanel',),
+                  admit=includable(holder),
                   stages=((TREATY_DRAFT,potential(listing,holder),
                            lambda values:['TreatyDraft.AddArticle(ArticleType.Self, Country.Self, TreatyDraft.GetOtherCountry(Country.Self).Self)']),))
 
 
 def goods_treaty(name,listing,holder):
     return Action(name,('country','treaty_article','goods'),'TreatyDraft.SendProposal',datamodels=(DRAFT,),window=TREATY_DRAFT,start=OPEN_DRAFT,
-                  cleanup=('RightClickMenuManager.Close','InformationPanelBar.ClosePanel'),
+                  cleanup=('RightClickMenuManager.Close','InformationPanelBar.ClosePanel'),admit=includable(holder),
                   stages=((TREATY_DRAFT,potential(listing,holder),lambda values:[ARTICLE_MENU]),
-                          (ARTICLE_INPUT,(('ArticleDraft.GetValidGoods','ObjectsEqual(Goods.Self, {goods}.Self)'),),lambda values:['ArticleDraft.SetGood(Goods.Self)']),
-                          (ARTICLE_INPUT,(),lambda values:['TreatyDraft.AddArticleDraft(ArticleDraft.Self)','RightClickMenuManager.Close'])))
+                          (ARTICLE_CONFIRM,(),lambda values:['ArticleDraft.SetGood({goods}.Self)']),
+                          (ARTICLE_CONFIRM,(),lambda values:['TreatyDraft.AddArticleDraft(ArticleDraft.Self)'])))
 
 
 PROPOSAL_KINDS=(('treaty','GetTreaty','Proposal.GetTreaty.IsValid',(('accept','AcceptTreatyProposal'),('decline','DeclineTreatyProposal'))),
@@ -468,12 +503,8 @@ ACTIONS=(
     act('request_join_power_bloc','power_bloc','{power_bloc}.GetRequestToJoin(GetPlayer.Self).ExecuteAction'),
     act('kick_from_power_bloc','country','GetPlayer.GetPowerBloc.Kick({country}.Self)'),
     act('leave_power_bloc','','GetPlayer.LeavePowerBloc'),
-    Action('pick_principle',('slot:int','power_bloc_principle'),'PowerBlocPrincipleSelectionWindow.SubmitPrincipleSelection',window=PRINCIPLE_WINDOW,
-           start=(('InformationPanelBar.OpenPowerBlocPanel(GetPlayer.GetPowerBloc.Self)',),((),)),
-           cleanup=('PopupManager.HidePowerBlocPrincipleSelectionWindow','InformationPanelBar.ClosePanel'),
-           stages=((BLOC_PANEL,(('@PowerBlocPanel.GetPrincipleSlot({slot})',''),),lambda values:['PowerBlocPanel.ToggleSelectionWindow(PowerBlocPrincipleSlot.AccessSelf)']),
-                   (PRINCIPLE_WINDOW,(('PowerBlocPrincipleSelectionWindow.GetAvailableGroups',''),('PowerBlocPrincipleGroup.GetLevels','ObjectsEqual(PowerBlocPrinciple.Self, {power_bloc_principle}.Self)')),
-                    lambda values:['PowerBlocPrincipleSelectionWindow.TogglePrincipleSelection(PowerBlocPrinciple.Self)']))),
+    principle('pick_principle'),
+    principle('replace_principle'),
     act('upgrade_principle','power_bloc_principle','PowerBlocPrinciple.UpgradeToNextLevel',
         datamodels=(('AccessPlayer.AccessPowerBloc.GetPrinciples','ObjectsEqual(PowerBlocPrinciple.Self, {power_bloc_principle}.Self)'),)),
     act('create_company','company_type','GetPlayer.CreateCompany({company_type}.Self)'),
@@ -496,6 +527,21 @@ ACTIONS=(
       for kind,getter,condition,pairs in PROPOSAL_KINDS for verb,command in pairs),
     act('quick_decline_proposal','country','PopupManager.DeclineProposal(Proposal.AccessSelf)',valid='Proposal.GetActor.IsValid',window=PROPOSALS,
         datamodels=((PROPOSALS[1],'ObjectsEqual(Proposal.GetActor.Self, {country}.Self)'),)),
+    act('break_pact','country diplomatic_action','DiplomaticAction.ExecuteAction',
+        datamodels=(('@GetCountryDiplomaticAction({diplomatic_action}, GetPlayer.Self, {country}.Self)','DiplomaticAction.IsActivePact'),)),
+    Action('embark_formation',('military_formation','fleet:military_formation'),'MilitaryFormationWrapped.EmbarkFormation(MilitaryFormation.Self)',window=EMBARK_FLEETS,
+           start=(('RightClickMenuManager.ShowForEmbarkSelectFleet(MilitaryFormation.AccessSelf)',),FORMATION[:1]),cleanup=('RightClickMenuManager.Close',),
+           datamodels=((EMBARK_FLEETS[1],'ObjectsEqual(MilitaryFormation.Self, {fleet}.Self)'),)),
+    invasion('plan_land_invasion','military_formation state',((INVADING_ARMY,'InvasionPlannerPopup.OnSelectedArmy(MilitaryFormation.AccessSelf)'),)),
+    invasion('plan_naval_invasion','military_formation fleet:military_formation state',
+             ((INVADING_FLEET,'InvasionPlannerPopup.OnSelectedFleet(MilitaryFormation.AccessSelf)'),(INVADING_ARMY,'InvasionPlannerPopup.OnSelectedArmy(MilitaryFormation.AccessSelf)'))),
+    Action('offer_sway',('diplomatic_play','country','offer:int'),SWAY,window=SWAY_PANEL,cleanup=('InformationPanelBar.ClosePanel',),
+           start=(('InformationPanelBar.OpenSwayCountryPanel({diplomatic_play}.Self, {country}.Self)',),((),)),
+           datamodels=(('SwayCountryPanel.AccessShownSwayOffers',"EqualTo_int32(PdxGuiWidget.AccessParent.GetIndexInDataModel, '(int32)0')"),),
+           admit='GreaterThan_int32(GetDataModelSize(SwayCountryPanel.AccessSwayOfferTypes), {offer})',
+           absent=(('interface_stage0','IsDataModelEmpty(SwayCountryPanel.AccessShownSwayOffers)'),),
+           stages=((SWAY_PANEL,(('SwayCountryPanel.AccessSwayOfferTypes','And('+ADMITTED+', EqualTo_int32(PdxGuiWidget.AccessParent.GetIndexInDataModel, {offer}))'),),
+                    lambda values:['SwayCountryPanel.SetSwayOfferType(SwayOfferType.Self)']),)),
     act('pause','','TimeKeeper.TogglePause',valid='And(TimeKeeper.CanTogglePause, Not(TimeKeeper.IsPaused))',why=TIME_WHY),
     act('unpause','','TimeKeeper.TogglePause',valid='And(TimeKeeper.CanTogglePause, TimeKeeper.IsPaused)',why=TIME_WHY),
     act('set_speed','speed:choice',"TimeKeeper.SetGameSpeed('(int32){speed}')",valid='TimeKeeper.CanSetGameSpeed',choices=('0','1','2','3','4')),
@@ -521,15 +567,16 @@ GROUPS={
                 'set_institution_level','stop_institution_change','issue_decree','remove_decree'),
     'research':('research','queue_research','dequeue_research'),
     'army':('defend_invasion','set_formation_flag','station_selected','deploy_selected_to_front','mobilize_selected','demobilize_selected','raise_conscripts_selected','cancel_strategic_objective_selected','set_borrow_setting','transfer_battalions','upgrade_all_units','create_army','recruit_from_formation','activate_conscription_center','disembark','deploy_to_front','station_formation','rehome_formation','set_strategic_objective','cancel_invasion','recruit','mobilize','demobilize','raise_conscripts','disband_formation','mobilize_all','demobilize_all','toggle_mobilization_option',
-            'set_supply_priority','disband_regulars','disband_conscripts','upgrade_regulars','upgrade_conscripts','set_default_unit_type'),
+            'set_supply_priority','disband_regulars','disband_conscripts','upgrade_regulars','upgrade_conscripts','set_default_unit_type','embark_formation','plan_land_invasion','plan_naval_invasion'),
     'navy':('recall_fleet','raise_ship_item','lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item','set_default_construction_fleet','clear_default_construction_fleet','decommission_ship','build_ship','build_ship_for','cancel_ship','start_naval_mission','end_naval_mission','start_naval_mission_selected','end_naval_mission_selected','pause_ship_construction','resume_ship_construction','set_supply_ship_construction','design_ship_template','edit_ship_template','retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all',
             'set_default_ship_template','set_fleet_ship_template','delete_ship_template'),
     'characters':('commander_order','hire_commander','hire_commander_for','promote_commander','assign_commander','unassign_commander','character_interaction'),
     'diplomacy':('diplomatic_action','diplomatic_action_obligation','start_play_confirmed','withdraw_treaty','offer_treaty_article','demand_treaty_article','agree_treaty_article',
                  'offer_goods_treaty_article','demand_goods_treaty_article','accept_treaty','decline_treaty','accept_demand','reject_demand','accept_action_proposal',
-                 'decline_action_proposal','quick_decline_proposal','request_join_power_bloc','form_power_bloc','kick_from_power_bloc','leave_power_bloc','upgrade_principle','pick_principle'),
+                 'decline_action_proposal','quick_decline_proposal','request_join_power_bloc','form_power_bloc','kick_from_power_bloc','leave_power_bloc','upgrade_principle','pick_principle',
+                 'replace_principle','break_pact'),
     'plays':('start_play_country','start_play_state','support_initiator','support_target','lean_initiator','lean_target','stay_on_fence',
-             'declare_neutrality','back_down','accept_sway','reject_sway','toggle_press_war_goal','make_primary_demand','add_war_goal'),
+             'declare_neutrality','back_down','accept_sway','reject_sway','toggle_press_war_goal','make_primary_demand','add_war_goal','offer_sway'),
     'war':('propose_peace','white_peace','capitulate','toggle_accept_peace'),
     'companies':('create_company','remove_company','toggle_charter'),
     'expansion':('colonize','toggle_pause_colonization','abandon_colony','incorporate','unincorporate'),

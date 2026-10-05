@@ -20,7 +20,7 @@ from .project import nations
 from .source import assignments, select_regions
 from .audit import audit
 
-MAP={'states':(20,100),'country_share':(1/8,1/5),'tech':.5,'ideology_uniformity':0,'primary_culture_share':None,'copies':0,
+MAP={'states':(20,50),'country_share':(1/8,1/5),'tech':.5,'ideology_uniformity':0,'primary_culture_share':None,'copies':0,
      'tech_variation':1,'country_economy':1,'local_economy':1,'source_regions':1}
 PROVINCE_PIXELS=2000
 SEA_ID=3000

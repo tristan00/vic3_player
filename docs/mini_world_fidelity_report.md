@@ -1,82 +1,127 @@
-# Mini-world relationships and opening fidelity
+# Mini-world generation and opening checks
 
-29 September 2026. This replaces the earlier source-text fidelity report and subsequent investigation report.
+A mini world is a mod with a new small map and vanilla content. Every state copies one vanilla state region, its template. Every country copies one vanilla country, its donor. `interface.world.generate.generate` writes the mod, `manifest.json` and `audit.json` to `<data>/worlds/seed_<seed>_<countries>_<states>`.
 
-The generator now projects ownership, countries, military capacity, headquarters, laws, institutions, diplomacy, and state history together. Every generated campaign checks its paused opening buildings and structural relationships before creating a recorded run. Technology exclusions are determined before launching the game and are recorded separately from the eligible building expectations.
+Three checks cover a world. The generation audit reads the emitted scripts. The opening building check and the opening relationship check read the loaded game.
 
-## What was wrong
+| Path | Responsibility |
+| --- | --- |
+| `interface/world/sampling.py` | Seed, size and slider draws |
+| `interface/world/generate.py` | Map, mod files, manifest, rewriting of vanilla scripts outside history |
+| `interface/world/vanilla.py`, `source.py` | Vanilla templates, countries and history; template assignment |
+| `interface/world/project.py`, `nations.py` | Countries, technologies, laws and every history file |
+| `interface/world/buildings.py` | Building projection, expected levels, opening building check |
+| `interface/world/military.py`, `cultures.py`, `characters.py` | Fleets, pop cultures, ideology uniformity |
+| `interface/world/audit.py` | Generation audit |
+| `interface/world/relationships.py` | Opening relationship check |
+| `interface/world/cache.py` | World cache |
 
-The previous regional tests compared generated scripts with source scripts. They did not establish that the game initialized those buildings. The earlier company probe checked company behavior while its game log contained building, formation, and commander errors.
+## Size and sliders
 
-The saved opening snapshots for old runs 4–17 contained 8,930 levels at locations where generated building history requested 13,132. That historical comparison excluded automatically generated buildings and counted ownership levels, not direct monument levels or barracks implicit in army history. It established a real loss, but was not a complete vanilla building inventory.
+`sampling.world_size` draws every quantity below. A slider fixed on the `loop.run` command line replaces its draw. `python -m interface.world` generates one world from explicit values.
 
-Two concrete examples were:
+| Quantity | Draw | Effect |
+| --- | --- | --- |
+| States | 20 to 50 | Every state has an owner |
+| Countries | states/8 to states/5, rounded down, at least 2 | 2 to 4 countries at 20 states, 6 to 10 at 50 |
+| `tech` | .35 to .65 | Mean technology count. 0 is the lowest count among vanilla recognized and unrecognized countries, .5 the mean of the countries that own the source regions, 1 the highest |
+| `tech_variation` | .5 to 1.5 | Spread of technology counts between countries, as a multiple of the spread among the source regions' owners. At 0 every country has the same count |
+| `copies` | 0 to 1 | Share of countries that keep the donor's tag and name. The others get an unused `X` tag, a generated name and a one-colour flag |
+| `country_economy` | .5 to 1.5 | Spread between countries of productive building levels per person, as a multiple of the spread in the source regions |
+| `local_economy` | .5 to 1.5 | The same between the states of one country |
+| `source_regions` | 1 to 4 | Number of vanilla strategic regions that supply templates. The map has as many strategic regions |
+| `ideology_uniformity` | 0 to 1, per country | Chance that a character's ideology is redrawn with equal weight among the ideologies it qualifies for |
+| `primary_culture_share` | 0 to 1, per country | Share of the country's population given its primary cultures |
 
-- Old run 16 requested 96 barracks levels for BIC but loaded 68. Combining multiple source owners produced repeated barracks records in Malaya, Cambodia, and Laos; the engine did not add those records together.
-- Old run 17 gave COB a Trans-Baikal iron mine whose financial district named Russia as its country and a COB-owned state as its location. The opening mine had zero levels. The other seven sampled player states had no constructed source buildings. Subsistence buildings existed, and gold fields appeared later; the failure concerned the opening constructed economy.
+The two per-country sliders are passed as a range and `project.nations` draws a value for each country.
 
-Country selection also preferred source owners, then used other countries as replacements. Military declarations could point to another country's generated state or an absent headquarters. Global scopes, treaties, and state-specific production methods followed inconsistent projection rules. Modernity could leave institutions without their enabling laws or select an army law that caused the engine to reduce barracks levels.
+Productive levels exclude military buildings, government administration, the construction sector and the trade centre. Those types are never scaled. With both economy sliders at 1 nothing is scaled. Scaling stops at the template's capped resources and arable land.
+
+`generate` gives each state a target of 5 to 15 provinces. Countries grow from a capital state to log-normally weighted sizes. Up to about 13 percent of the states, coastal and not capitals, are then handed to a country that does not border them and has a coast of its own.
 
 ## Projection rules
 
-| Relationship | Current behavior |
-| --- | --- |
-| Country profile and geography | Sample distinct profiles uniformly from all eligible non-decentralized vanilla countries. Source owners and neighboring countries receive no preference. Identity/name randomness is separate from technology randomness. |
-| Country and capital | The generated capital belongs to the generated country. Historical capital and market-capital overrides cannot redirect it to another country's sampled state. |
-| State and population | Retain source population records and homelands. Project claims and state variables only through existing references. |
-| Buildings sharing a state | Emit one building record per state and type, combining ownership levels. For conflicting production methods, request the largest source record's method set; one merged building cannot have several simultaneous method sets. |
-| Private ownership | Resolve the ownership building's location and owning country together. If its original location is absent, establish the ownership building in the asset's generated state under that state's actual country. |
-| Company and assets | Keep one company and one coherent headquarters. Use a retained original headquarters when present; otherwise locate it at its largest retained asset footprint. Company-owned assets remain connected to the company, including foreign assets. |
-| Barracks and units | Count both explicit barracks and barracks created implicitly by vanilla army declarations. Create that capacity once. Let the game initialize troops from the actual buildings, rather than replaying unrelated donor army declarations and duplicating capacity. |
-| Fleets and headquarters | Locate copied fleets and ship location references in owned coastal territory. Omit fleets without an owned coast and remove dependent references to their omitted scopes. |
-| Laws and technologies | Use ordinary parent laws for country-specific variants and choose researched laws closest to the requested profile. Preserve the requested technology count. |
-| Army law and capacity | Require the selected army law to support the largest retained barracks in the country. Reserve standing army and military drill within the existing technology budget when capacity exceeds peasant levies. |
-| Laws and institutions | Initialize laws first. Apply copied institution investment only when the resulting country has that institution. |
-| Diplomacy and subjects | Retain projected relationships only when their participants exist. Apply liberty desire after diplomatic initialization and only to an actual subject. |
-| Treaties and global history | Project global country/state scopes and treaty participants. Remove commands with missing required endpoints without removing guards and accidentally exposing their alternative branches. |
-| Old military deployments | Do not replay deployments to vanilla province/front locations that have no meaning on the generated map. |
+History commands pass through `project.history_text`. A vanilla reference survives only when its target is in the world: a country when it is a donor, a state when its template was sampled, a strategic region when it is a source region. A province reference never survives.
 
-The army formation layout and unit mix are initialized by the game from the generated country and its buildings. They are not a reproduction of the donor country's historical order of battle. These checks establish building levels and structural links, not full employment, equal military strength, identical profitability, or exact production methods after the game applies laws.
+| Subject | Rule |
+| --- | --- |
+| Countries | `project.nations` draws a distinct donor for each country, uniformly from the vanilla countries that have a starting history and are not decentralized. The vanilla owners of the sampled templates get no preference. The donor supplies the country definition and per-country history and is the starting point for technologies and laws. Tags kept under `copies`, names and flag colours use a random stream separate from technologies. |
+| Capitals | The capital is the state the country grew from, and it is never handed to another country. The definition's `capital` is rewritten to it. `set_capital` and `set_market_capital` are removed from the donor's history. |
+| States and population | `source.assignments` gives each state a template from a source region. A coastal template never lands on an inland state. The template supplies resources, arable land, traits, pops, buildings, state history and trade. One country owns the whole state. Pops keep their type, religion and total size. `cultures.population` relabels cultures so that the template owner's primary cultures become the new country's, at the share `primary_culture_share` sets or the template's own share when it is unset. `add_homeland` follows the same mapping. |
+| Buildings | `buildings.project` writes one `create_building` per state and type. Direct `level` values and ownership levels of every template record of that type are added up. Production methods and other fields come from the record with the most levels. Ownership levels are multiplied by the state's economic scale and rounded within each ownership block. A type whose unlocking technologies the country lacks is left out whole. |
+| Ownership | Country-owned levels go to the generated country of the vanilla owner when that owner is a donor in the world, otherwise to the state's owner. Unscaled types always go to the state's owner. A building owner, such as a financial district, is resolved together with its location: a generated state that copies its vanilla state region and the country that owns that state, or the asset's own state and owner when no state copies it. |
+| Companies | A vanilla company is kept when a state copies its headquarters template or holds levels it owns. Its headquarters is the state copying the original headquarters, otherwise the state with the most company-owned levels. The country that owns that state receives `add_company` and the company setup. Every company-owned level, in any country, names that country. |
+| Barracks and units | `source.reference` adds to each template one barracks level per non-conscript `combat_unit` that vanilla formations declare in it. These join the declared barracks in one building, unscaled and owned by the state's country. `military.military` drops every army formation and each command that uses its saved scope, so no army is declared. |
+| Fleets | A donor fleet is kept only when the country owns a coastal state. Its `hq_region` becomes the strategic region of the country's first coastal state and every state it names becomes that state. Otherwise the fleet and each command using its saved scope are dropped. Other formation commands that name a state, region, province or country are dropped, as is `activate_production_method`. |
+| Technologies | `project.tech_counts` sets a count per country from `tech` and `tech_variation`. `nations._techs` starts from the donor's technologies, then adds random researchable ones or removes random ones that nothing held depends on, until the count is exact. The country history lists each technology; tier and era grants are removed. |
+| Laws | `project.politics` expands the donor's starting politics into laws and replaces country-specific variants with their parent law. In each law group it activates the law closest in progressiveness to the donor's, among laws without a parent whose unlocking technologies are held. The army model must also allow the country's largest barracks. When that exceeds what peasant levies allow, `standing_army` and `military_drill` are reserved inside the technology count. |
+| Institutions | Technologies and laws are written first in the country history. Each `set_institution_investment_level` is wrapped in a `has_institution` condition. |
+| Diplomacy and subjects | Donor history in every other per-country folder (diplomacy, diplomatic plays, power blocs, lobbies, governments, characters and the rest) passes through `history_text`. A pact, relation or subject tie survives only when the other country is in the world. `add_liberty_desire` moves to global history under `is_subject = yes`. |
+| Treaties and global history | Entries not scoped to a donor follow the same rule, and a state-scoped entry is repeated for every state that copies the template. A command naming an absent target is dropped, so a treaty needs both countries. A block whose `limit` names an absent target is dropped whole. When an `if` or `else_if` is dropped, the `else` branches after it are dropped too, so no alternative runs unguarded. |
+| Military deployments | None are written. |
+| Scripts outside history | `generate._rewrites` maps donor tags to generated tags in vanilla `common` and `events` scripts. A condition on a state or strategic region becomes a choice among the generated ones that copy it, or `always = no` when none do. Tests for an absent country become `always = no`. Company type conditions and `preferred_headquarters` name generated states only. |
+
+## Generation audit
+
+`audit.audit` reads the emitted history files and writes `audit.json` beside the manifest. It also records source and generated population, levels, excluded levels, arable land and coast for every state.
+
+| Field | Passes when |
+| --- | --- |
+| `population_structure_preserved` | In every state, pop sizes grouped by everything except culture equal the template's |
+| `culture_projection_matches` | The emitted pops equal the records `cultures.population` produced |
+| `production_methods_match_projection` | The emitted production methods equal those of the largest eligible template record of each type |
+| `duplicate_buildings` | Empty: no state has two records of one building type |
+| `ownership_errors` | Empty: every owning building's `region` belongs to its `country` |
+| `company_errors` | Empty: every added company has a headquarters in a state its country owns, and every company owner in a building names a company that country adds |
+| `coastal_templates_inland` | Zero |
+
+`cache.checked` rejects a world that fails any of these. `generate` only writes the file.
 
 ## Building acceptance contract
 
-Each manifest contains eligible building levels by country, state, and building type. Its separate `excluded_buildings` entries identify levels excluded for missing building technologies and name those technologies. The expected counts are fixed before the game launches; observed losses never lower them.
+The manifest lists for every state its `country`, `buildings` (type to levels) and `excluded_buildings` (type to levels and missing technologies). `buildings.expected` computes the levels: direct `level` plus scaled ownership levels, added over the template's records, including the barracks that army formations imply. A type the owning country lacks the technologies for moves whole to `excluded_buildings`. Both are fixed at generation. Nothing read from the game changes them.
 
-The opening check compares every eligible location/type against live memory. Equal global totals are insufficient: a loss in one state cannot be hidden by an excess in another. Monuments with direct `level` declarations are included. Unrequested automatic subsistence and ownership buildings do not conceal missing constructed buildings.
+`GameInterface.campaign` in `interface/runner/session.py` refuses a manifest whose states have no `buildings`. Once the campaign has loaded, `GameInterface.campaign_ready` calls `buildings.loaded`. It sums the levels of live buildings in game memory by country, state region and building type, and `buildings.compare` reports every expected entry whose loaded total differs. The report is written to `opening_buildings.json` beside the manifest with `expected_buildings`, `expected_levels`, `actual_levels`, `excluded_levels` and `differences`. Any difference raises.
 
-A second check verifies capitals, ownership endpoints, company headquarters, formation headquarters, unit countries, unit supporting buildings, and the one-to-one relationship between regular units and barracks levels. A discrepancy aborts campaign startup before a recorded run is created. Legacy manifests without expectations are rejected and must be regenerated.
+The comparison is per state and type, so a shortfall in one place cannot be offset by a surplus in another. Buildings in the game that the manifest does not list are ignored.
 
-Both opening reports and every generated history category are archived with the world. This replaces the earlier archive that kept only population, building, and state history.
+## Opening relationship check
 
-## Verification
+When the buildings match, `relationships.loaded` reads countries, states, buildings, building ownerships, companies, formations, headquarters and combat units from game memory and writes `opening_relationships.json`. Any error raises.
 
-All operational checks below loaded paused at 1 January 1836. The retained run settings were regenerated with the corrected generator; they are new worlds, not repaired historical recordings.
+| Link | Requirement |
+| --- | --- |
+| Capital | Every country's capital is a state it owns |
+| Building ownership | The owned building exists. An owning building exists. An owning country exists |
+| Company | Its country owns a state in its headquarters state region. Its headquarters building, when it has one, stands in that state |
+| Formation | Its home headquarters belongs to its country, and the country owns a state in that headquarters' strategic region |
+| Combat unit | Its building stands in a state owned by the unit's country, and its formation belongs to the same country |
+| Units and barracks | In every state, the number of combat units based there equals the expected barracks levels |
 
-| Check | Eligible levels | Loaded levels | Missing-technology exclusions | Regular units | Checked relationship errors |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Western Europe, 5 countries / 33 states | 1,537 | 1,537 | 34 | 288 | 0 |
-| Old run 17 settings, Siberia, 3 countries / 27 states | 21 | 21 | 0 | 13 | 0 |
-| Old run 16 settings, 12 countries / 79 states | 1,385 | 1,385 | 3 | 577 | 0 |
-| First relaunched run, 13 countries / 65 states | 506 | 506 | 14 | 234 | 0 |
+## Failure and records
 
-The final run 16 check also contains no invalid-law replacement messages or history script errors. The run 17 and Western Europe checks contain no history script errors. Unrelated engine/rendering and capture warnings are not represented as a clean entire game log.
+`loop.run.session` launches the campaign without waiting, then runs `prepare_recording` and `campaign_ready` side by side. `session` re-raises a failed check once both have finished and before `Loop` is built, so no run is begun. Registration has finished by then, so the world row exists.
 
-The first relaunched run was independently checked against its recorded opening snapshot, run 1 / sequence 0 / phase `start`, with the same 506-of-506 result.
+Registration (`geography.mini_world` and `Store.world` in `interface/recording`) stores the map data, the manifest, every generated history file and `audit.json` as `world_asset` rows. After both checks pass, `Store.world_reports` stores the two opening reports the same way. A cached world played again keeps its world row and its reports are overwritten.
 
-Short verification suites passed: 35 world tests in 8.8 seconds and 59 map, control, archive, and timing tests in 3.1 seconds. A separate projection check over all 14 retained historical layouts passed in 4.5 seconds, checking reference closure, ownership consistency, duplicate elimination, and level accounting. That projection check is explicitly a script check, not a substitute for a game load. Game launches and paused operational inspections ran detached from the agent.
+## World cache
 
-Evidence:
+`python -m interface.world.cache build --directory <directory> --count <n> --workers <w>` relaunches itself detached and logs to `build.log` in the directory. `status` prints progress.
 
-- `artifacts/building_fix/accepted5/result.json`: the three complete paused-load comparisons.
-- `artifacts/building_fix/accepted6/result.json`: final run 16 verification after the remaining law-eligibility correction.
-- `artifacts/building_fix/matrix.json`: projections of the 14 retained layouts.
-- `artifacts/building_fix/relaunch.json`: direct comparison with the new recorded opening snapshot.
-- `artifacts/military_investigation/`: evidence captured before the old database records were wiped.
+- A cache holds at least 1000 worlds. `build` refuses a smaller count and `Cached` refuses an index with fewer completed worlds.
+- `jobs` derives the schedule from the cache seed by calling `world_size` with no slider fixed. A resumed build keeps finished worlds.
+- Each world must pass `checked`: the mod is where the manifest says, at least one country is not decentralized and the audit passes.
+- `fingerprint` hashes every module in `interface/world` except `cache.py`, `__main__.py` and `__init__.py`, then `interface/script.py`, then the path, size and modification time of `victoria3.exe`. `build` and `Cached` refuse a directory with a different fingerprint. Any change to the generator, including the ranges above, needs a new cache directory.
+- `loop.run --world-cache` draws worlds uniformly with replacement and rechecks each one. It cannot be combined with fixed sliders, `--tag`, `--pool` or `--vanilla`. Cached worlds stay on disk. A world generated for a single run is deleted after it.
 
-## Reset and running batch
+## What the checks do not establish
 
-Deleted 18 old runs and 29 stored worlds, including dependent snapshots, training observations, and recorded models. Removed seven old directories from the production and dashboard world catalogs. Before restarting, the database had zero runs and zero worlds.
-
-Started supervised batch `collect_116` with 94 total runs, 10 initial warmup runs, 12 minutes per run, the existing random/SMAC/SVR advisors, and first/CatBoost pickers. New run 1 is using the random advisor and first picker, as required for warmup. Its validated opening reports are present in the world archive.
-
-Reset records are in `artifacts/building_fix/reset.json` and `removed_worlds.json`; the supervisor log is `D:/vic3_data/interface/supervisor.log`.
+- The building check counts levels per state and type. It does not read production methods, employment or owners from the game.
+- The audit checks production methods, the location of owning buildings and the existence of company owners in the scripts only. It does not check country owners.
+- Excluded types are not checked to be absent, and buildings outside the manifest are not examined.
+- The relationship check examines objects that exist. A company, fleet, pact or treaty that the game did not create raises nothing.
+- Laws, technologies, institutions, pops and diplomacy are never read back from the game.
+- No army is declared, so unit types and formation layout are the game's own and not the donor's. Beyond the links above, only the unit count per state is checked.
+- The game log is not searched for script errors.
+- Only the cache acts on the audit. A world generated directly for a run can fail it and still be played.
+- Nothing compares profitability, employment or military strength with vanilla.

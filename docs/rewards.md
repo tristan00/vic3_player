@@ -1,51 +1,118 @@
 # Rewards and model targets
 
-## Fixed three-metric reward
+## The reward
 
-`advisors/data/endgame.py` owns `endgame_three_v1`, shared by the forest and SVR sampler initializers, both CatBoost pickers and the dashboard. Its metrics are constructed building stock, population and GDP. Building stock sums levels times construction costs in states owned by the player.
+`advisors/data/endgame.py` defines the single reward, `endgame_three_v1`. The forest and SVR initializers, both CatBoost pickers and the dashboard call the same functions.
 
-Let `T` be the scoring interval in game years. Divide each metric by its starting value to get normalized stock `k`, population `p` and GDP `g`. For each normalized metric `x`, define `dx = (x(end) - x(end - w)) / w`, where `w = min(1, T)` years:
+| Metric | Value |
+| --- | --- |
+| `stock` | Building levels times the construction cost of their type, summed over the states the played country owns. Types without a construction cost are left out. |
+| `population` | Lower, middle and upper strata of the played country, summed. |
+| `gdp` | GDP of the played country. |
+
+`T` is the scored interval in game years of 365 days. Each metric is divided by its baseline value, giving `k`, `p` and `g`. For a normalized metric `x`, `dx = (x(end) - x(end - w)) / w` with `w = min(1, T)`.
 
 ```text
-R = (sqrt(T) * (k + dk) / 2 + 6*T*dp + (g + dg) / sqrt(T)) / 9
+R = (sqrt(T) * (k + dk) / 2 + 6 * T * dp + (g + dg) / sqrt(T)) / 9
 ```
 
-The stock part is `(k + dk) / 2`, the population part is `dp`, and the GDP part is `(g + dg) / 2`. Their weights are `1/9`, `6/9` and `2/9`; their duration factors are `T^0.5`, `T` and `T^-0.5`. These fixed values replace the sampled legacy objective for all four learned methods. Living standards do not enter the reward.
+| Metric | Part | Weight | Exponent of `T` |
+| --- | --- | --- | --- |
+| `stock` | `(k + dk) / 2` | 1/9 | 0.5 |
+| `population` | `dp` | 6/9 | 1 |
+| `gdp` | `(g + dg) / 2` | 2/9 | -0.5 |
 
-## Baselines and ending outcomes
+A metric contributes its weight times `T` raised to its exponent times its part. The three contributions sum to `R`. Standard of living is not part of the reward.
 
-Initializers score complete runs from the exact opening snapshot. Observations retain the actual score; forest and SVR fitting uses rank-normalized scores. Initializer eligibility requires one recorded advisor and positive recorded sampling weights for every action in the fitted space.
+A value at a time is the latest measurement at or before it, so the last of several snapshots sharing a timestamp counts. When `T` is at most one year the window starts at the baseline and `x(end - w)` is exactly 1.
 
-Both pickers score the remaining interval from the first snapshot at the pause's game timestamp to the run's final recorded timestamp. All starting values and duration use that pause. Multiple action snapshots at one timestamp share the same reward baseline. Row metadata records the action's `before_seq` separately from the reward's `baseline_seq`.
+`breakdown` raises when the interval is not positive, when a baseline is not positive and finite, or when a ratio is negative or not finite. An ending value of zero is valid.
 
-When the final-year window reaches the interval's beginning, its earlier normalized value is exactly one. Otherwise, use the latest recorded value at or before the window boundary. At duplicate timestamps the last measurement governs the following interval; the first snapshot still defines the baseline.
+## Scored runs
 
-Recorded defeat sets all three ending values to zero before calculating recent changes. Debt cutoff retains the recorded measurements. Starting values must be positive and finite, and duration must be positive. Zero ending values are valid. Rows with missing or nonpositive starting measurements, no future duration or missing required model state are omitted. There is no synthetic baseline or log floor.
+`scored_runs` and the `ENDED` and `PLAYED` clauses in `advisors/data/rewards.py` choose the runs. A run is scored when it was played on a generated mini world, has ended, and either ended as `time`, `years`, `defeated` or `debt_cap` or holds at least one game year between its first and last snapshot. Vanilla runs are never scored. The interval always ends at the run's last recorded game date.
 
-Each row action receives the complete subsequent reward, without action-count division or sample weighting. Histogram rows receive the complete subsequent block reward. These targets associate actions and context with later outcomes without identifying isolated causal credit. Piecewise averaging applies during candidate selection.
+`Trajectories.reason` leaves a start out when no game time follows it, when a metric has no measurement at or before it, or when a baseline is zero, negative or not finite. Nothing is substituted for a missing baseline.
+
+## Ending outcomes
+
+| End reason | Cause | Reward |
+| --- | --- | --- |
+| `time` | The round's wall-clock limit passed | Recorded values |
+| `years` | The round's limit in game years passed | Recorded values |
+| `debt_cap` | At the start of a turn, `principal` in `player_treasury` is positive and at least `credit` | Recorded values |
+| `defeated` | The played country owns no state | All three ending values are zero. The values at the start of the window stay as recorded. |
+| `ui_stuck`, `game_crashed`, `loop_crashed`, `loop_lost`, `loop_stalled` | The round broke off | Recorded values, and only when at least one game year was recorded |
+
+## Baselines
+
+### Initializers
+
+`advisors/data/weights.py` scores each run from its opening snapshot to its last. `history` keeps a scored run when it has exactly one initializer in `run_advisor` and a positive weight in `run_weight` for every lever being fitted. The fitted levers are all those not switched off with `--weight name=0`. Features are the base-10 logarithms of the lever weights. Both learned initializers raise when no run qualifies.
+
+Fitting uses `normalized` rewards: each reward is replaced by the normal quantile of its rank. The forest's `best_reward` and predictions and the SVR's `predicted_reward` are on that scale. `smac_observation.reward` and `svr_observation.reward` hold the actual reward; `svr_observation` also holds the normalized value and the bootstrap draw count. The forest's proposal is stored with the reward tag `composite`.
+
+### Pickers
+
+Both pickers read every recorded act and its parameters from `loop_action.advisor_action` and `loop_decision_param`. The interval runs from the game date of the act's `before_seq` snapshot to the run's last recorded date. The baseline is read at the first snapshot with that game date, so every act of a pause has the same baseline and the same target.
+
+| Picker | Rows | Target |
+| --- | --- | --- |
+| `catboost` | One per pause, built in `advisors/models/histogram/data.py` | Reward of the remaining interval |
+| `catboost_piecewise` | One per act, built in `advisors/models/row/data.py` | The same reward for every act of the pause, undivided and unweighted |
+
+Row metadata records `before_seq` and `baseline_seq` separately. A pause is also left out when its state features are missing. The target covers everything after the pause; it does not isolate the effect of one act. When it picks, `catboost_piecewise` averages its act predictions over each candidate block.
+
+## Validation and execution
+
+Whether a command or its act validated, verified or executed never enters reward inputs, model features or the selection of training rows. The two training queries read the act, its parameters and `before_seq`. They do not read `loop_action.status`, `detail`, `after_seq` or `ms`, and acts of every status are kept. The reward reads snapshot dates, the three metrics, state ownership and the `run` row: kind, player country, end time and end reason. The only filter on whole runs is the one under Scored runs.
+
+## Sampled objective
+
+`loop/run.py` still draws four weights and an exponent for every run with `draw_objective` and stores them in the `objective_*` columns of `run`. No initializer, picker or dashboard score reads them. The policy run page lists them as the legacy recorded objective.
+
+`advisors/data/rewards.py` supplies the reward with `built`, `value_at`, `scored_runs`, its SQL fragments and `COSTS`, and supplies the run page's outcome charts with `series`. Its log-growth functions `mean_log`, `growth`, `reward`, `combine`, `breakdown`, `outcomes` and `rewards` have no caller outside the tests.
 
 ## Dashboard
 
-Policy overview and reward tables score completed runs with the shared scorer. Configuration comparisons report median current reward, median ending changes and median final-year changes for the three metrics. Unscorable runs remain visible with no score and are excluded from those medians.
+`reward_scores` in `dashboard/server/runs.py` scores every scored run with `endgame.outcomes`. `dashboard/server/policy.py` builds two tables from it, and a third route explains one run.
 
-A run's reward page shows its opening baseline snapshot, duration, recent window and each metric's normalized ending value, recent change, reward part, weight, duration exponent, time factor and contribution. A learned picker's decision page shows the same breakdown from the pause's first snapshot, even if the selected decision snapshot comes later at the same timestamp.
+| Route | Content |
+| --- | --- |
+| `/api/policy/runs` | One row per run: years, window, and for each metric the ending ratio, recent change, part, weight, exponent, time factor and contribution, then the reward. A run without a score keeps its row with those cells empty. |
+| `/api/policy/configs` | One row per initializer and picker: runs, scored runs, median reward, median ending change of each metric in percent, median final-year change of each metric in percent per year, median years. Unscored runs count as runs and stay out of the medians. |
+| `/api/policy/runs/{run_id}/reward` | The breakdown of one run from its opening snapshot. `?seq=` starts at the first snapshot sharing that snapshot's game date. |
 
-`GET /api/policy/runs/{run_id}/reward` returns the run-opening breakdown. Adding `?seq={snapshot}` selects that snapshot's pause. A missing run or snapshot returns 404; unavailable scores include a reason. Both paths use `Trajectories` and the canonical `breakdown` function used by model targets.
+The reward route answers 404 for a missing run or snapshot. Without a score it returns no parts and an `unavailable_reason`: the run has not ended, is not a scored run, has no game time after the snapshot, lacks a starting metric, or has a baseline that is not positive and finite. It builds `Trajectories` for the one run on every request and calls the same `breakdown` as the model targets.
 
-Saved predictions, initializer observations, model settings and feature importance remain historical records. They are not recalculated or relabeled as results of newer training. Sampled four-component weights and alpha remain under the collapsed legacy objective record and do not control current scores. `advisors/data/rewards.py` retains legacy calculations and shared trajectory utilities; dashboard reward tables no longer call its log scorer.
+`dashboard/ui/src/components/Reward.tsx` shows the baseline snapshot, the years, the window and the table of parts. `dashboard/ui/src/routes/PolicyRun.tsx` shows it for the run under "Rewards & outcomes" and, with `seq`, for a decision snapshot of a learned picker. Recorded picker predictions, initializer proposals and observations, model settings and feature importances are shown as stored. Only reward breakdowns are calculated on request.
 
-## Dashboard loading and refresh
+### Score cache
 
-The server shares completed-run scores between policy pages. Each request checks eligible run IDs, start dates, end dates and end reasons, then recalculates only new or changed runs. It drops removed runs and remembers unscorable runs without repeatedly reconstructing them. Concurrent requests share one calculation. Reopening the database pool clears reuse. Editing historical metric values without changing scoring bounds or end reason requires restarting the dashboard.
+`reward_scores` holds one lock for the whole call. It reads each scored run's first date, last date and end reason, recalculates only the runs that are new or whose three values changed, and forgets runs that are no longer scored. A run that cannot be scored is remembered by its three values and not retried. Requests arriving together wait for the lock and reuse the result. A failed calculation leaves the previous state for the next request. Opening a new connection pool discards the cache. Editing recorded metric values without changing those three values is not noticed until the dashboard restarts.
 
-Visible browser tabs poll `GET /api/stamp` every three seconds after the previous poll finishes. Hidden tabs stop polling and check immediately when shown again. Polling uses short requests instead of permanent event streams that occupy browser connections. Changed stamps queue one refresh behind an active data request; navigation and unmounting cancel obsolete requests. A slow initial load can finish despite incoming live updates.
+### Refresh
 
-The October 3 comparison requested policy runs and configuration medians concurrently while collection continued. Request times fell from 1163/1166 ms to 72/73 ms with the completed-run cache populated; both JSON responses were identical. Initial cache population still reconstructs history once. Evidence is in `artifacts/dashboard_loading_20261003`. API timing remains available through `Server-Timing` and the dashboard log.
+While the tab is visible, `dashboard/ui/src/lib/live.ts` requests `/api/stamp` three seconds after the previous request finished, with a ten-second timeout. A hidden tab stops and cancels the request in flight; it asks again as soon as it is shown. The stamp changes with the newest run, the number of open runs, the latest end time, and the newest run's last snapshot and command numbers. A changed stamp refreshes every live request on the page.
 
-## Model caches and prepared data
+`latestRequest` in `dashboard/ui/src/lib/requests.ts` runs one request at a time for each data hook. A refresh that arrives during a request is queued once behind it, so a slow first load still finishes. Leaving the page cancels the request and its queued refresh.
 
-Completed-run model caches retain features and the three unweighted reward parts. Versions include start date, end date and end reason, so changing defeat status reloads targets even when timestamps are unchanged. Removed runs are dropped; a new database DSN clears the cache. Replacing a database at the same DSN requires restarting workers.
+Every `/api/` response carries a `Server-Timing` header with its total and its six slowest spans, and the same figures go to the dashboard log.
 
-Fresh row and histogram preparation records the fixed reward specification. Data prepared for the former log reward must be regenerated before tuning. Existing production hyperparameters remain installed; each learned-picker start fits a new estimator. Model and proposal schemas remain compatible, including the general SMAC composite-reward tag.
+## Model caches
 
-Action validation, verification and execution results never enter reward inputs, model features or training-row selection. Checks cover the equation, shortened windows, duplicate timestamps, defeat, zero endings, independent run scores, first-pause baselines, cache invalidation and dashboard breakdowns. Dashboard checks also cover concurrent cache access, failed-refresh recovery, queued requests, navigation cancellation and visibility-aware polling.
+Each learned picker owns a `TrainingCache` that lives as long as the loop process. It keeps, per run, the features, the years and the three reward parts; the target is computed from years and parts on every load. Each learned-picker start fits a new estimator with the installed `parameters.json`.
+
+A run is reloaded when its first date, last date or end reason changes, so a change from `debt_cap` to `defeated` alone reloads it. Runs that are no longer scored are dropped. A failed load does not mark runs as loaded. A different DSN clears the cache. A database replaced under the same DSN is recognised only through those three values, so restart the loop process after replacing one.
+
+`python -m advisors.models.row.prepare` and `python -m loop.prepare_histogram_tuning` store the reward specification `OBJECTIVE` with the data they write.
+
+## Tests
+
+| File | Covers |
+| --- | --- |
+| `tests/test_endgame_reward.py` | The equation, intervals under a year, duplicate timestamps, the window start, defeat, zero endings, zero baselines and zero duration, run and pause baselines, both picker datasets, cache reload on a changed end reason, dashboard breakdowns against training targets |
+| `tests/test_training_cache.py` | Reuse, changed and removed runs, a different DSN, failed loads, targets unchanged by other runs |
+| `tests/test_dashboard_cache.py` | Reuse and refresh of scores, simultaneous requests, a failed refresh |
+| `dashboard/ui/tests/requests.test.mjs` | Queued refreshes, cancellation on leaving, recovery after a failed request, polling that stops while hidden |
+| `tests/test_loop.py` | The debt cap, rank normalization, initializer proposals |

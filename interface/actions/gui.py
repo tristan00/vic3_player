@@ -110,7 +110,8 @@ def states(code,action,chain,index,values):
     base=conjunction(equal('interface_action',code),equal('interface_choice',index) if index is not None else '',
                      "GetVariableSystem.Exists('interface_key_ready')" if needs_key(action) else '',
                      f"GetVariableSystem.Exists('{stage_flag(len(action.stages)-1)}')" if action.stages else "GetVariableSystem.Exists('interface_map_go')" if action.start else '',*match)
-    clear=["GetVariableSystem.Clear('interface_key_ready')","GetVariableSystem.Clear('interface_overseas')",*(["GetVariableSystem.Clear('interface_map_go')"] if action.start else []),
+    clear=["GetVariableSystem.Clear('interface_key_ready')","GetVariableSystem.Clear('interface_overseas')","GetVariableSystem.Clear('interface_admit')",
+           *(["GetVariableSystem.Clear('interface_map_go')"] if action.start else []),
            *[f"GetVariableSystem.Clear('{flag(number)}')" for number in range(len(action.stages)) for flag in (stage_flag,armed_flag)]]
     done=[f"GetVariableSystem.Set('interface_clean', '{'event' if action.window==EVENT_WINDOW else 'all'}')",*action.cleanup,*after(True)]
     start=[*clear,*([] if action.window or action.start else CLEAN)]
@@ -137,6 +138,38 @@ def states(code,action,chain,index,values):
     return out
 
 
+ADMIT="GetVariableSystem.Get('interface_admit')"
+
+
+@timed_often
+def refusal(action):
+    clear=["GetVariableSystem.Clear('interface_key_ready')","GetVariableSystem.Clear('interface_map_go')","GetVariableSystem.Clear('interface_admit')",
+           *[f"GetVariableSystem.Clear('{flag(number)}')" for number in range(len(action.stages)) for flag in (stage_flag,armed_flag)]]
+    calls=[f"GetVariableSystem.Set('interface_fired', {FIRED})",*clear,"GetVariableSystem.Set('interface_action_valid', '0')","GetVariableSystem.Set('interface_action_desc', 'absent')",
+           "GetVariableSystem.Set('interface_clean', 'all')",*action.cleanup,*after(True)]
+    return ' '.join(f'on_start = "[{call}]"' for call in calls)
+
+
+@timed_often
+def absent_widget(code,action,index,values):
+    base=conjunction(equal('interface_action',code),equal('interface_choice',index) if index is not None else '')
+    body=refusal(action)
+    states=[]
+    for mode in (1,2):
+        for flip in (0,1):
+            turn=conjunction(equal('interface_mode',mode),equal('interface_flip',flip))
+            if action.admit:
+                asked=conjunction(base,"GetVariableSystem.Exists('interface_map_go')","Not(GetVariableSystem.Exists('interface_admit'))",turn)
+                decided=f"GetVariableSystem.Set('interface_admit', Select_CString({fill(action.admit,values)}, '1', '0'))"
+                states.append(f'state = {{ name = admit_{code}_{index}_{mode}_{flip} trigger_when = "[{asked}]" on_start = "[{decided}]" }}')
+                refused=conjunction(base,f"EqualTo_string({ADMIT}, '0')",turn,UNFIRED)
+                states.append(f'state = {{ name = refuse_{code}_{index}_{mode}_{flip} trigger_when = "[{refused}]" {body} }}')
+            for number,(gate,missing) in enumerate(action.absent):
+                trigger=conjunction(base,f"GetVariableSystem.Exists('{gate}')",turn,UNFIRED,fill(missing,values))
+                states.append(f'state = {{ name = absent_{code}_{index}_{number}_{mode}_{flip} trigger_when = "[{trigger}]" {body} }}')
+    return 'widget = { size = { 0 0 }'+chr(10)+chr(10).join(states)+chr(10)+'}'
+
+
 @timed_often
 def wrap(code,action,chain,values,inner):
     for datamodel,_ in reversed(chain):
@@ -161,7 +194,7 @@ def start_widgets():
                 base=conjunction(equal('interface_action',code),equal('interface_choice',index) if index is not None else '',
                                  *[fill(condition,values) for _,condition in chain if condition])
                 inner=('widget = { size = { 0 0 }\n'+'\n'.join(f'state = {{ name = start_{code}_{index}_{mode}_{flip} trigger_when = "[{conjunction(base,equal("interface_mode",mode),equal("interface_flip",flip))}]" duration = 0.3 '
-                                                               f'on_start = "[GetVariableSystem.Clear(\'interface_map_go\')]" '
+                                                               f'on_start = "[GetVariableSystem.Clear(\'interface_map_go\')]" on_start = "[GetVariableSystem.Clear(\'interface_admit\')]" '
                                                                +' '.join(f'on_start = "[{call}]"' for call in CLEAN)+' '
                                                                +' '.join(f'on_start = "[{fill(command,values)}]"' for command in commands)+' '
                                                                f'on_finish = "[GetVariableSystem.Set(\'interface_map_go\', \'1\')]" }}' for mode in (1,2) for flip in (0,1))+'\n}')
@@ -223,6 +256,8 @@ def action_widgets(windowed):
                     widgets+=[(window,stage_widget(code,action,index,values,number,stage_chain,calls))
                               for number,(window,stage_chain,calls) in enumerate(action.stages)]
                     inner=wrap(code,action,listed(chain),values,inner)
+                if action.absent or action.admit:
+                    widgets.append((action.stages[0][0] if action.stages else action.window,absent_widget(code,action,index,values)))
                 widgets.append((action.window,inner))
     return widgets
 

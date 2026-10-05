@@ -2,7 +2,8 @@ import re
 from functools import lru_cache
 
 from ..actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, ACTIONS, LEVELS, TOLL_LEVELS
-from ..common import progress, timed, timed_often
+from ..common import DEFAULT_GAME, progress, timed, timed_often
+from ..script import body, fields, read
 from ..recording.spec import METRIC_COLUMNS
 from ..runner.memory import MONTH_STARTS
 
@@ -2026,6 +2027,18 @@ def articles_between(s):
     return s.memo('articles_between',compute)
 
 
+@lru_cache(maxsize=None)
+@timed
+def ratification():
+    return {name:' '.join(dict(fields(body(text))).get('can_ratify',())) for name,text in read(DEFAULT_GAME/'game','common/treaty_articles')}
+
+
+@timed_often
+def ratifiable(s,article,source,target):
+    scope=country_scope(s,source,other_country=('country',target),source_country=('country',source),target_country=('country',target))
+    return evaluate(parsed(ratification()[article]),scope) is not False
+
+
 @timed_often
 def treaty_articles(s,kind,offered,goods):
     acquired=technologies(s)[0]
@@ -2038,11 +2051,118 @@ def treaty_articles(s,kind,offered,goods):
             source,target=(s.player,country) if offered else (country,s.player)
             if not passes(s,'common/treaty_articles',article,('visible','possible'),country_scope(s,source,other_country=('country',target))):
                 continue
+            if not ratifiable(s,article,source,target):
+                continue
             if goods:
                 combos+=[{'country':country,'treaty_article':article,'goods':item} for item in traded(s)]
             elif (source,target,article) not in articles_between(s):
                 combos.append({'country':country,'treaty_article':article})
     return combos
+
+
+@lru_cache(maxsize=None)
+@timed
+def pact_terms():
+    terms={}
+    for name,text in read(DEFAULT_GAME/'game','common/diplomatic_actions'):
+        found=dict(fields(body(text)))
+        if 'pact' in found and found.get('can_select_to_break')!=['no']:
+            inner=dict(fields(' '.join(found['pact'])))
+            terms[name]=(int(inner.get('forced_duration',['0'])[0]),' '.join(inner.get('actor_can_break',())))
+    return terms
+
+
+@timed_often
+def snapshot_hours(s,seq):
+    return s.memo(('snapshot_hours',seq),lambda:s.connection.execute('select game_date from snapshot where run_id=%s and seq=%s',(s.run_id,seq)).fetchone()[0])
+
+
+@timed_often
+def opening_seq(s):
+    return s.memo('opening_seq',lambda:s.connection.execute('select min(seq) from snapshot where run_id=%s',(s.run_id,)).fetchone()[0])
+
+
+@timed_often
+def breakable_pacts(s):
+    seen=s.first_seen('pact')
+    found=[]
+    for pact,first,second,kind in s.rows('pact','pact,first_country,second_country,pact_type'):
+        if first!=s.player or kind not in pact_terms():
+            continue
+        months,can_break=pact_terms()[kind]
+        if seen[pact]!=opening_seq(s) and now(s)<months_later(snapshot_hours(s,seen[pact]),months):
+            continue
+        if evaluate(parsed(can_break),country_scope(s,target_country=('country',second),actor=('country',s.player))) is not False:
+            found.append({'country':second,'diplomatic_action':kind})
+    return found
+
+
+@timed_often
+def replaceable_principles(s):
+    held=bloc_principles(s)
+    if not bloc_leader(s) or not mandates(s):
+        return []
+    identity=bloc_identity(s)
+    groups=s.definitions('common/power_bloc_principle_groups')
+    return [{'slot':slot,'power_bloc_principle':levels[0]} for slot in range(len(held)) for group in groups
+            for levels in [definition(s,'common/power_bloc_principle_groups',group,'levels')] if levels and not set(levels)&held and principle_allowed(s,levels[0])
+            and definition(s,'common/power_bloc_principle_groups',group,'unlocking_identity') in ([],[identity])
+            and definition(s,'common/power_bloc_principle_groups',group,'blocking_identity')!=[identity]]
+
+
+@timed_often
+def marines(s,formation):
+    kinds=regular_types(s,formation)
+    return bool(kinds) and all(definition(s,'common/combat_unit_types',kind,'group')==['combat_unit_group_marines'] for kind in kinds)
+
+
+@timed_often
+def ashore(s):
+    return [f for f in settled(s,s.formations('army')) if not formation_report(s,f,'embarked') and not formation_report(s,f,'invading') and not demobilizing(s,f)]
+
+
+@timed_often
+def embarkable(s):
+    return [{'military_formation':army,'fleet':fleet} for army in ashore(s) if marines(s,army)
+            for fleet in s.formations('fleet') if not formation_report(s,fleet,'retrofitting') and not formation_report(s,fleet,'invading')]
+
+
+@timed_often
+def war_enemies(s):
+    plays={s.map('war','war,diplomatic_play').get(war) for war in s.wars()}
+    sides=play_sides(s)
+    return {member for (play,side),members in sides.items() if play in plays and s.player in sides.get((play,1-side),set()) for member in members}
+
+
+@timed_often
+def invadable(s):
+    enemies=war_enemies(s)
+    return [state for state,country in s.rows('state','state,country') if country in enemies]
+
+
+@timed_often
+def land_invasions(s):
+    return [{'military_formation':army,'state':state} for army in ashore(s) for state in invadable(s)]
+
+
+@timed_often
+def naval_invasions(s):
+    fleets=[fleet for fleet in s.formations('fleet') if not formation_report(s,fleet,'retrofitting') and not formation_report(s,fleet,'invading')]
+    return [{'military_formation':army,'fleet':fleet,'state':state} for army in ashore(s) for fleet in fleets for state in invadable(s) if trigger_coastal(s,state)]
+
+
+SWAY_OFFER_TYPES=6
+
+
+@timed_often
+def swayable(s):
+    found=[]
+    for play in principal(s):
+        if play in at_war_plays(s) or not OPENING_PHASE_END<=escalation(s,play)<COUNTDOWN:
+            continue
+        taken={country for side in range(2) for country in play_members(s).get((play,side),set())}|set(involved(s)[0][play])
+        found+=[{'diplomatic_play':play,'country':country,'offer':offer} for country in s.countries() if country not in taken for offer in range(SWAY_OFFER_TYPES)]
+    return found
 
 
 RULES={
@@ -2247,6 +2367,12 @@ RULES={
     'press_journal_button':journal_buttons,
     'choose_event_option':event_options,
     'quick_decline_proposal':lambda s:product(country=sorted({country for country, in s.rows('player_proposal','country')})),
+    'break_pact':breakable_pacts,
+    'replace_principle':replaceable_principles,
+    'embark_formation':embarkable,
+    'plan_land_invasion':land_invasions,
+    'plan_naval_invasion':naval_invasions,
+    'offer_sway':swayable,
     **{name:(lambda s,kind=name.split('_',1)[1]:product(country=proposers(s,kind))) for name in ('accept_treaty','decline_treaty','accept_demand','reject_demand',
                                                                     'accept_action_proposal','decline_action_proposal','accept_sway','reject_sway')},
     'pause_all_construction':lambda s:[{}] if not construction_paused(s) else [],
