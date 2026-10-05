@@ -97,6 +97,10 @@ Six commands were added so that every act can fire. Their availability rules are
 
 The forced months of a pact count from the first snapshot that lists it. A pact already present at the run's first snapshot counts as free. Forced months and `actor_can_break` are read from the installed game's `common/diplomatic_actions`.
 
+## Treaty proposals on offer
+
+`treaty_articles` offers an article between two countries when its `visible` and `possible` triggers do not fail and its `can_ratify` trigger does not fail either. `can_ratify` is read from the installed game's `common/treaty_articles`, with the giving country as `source_country` and the other as `target_country`. A trigger the evaluator cannot decide does not exclude the article; the gate then asks the game.
+
 ## Observed against the game
 
 These were run on a cached mini world in October 2026, mostly in check mode.
@@ -105,7 +109,7 @@ These were run on a cached mini world in October 2026, mostly in check mode.
 | --- | --- |
 | `break_pact` | Valid for improving relations; influence returned from 1225 to 1375 at once. A rivalry four days old was refused with `DIPLO_ACTION_FORCED_DURATION`. A pact that did not exist matched nothing. |
 | `offer_sway` | Sent once for real in 0.4 s. The three offer types the panel showed were valid in 0.7 s; positions beyond them returned `absent` in 0.5 s. |
-| `offer_treaty_article`, `demand_treaty_article` | All 146 proposals on offer at an opening were acknowledged: 55 valid in 0.7 s, 91 `absent` in 0.5 s. Before the gate, 205 of 1398 such proposals in earlier collection logs ran into the five-second limit. |
+| `offer_treaty_article`, `demand_treaty_article` | All 146 proposals on offer at an opening were acknowledged: 55 valid in 0.7 s, 91 `absent` in 0.5 s. That was before the rule read `can_ratify`. Before the gate, 205 of 1398 such proposals in earlier collection logs ran into the five-second limit. |
 | `offer_goods_treaty_article`, `demand_goods_treaty_article` | All 53 sampled proposals were valid in 1.0 s. Before, 108 of 110 in earlier collection logs ran into the limit, because the chosen good was matched by object identity and never matched. |
 | `embark_formation` | Acknowledged with the game's refusal: the army held non-marine units and the fleet's marine capacity was too small. |
 | `plan_land_invasion`, `plan_naval_invasion` | Acknowledged with the game's refusals: no ships for the land plan across water, no port within reach for the naval plan. No valid invasion was launched. |
@@ -154,4 +158,4 @@ Whether a command or its act validated, verified or executed never enters reward
 - a transport result overrides the acknowledgement only for the same sequence, and an unknown result raises;
 - every execute and check state of every command stores validity before cleanup.
 
-`tests/test_actions.py` checks the catalogue and the generated GUI text, and that every game function a command names exists in the game's data types. `tests/test_reach.py` checks the availability rules of the six added commands, that the gate's one decision feeds both the first stage and the refusal, and that a goods proposal waits for no list item. `tests/test_tail.py` and `tests/test_log_tail.py` check that the log tail follows rotations without losing or repeating lines. `tests/test_loop.py` checks that an answer whose event or proposal is still waiting counts as unanswered. `tests/test_quarterly.py` checks that advancing a quarter issues only the loop's own `unpause`.
+`tests/test_actions.py` checks the catalogue and the generated GUI text, and that every game function a command names exists in the game's data types. `tests/test_reach.py` checks the availability rules of the six added commands, the ratification filter on treaty proposals, that the gate's one decision feeds both the first stage and the refusal, and that a goods proposal waits for no list item. `tests/test_tail.py` and `tests/test_log_tail.py` check that the log tail follows rotations without losing or repeating lines. `tests/test_loop.py` checks that an answer whose event or proposal is still waiting counts as unanswered. `tests/test_quarterly.py` checks that advancing a quarter issues only the loop's own `unpause`.
