@@ -31,7 +31,9 @@ VALUES={'state':[1],'building':list(range(1,len(KINDS)+1)),'building_type':PLACE
         'law':list(LAWS),'technology':list(TREES.values()),'institution':[30],'military_formation':[7,8],'fleet':[8],'power_bloc':[5],'strait':[70],'amendment':[80],
         'treaty_article':OFFERABLE,'treaty':[60,61,62,63,64],'diplomatic_action':sorted(DEALT),'charter':['investment_charter','trade_charter'],
         'access':list(ACCESS_STATUSES),'allowed':list(ACCESS_PERMISSIONS),'ownership':['any']}
+STATE_PICKING=sorted({*C.STATE_DEALS,C.STATE_TRADE})
 POOLS={('break_pact','diplomatic_action'):sorted(pact_terms()),
+       **{(command,'diplomatic_action'):STATE_PICKING for command in ('diplomatic_action_first_state','diplomatic_action_second_state','diplomatic_action_states')},
        **{(f'{verb}_goods_treaty_article','treaty_article'):GOODS_OFFERABLE for verb in ('offer','demand')},
        ('set_strait_toll','level'):list(TOLL_LEVELS),('set_institution_level','level'):[1,2,3],('set_supply_priority','level'):['low','medium','high'],
        **{(f'set_{direction}_{kind}','level'):list(codes) for direction in ('import','export') for kind,codes in translate.TARIFF_CODES.items()}}
@@ -109,10 +111,10 @@ def everything():
 
 
 class CatalogueTests(unittest.TestCase):
-    def test_there_are_ninety_one_levers_in_their_blocks(self):
-        self.assertEqual(len(C.NAMES),91)
-        self.assertEqual(len(set(C.NAMES)),91)
-        self.assertEqual(Counter(lever.domain for lever in C.LEVERS),{C.CONSTRUCT:12,C.QUEUE:7,C.RAISE:27,C.LOWER:27,C.SINGLE:14,C.ANSWER:4})
+    def test_there_are_ninety_three_levers_in_their_blocks(self):
+        self.assertEqual(len(C.NAMES),93)
+        self.assertEqual(len(set(C.NAMES)),93)
+        self.assertEqual(Counter(lever.domain for lever in C.LEVERS),{C.CONSTRUCT:12,C.QUEUE:7,C.RAISE:27,C.LOWER:27,C.SINGLE:16,C.ANSWER:4})
         self.assertEqual([lever.name for lever in C.LEVERS if lever.domain==C.CONSTRUCT],list(C.SECTORS))
         self.assertEqual({lever.name.removeprefix('raise_') for lever in C.LEVERS if lever.domain==C.RAISE},
                          {lever.name.removeprefix('lower_') for lever in C.LEVERS if lever.domain==C.LOWER})
@@ -137,8 +139,8 @@ class CatalogueTests(unittest.TestCase):
     def test_only_construction_is_split_by_building_type(self):
         self.assertEqual(len(PLACED),len(set(PLACED)))
         split=[lever.name for lever in C.LEVERS if any(C.KIND in params for _,params in lever.acts) and lever.domain not in (C.CONSTRUCT,C.QUEUE)]
-        self.assertEqual(split,['raise_subsidies_statewide','lower_subsidies_statewide','raise_state_ownership','lower_state_ownership','change_production_method_statewide',
-                                'nationalise_statewide'])
+        self.assertEqual(split,['raise_subsidies_statewide','lower_subsidies_statewide','raise_state_ownership','lower_state_ownership','raise_companies_and_charters',
+                                'lower_companies_and_charters','raise_commercial_treaties','change_production_method_statewide','nationalise_statewide'])
 
     def test_every_building_the_government_can_queue_has_a_place(self):
         queued={name for name,found in C.BUILDINGS.items() if found.get('buildable')!=['no'] and found.get('recruits_combat_units')!=['yes']}
@@ -153,6 +155,7 @@ class CatalogueTests(unittest.TestCase):
         self.assertLessEqual({*ESTABLISHED.values(),*(name for names in ENDED.values() for name in names)},set(GAME_ACTIONS))
         choosable={name for name,text in GAME_ACTIONS.items() if not NEVER.search(text) and not PICKS.search(text)}
         self.assertEqual(choosable-DEALT,set())
+        self.assertEqual({name for name,text in GAME_ACTIONS.items() if not NEVER.search(text) and PICKS.search(text)},set(STATE_PICKING))
         self.assertLessEqual({name for names in ENDED.values() for name in names},set(pact_terms()))
 
     def test_categories_and_trees_are_the_games_own(self):
@@ -276,7 +279,7 @@ class TranslationTests(unittest.TestCase):
         found=offer({'subset_subsidies_on_state':[group],'subset_subsidies_off_state':[group],'bulk_nationalize_state':[group],'bulk_switch_production_method_state':[method],
                      'subsidies_on':[{'building':1}],'switch_production_method':[{'building':1,'production_method':'pm_x'}]})
         self.assertEqual(found['raise_subsidies_statewide'],[Choice(group,[('subset_subsidies_on_state',group)])])
-        self.assertEqual(found['change_production_method_statewide'],[Choice(method,[('bulk_switch_production_method_state',method)])])
+        self.assertEqual(found['switch_methods_statewide'],[Choice(method,[('bulk_switch_production_method_state',method)])])
         self.assertEqual(sorted(C.LEVER[name] for name in found),['change_production_method','change_production_method_statewide','lower_subsidies_statewide','nationalise_statewide',
                                                                   'raise_subsidies','raise_subsidies_statewide'])
 
@@ -365,7 +368,7 @@ class TranslationTests(unittest.TestCase):
         self.assertEqual([choice.params for choice in found['propose_commercial_article']],
                          [{'country':3,'treaty_article':'trade_privilege','giver':'us'},{'country':3,'treaty_article':'take_on_debt','giver':'us'},
                           {'country':3,'treaty_article':'foreign_investment_rights','giver':'them'}])
-        self.assertEqual([choice.params for choice in found['raise_security_treaties']],
+        self.assertEqual([choice.params for choice in found['propose_security_article']],
                          [{'country':3,'treaty_article':'military_access','giver':'us'},{'country':3,'treaty_article':'alliance','giver':'both'}])
         self.assertEqual([choice.params for choice in found['propose_goods_article']],[{'country':3,'treaty_article':'goods_transfer','goods':'grain','giver':'them'}])
         self.assertEqual([choice.params['treaty_article'] for choice in found['propose_bloc_article']],['host_power_bloc_embassy'])
@@ -375,8 +378,8 @@ class TranslationTests(unittest.TestCase):
 
     def test_withdrawing_files_every_treaty_once_and_a_mixed_one_under_security(self):
         found=offer({'withdraw_treaty':[{'treaty':treaty} for treaty in VALUES['treaty']]})
-        self.assertEqual([choice.params for choice in found['lower_commercial_treaties']],[{'treaty':60}])
-        self.assertEqual([choice.params for choice in found['lower_security_treaties']],[{'treaty':61},{'treaty':62}])
+        self.assertEqual([choice.params for choice in found['withdraw_commercial_treaty']],[{'treaty':60}])
+        self.assertEqual([choice.params for choice in found['withdraw_security_treaty']],[{'treaty':61},{'treaty':62}])
         self.assertEqual([choice.params for choice in found['withdraw_bloc_treaty']],[{'treaty':63}])
         self.assertEqual([choice.params for choice in found['withdraw_diplomatic_treaty']],[{'treaty':64}])
 
@@ -406,16 +409,20 @@ class TranslationTests(unittest.TestCase):
     def test_every_demand_is_one_of_two_acts_and_sides_are_taken_or_left(self):
         option={'country':3,'diplomatic_play_type':'dp_open_market'}
         play={'diplomatic_play':2}
-        sway={'diplomatic_play':2,'country':3,'offer':0}
+        sway={'diplomatic_play':2,'country':3}
+        pact={**sway,'diplomatic_action':'protectorate'}
         found=offer({'start_play_country':[option],'start_play_confirmed':[{**option,'mode':'AsDemand'},{**option,'mode':'ForcePlay'}],
-                     'start_play_state':[{'state':1,'diplomatic_play_type':'dp_conquer_state'}],'add_war_goal':[{'diplomatic_play':2,'war_goal_type':'conquer_state','index':0}],
-                     'offer_sway':[sway],'support_initiator':[play],'support_target':[play],'lean_initiator':[play],'lean_target':[play]})
+                     'start_play_state':[{'state':1,'diplomatic_play_type':'dp_conquer_state'}],
+                     'add_war_goal_state':[{'diplomatic_play':2,'war_goal_type':'conquer_state','holder':1,'state':1}],
+                     'offer_sway':[sway],'offer_sway_ally':[sway],'offer_sway_subjection':[pact],'support_initiator':[play],'support_target':[play],'lean_initiator':[play],'lean_target':[play]})
         self.assertEqual(found['demand_of_country'],[Choice(option,[('start_play_country',option),('start_play_confirmed',{**option,'mode':'AsDemand'}),
                                                                    ('start_play_confirmed',{**option,'mode':'ForcePlay'})])])
         self.assertEqual(found['demand_for_state'][0].params,{'state':1,'diplomatic_play_type':'dp_conquer_state'})
-        self.assertEqual(found['add_demand'][0].params,{'diplomatic_play':2,'war_goal_type':'conquer_state'})
+        self.assertEqual(found['add_demand_for_state'][0].params,{'diplomatic_play':2,'war_goal_type':'conquer_state','holder':1,'state':1})
         self.assertEqual(found['sway_country'],[Choice(sway,[('offer_sway',sway)])])
-        self.assertEqual(len(found),8)
+        self.assertEqual(found['sway_ally'],[Choice(sway,[('offer_sway_ally',sway)])])
+        self.assertEqual(found['sway_with_pact'],[Choice(pact,[('offer_sway_subjection',pact)])])
+        self.assertEqual(len(found),10)
         self.assertEqual({C.LEVER[name] for name in found},{'raise_confrontations'})
         found=offer({'stay_on_fence':[play],'declare_neutrality':[play],'back_down':[play]})
         self.assertEqual(sorted(found),['stay_neutral','stay_on_the_fence','withdraw_from_confrontation'])

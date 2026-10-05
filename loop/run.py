@@ -71,27 +71,36 @@ class ClockStalled(RuntimeError):
     pass
 
 
-SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_queue_item','cancel_construction','cancel_queue_item','declare_bankruptcy','disband_formation','disband_regulars','disband_conscripts'),
+SLOTS={'queue':('raise_queue_item','lower_queue_item','first_queue_item','last_queue_item','cancel_construction','cancel_queue_item','declare_bankruptcy','disband_formation','disband_regulars','disband_conscripts','disband_unit'),
        'authority':('toggle_bolster_movement','toggle_suppress_movement','issue_decree','toggle_monopoly','toggle_charter','toggle_consumption_tax',
-                    'set_government_wages','character_interaction'),
+                    'set_government_wages','character_interaction','grant_building_charter','revoke_building_charter','grant_region_charter','revoke_region_charter'),
        'pausing':('pause_all_construction','resume_all_construction','pause_ship_construction','resume_ship_construction','declare_bankruptcy'),
-       'bureaucracy':('set_tax_level','set_institution_level','switch_production_method','bulk_switch_production_method_state'),
-       'money':('nationalize','bulk_nationalize_state','declare_bankruptcy'),
+       'bureaucracy':('set_tax_level','set_institution_level','switch_production_method','bulk_switch_production_method_state','reset_building_production_methods',
+                      'reset_production_methods'),
+       'money':('nationalize','bulk_nationalize_state','bulk_expropriate_state','declare_bankruptcy'),
        'companies':('create_company','remove_company'),
        'decisions':('take_decision','toggle_ignore_decision'),
        'retrofit':('retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all','decommission_ship','disband_formation',
                    'build_ship','build_ship_for','cancel_ship','raise_ship_item','lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item',
-                   'start_naval_mission','start_naval_mission_selected'),
-       'influence':('diplomatic_action','diplomatic_action_obligation','request_join_power_bloc'),
+                   'start_naval_mission','start_naval_mission_selected','retrofit_fleet_and_station','retrofit_all_and_station','retrofit_ship','cancel_retrofit_ship',
+                   'change_ship_template','change_naval_mission_type','toggle_naval_mission_region','cancel_ship_for'),
+       'formations':('disband_formation','disband_regulars','disband_conscripts','disband_unit','transfer_battalions','transfer_ships','transfer_ship','split_army','split_fleet',
+                     'merge_armies','merge_fleets','create_army','create_fleet','decommission_ship','station_fleet','rehome_fleet','defend_invasion_fleet'),
+       'capital':('move_capital','move_market_capital'),
+       'influence':('diplomatic_action','diplomatic_action_obligation','request_join_power_bloc','diplomatic_action_first_state','diplomatic_action_second_state',
+                    'diplomatic_action_states'),
        'research':('research','queue_research','dequeue_research'),
        'imposition':('impose_law',),
-       'play':('start_play_country','start_play_state','start_play_confirmed','abandon_colony'),
+       'play':('start_play_country','start_play_state','start_play_confirmed','start_play_liberation','abandon_colony'),
+       'sway':('offer_sway','offer_sway_ally','offer_sway_state','offer_sway_subject','offer_sway_pact','offer_sway_subjection','offer_sway_goal_country','offer_sway_goal_state',
+               'offer_sway_goods_article','offer_sway_state_article','offer_sway_region_article','offer_sway_law_article'),
        'bloc':('form_power_bloc','leave_power_bloc','request_join_power_bloc','kick_from_power_bloc','pick_principle','upgrade_principle','replace_principle'),
        'enactment':('enact_law','cancel_enactment','negotiate','reform_government','reform_government_party'),
        'commanders':('hire_commander','hire_commander_for','unassign_commander'),
        'army_state':('raise_conscripts','raise_conscripts_selected','mobilize','mobilize_all','mobilize_selected','demobilize','demobilize_all','demobilize_selected','station_formation','rehome_formation','back_down','capitulate','disband_formation','disband_regulars',
                      'deploy_to_front','deploy_selected_to_front','defend_invasion'),
-       'map_list':('create_army','station_formation','rehome_formation','deploy_to_front','set_strategic_objective','recruit_from_formation','activate_conscription_center'),
+       'map_list':('create_army','station_formation','rehome_formation','deploy_to_front','set_strategic_objective','recruit_from_formation','activate_conscription_center',
+                   'create_fleet','station_fleet','rehome_fleet','toggle_naval_mission_region','move_capital','move_market_capital','reset_production_methods'),
        'shipbuilding':('build_ship','build_ship_for','cancel_ship','pause_ship_construction','resume_ship_construction','raise_ship_item',
                        'lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item','declare_bankruptcy','decommission_ship','disband_formation'),
        'templates':('design_ship_template','edit_ship_template','set_default_ship_template','set_fleet_ship_template','delete_ship_template')}
@@ -207,7 +216,9 @@ def linked(snapshot):
     return {**{('building',ident):('building_type',kind) for ident,kind,_ in snapshot.buildings()},
             **{('character',ident):('military_formation',formation) for ident,formation in snapshot.rows('character','character,formation',country=snapshot.player) if formation},
             **{('war',war):('diplomatic_play',play) for play,war in snapshot.rows('diplomatic_play','diplomatic_play,war') if war is not None},
-            **{('ship',ship):('military_formation',fleet) for ship,fleet in snapshot.rows('ship','ship,fleet') if fleet is not None}}
+            **{('ship',ship):('military_formation',fleet) for ship,fleet in snapshot.rows('ship','ship,fleet') if fleet is not None},
+            **{('treaty',treaty):('country',second if first==snapshot.player else first) for treaty,first,second in snapshot.rows('treaty','treaty,first_country,second_country')
+               if snapshot.player in (first,second)}}
 
 
 @timed

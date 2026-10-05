@@ -556,6 +556,12 @@ SCOPES={'root','ROOT','owner','ruler','heir','interest_group','commander_militar
 
 
 @timed_often
+def unsupplied(scope,key):
+    head=key.split('.')[0]
+    return head.startswith('scope:') and head.split(':',1)[1] not in scope.saved
+
+
+@timed_often
 def is_scope(key):
     return all(part in SCOPES or part.startswith(('scope:','c:','s:','mg:','ig:')) for part in key.split('.'))
 
@@ -607,6 +613,8 @@ def test(key,operator,value,scope):
             return both(results)
         return counted(count[1],amount(scope.s,count[2]),results)
     if isinstance(value,list) and is_scope(key):
+        if unsupplied(scope,key):
+            return None
         found=target(scope,key)
         return bool(found) and evaluate(value,found)
     if key.startswith(('c:','s:')) and isinstance(value,str):
@@ -909,10 +917,12 @@ def country_test(key,operator,value,scope):
         return bool(s.map('country','country,bloc_leader').get(country))==yes(value)
     if key in ('has_any_strait_province','has_any_strait_control'):
         listed=s.rows('strait_endpoint','strait,first_state,second_state')
-        if {ident for ident, in s.rows('strait','strait')}-{strait for strait,_,_ in listed}:
-            raise Unknown(f'{key}: a strait has no recorded endpoints')
         owners=s.map('state','state,country')
-        held=resolve(scope,value) in {owners.get(state) for _,first,second in listed for state in (first,second)}
+        country=resolve(scope,value)
+        held=country in {owners.get(state) for _,first,second in listed for state in (first,second)}
+        ours=country==s.player and not any(controller==s.player for _,controller in s.rows('occupation','state,controller'))
+        if not held and not ours and {ident for ident, in s.rows('strait','strait')}-{strait for strait,_,_ in listed}:
+            raise Unknown(f'{key}: a strait has no recorded endpoints')
         if held and key=='has_any_strait_control':
             raise Unknown(f'{key} of a country that borders a strait')
         return held

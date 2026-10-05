@@ -322,8 +322,10 @@ class RuleTests(unittest.TestCase):
                                                                                                     'unlocked_by_technologies':['international_trade']},
                   'treaty_port':{'kind':['directed'],'required_inputs':['state']}}
         s=snapshot({'common/treaty_articles':articles},player_diplomatic_option=[{'target_country':OTHER,'action_type':'rivalry','possible':True}],
-                   treaty_history=[{'treaty':1,'first_country':PLAYER,'second_country':OTHER,'withdrawn':False}],
+                   treaty_history=[{'treaty':1,'first_country':PLAYER,'second_country':OTHER,'withdrawn':False,'entered_into_force_on':100}],
                    treaty_article_history=[{'treaty_article':1,'treaty':1,'treaty_article_type':'trade_privilege','source_country':PLAYER,'target_country':OTHER}])
+        waiting=snapshot({'common/treaty_articles':articles},player_diplomatic_option=[{'target_country':OTHER,'action_type':'rivalry','possible':True}],
+                         treaty_history=[{'treaty':1,'first_country':PLAYER,'second_country':OTHER,'withdrawn':False}])
         with (mock.patch('interface.options.available.technologies',lambda s:(set(),set(),set(),set())),mock.patch('interface.options.available.traded',lambda s:['grain','iron']),
               mock.patch('interface.options.available.ratification',lambda:dict.fromkeys(articles,''))):
             self.assertEqual(RULES['offer_treaty_article'](s),[{'country':OTHER,'treaty_article':'transit_rights'}])
@@ -332,6 +334,10 @@ class RuleTests(unittest.TestCase):
             self.assertEqual(RULES['offer_goods_treaty_article'](s),[{'country':OTHER,'treaty_article':'goods_transfer','goods':'grain'},
                                                                      {'country':OTHER,'treaty_article':'goods_transfer','goods':'iron'}])
             self.assertEqual(RULES['demand_goods_treaty_article'](s),RULES['offer_goods_treaty_article'](s))
+            self.assertEqual(RULES['offer_state_treaty_article'](s),[])
+            self.assertEqual(RULES['offer_treaty_article'](waiting),[])
+            self.assertEqual(RULES['withdraw_treaty'](waiting),[])
+            self.assertEqual(RULES['withdraw_treaty'](s),[{'treaty':1}])
 
     def test_recruit_is_offered_only_in_barracks_states_without_a_queued_level(self):
         from unittest import mock

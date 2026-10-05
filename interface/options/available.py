@@ -9,6 +9,7 @@ from ..runner.memory import MONTH_STARTS
 
 from .triggers import ENGAGED, Scope, autonomous, bloc_advantage, modifier_flag, character_scope, country_scope, evaluate, overlords, parse, subject_pairs
 from .triggers import play_sides, play_enemies, indirect_overlords, stance, coastal as trigger_coastal, laws as trigger_laws, technologies as trigger_technologies
+from .triggers import dlc_feature, homeland, primary_cultures
 
 SLOT=0xFFFFFF
 
@@ -224,16 +225,27 @@ def plays_permitted(s,country,region,state=None):
 
 
 @timed_often
+def in_force(s):
+    return s.memo('in_force',lambda:{treaty:(first,second) for treaty,first,second,began,withdrawn in
+                                    s.rows('treaty','treaty,first_country,second_country,entered_into_force_on,withdrawn') if began is not None and not withdrawn})
+
+
+@timed_often
+def proposed_treaties(s):
+    return s.memo('proposed_treaties',lambda:{treaty:(first,second) for treaty,first,second,began in
+                                             s.rows('treaty','treaty,first_country,second_country,entered_into_force_on') if began is None and s.player in (first,second)})
+
+
+@timed_often
 def guaranteed(s):
-    return s.memo('guaranteed',lambda:{target for kind,target in s.rows('treaty_article','treaty_article_type,target_country',source_country=s.player)
-                                      if kind=='guarantee_independence'})
+    return s.memo('guaranteed',lambda:{target for treaty,kind,target in s.rows('treaty_article','treaty,treaty_article_type,target_country',source_country=s.player)
+                                      if kind=='guarantee_independence' and treaty in in_force(s)})
 
 
 @timed_often
 def defensive_partners(s):
     def compute():
-        sides={treaty:(first,second) for treaty,first,second in s.rows('treaty','treaty,first_country,second_country')}
-        pairs=[sides.get(treaty,()) for treaty,kind in s.rows('treaty_article','treaty,treaty_article_type') if kind=='defensive_pact']
+        pairs=[in_force(s).get(treaty,()) for treaty,kind in s.rows('treaty_article','treaty,treaty_article_type') if kind=='defensive_pact']
         return {other for pair in pairs if s.player in pair for other in pair if other!=s.player}
     return s.memo('defensive_partners',compute)
 
@@ -259,17 +271,18 @@ def rank_value(s,country):
 
 
 @timed_often
-def subject_fits(s,subject_type,country):
+def subject_fits(s,subject_type,country,overlord=None):
     field=lambda name:definition(s,'common/subject_types',subject_type,name)
-    return ((not field('valid_overlord_country_types') or type_of(s,s.player) in field('valid_overlord_country_types'))
+    above=s.player if overlord is None else overlord
+    return ((not field('valid_overlord_country_types') or type_of(s,above) in field('valid_overlord_country_types'))
             and (not field('valid_subject_country_types') or type_of(s,country) in field('valid_subject_country_types'))
-            and (not field('valid_overlord_ranks') or rank_of(s,s.player) in field('valid_overlord_ranks'))
+            and (not field('valid_overlord_ranks') or rank_of(s,above) in field('valid_overlord_ranks'))
             and (not field('valid_subject_ranks') or rank_of(s,country) in field('valid_subject_ranks'))
-            and (field('overlord_must_be_higher_rank')!=['yes'] or rank_value(s,s.player)>rank_value(s,country)))
+            and (field('overlord_must_be_higher_rank')!=['yes'] or rank_value(s,above)>rank_value(s,country)))
 
 
 AUTONOMY_GOALS={'independence','increase_autonomy'}
-UNSELECTABLE_GOALS={'liberate_country','unification','unification_leadership'}
+UNIFYING_GOALS={'unification','unification_leadership'}
 
 
 INDEPENDENCE_LIBERTY=90
@@ -315,9 +328,16 @@ def subject_permits(s,field):
 
 
 @timed_often
-def play_allowed(s,play,**saved):
+def debug_goal(s,kind):
+    return 'debug' in definition(s,'common/war_goal_types',kind,'settings')
+
+
+@timed_often
+def play_allowed(s,play,liberating=False,**saved):
     scope=country_scope(s,**saved)
     target=saved.get('target_country',(None,None))[1]
+    if any(debug_goal(s,goal) for goal in definition(s,'common/diplomatic_plays',play,'war_goal')):
+        return False
     if (target,'player_owes') in obligations(s):
         return False
     kinds={next(iter(definition(s,'common/war_goal_types',goal,'kind')),'') for goal in definition(s,'common/diplomatic_plays',play,'war_goal')}
@@ -340,9 +360,7 @@ def play_allowed(s,play,**saved):
         return False
     if 'independence' in kinds and liberty_desire(s)<INDEPENDENCE_LIBERTY:
         return False
-    if 'regime_change' in kinds:
-        return False
-    if kinds&UNSELECTABLE_GOALS:
+    if kinds&UNIFYING_GOALS or ('liberate_country' in kinds)!=liberating:
         return False
     for goal in definition(s,'common/diplomatic_plays',play,'war_goal'):
         kind=next(iter(definition(s,'common/war_goal_types',goal,'kind')),'')
@@ -1580,8 +1598,9 @@ def journal_buttons(s):
 
 @timed_often
 def play_types(s,target):
+    targets={'country':('country','treaty_article'),'state':('state',)}[target]
     return [name for name in s.keys('diplomatic_play_type') if not definition(s,'common/diplomatic_plays',name,'never_selectable')
-            and any(definition(s,'common/war_goal_types',goal,'target_type')==[target] for goal in definition(s,'common/diplomatic_plays',name,'war_goal'))]
+            and any(kind in targets for goal in definition(s,'common/diplomatic_plays',name,'war_goal') for kind in definition(s,'common/war_goal_types',goal,'target_type'))]
 
 
 @timed_often
@@ -2012,19 +2031,33 @@ def enforced_on_player(s):
 
 
 GOODS_INPUTS=({'goods'},{'goods','quantity'})
+EXCHANGED=frozenset(next(action for action in ACTIONS if action.name=='exchange_treaty_articles').choices)
+C_MEMBERSHIP='join_power_bloc'
 
 
 @timed_often
 def treaty_partners(s):
-    return sorted({country for country,_ in diplomatic_shown(s)})
+    waiting={country for pair in proposed_treaties(s).values() for country in pair}
+    return sorted({country for country,_ in diplomatic_shown(s)}-waiting)
 
 
 @timed_often
 def articles_between(s):
     def compute():
-        sides={treaty:(first,second) for treaty,first,second,withdrawn in s.rows('treaty','treaty,first_country,second_country,withdrawn') if not withdrawn}
-        return {(source,target,kind) for treaty,kind,source,target in s.rows('treaty_article','treaty,treaty_article_type,source_country,target_country') if treaty in sides}
+        return {(source,target,kind) for treaty,kind,source,target in s.rows('treaty_article','treaty,treaty_article_type,source_country,target_country')
+                if treaty in in_force(s)}
     return s.memo('articles_between',compute)
+
+
+@lru_cache(maxsize=None)
+@timed
+def installed(folder):
+    return {name:dict(fields(body(text))) for name,text in read(DEFAULT_GAME/'game',folder)}
+
+
+@timed_often
+def stated(folder,name,field):
+    return installed(folder).get(name,{}).get(field) or []
 
 
 @lru_cache(maxsize=None)
@@ -2041,7 +2074,8 @@ def ratification():
 
 @timed_often
 def parties(s,source,target):
-    return country_scope(s,source,other_country=('country',target),source_country=('country',source),target_country=('country',target))
+    return country_scope(s,source,other_country=('country',target),source_country=('country',source),target_country=('country',target),
+                         first_country=('country',source),second_country=('country',target))
 
 
 @timed_often
@@ -2050,21 +2084,24 @@ def ratifiable(s,article,source,target):
 
 
 @timed_often
-def treaty_articles(s,kind,offered,goods):
+def treaty_articles(s,kind,offered,goods,amending=False):
     acquired=technologies(s)[0]
     combos=[]
     for article,fields in s.definitions('common/treaty_articles').items():
         inputs=set(fields.get('required_inputs',()))
-        if fields.get('kind')!=[kind] or (inputs not in GOODS_INPUTS if goods else inputs) or not set(fields.get('unlocked_by_technologies',()))<=acquired:
+        fitting=inputs==goods if isinstance(goods,set) else inputs in GOODS_INPUTS if goods else not inputs
+        if fields.get('kind')!=[kind] or not fitting or not set(fields.get('unlocked_by_technologies',()))<=acquired:
             continue
-        for country in treaty_partners(s):
+        for country in sorted(set(standing_treaties(s).values())) if amending else treaty_partners(s):
             source,target=(s.player,country) if offered else (country,s.player)
             if not passes(s,'common/treaty_articles',article,('visible','possible'),parties(s,source,target)):
                 continue
             if not ratifiable(s,article,source,target):
                 continue
-            if goods:
+            if goods is True:
                 combos+=[{'country':country,'treaty_article':article,'goods':item} for item in traded(s)]
+            elif goods:
+                combos.append({'country':country,'treaty_article':article})
             elif (source,target,article) not in articles_between(s):
                 combos.append({'country':country,'treaty_article':article})
     return combos
@@ -2078,7 +2115,8 @@ def pact_terms():
         found=dict(fields(body(text)))
         if 'pact' in found and found.get('can_select_to_break')!=['no']:
             inner=dict(fields(' '.join(found['pact'])))
-            terms[name]=(int(inner.get('forced_duration',['0'])[0]),' '.join(inner.get('actor_can_break',())))
+            terms[name]=(int(inner.get('forced_duration',['0'])[0]),' '.join(inner.get('actor_can_break',())),
+                         None if inner.get('is_two_sided_pact')==['no'] else ' '.join(inner.get('target_can_break',())))
     return terms
 
 
@@ -2097,13 +2135,14 @@ def breakable_pacts(s):
     seen=s.first_seen('pact')
     found=[]
     for pact,first,second,kind in s.rows('pact','pact,first_country,second_country,pact_type'):
-        if first!=s.player or kind not in pact_terms():
+        if s.player not in (first,second) or kind not in pact_terms():
             continue
-        months,can_break=pact_terms()[kind]
-        if seen[pact]!=opening_seq(s) and now(s)<months_later(snapshot_hours(s,seen[pact]),months):
+        months,began,joined=pact_terms()[kind]
+        can_break,other=(began,second) if first==s.player else (joined,first)
+        if can_break is None or seen[pact]!=opening_seq(s) and now(s)<months_later(snapshot_hours(s,seen[pact]),months):
             continue
-        if evaluate(parsed(can_break),country_scope(s,target_country=('country',second),actor=('country',s.player))) is not False:
-            found.append({'country':second,'diplomatic_action':kind})
+        if evaluate(parsed(can_break),country_scope(s,target_country=('country',other),actor=('country',s.player))) is not False:
+            found.append({'country':other,'diplomatic_action':kind})
     return found
 
 
@@ -2161,7 +2200,363 @@ def naval_invasions(s):
     return [{'military_formation':army,'fleet':fleet,'state':state} for army in ashore(s) for fleet in fleets for state in invadable(s) if trigger_coastal(s,state)]
 
 
-SWAY_OFFER_TYPES=6
+@timed_often
+def seizable_subsets(s):
+    classes=ownership_classes(s)
+    located=s.map('building','building,state')
+    kinds={ident:kind for ident,kind,_ in s.buildings()}
+    return [{'building_type':kind,'state':state,'ownership':ownership}
+            for kind,state,ownership in sorted({(kinds[ident],located[ident],ownership) for ident in private_levels(s)
+                                                for ownership in ('any',*classes.get(ident,set())-{'owned_foreign'})},key=str)]
+
+
+@timed_often
+def standard_methods(s):
+    def compute():
+        group_of={(kind,method):group for kind,group,method in s.methods}
+        active=s.grouped('building_production_method_active','building,production_method')
+        counts={}
+        for ident,kind,levels in s.buildings():
+            for method in active.get(ident,()) if levels else ():
+                tally=counts.setdefault((kind,group_of.get((kind,method))),{})
+                tally[method]=tally.get(method,0)+levels
+        return {key:max(tally,key=tally.get) for key,tally in counts.items() if sorted(tally.values())[-2:].count(max(tally.values()))==1}
+    return s.memo('standard_methods',compute)
+
+
+@timed_often
+def resettable(s):
+    group_of={(kind,method):group for kind,group,method in s.methods}
+    active=s.grouped('building_production_method_active','building,production_method')
+    standard=standard_methods(s)
+    return [ident for ident,kind,levels in s.buildings() if levels
+            and any(standard.get((kind,group_of.get((kind,method))),method)!=method for method in active.get(ident,()))]
+
+
+@timed_often
+def moved_recently(s,modifier):
+    return bool(s.rows('country_timed_modifier','country',country=s.player,modifier=modifier))
+
+
+@timed_often
+def settled_country(s):
+    return not in_play(s,s.player) and not s.wars()
+
+
+@timed_often
+def capital_sites(s):
+    if not settled_country(s) or moved_recently(s,'moved_capital_recently'):
+        return []
+    capital=s.map('country','country,capital').get(s.player)
+    cultures=primary_cultures(s,s.player)
+    return [state for state in s.states() if state!=capital and incorporation(s).get(state)==1 and any(homeland(s,state,culture) for culture in cultures)]
+
+
+@timed_often
+def market_capital_sites(s):
+    if not settled_country(s) or not market_owner(s) or moved_recently(s,'moved_market_capital_recently'):
+        return []
+    capital=s.map('country','country,market_capital').get(s.player)
+    return [state for state in s.states() if state!=capital and incorporation(s).get(state)==1]
+
+
+BUILDING_CHARTERS={'monopoly_charter':'building_types','industry_charter':'extension_building_types'}
+REGION_CHARTER='colonization_charter'
+
+
+@timed_often
+def building_charters(s):
+    kinds=s.map('company','company,company_type',country=s.player)
+    return [{'company':company,'charter':charter,'building_type':kind} for company in s.mine('company') for charter,field in BUILDING_CHARTERS.items()
+            for kind in stated('common/company_types',kinds[company],field)]
+
+
+@timed_often
+def region_charters(s):
+    return [{'company':company,'charter':REGION_CHARTER,'state':state} for company in s.mine('company') for state in colonizable(s)]
+
+
+@timed_often
+def fleet_ships(s):
+    fleets=set(s.formations('fleet'))
+    return [(ship,fleet) for ship,fleet in s.rows('ship','ship,fleet') if fleet in fleets]
+
+
+@timed_often
+def free_fleets(s):
+    return [fleet for fleet in s.formations('fleet') if not formation_report(s,fleet,'invading') and not formation_report(s,fleet,'retrofitting')]
+
+
+@timed_often
+def divisible(s,fleets):
+    counts={}
+    for _,fleet in fleet_ships(s):
+        counts[fleet]=counts.get(fleet,0)+1
+    return [fleet for fleet in fleets if counts.get(fleet,0)>=2]
+
+
+@timed_often
+def mergeable(s,kind):
+    return [{'military_formation':target,'source':source} for target in s.formations(kind) if not formation_report(s,target,'invading')
+            for source in s.formations(kind) if source!=target and not formation_report(s,source,'invading')
+            and not (demobilizing(s,source) and target in armies(s,True))]
+
+
+@timed_often
+def naval_regions(s):
+    return sorted({region for kind,region in hq_regions(s).values() if kind==1})
+
+
+@timed_often
+def sea_regions(s):
+    return [name for name,fields in s.definitions('common/strategic_regions').items() if not fields.get('capital_province') and name.startswith('region_interface_sea')]
+
+
+@timed_often
+def on_mission(s,wanted):
+    fleets=set(s.formations('fleet'))
+    return [fleet for fleet,mission in s.rows('formation_status','formation,naval_mission') if fleet in fleets and (mission is not None)==wanted
+            and not formation_report(s,fleet,'retrofitting') and fleet not in uncrewed_fleets(s)]
+
+
+@timed_often
+def ship_kinds(s):
+    kinds=s.map('ship_template_version','ship_template_version,ship_type')
+    return {ship:kinds.get(version) for ship,version in s.rows('ship','ship,version')}
+
+
+@timed_often
+def ship_template_choices(s):
+    kinds=ship_kinds(s)
+    held=s.grouped('ship_template_version_list','ship_template,ship_template_version')
+    versions=s.map('ship','ship,version')
+    return [{'ship':ship,'index':index} for ship,_ in fleet_ships(s) for (kind,index),template in sorted(own_templates(s).items())
+            if kind==kinds[ship] and versions[ship] not in held.get(template,())]
+
+
+@timed_often
+def state_picks(s,side):
+    found={}
+    for country,action,flank,state in s.rows('player_diplomatic_option_state','target_country,action_type,side,state'):
+        if flank==side:
+            found.setdefault((country,action),[]).append(state)
+    return found
+
+
+@timed_often
+def owing(s,country,action):
+    usable=definition(s,'common/diplomatic_actions',action,'can_use_obligations')==['yes']
+    return ['None',*(name for name,direction,wanted in (('CallInObligation','owes_player',True),('OweObligation','player_owes',False))
+                     if usable and ((country,direction) in obligations(s))==wanted)]
+
+
+@timed_often
+def state_actions(s,side):
+    other=state_picks(s,'target' if side=='source' else 'source')
+    return [{'country':country,'diplomatic_action':action,'state':state,'obligation':obligation}
+            for (country,action),states in sorted(state_picks(s,side).items()) if (country,action) not in other and diplomatic_allowed(s,country,action)
+            for state in states for obligation in owing(s,country,action)]
+
+
+@timed_often
+def state_trades(s):
+    taken=state_picks(s,'target')
+    return [{'country':country,'diplomatic_action':action,'given':given,'taken':wanted,'obligation':obligation}
+            for (country,action),states in sorted(state_picks(s,'source').items()) if (country,action) in taken and diplomatic_allowed(s,country,action)
+            for given in states for wanted in taken[country,action] for obligation in owing(s,country,action)]
+
+
+@timed_often
+def liberations(s):
+    owners={}
+    for state,region,country in s.rows('state','state,state_region,country'):
+        owners.setdefault(country,set()).add(region)
+    homelands={}
+    for culture,region in s.rows('culture_core_state','culture,state_region'):
+        homelands.setdefault(s.map('culture','culture,culture_type').get(culture),set()).add(region)
+    found=[]
+    for option in RULES['start_play_country'](s,liberating=True):
+        held=owners.get(option['country'],set())
+        for name in creatable(s):
+            fields=installed('common/country_creation')[name]
+            wanted=set(fields.get('states') or ())|{region for culture in stated('common/country_definitions',name,'cultures') for region in homelands.get(culture,())
+                                                    if fields.get('use_culture_states')==['yes']}
+            if wanted&held:
+                found.append({**option,'country_definition':name})
+    return found
+
+
+@timed_often
+def creatable(s):
+    alive={kind for kind, in s.rows('country','country_definition')}
+    return [name for name in s.keys('country_definition') if name in installed('common/country_creation') and name not in alive]
+
+
+TREATY_SHARES=('0','1','2','3','4')
+TREATY_DAYS=('1825','3650','5475','9125','18250','36135')
+INPUT_KINDS={'state':{'state'},'region':{'strategic_region'},'law':{'law_type'},'subject':{'country'},'ship':{'ship'},'monopoly':{'company','building_type'},
+             'money':{'quantity'},'goods_amount':{'quantity','goods'}}
+
+
+@timed_often
+def land_regions(s):
+    return sorted({region for region in state_regions(s).values() if region})
+
+
+@timed_often
+def country_ships(s,country):
+    fleets={formation for formation, in s.rows('formation','formation',country=country)}
+    return [ship for ship,fleet in s.rows('ship','ship,fleet') if fleet in fleets]
+
+
+@timed_often
+def article_states(s,article,giver,taker):
+    ports=s.map('state','state,treaty_port_potential')
+    return [state for state, in s.rows('state','state',country=giver) if article!='treaty_port' or taker!=s.player or ports.get(state)]
+
+
+@timed_often
+def article_regions(s,article):
+    unclaimed={state_regions(s).get(state) for state,country in s.rows('state','state,country') if country in decentralized(s)}
+    return [region for region in land_regions(s) if article!='non_colonization_agreement' or region in unclaimed]
+
+
+@timed_often
+def article_inputs(s,kind,giver,taker,article):
+    if kind=='state':
+        return [{'state':state} for state in article_states(s,article,giver,taker)]
+    if kind=='region':
+        return [{'strategic_region':region} for region in article_regions(s,article)]
+    if kind=='law':
+        return [{'commitment':law} for law,active in s.rows('law','law,active',country=giver) if not active]
+    if kind=='subject':
+        return [{'subject':subject} for overlord,subject in sorted(subject_pairs(s)) if overlord==giver]
+    if kind=='ship':
+        return [{'ship':ship} for ship in country_ships(s,giver)]
+    if kind=='monopoly':
+        return [{'company':company,'building_type':building} for company,name in s.rows('company','company,company_type',country=taker)
+                for block in definition(s,'common/company_types',name,'building_types') for building in block.split()]
+    if kind=='money':
+        return [{'share':share} for share in TREATY_SHARES]
+    return [{'goods':goods,'share':share} for goods in traded(s) for share in TREATY_SHARES]
+
+
+@timed_often
+def input_articles(s,offered,kind):
+    return [{**option,**extra} for option in treaty_articles(s,'directed',offered,INPUT_KINDS[kind])
+            for giver,taker in [(s.player,option['country']) if offered else (option['country'],s.player)] for extra in article_inputs(s,kind,giver,taker,option['treaty_article'])]
+
+
+@timed_often
+def promises(s,country):
+    owed=obligations(s)
+    return [name for name,usable in (('OweObligation',(country,'player_owes') not in owed),('CallInObligation',(country,'owes_player') in owed),
+                                     ('AskForObligation',(country,'owes_player') not in owed)) if usable]
+
+
+@timed_often
+def exchanges(s):
+    wanted={}
+    for option in treaty_articles(s,'directed',False,False):
+        wanted.setdefault(option['country'],[]).append(option['treaty_article'])
+    return [{**option,'demand':demand} for option in treaty_articles(s,'directed',True,False) for demand in wanted.get(option['country'],())
+            if demand in EXCHANGED and demand!=C_MEMBERSHIP and option['treaty_article']!=demand]
+
+
+@timed_often
+def standing_treaties(s):
+    return {treaty:(first if second==s.player else second) for treaty,(first,second) in {**in_force(s),**proposed_treaties(s)}.items()
+            if s.player in (first,second) and (treaty in in_force(s) or second==s.player)}
+
+
+@timed_often
+def amendments(s,kind,offered):
+    held={}
+    for treaty,article in s.rows('treaty_article','treaty,treaty_article_type'):
+        held.setdefault(treaty,set()).add(article)
+    return [{'treaty':treaty,'treaty_article':option['treaty_article']} for treaty,country in sorted(standing_treaties(s).items())
+            for option in treaty_articles(s,kind,offered,False,amending=True) if option['country']==country and option['treaty_article'] not in held.get(treaty,())]
+
+
+@timed_often
+def droppable(s,kind,offered):
+    treaties=standing_treaties(s)
+    found=[]
+    for treaty,article,source,target in s.rows('treaty_article','treaty,treaty_article_type,source_country,target_country'):
+        fields=s.definitions('common/treaty_articles').get(article,{})
+        if treaty in treaties and fields.get('kind')==[kind] and 'can_be_renegotiated' in stated('common/treaty_articles',article,'flags') \
+                and (kind=='mutual' or (source==s.player)==offered):
+            found.append({'treaty':treaty,'treaty_article':article})
+    return found
+
+
+@timed_often
+def play_opponents(s,play):
+    leaders=involved(s)[0].get(play,())
+    side=leaders.index(s.player)
+    return play_members(s).get((play,1-side),set())|{leaders[1-side]}
+
+
+@timed_often
+def sway_goals(s,target_type):
+    found=[]
+    for option in swayable(s):
+        for kind in listed_goals(s,target_type):
+            targets=goal_targets(s,option['diplomatic_play'],kind)
+            found+=[{**option,'war_goal_type':kind,('target' if target_type=='country' else 'state'):target} for target in sorted(targets if targets is not True else ())]
+    return found
+
+
+@timed_often
+def listed_goals(s,target_type):
+    return [kind for kind in s.keys('war_goal_type') if kind not in UNIFYING_GOALS and not debug_goal(s,kind) and definition(s,'common/war_goal_types',kind,'target_type')==[target_type]
+            and 'skip_build_list' not in definition(s,'common/war_goal_types',kind,'settings')
+            and 'country_creation' not in definition(s,'common/war_goal_types',kind,'settings')]
+
+
+@timed_often
+def open_plays(s):
+    return [play for play in principal(s) if play not in at_war_plays(s) and escalation(s,play)<COUNTDOWN]
+
+
+@timed_often
+def goal_drafts(s,target_type):
+    key='country' if target_type=='country' else 'state'
+    found=[]
+    for play in open_plays(s):
+        for kind in listed_goals(s,target_type):
+            targets=goal_targets(s,play,kind)
+            seizing='validate_force_nationalization' in definition(s,'common/war_goal_types',kind,'settings')
+            found+=[{'diplomatic_play':play,'war_goal_type':kind,'holder':s.player,key:target} for target in sorted(targets if targets is not True else ())
+                    if not seizing or owns_here(s,target)]
+    return found
+
+
+@timed_often
+def enforceable(s,inputs):
+    return [article for article,fields in s.definitions('common/treaty_articles').items()
+            if 'can_be_enforced' in stated('common/treaty_articles',article,'flags') and set(fields.get('required_inputs',()))==inputs]
+
+
+ENFORCED='enforce_treaty_article'
+
+
+@timed_often
+def article_goals(s,inputs,extra):
+    return [{'diplomatic_play':play,'war_goal_type':ENFORCED,'country':country,'treaty_article':article,**added}
+            for play in open_plays(s) for country in sorted(play_opponents(s,play)) for article in enforceable(s,inputs) for added in extra(country,article)]
+
+
+@timed_often
+def liberation_goals(s):
+    owners={}
+    for state,region,country in s.rows('state','state,state_region,country'):
+        owners.setdefault(country,set()).add(region)
+    kinds=[kind for kind in s.keys('war_goal_type') if 'country_creation' in definition(s,'common/war_goal_types',kind,'settings')
+           and 'skip_build_list' not in definition(s,'common/war_goal_types',kind,'settings')]
+    return [{'diplomatic_play':play,'war_goal_type':kind,'country':country,'country_definition':name}
+            for play in open_plays(s) for kind in kinds for country in sorted(play_opponents(s,play))
+            for name in creatable(s) if set(installed('common/country_creation')[name].get('states') or ())&owners.get(country,set())]
 
 
 @timed_often
@@ -2171,8 +2566,33 @@ def swayable(s):
         if play in at_war_plays(s) or not OPENING_PHASE_END<=escalation(s,play)<COUNTDOWN:
             continue
         taken={country for side in range(2) for country in play_members(s).get((play,side),set())}|set(involved(s)[0][play])
-        found+=[{'diplomatic_play':play,'country':country,'offer':offer} for country in s.countries() if country not in taken for offer in range(SWAY_OFFER_TYPES)]
+        found+=[{'diplomatic_play':play,'country':country} for country in s.countries() if country not in taken]
     return found
+
+
+@timed_often
+def allies(s):
+    pairs=[in_force(s).get(treaty,()) for treaty,kind in s.rows('treaty_article','treaty,treaty_article_type') if kind in ('alliance','defensive_pact')]
+    return {other for pair in pairs if s.player in pair for other in pair if other!=s.player}
+
+
+@lru_cache(maxsize=None)
+@timed
+def sway_pacts():
+    pacts,subjections=[],{}
+    for name,found in installed('common/diplomatic_actions').items():
+        inner=dict(fields(' '.join(found.get('pact',()))))
+        kind=inner.get('subject_type')
+        if kind and stated('common/subject_types',kind[0],'can_offer_to_become_in_sway_offers')==['yes']:
+            subjections[name]=kind[0]
+        elif inner.get('can_be_used_in_sway_offers')==['yes']:
+            pacts.append(name)
+    return pacts,subjections
+
+
+@timed_often
+def transferable_subjects(s):
+    return sorted(subject for subject in subjects(s) if stated('common/subject_types',subject_type_of(s,subject),'can_be_used_in_sway_offers')!=['no'])
 
 
 RULES={
@@ -2199,6 +2619,16 @@ RULES={
     'subset_subsidies_on_state':lambda s:subset_options(s,private_kinds(s),lambda s,i:not s.map('building','building,subsidized').get(i)),
     'subset_subsidies_off_state':lambda s:subset_options(s,private_kinds(s),lambda s,i:bool(s.map('building','building,subsidized').get(i))),
     'bulk_nationalize_state':lambda s:[] if law_flag(s,'country_disable_nationalization_bool') else nationalizable_subsets(s),
+    'bulk_expropriate_state':lambda s:[] if law_flag(s,'country_disable_nationalization_bool') or law_flag(s,'country_disable_nationalization_without_compensation_bool')
+                                      else seizable_subsets(s),
+    'reset_building_production_methods':lambda s:product(building=resettable(s)),
+    'reset_production_methods':lambda s:product(state=sorted({s.map('building','building,state')[ident] for ident in resettable(s)})),
+    'move_capital':lambda s:product(state=capital_sites(s)),
+    'move_market_capital':lambda s:product(state=market_capital_sites(s)),
+    'grant_building_charter':building_charters,
+    'revoke_building_charter':building_charters,
+    'grant_region_charter':region_charters,
+    'revoke_region_charter':region_charters,
     'bulk_switch_production_method_state':bulk_methods,
     'cancel_queue_item':lambda s:queue_items(s,0,0),
     'raise_queue_item':lambda s:queue_items(s,1,0),
@@ -2253,6 +2683,30 @@ RULES={
     'transfer_battalions':lambda s:[{'military_formation':source,'target':target} for source in s.formations('army') for target in s.formations('army')
                                     if source!=target and located(s,source)==located(s,target) and len(s.rows('combat_unit','combat_unit',formation=source))>=TRANSFER_MINIMUM
                                     and not formation_report(s,target,'invading')],
+    'transfer_ships':lambda s:[{'military_formation':source,'target':target} for source in divisible(s,free_fleets(s)) for target in free_fleets(s) if source!=target],
+    'split_army':lambda s:product(military_formation=[f for f in s.formations('army') if len(s.rows('combat_unit','combat_unit',formation=f))>=TRANSFER_MINIMUM
+                                                      and not formation_report(s,f,'invading')]),
+    'split_fleet':lambda s:product(military_formation=divisible(s,free_fleets(s))),
+    'transfer_ship':lambda s:[{'ship':ship,'target':target} for ship,fleet in fleet_ships(s) if fleet in divisible(s,free_fleets(s)) for target in free_fleets(s) if target!=fleet],
+    'merge_armies':lambda s:mergeable(s,'army'),
+    'merge_fleets':lambda s:mergeable(s,'fleet'),
+    'create_fleet':lambda s:product(option=range(len(naval_regions(s)))),
+    'toggle_naval_mission_region':lambda s:[{'military_formation':fleet,'strategic_region':region} for fleet in on_mission(s,True) for region in sea_regions(s)],
+    'change_naval_mission_type':lambda s:[{'military_formation':fleet,'naval_mission_type':kind} for fleet in on_mission(s,True) for kind in mission_types(s,fleet)],
+    'station_fleet':lambda s:[{'military_formation':fleet,'state':state} for fleet in free_fleets(s) for state in s.states() if trigger_coastal(s,state)],
+    'rehome_fleet':lambda s:[{'military_formation':fleet,'strategic_region':region} for fleet in free_fleets(s) for region in naval_regions(s)
+                             if region!=hq_regions(s)[home_of(s,fleet)][1]],
+    'defend_invasion_fleet':lambda s:[{'military_formation':fleet,'front':front} for front,ended in invasions(s) if not ended for fleet in free_fleets(s)],
+    'assign_flagship':lambda s:product(ship=[ship for ship,_ in fleet_ships(s) if stated('common/ship_types',ship_kinds(s)[ship],'can_be_flagship')==['yes']]),
+    'unassign_flagship':lambda s:product(ship=[ship for ship,_ in fleet_ships(s)]),
+    'retrofit_ship':lambda s:product(ship=[ship for ship,_ in fleet_ships(s)]),
+    'cancel_retrofit_ship':lambda s:product(ship=[ship for ship,_ in fleet_ships(s)]),
+    'change_ship_template':ship_template_choices,
+    'retrofit_fleet_and_station':lambda s:product(military_formation=retrofit_fleets(s,False)),
+    'retrofit_all_and_station':lambda s:[{}] if retrofit_fleets(s,False) else [],
+    'disband_unit':lambda s:[] if revolution_brewing(s) else product(combat_unit=[unit for mine in [set(s.formations())] for unit,formation in s.rows('combat_unit','combat_unit,formation')
+                                                                                 if formation in mine]),
+    'cancel_ship_for':lambda s:product(ship_type=sorted(cancellable_types(s)),military_formation=s.formations('fleet')),
     'upgrade_all_units':lambda s:[{}] if RULES['upgrade_regulars'](s) else [],
     'create_army':lambda s:product(option=range(len({region for kind,region in hq_regions(s).values() if kind==0}))),
     'recruit_from_formation':lambda s:[{'military_formation':combo['military_formation'],'combat_unit_type':combo['combat_unit_type'],'state':s.map('building','building,state')[combo['building']]}
@@ -2289,8 +2743,7 @@ RULES={
                                  for formation in s.formations() if s.map('character','character,formation',country=s.player).get(character)!=formation
                                  and fits(s,character,formation)],
     'unassign_commander':lambda s:product(character=[c for c in commanders_where(s,lambda formation,recruitable:formation in set(s.mine('formation'))) if assigned(s,c) and idle_room(s,c)]),
-    'start_naval_mission':lambda s:[{'military_formation':fleet,'naval_mission_type':kind} for fleet in s.formations('fleet') if not formation_report(s,fleet,'retrofitting')
-                                    and fleet not in uncrewed_fleets(s) for kind in mission_types(s,fleet)],
+    'start_naval_mission':lambda s:[{'military_formation':fleet,'naval_mission_type':kind} for fleet in on_mission(s,False) for kind in mission_types(s,fleet)],
     'start_naval_mission_selected':lambda s:RULES['start_naval_mission'](s),
     'end_naval_mission_selected':lambda s:RULES['end_naval_mission'](s),
     'end_naval_mission':lambda s:product(military_formation=[i for fleets in [set(s.formations('fleet'))] for i,m in s.rows('formation_status','formation,naval_mission') if i in fleets and m is not None]),
@@ -2309,10 +2762,8 @@ RULES={
     'retrofit_all':lambda s:[{}] if retrofit_fleets(s,False) else [],
     'cancel_retrofit_all':lambda s:[{}] if retrofit_fleets(s,True) else [],
     'character_interaction':lambda s:[{'character':character,'interaction':interaction}
-                                      for chosen in [set(s.characters('character_role_ruler','character_role_heir','character_role_general','character_role_admiral',
-                                                                      'character_role_ig_leader'))]
                                       for character,interaction,possible in s.rows('player_character_interaction','character,character_interaction,possible')
-                                      if character in chosen and interaction not in cooling(s) and possible],
+                                      if interaction not in cooling(s) and possible],
     'diplomatic_action':lambda s:[{'country':country,'diplomatic_action':action} for country,action in sorted(diplomatic_shown(s))
                                   if not definition(s,'common/diplomatic_actions',action,'picks_states') and diplomatic_allowed(s,country,action)],
     'diplomatic_action_obligation':lambda s:[{**option,'obligation':obligation} for option in RULES['diplomatic_action'](s)
@@ -2320,8 +2771,12 @@ RULES={
                                              for obligation,direction,wanted in (('CallInObligation','owes_player',True),('OweObligation','player_owes',False))
                                              if ((option['country'],direction) in obligations(s))==wanted],
     'start_play_confirmed':lambda s:[{**option,'mode':mode} for option in RULES['start_play_country'](s) for mode in ('AsDemand','ForcePlay')],
-    'start_play_country':lambda s:[{'country':country,'diplomatic_play_type':play} for country in s.countries() if reachable_country(s,country) and not play_opposed(s,country)
-                                   for play in play_types(s,'country') if play_allowed(s,play,target_country=('country',country))
+    'start_play_liberation':liberations,
+    'diplomatic_action_first_state':lambda s:state_actions(s,'source'),
+    'diplomatic_action_second_state':lambda s:state_actions(s,'target'),
+    'diplomatic_action_states':state_trades,
+    'start_play_country':lambda s,liberating=False:[{'country':country,'diplomatic_play_type':play} for country in s.countries() if reachable_country(s,country) and not play_opposed(s,country)
+                                   for play in play_types(s,'country') if play_allowed(s,play,liberating,target_country=('country',country))
                                    and not country_regions(s,country)&regions_in_play(s)
                                    and (not marker_required(s,play) or state_regions(s).get(s.map('country','country,capital').get(country)) in engaged(s))],
     'start_play_state':lambda s:[{'state':state,'diplomatic_play_type':play} for state,country in s.rows('state','state,country') if country!=s.player and reachable_state(s,state) and not play_opposed(s,country)
@@ -2343,12 +2798,10 @@ RULES={
     'toggle_press_war_goal':lambda s:[goal for goal in war_goals(s) if goal['diplomatic_play'] in at_war_plays(s)
                                       and (war:=war_of_play(s,goal['diplomatic_play'])) is not None
                                       and war_leader(s,war) and negotiable_war(s,war) and proposer(s,war) is None and peace_open(s,war)],
-    'add_war_goal':lambda s:[{'diplomatic_play':play,'war_goal_type':kind,'index':0} for play in principal(s) if play not in at_war_plays(s) and escalation(s,play)<COUNTDOWN
-                             for kind in sorted({kind for kind, in s.rows('war_goal','war_goal_type')}) if goal_targets(s,play,kind)],
     'make_primary_demand':lambda s:[goal for goal in war_goals(s) if goal['diplomatic_play'] not in at_war_plays(s) and goal['diplomatic_play'] in principal(s)
                                     and sum(other['diplomatic_play']==goal['diplomatic_play'] for other in war_goals(s))>1],
-    'withdraw_treaty':lambda s:product(treaty=[ident for ident,first,second,withdrawn in s.rows('treaty','treaty,first_country,second_country,withdrawn')
-                                              if s.player in (first,second) and not withdrawn and (first,second) not in enforced_on_player(s)]),
+    'withdraw_treaty':lambda s:product(treaty=[ident for ident,(first,second) in sorted(in_force(s).items())
+                                              if s.player in (first,second) and (first,second) not in enforced_on_player(s)]),
     'request_join_power_bloc':lambda s:product(power_bloc=[] if player_blocs(s) or overlords(s,s.player) else
                                                [bloc for bloc, in s.rows('country_leverage','power_bloc',country=s.player)
                                                 if bloc_advantage(s,bloc,s.player)>=JOIN_LEVERAGE and below_leader(s,bloc)]),
@@ -2382,6 +2835,40 @@ RULES={
     'embark_formation':embarkable,
     'plan_land_invasion':land_invasions,
     'plan_naval_invasion':naval_invasions,
+    **{f'{verb}_{kind}_treaty_article':(lambda s,offered=offered,kind=kind:input_articles(s,offered,kind)) for verb,offered in (('offer',True),('demand',False)) for kind in INPUT_KINDS},
+    **{f'{verb}_timed_treaty_article':(lambda s,kind=kind,offered=offered:[{**option,'days':days} for option in treaty_articles(s,kind,offered,False) for days in TREATY_DAYS])
+       for verb,kind,offered in (('offer','directed',True),('demand','directed',False),('agree','mutual',True))},
+    **{f'{verb}_obliged_treaty_article':(lambda s,kind=kind,offered=offered:[{**option,'obligation':promise} for option in treaty_articles(s,kind,offered,False)
+                                                                           for promise in promises(s,option['country'])])
+       for verb,kind,offered in (('offer','directed',True),('demand','directed',False),('agree','mutual',True))},
+    'threaten_treaty_article':lambda s:treaty_articles(s,'directed',False,False) if dlc_feature(s,'ep2_content') else [],
+    'work_out_treaty_article':lambda s:treaty_articles(s,'directed',False,False),
+    'exchange_treaty_articles':exchanges,
+    **{f'amend_{verb}_treaty_article':(lambda s,kind=kind,offered=offered:amendments(s,kind,offered)) for verb,kind,offered in (('offer','directed',True),('demand','directed',False),('agree','mutual',True))},
+    **{f'amend_drop_{verb}_treaty_article':(lambda s,kind=kind,offered=offered:droppable(s,kind,offered)) for verb,kind,offered in (('offer','directed',True),('demand','directed',False),('agree','mutual',True))},
+    'offer_sway_state':lambda s:[{**option,'state':state} for option in swayable(s) for state in s.states()],
+    'offer_sway_subject':lambda s:[{**option,'subject':subject} for option in swayable(s) for subject in transferable_subjects(s)],
+    'offer_sway_pact':lambda s:[{**option,'diplomatic_action':action} for option in swayable(s) for action in sway_pacts()[0]],
+    'offer_sway_subjection':lambda s:[{**option,'diplomatic_action':action} for option in swayable(s) for action,kind in sway_pacts()[1].items()
+                                      if subject_fits(s,kind,s.player,option['country'])],
+    'offer_sway_ally':lambda s:[option for option in swayable(s) if option['country'] in allies(s)],
+    'offer_sway_goal_country':lambda s:sway_goals(s,'country'),
+    'offer_sway_goal_state':lambda s:sway_goals(s,'state'),
+    'offer_sway_goods_article':lambda s:[{**option,'war_goal_type':ENFORCED,'treaty_article':article,'goods':goods} for option in swayable(s) for article in enforceable(s,{'goods'}) for goods in traded(s)],
+    'offer_sway_state_article':lambda s:[{**option,'war_goal_type':ENFORCED,'treaty_article':article,'state':state} for option in swayable(s) for article in enforceable(s,{'state'})
+                                         for opponent in sorted(play_opponents(s,option['diplomatic_play'])) for state, in s.rows('state','state',country=opponent)],
+    'offer_sway_region_article':lambda s:[{**option,'war_goal_type':ENFORCED,'treaty_article':article,'strategic_region':region} for option in swayable(s)
+                                          for article in enforceable(s,{'strategic_region'}) for region in article_regions(s,article)],
+    'offer_sway_law_article':lambda s:[{**option,'war_goal_type':ENFORCED,'treaty_article':article,'commitment':law} for option in swayable(s) for article in enforceable(s,{'law_type'})
+                                       for opponent in sorted(play_opponents(s,option['diplomatic_play'])) for law,active in s.rows('law','law,active',country=opponent) if not active],
+    'add_war_goal_country':lambda s:goal_drafts(s,'country'),
+    'add_war_goal_state':lambda s:goal_drafts(s,'state'),
+    'add_war_goal_liberation':liberation_goals,
+    'add_war_goal_article':lambda s:article_goals(s,set(),lambda country,article:[{}]),
+    'add_goods_war_goal':lambda s:article_goals(s,{'goods'},lambda country,article:[{'goods':goods} for goods in traded(s)]),
+    'add_state_war_goal':lambda s:article_goals(s,{'state'},lambda country,article:[{'state':state} for state in article_states(s,article,country,s.player)]),
+    'add_region_war_goal':lambda s:article_goals(s,{'strategic_region'},lambda country,article:[{'strategic_region':region} for region in article_regions(s,article)]),
+    'add_law_war_goal':lambda s:article_goals(s,{'law_type'},lambda country,article:[{'commitment':law} for law,active in s.rows('law','law,active',country=country) if not active]),
     'offer_sway':swayable,
     **{name:(lambda s,kind=name.split('_',1)[1]:product(country=proposers(s,kind))) for name in ('accept_treaty','decline_treaty','accept_demand','reject_demand',
                                                                     'accept_action_proposal','decline_action_proposal','accept_sway','reject_sway')},

@@ -2,12 +2,13 @@
 
 Collection plays generated mini worlds one run after another, pauses on the first day of every quarter, and records each pause, each drawn block and each executed command in PostgreSQL. Levers, acts and the pickers are described in `advisors.md`, mini worlds in `mini_world_fidelity_report.md`, command execution in `action_verification.md`, the reward in `rewards.md`.
 
-## Current batch
+## Batches
+
+No batch is running and the database is empty. The owner had it cleared on 5 October 2026, when the catalogue grew to 93 levers and 341 acts. The next batch starts from the settings below with a checkpoint file of its own.
 
 | Setting | Value |
 | --- | --- |
 | Runs | 697 completed runs |
-| Checkpoint | `D:/vic3_data/interface/collection_levers_91.json` |
 | World cache | `D:/vic3_data/interface/world_cache_states50_20261004` |
 | Initializers | `random`, `random_smac_weighting`, `random_svr_weighting` |
 | Pickers | `first`, `catboost`, `catboost_piecewise` |
@@ -15,14 +16,23 @@ Collection plays generated mini worlds one run after another, pauses on the firs
 | Run limits | 12 minutes of wall clock, 100 game years |
 
 ```powershell
-.venv/Scripts/python.exe -m loop.launch --world-cache D:/vic3_data/interface/world_cache_states50_20261004 --runs 697 --minutes 12 --years 100 --advisors random random_smac_weighting random_svr_weighting --pickers first catboost catboost_piecewise --warmup 10 --progress-file D:/vic3_data/interface/collection_levers_91.json
+.venv/Scripts/python.exe -m loop.launch --world-cache D:/vic3_data/interface/world_cache_states50_20261004 --runs 697 --minutes 12 --years 100 --advisors random random_smac_weighting random_svr_weighting --pickers first catboost catboost_piecewise --warmup 10 --progress-file <checkpoint>
 ```
 
-The batch started on an empty database. Every run draws one sampling weight for each of the 91 levers and stores them in `run_weight`. The checkpoint counts completed runs. Run IDs also count runs that broke off, so they run ahead of it.
+Every run draws one sampling weight for each lever and stores them in `run_weight`. The checkpoint counts completed runs. Run IDs also count runs that broke off, so they run ahead of it.
 
 Each run draws its initializer and its picker independently and uniformly from the two lists. While the checkpoint is below the warmup count, the run uses `random` and `first` instead. The `first` picker sees one block per pause. A run with a learned picker draws a candidate count from 8 to 50 once and keeps it.
 
 Batch size, lineup, checkpoint resets and deletion of recorded data are the owner's decisions.
+
+### A changed catalogue needs an empty database
+
+Runs recorded under one catalogue cannot be read under another.
+
+- `history` in `advisors/data/weights.py` keeps a run for the learned initializers only when it has a positive weight for every lever being fitted, so runs recorded before a lever existed drop out.
+- `action_features` in `advisors/models/row/features.py` raises on an act it does not know or whose parameters differ from the catalogue, so a learned picker cannot build its training rows while such runs are in the database.
+
+The database is emptied by `interface.recording.store.install`, which drops the schema and installs `schema.sql` again. The checkpoint files of earlier batches under `D:/vic3_data/interface` (`collection_levers_79.json`, `collection_levers_91.json` and older) count runs that are no longer recorded and must not be passed to a new batch.
 
 ## Timeouts
 
@@ -35,6 +45,8 @@ Batch size, lineup, checkpoint resets and deletion of recorded data are the owne
 | Model training, recording preparation and game loading before a run | 180 | `session` in `loop/run.py` |
 
 Changing any timeout needs the owner's direct approval. That holds during autonomous repair and monitoring too.
+
+The game side also refuses a request whose target the game's own list does not hold, 0.5 s plus 0.2 s per stage after the command has opened its panel. This is `LISTED` in `interface/actions/catalogue.py`, described in `action_verification.md`, and 91 of the 265 commands use it. It ends a request as `invalid` with the detail `absent`; without it the same request runs into the five-second acknowledgement limit and counts toward the `no_object` streak.
 
 ## Launch and supervision
 
@@ -56,7 +68,7 @@ The collector's watchdog thread checks every 0.1 seconds. When the supervisor is
 
 ## A run
 
-`session` draws a world from the cache uniformly with replacement, rechecks it, and plays a country drawn uniformly from the world's manifest. Model training, recording preparation and game loading run side by side. The opening building and relationship checks must pass before the run begins.
+`session` draws a world from the cache uniformly with replacement, rechecks it, and plays a country drawn uniformly from the world's manifest. Model training, recording preparation and game loading run side by side. The opening building and relationship checks must pass before the run begins. The game is launched without `-debug_mode`.
 
 `Loop.play` pauses the game, takes the `start` snapshot and then repeats two steps: `turn_actions` executes one block, and `advance_quarter` runs the clock to the next quarter. Before each turn it ends the run when a limit is reached.
 
@@ -101,7 +113,7 @@ A cache is bound to the generator sources under `interface/world`, to `interface
 - `loop.watch.roles` lists the supervisor, the round's `launch.cmd`, the collector and the game.
 - `supervisor.log` shows `SUPERVISOR STARTED` and `LAUNCHED collect_<n>` with the arguments.
 - The open row in `run` has a fresh `heartbeat_at`, and its snapshots and game dates advance.
-- `run_weight` holds 91 rows for the run, one per lever in `advisors.catalogue.NAMES`.
+- `run_weight` holds one row for the run per lever in `advisors.catalogue.NAMES`, 93 with the current catalogue.
 - `loop_action.advisor_action` names acts from `advisors.catalogue.ACTIONS`, with their parameters in `loop_decision_param`.
 - The collector's log holds a `quarterly pause` line for every quarter.
 

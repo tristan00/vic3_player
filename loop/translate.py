@@ -14,10 +14,26 @@ DEALS=('diplomatic_action','diplomatic_action_obligation')
 ESTABLISHED={act:action for acts in C.ESTABLISHED.values() for act,action in acts.items()}
 ENDED={act:actions for acts in C.ENDED.values() for act,actions in acts.items()}
 DEALT=frozenset({*ESTABLISHED.values(),C.MEMBERSHIP})
-FILING=('security','commercial','bloc','diplomatic')
+SIDES=(('offer','us'),('demand','them'),('agree','both'))
+STATE_PICKS=('diplomatic_action_first_state','diplomatic_action_second_state')
 PLAIN={'downsize_building':('downsize',),'raise_subsidies':('subsidies_on',),'lower_subsidies':('subsidies_off',),'nationalise_building':('nationalize',),
-       'raise_subsidies_statewide':('subset_subsidies_on_state',),'lower_subsidies_statewide':('subset_subsidies_off_state',),'nationalise_statewide':('bulk_nationalize_state',),
-       'change_production_method_statewide':('bulk_switch_production_method_state',),
+       'raise_subsidies_statewide':('subset_subsidies_on_state',),'lower_subsidies_statewide':('subset_subsidies_off_state',),'buy_out_statewide':('bulk_nationalize_state',),
+       'expropriate_statewide':('bulk_expropriate_state',),'switch_methods_statewide':('bulk_switch_production_method_state',),
+       'reset_methods_statewide':('reset_production_methods',),'reset_building_methods':('reset_building_production_methods',),
+       'relocate_national_capital':('move_capital',),'relocate_market_capital':('move_market_capital',),
+       'grant_charter_for_building_type':('grant_building_charter',),'revoke_charter_for_building_type':('revoke_building_charter',),
+       'grant_charter_for_region':('grant_region_charter',),'revoke_charter_for_region':('revoke_region_charter',),
+       'disband_one_unit':('disband_unit',),'cancel_queued_ship_for_fleet':('cancel_ship_for',),'refit_fleet_in_port':('retrofit_fleet_and_station',),
+       'refit_every_fleet_in_port':('retrofit_all_and_station',),'refit_ship':('retrofit_ship',),'cancel_ship_refit':('cancel_retrofit_ship',),
+       'rebuild_ship_to_design':('change_ship_template',),'form_fleet':('create_fleet',),'divide_army':('split_army',),'divide_fleet':('split_fleet',),
+       'combine_armies':('merge_armies',),'combine_fleets':('merge_fleets',),'move_ships':('transfer_ships',),'move_ship':('transfer_ship',),
+       'change_fleet_mission':('change_naval_mission_type',),'change_fleet_mission_area':('toggle_naval_mission_region',),'station_fleet_in_state':('station_fleet',),
+       'rebase_fleet':('rehome_fleet',),'defend_against_invasion_at_sea':('defend_invasion_fleet',),'appoint_flagship':('assign_flagship',),
+       'dismiss_flagship':('unassign_flagship',),'demand_liberation':('start_play_liberation',),'add_demand_on_country':('add_war_goal_country',),
+       'add_demand_for_state':('add_war_goal_state',),'add_liberation_demand':('add_war_goal_liberation',),'add_article_demand':('add_war_goal_article',),
+       **{f'add_{kind}_article_demand':(f'add_{kind}_war_goal',) for kind in C.ARTICLE_INPUTS},'sway_with_state':('offer_sway_state',),
+       'sway_with_subject':('offer_sway_subject',),'sway_with_pact':('offer_sway_pact','offer_sway_subjection'),'sway_with_war_goal':('offer_sway_goal_country',),
+       'sway_with_state_war_goal':('offer_sway_goal_state',),**{f'sway_with_{kind}_article':(f'offer_sway_{kind}_article',) for kind in C.ARTICLE_INPUTS},
        'halt_construction_queue':('pause_construction','pause_all_construction'),'restart_construction_queue':('resume_construction','resume_all_construction'),
        'halt_construction_sector':('pause_construction_output',),'restart_construction_sector':('resume_construction_output',),
        'halt_shipbuilding':('pause_ship_construction',),'restart_shipbuilding':('resume_ship_construction',),'cancel_queued_research':('dequeue_research',),
@@ -25,7 +41,7 @@ PLAIN={'downsize_building':('downsize',),'raise_subsidies':('subsidies_on',),'lo
        'raise_ship_priority':('raise_ship_item','first_ship_item'),'lower_ship_priority':('lower_ship_item','last_ship_item'),'cancel_ship_order':('cancel_ship_item',),
        'establish_company':('create_company',),'disband_company':('remove_company',),'raise_state_decrees':('issue_decree',),'lower_state_decrees':('remove_decree',),
        'found_power_bloc':('form_power_bloc',),'leave_bloc':('leave_power_bloc',),'remove_bloc_member':('kick_from_power_bloc',),'replace_bloc_principle':('replace_principle',),
-       'make_demand_primary':('make_primary_demand',),'sway_country':('offer_sway',),'back_initiator':('support_initiator',),'back_target':('support_target',),
+       'make_demand_primary':('make_primary_demand',),'sway_country':('offer_sway',),'sway_ally':('offer_sway_ally',),'back_initiator':('support_initiator',),'back_target':('support_target',),
        'lean_towards_initiator':('lean_initiator',),'lean_towards_target':('lean_target',),'stay_on_the_fence':('stay_on_fence',),'stay_neutral':('declare_neutrality',),
        'withdraw_from_confrontation':('back_down',),'surrender_war':('capitulate',),'establish_colony':('colonize',),'give_up_colony':('abandon_colony',),
        'raise_incorporation':('incorporate',),'lower_incorporation':('unincorporate',),
@@ -33,7 +49,7 @@ PLAIN={'downsize_building':('downsize',),'raise_subsidies':('subsidies_on',),'lo
        'call_up_conscripts':('activate_conscription_center',),'raise_army_conscripts':('raise_conscripts','raise_conscripts_selected'),
        'demobilise_army':('demobilize','demobilize_selected'),'demobilise_all_armies':('demobilize_all',),'send_conscripts_home':('disband_conscripts',),
        'queue_ship':('build_ship',),'queue_ship_for_fleet':('build_ship_for',),'cancel_queued_ship':('cancel_ship',),'scrap_ship':('decommission_ship',),
-       'change_production_method':('switch_production_method',),'enact_new_law':('enact_law',),'negotiate_over_law':('negotiate',),'impose_law_on_subject':('impose_law',),
+       'switch_building_method':('switch_production_method',),'enact_new_law':('enact_law',),'negotiate_over_law':('negotiate',),'impose_law_on_subject':('impose_law',),
        'repeal_law_amendment':('repeal_amendment',),'upgrade_regular_units':('upgrade_regulars',),
        'upgrade_conscript_units':('upgrade_conscripts',),'set_standard_unit_type':('set_default_unit_type',),'upgrade_every_unit':('upgrade_all_units',),
        'design_ship':('design_ship_template',),'redesign_ship':('edit_ship_template',),'set_standard_ship_design':('set_default_ship_template',),
@@ -213,13 +229,47 @@ def proposed(c,kind):
 
 
 @timed_often
+def termed(c,kind,form):
+    return merged(*[[single(f'{verb}_{form}_treaty_article',option,giver=giver) for option in c.o[f'{verb}_{form}_treaty_article'] if filed(option['treaty_article'])==kind]
+                    for verb,giver in SIDES])
+
+
+@timed_often
+def pressing(c,kind,action):
+    return [single(action,option) for option in c.o[action] if filed(option['treaty_article'])==kind]
+
+
+@timed_often
+def amending(c,kind,form):
+    return merged(*[[single(f'{form}{verb}_treaty_article',option,giver=giver) for option in c.o[f'{form}{verb}_treaty_article'] if filed(option['treaty_article'])==kind]
+                    for verb,giver in SIDES])
+
+
+@timed_often
+def supplied(c,kind):
+    return merged(*[[single(f'{verb}_{kind}_treaty_article',option,giver=giver) for option in c.o[f'{verb}_{kind}_treaty_article']] for verb,giver in SIDES[:2]])
+
+
+@timed_often
+def ceded(c,action,commands=STATE_PICKS):
+    return merged(*[[Choice({'country':option['country'],'state':option['state']},[(command,option)]) for option in c.o[command] if option['diplomatic_action']==action]
+                    for command in commands])
+
+
+@timed_often
+def swapped(c):
+    return merged([Choice({'country':option['country'],'given':option['given'],'taken':option['taken']},[('diplomatic_action_states',option)])
+                   for option in c.o['diplomatic_action_states']])
+
+
+@timed_often
 def traded(c):
     return merged(*[[single(action,option,giver=giver) for option in c.o[action]] for action,giver in GOODS_ARTICLES])
 
 
 @timed_often
 def withdrawn(c,kind):
-    return [single('withdraw_treaty',option) for option in c.o['withdraw_treaty'] if min(map(filed,c.articles[option['treaty']]),key=FILING.index)==kind]
+    return [single('withdraw_treaty',option) for option in c.o['withdraw_treaty'] if min(map(filed,c.articles[option['treaty']]),key=C.FILING.index)==kind]
 
 
 @timed_often
@@ -318,9 +368,21 @@ RULES={
     'lower_import_tariff':lambda c:duty(c,'import',-1),
     'raise_export_tariff':lambda c:duty(c,'export',1),
     'lower_export_tariff':lambda c:duty(c,'export',-1),
-    'propose_commercial_article':lambda c:proposed(c,'commercial'),
+    **{f'propose_{kind}_article':(lambda c,kind=kind:proposed(c,kind)) for kind in C.FILING},
+    **{f'propose_{kind}_article_for_term':(lambda c,kind=kind:termed(c,kind,'timed')) for kind in C.FILING},
+    **{f'propose_{kind}_article_with_obligation':(lambda c,kind=kind:termed(c,kind,'obliged')) for kind in C.FILING},
+    **{f'demand_{kind}_article_under_threat':(lambda c,kind=kind:pressing(c,kind,'threaten_treaty_article')) for kind in C.FILING},
+    **{f'demand_{kind}_article_made_acceptable':(lambda c,kind=kind:pressing(c,kind,'work_out_treaty_article')) for kind in C.FILING},
+    **{f'exchange_{kind}_articles':(lambda c,kind=kind:pressing(c,kind,'exchange_treaty_articles')) for kind in C.FILING},
+    **{f'add_{kind}_article_to_treaty':(lambda c,kind=kind:amending(c,kind,'amend_')) for kind in C.FILING},
+    **{f'drop_{kind}_article_from_treaty':(lambda c,kind=kind:amending(c,kind,'amend_drop_')) for kind in C.FILING},
+    **{f'withdraw_{kind}_treaty':(lambda c,kind=kind:withdrawn(c,kind)) for kind in C.FILING},
+    **{name:(lambda c,kind=kind:supplied(c,kind)) for kind,(_,name,_) in C.INPUT_ACTS.items()},
+    **{name:(lambda c,action=action:ceded(c,action)) for action,(_,name) in C.STATE_DEALS.items()},
+    'give_state_in_trade':lambda c:ceded(c,C.STATE_TRADE,STATE_PICKS[:1]),
+    'ask_state_in_trade':lambda c:ceded(c,C.STATE_TRADE,STATE_PICKS[1:]),
+    'exchange_states':swapped,
     'propose_goods_article':traded,
-    'lower_commercial_treaties':lambda c:withdrawn(c,'commercial'),
     'raise_tax_level':lambda c:step(c,'set_tax_level','tax_level',1),
     'lower_tax_level':lambda c:step(c,'set_tax_level','tax_level',-1),
     'raise_consumption_taxes':lambda c:toggle(c,'toggle_consumption_tax',set(c.s.rows('player_taxed_goods','goods')),False,'goods'),
@@ -339,18 +401,11 @@ RULES={
     'stop_bolstering_movement':lambda c:movement(c,'toggle_bolster_movement',PROMOTED,True),
     'suppress_movement':lambda c:movement(c,'toggle_suppress_movement',SUPPRESSED,False),
     'stop_suppressing_movement':lambda c:movement(c,'toggle_suppress_movement',SUPPRESSED,True),
-    'propose_diplomatic_article':lambda c:proposed(c,'diplomatic'),
-    'withdraw_diplomatic_treaty':lambda c:withdrawn(c,'diplomatic'),
-    'raise_security_treaties':lambda c:proposed(c,'security'),
-    'lower_security_treaties':lambda c:withdrawn(c,'security'),
     'ask_to_join_power_bloc':joining,
     'invite_to_power_bloc':inviting,
     'adopt_bloc_principle':lambda c:merged([single('pick_principle',option,'power_bloc_principle') for option in c.o['pick_principle']],plain(c,'upgrade_principle')),
-    'propose_bloc_article':lambda c:proposed(c,'bloc'),
-    'withdraw_bloc_treaty':lambda c:withdrawn(c,'bloc'),
     'demand_of_country':demanded,
     'demand_for_state':lambda c:plain(c,'start_play_state'),
-    'add_demand':lambda c:[single('add_war_goal',option,'diplomatic_play','war_goal_type') for option in c.o['add_war_goal']],
     'resume_colony':lambda c:toggle(c,'toggle_pause_colonization',paused(c),True,'state'),
     'pause_colony':lambda c:toggle(c,'toggle_pause_colonization',paused(c),False,'state'),
     'raise_regular_army':recruited,

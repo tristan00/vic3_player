@@ -108,11 +108,15 @@ class DataTypeTests(unittest.TestCase):
 
     def test_every_cleanup_call_is_a_void_callback(self):
         text='\n'.join(f.read_text(encoding='utf-8',errors='replace') for f in (DEFAULT_DATA/'profiles'/'mini'/'logs'/'data_types').glob('data_types_*.txt'))
-        returns={m[1]:m[2] for m in re.finditer(r'^([A-Z][\w.]*)(?:\( [^)]*\))?\nDefinition type: [\w ]+\nReturn type: (\S+)',text,re.M)}
+        returns={}
+        for m in re.finditer(r'^([A-Z][\w.]*)(?:\( [^)]*\))?\nDefinition type: [\w ]+\nReturn type: (\S+)',text,re.M):
+            if m[2]!='[unregistered]':
+                returns.setdefault(m[1],m[2])
         closers={call for text in gui.windows(DEFAULT_GAME/'game').values() for call in re.findall(r'name = interface_close [^}]*on_start = "\[([\w.]+)(?:\([\w.]*\))?\]"',text)}
         self.assertIn('PopupManager.HideTransportPlannerPopup',closers)
         for call in [*gui.AFTER,*closers]:
-            self.assertEqual(returns.get(call),'void',call)
+            head,_,member=call.partition('.')
+            self.assertEqual(returns.get(call) or returns.get(f'{returns.get(head)}.{member}'),'void',call)
 
     def test_every_type_function_used_by_an_action_exists(self):
         for action in ACTIONS:

@@ -94,29 +94,44 @@ class SwayTests(unittest.TestCase):
                         state_history=[{'state':1,'country':PLAYER},{'state':2,'country':OTHER},{'state':3,'country':THIRD},{'state':4,'country':THIRD+1}])
 
     def test_a_country_outside_our_confrontation_can_be_swayed_during_manoeuvres(self):
-        found=RULES['offer_sway'](self.play(30))
-        self.assertEqual({option['country'] for option in found},{THIRD})
-        self.assertEqual([option['offer'] for option in found],list(range(available.SWAY_OFFER_TYPES)))
-        self.assertEqual({option['diplomatic_play'] for option in found},{4})
+        self.assertEqual(RULES['offer_sway'](self.play(30)),[{'diplomatic_play':4,'country':THIRD}])
+        self.assertEqual(RULES['offer_sway_ally'](self.play(30)),[])
+        self.assertEqual(RULES['offer_sway_pact'](self.play(30)),[])
+        self.assertEqual(available.sway_pacts(),([],{'protectorate':'subject_type_protectorate','tributary':'subject_type_tributary'}))
+        with patch.object(available,'subject_fits',lambda s,kind,country,overlord:kind=='subject_type_tributary' and (country,overlord)==(PLAYER,THIRD)):
+            self.assertEqual(RULES['offer_sway_subjection'](self.play(30)),[{'diplomatic_play':4,'country':THIRD,'diplomatic_action':'tributary'}])
 
     def test_nobody_is_swayed_in_the_opening_the_countdown_or_a_war(self):
         for escalation,war in ((available.OPENING_PHASE_END-1,None),(available.COUNTDOWN,None),(100,1)):
             self.assertEqual(RULES['offer_sway'](self.play(escalation,war)),[],escalation)
 
-    def test_an_offer_the_panel_does_not_show_is_refused_without_waiting(self):
-        action=BY_NAME['offer_sway']
-        text=gui.absent_widget(list(BY_NAME).index('offer_sway')+1,action,None,gui.bindings(action))
-        self.assertEqual([text.count(f'state = {{ name = {kind}_') for kind in ('admit','refuse','absent')],[4,4,4])
-        self.assertEqual(text.count("GetVariableSystem.Set('interface_action_valid', '0')"),8)
-        self.assertIn('GetDataModelSize(SwayCountryPanel.AccessSwayOfferTypes)',text)
-        self.assertIn('IsDataModelEmpty(SwayCountryPanel.AccessShownSwayOffers)',text)
-        self.assertLess(text.index("Set('interface_action_valid', '0')"),text.index("Set('interface_clean', 'all')"))
+    def test_no_unification_goal_and_no_debug_only_goal_is_demanded_or_offered(self):
+        types={'humiliation':{'target_type':['country'],'settings':[]},'unification_leadership':{'target_type':['country'],'settings':[]},
+               'regime_change':{'target_type':['country'],'settings':['debug']}}
+        s=snapshot({'common/war_goal_types':types})
+        s.keys=lambda name:list(types)
+        self.assertEqual(available.listed_goals(s,'country'),['humiliation'])
+
+    def test_a_confrontation_over_a_debug_only_goal_is_not_started(self):
+        s=snapshot({'common/war_goal_types':{'regime_change':{'settings':['debug']}},'common/diplomatic_plays':{'dp_regime_change':{'war_goal':['regime_change']}}})
+        self.assertFalse(available.play_allowed(s,'dp_regime_change',target_country=('country',OTHER)))
+
+    def test_the_offer_type_is_picked_by_the_games_name_for_it_and_a_missing_one_is_refused_without_waiting(self):
+        kinds={'offer_sway':'OBLIGATIONS','offer_sway_ally':'SWAY_TYPE_CALL_ALLY','offer_sway_state':'SWAY_TYPE_TRANSFER_STATE','offer_sway_subject':'SWAY_TYPE_TRANSFER_SUBJECT',
+               'offer_sway_pact':'SWAY_TYPE_DIPLOMATIC_PACT','offer_sway_subjection':'SWAY_TYPE_BECOME_SUBJECT'}
+        sways=[action for action in BY_NAME.values() if action.name.startswith('offer_sway')]
+        self.assertEqual(len(sways),12)
+        for action in sways:
+            window,chain,calls=action.stages[0]
+            self.assertEqual(chain,(('SwayCountryPanel.AccessSwayOfferTypes',f"EqualTo_string(SwayOfferType.GetName, Localize('{kinds.get(action.name,'WARGOALS')}'))"),),action.name)
+            self.assertTrue(action.deadline,action.name)
+            self.assertNotIn('offer:int',action.params,action.name)
 
 
 class GateTests(unittest.TestCase):
-    GATED=('offer_treaty_article','demand_treaty_article','agree_treaty_article','offer_goods_treaty_article','demand_goods_treaty_article','offer_sway')
+    GATED=tuple(name for name in BY_NAME if name.endswith(('_treaty_article','_treaty_articles')))
 
-    def test_the_gated_commands_are_the_treaty_proposals_and_the_sway(self):
+    def test_the_gated_commands_are_the_treaty_proposals(self):
         self.assertEqual({action.name for action in BY_NAME.values() if action.admit},set(self.GATED))
 
     def test_one_decision_lets_the_first_stage_run_or_refuses_and_never_both(self):
@@ -159,6 +174,13 @@ class RatificationTests(unittest.TestCase):
             self.assertEqual(RULES['offer_treaty_article'](s),[{'country':OTHER,'treaty_article':'ratified'},{'country':OTHER,'treaty_article':'unknown'}])
             self.assertEqual(RULES['demand_treaty_article'](s),RULES['offer_treaty_article'](s))
 
+    def test_a_naval_threat_is_offered_with_the_expansion_that_provides_it(self):
+        s=snapshot({'common/treaty_articles':{'ratified':{'kind':['directed']}}},player_diplomatic_option=[{'target_country':OTHER,'action_type':'rivalry','possible':True}])
+        with patch.object(available,'technologies',lambda s:(set(),set(),set(),set())),patch.object(available,'ratification',lambda:{'ratified':''}):
+            for installed,offered in (((),[]),(('ep2',),[{'country':OTHER,'treaty_article':'ratified'}])):
+                with patch.object(type(s),'dlc',installed):
+                    self.assertEqual(RULES['threaten_treaty_article'](s),offered,installed)
+
     def test_a_strait_article_needs_the_giver_to_border_a_strait(self):
         articles={'no_tolls':{'kind':['directed'],'visible':['has_any_strait_province = scope:source_country'],
                               'possible':['has_any_strait_province = scope:source_country has_any_strait_control = scope:source_country']}}
@@ -168,7 +190,8 @@ class RatificationTests(unittest.TestCase):
         cases=(({},[],[]),
                ({'strait_history':strait,'strait_endpoint':[{'strait':5,'first_state':1,'second_state':3}]},[{'country':OTHER,'treaty_article':'no_tolls'}],[]),
                ({'strait_history':strait,'strait_endpoint':[{'strait':5,'first_state':2,'second_state':3}]},[],[{'country':OTHER,'treaty_article':'no_tolls'}]),
-               ({'strait_history':strait},[{'country':OTHER,'treaty_article':'no_tolls'}],[{'country':OTHER,'treaty_article':'no_tolls'}]))
+               ({'strait_history':strait},[],[{'country':OTHER,'treaty_article':'no_tolls'}]),
+               ({'strait_history':strait,'occupation_history':[{'state':2,'controller':PLAYER}]},[{'country':OTHER,'treaty_article':'no_tolls'}],[{'country':OTHER,'treaty_article':'no_tolls'}]))
         for tables,offered,demanded in cases:
             s=snapshot({'common/treaty_articles':articles},player_diplomatic_option=option,state_history=states,**tables)
             with patch.object(available,'technologies',lambda s:(set(),set(),set(),set())),patch.object(available,'ratification',lambda:{'no_tolls':''}):
@@ -195,3 +218,196 @@ class PrincipleTests(unittest.TestCase):
 
 if __name__=='__main__':
     unittest.main()
+
+
+class JoinedPactTests(unittest.TestCase):
+    def offered(self,rows):
+        s=snapshot(pact_history=rows)
+        with patch.object(available,'opening_seq',lambda s:99),patch.object(available,'snapshot_hours',lambda s,seq:s.hours-99*MONTH):
+            return RULES['break_pact'](s)
+
+    def test_a_two_sided_pact_the_other_country_began_can_be_ended_by_us(self):
+        self.assertEqual(self.offered([pact(1,OTHER,PLAYER,'da_knowledge_sharing')]),[{'country':OTHER,'diplomatic_action':'da_knowledge_sharing'}])
+
+    def test_a_one_sided_pact_and_our_own_subjection_stay_with_the_country_that_began_them(self):
+        self.assertIsNone(available.pact_terms()['rivalry'][2])
+        self.assertEqual(self.offered([pact(1,OTHER,PLAYER,'rivalry'),pact(2,OTHER,PLAYER,'puppet')]),[])
+
+
+class StatePickTests(unittest.TestCase):
+    def picks(self,*rows):
+        return snapshot(player_diplomatic_option_state=[{'target_country':country,'action_type':action,'side':side,'state':state} for country,action,side,state in rows])
+
+    def test_a_state_is_offered_on_the_side_the_game_listed_it(self):
+        s=self.picks((OTHER,'take_state','target',5),(OTHER,'grant_state','source',6))
+        with patch.object(available,'diplomatic_allowed',lambda s,country,action:True):
+            self.assertEqual(RULES['diplomatic_action_second_state'](s),[{'country':OTHER,'diplomatic_action':'take_state','state':5,'obligation':'None'}])
+            self.assertEqual(RULES['diplomatic_action_first_state'](s),[{'country':OTHER,'diplomatic_action':'grant_state','state':6,'obligation':'None'}])
+            self.assertEqual(RULES['diplomatic_action_states'](s),[])
+
+    def test_an_action_with_states_on_both_sides_is_a_trade(self):
+        s=self.picks((OTHER,'trade_states','source',6),(OTHER,'trade_states','target',5))
+        with patch.object(available,'diplomatic_allowed',lambda s,country,action:True):
+            self.assertEqual(RULES['diplomatic_action_states'](s),[{'country':OTHER,'diplomatic_action':'trade_states','given':6,'taken':5,'obligation':'None'}])
+            self.assertEqual(RULES['diplomatic_action_first_state'](s)+RULES['diplomatic_action_second_state'](s),[])
+
+    def test_a_refused_action_offers_no_state(self):
+        s=self.picks((OTHER,'take_state','target',5))
+        with patch.object(available,'diplomatic_allowed',lambda s,country,action:False):
+            self.assertEqual(RULES['diplomatic_action_second_state'](s),[])
+
+
+class DeadlineTests(unittest.TestCase):
+    def test_every_command_with_a_deadline_is_refused_when_its_request_runs_out(self):
+        timed=[action for action in BY_NAME.values() if action.deadline]
+        text='\n'.join(gui.deadline_widgets())
+        self.assertTrue(timed)
+        for action in timed:
+            code=list(BY_NAME).index(action.name)+1
+            turns=4*len(gui.variants(action))
+            self.assertEqual(text.count(f'state = {{ name = deadline_{code}_'),turns,action.name)
+            self.assertEqual(text.count(f'state = {{ name = late_{code}_'),turns,action.name)
+
+    def test_a_deadline_only_refuses_the_request_that_started_it(self):
+        timer,late=gui.deadline_widgets()[:2]
+        own=timer.split("GetVariableSystem.Set('")[1].split("'")[0]
+        self.assertTrue(own.startswith('interface_deadline_'))
+        self.assertIn(f"on_start = \"[GetVariableSystem.Set('{own}', {gui.FIRED})]\"",timer)
+        self.assertIn(f"on_finish = \"[GetVariableSystem.Set('interface_tick', GetVariableSystem.Get('{own}'))]\"",timer)
+        self.assertIn(gui.TICKED,late)
+        self.assertNotIn('SetIf',timer+late)
+
+    def test_a_stage_only_counts_for_the_request_that_reached_it(self):
+        for number in range(gui.MAX_STAGES):
+            self.assertIn(f"GetVariableSystem.Set('{gui.stage_flag(number)}', GetVariableSystem.Get('{gui.armed_flag(number)}'))",gui.STAGE_TIMERS)
+        for text in gui.start_widgets():
+            self.assertIn(f"GetVariableSystem.Set('interface_map_go', {gui.FIRED})",text)
+        generated='\n'.join([text for _,text in gui.action_widgets(True)]+gui.deadline_widgets()+[gui.ship_navigation()])
+        self.assertIn(f"GetVariableSystem.Set('{gui.armed_flag(0)}', {gui.FIRED})",generated)
+        for flag in ('interface_stage','interface_armed','interface_map_go'):
+            self.assertNotIn(f"GetVariableSystem.Exists('{flag}",generated)
+
+    def test_a_command_opens_once_and_never_again_after_it_has_fired(self):
+        for text in gui.start_widgets():
+            self.assertEqual(text.count('name = start_'),4)
+            self.assertEqual(text.count(gui.UNFIRED),4)
+
+    def test_a_later_refusal_stops_once_the_next_stage_has_begun(self):
+        action=BY_NAME['exchange_treaty_articles']
+        index,values=next(iter(gui.variants(action)))
+        text=gui.absent_widget(list(BY_NAME).index(action.name)+1,action,index,values)
+        state=next(line for line in text.split('\n') if 'name = absent_' in line)
+        self.assertIn(gui.reached(gui.stage_flag(0)),state)
+        for flag in (gui.armed_flag,gui.stage_flag):
+            self.assertIn(f'Not({gui.reached(flag(1))})',state)
+
+    def test_a_later_refusal_is_written_for_the_request(self):
+        for code,action in enumerate(BY_NAME.values(),1):
+            if action.absent:
+                for index,values in gui.variants(action):
+                    self.assertNotRegex(gui.absent_widget(code,action,index,values),r'\{\w+\}',action.name)
+
+    def test_a_staged_command_gets_time_for_each_stage(self):
+        staged=next(action for action in BY_NAME.values() if action.deadline and len(action.stages)>1)
+        code=list(BY_NAME).index(staged.name)+1
+        text=next(widget for widget in gui.deadline_widgets() if f'name = deadline_{code}_' in widget)
+        self.assertIn(f'duration = {round(staged.deadline+len(staged.stages)*(gui.STAGE+.05),2)} ',text)
+
+
+class DraftTests(unittest.TestCase):
+    def test_every_new_proposal_starts_from_an_empty_draft_and_leaves_one(self):
+        from interface.actions.catalogue import OPEN_DRAFT, RESET
+        opened=[action for action in BY_NAME.values() if action.start==OPEN_DRAFT]
+        self.assertGreater(len(opened),20)
+        for action in opened:
+            self.assertEqual(action.prepare,(RESET,),action.name)
+            self.assertLess(action.cleanup.index(RESET),action.cleanup.index('InformationPanelBar.ClosePanel'),action.name)
+
+    def test_the_draft_is_emptied_before_the_gate_decides(self):
+        action=BY_NAME['offer_treaty_article']
+        text=gui.absent_widget(list(BY_NAME).index(action.name)+1,action,None,gui.bindings(action))
+        self.assertLess(text.index('TreatyDraftPanel.GetDraft.ResetAll'),text.index("GetVariableSystem.Set('interface_admit'"))
+
+    def test_a_refused_proposal_carries_the_games_reason(self):
+        action=BY_NAME['offer_treaty_article']
+        text=gui.absent_widget(list(BY_NAME).index(action.name)+1,action,None,gui.bindings(action))
+        told=text.split("GetVariableSystem.Set('interface_action_desc', ")[1].split(']"')[0]
+        self.assertTrue(told.startswith('Select_CString('),told)
+        for reason in ('.IsAvailable(','TreatyDraftPanel.GetDraft.GetCanIncludeArticleTypeDesc(','.GetIsAvailableDesc('):
+            self.assertIn(reason,told)
+
+    def test_a_proposal_is_admitted_on_the_two_conditions_of_the_games_own_button(self):
+        from interface.actions.catalogue import INPUTS, OPEN_DRAFT, REDRAFT, available, includable
+        typed={f'{verb}_{kind}_treaty_article' for verb in ('offer','demand') for kind in INPUTS}
+        for action in BY_NAME.values():
+            if action.start==OPEN_DRAFT:
+                holder='Right' if action.name.startswith(('demand','threaten','work_out')) else 'Left'
+                self.assertIn(available(holder),action.admit,action.name)
+                self.assertEqual(includable(holder) in action.admit,action.name not in typed,action.name)
+            if action.start in (OPEN_DRAFT,REDRAFT):
+                self.assertTrue(action.deadline,action.name)
+
+
+class ArticleInputTests(unittest.TestCase):
+    def test_a_treaty_port_is_asked_only_of_a_state_that_can_be_ours(self):
+        s=snapshot(state_history=[{'state':2,'country':OTHER,'treaty_port_potential':True},{'state':5,'country':OTHER,'treaty_port_potential':False}])
+        self.assertEqual(available.article_states(s,'treaty_port',OTHER,PLAYER),[2])
+        self.assertEqual(available.article_states(s,'treaty_port',OTHER,THIRD),[2,5])
+        self.assertEqual(available.article_states(s,'state_transfer',OTHER,PLAYER),[2,5])
+
+    def test_a_non_colonisation_agreement_names_a_region_with_unclaimed_land(self):
+        s=snapshot(state_history=[{'state':2,'country':OTHER},{'state':5,'country':THIRD}],country_history=[{'country':THIRD,'country_type':'decentralized'}])
+        with patch.object(available,'state_regions',lambda s:{2:'a',5:'b'}):
+            self.assertEqual(available.article_regions(s,'non_colonization_agreement'),['b'])
+            self.assertEqual(available.article_regions(s,'law_commitment'),['a','b'])
+
+    def test_nationalisation_is_demanded_only_of_a_country_that_owns_buildings_here(self):
+        types={'force_nationalization':{'target_type':['country'],'settings':['validate_force_nationalization']}}
+        s=snapshot({'common/war_goal_types':types})
+        s.keys=lambda name:list(types)
+        for owns,expected in ((False,[]),(True,[{'diplomatic_play':4,'war_goal_type':'force_nationalization','holder':PLAYER,'country':OTHER}])):
+            with patch.object(available,'open_plays',lambda s:[4]),patch.object(available,'goal_targets',lambda s,play,kind:{OTHER}),patch.object(available,'owns_here',lambda s,country:owns):
+                self.assertEqual(available.goal_drafts(s,'country'),expected)
+
+
+class ConflictTests(unittest.TestCase):
+    def test_changing_a_treaty_and_proposing_to_its_other_country_cannot_share_a_pause(self):
+        from loop import run
+        s=snapshot(treaty_history=[{'treaty':7,'first_country':OTHER,'second_country':PLAYER},{'treaty':8,'first_country':OTHER,'second_country':THIRD}])
+        links=run.linked(s)
+        self.assertEqual(links[('treaty',7)],('country',OTHER))
+        self.assertNotIn(('treaty',8),links)
+        amended=run.targets('amend_demand_treaty_article',{'treaty':7,'treaty_article':'abandon_piracy'},links)
+        proposed=run.targets('demand_timed_treaty_article',{'country':OTHER,'treaty_article':'non_piracy_agreement','days':'5475'})
+        self.assertIn(('country',OTHER),amended&proposed)
+
+    def test_a_pause_holds_one_sway(self):
+        from loop import run
+        sways={name for name in BY_NAME if name.startswith('offer_sway')}
+        self.assertEqual(set(run.SLOTS['sway']),sways)
+
+
+class StandardMethodTests(unittest.TestCase):
+    class Country:
+        methods=[('farm','base','old'),('farm','base','new')]
+
+        def __init__(self,rows):
+            self.rows=rows
+
+        def buildings(self):
+            return [(ident,'farm',levels) for ident,levels,_ in self.rows]
+
+        def grouped(self,table,columns):
+            return {ident:[method] for ident,_,method in self.rows}
+
+        def memo(self,name,compute):
+            return compute()
+
+    def test_the_standard_is_the_method_most_levels_use(self):
+        self.assertEqual(available.resettable(self.Country([(1,5,'new'),(2,1,'old'),(3,1,'old')])),[2,3])
+
+    def test_a_tie_sets_no_standard(self):
+        self.assertEqual(available.resettable(self.Country([(1,2,'new'),(2,2,'old')])),[])
+
+    def test_an_empty_building_neither_counts_nor_resets(self):
+        self.assertEqual(available.resettable(self.Country([(1,3,'new'),(2,0,'old')])),[])

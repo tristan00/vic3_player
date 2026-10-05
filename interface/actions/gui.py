@@ -90,11 +90,19 @@ def result(command,valid,why=''):
 
 
 CLEAN=('PopupManager.ClosePopups','InformationPanelBar.ClosePanel','RightClickMenuManager.Close')
-AFTER=('MapListPanelManager.ResetActiveMapInteraction','MapListPanelManager.CloseCurrentPanel','CloseAllTooltips',*CLEAN)
+AFTER=('MapListPanelManager.ResetActiveMapInteraction','MapListPanelManager.CloseCurrentPanel','GetLensToolbar.Close','CloseAllTooltips',*CLEAN)
 
 
 FIRED=f"ToString_int32({number('interface_seq')})"
 UNFIRED=f"Not(EqualTo_string(GetVariableSystem.Get('interface_fired'), {FIRED}))"
+
+
+@timed_often
+def reached(flag):
+    return f"EqualTo_string(GetVariableSystem.Get('{flag}'), {FIRED})"
+
+
+TICKED=reached('interface_tick')
 
 
 @timed_often
@@ -109,7 +117,7 @@ def states(code,action,chain,index,values):
     match=[fill(condition,values) for _,condition in chain if condition]
     base=conjunction(equal('interface_action',code),equal('interface_choice',index) if index is not None else '',
                      "GetVariableSystem.Exists('interface_key_ready')" if needs_key(action) else '',
-                     f"GetVariableSystem.Exists('{stage_flag(len(action.stages)-1)}')" if action.stages else "GetVariableSystem.Exists('interface_map_go')" if action.start else '',*match)
+                     reached(stage_flag(len(action.stages)-1)) if action.stages else reached('interface_map_go') if action.start else '',*match)
     clear=["GetVariableSystem.Clear('interface_key_ready')","GetVariableSystem.Clear('interface_overseas')","GetVariableSystem.Clear('interface_admit')",
            *(["GetVariableSystem.Clear('interface_map_go')"] if action.start else []),
            *[f"GetVariableSystem.Clear('{flag(number)}')" for number in range(len(action.stages)) for flag in (stage_flag,armed_flag)]]
@@ -142,10 +150,10 @@ ADMIT="GetVariableSystem.Get('interface_admit')"
 
 
 @timed_often
-def refusal(action):
+def refusal(action,told="'absent'"):
     clear=["GetVariableSystem.Clear('interface_key_ready')","GetVariableSystem.Clear('interface_map_go')","GetVariableSystem.Clear('interface_admit')",
            *[f"GetVariableSystem.Clear('{flag(number)}')" for number in range(len(action.stages)) for flag in (stage_flag,armed_flag)]]
-    calls=[f"GetVariableSystem.Set('interface_fired', {FIRED})",*clear,"GetVariableSystem.Set('interface_action_valid', '0')","GetVariableSystem.Set('interface_action_desc', 'absent')",
+    calls=[f"GetVariableSystem.Set('interface_fired', {FIRED})",*clear,"GetVariableSystem.Set('interface_action_valid', '0')",f"GetVariableSystem.Set('interface_action_desc', {told})",
            "GetVariableSystem.Set('interface_clean', 'all')",*action.cleanup,*after(True)]
     return ' '.join(f'on_start = "[{call}]"' for call in calls)
 
@@ -159,15 +167,38 @@ def absent_widget(code,action,index,values):
         for flip in (0,1):
             turn=conjunction(equal('interface_mode',mode),equal('interface_flip',flip))
             if action.admit:
-                asked=conjunction(base,"GetVariableSystem.Exists('interface_map_go')","Not(GetVariableSystem.Exists('interface_admit'))",turn)
-                decided=f"GetVariableSystem.Set('interface_admit', Select_CString({fill(action.admit,values)}, '1', '0'))"
-                states.append(f'state = {{ name = admit_{code}_{index}_{mode}_{flip} trigger_when = "[{asked}]" on_start = "[{decided}]" }}')
+                asked=conjunction(base,reached('interface_map_go'),"Not(GetVariableSystem.Exists('interface_admit'))",turn)
+                decided=[*action.prepare,f"GetVariableSystem.Set('interface_admit', Select_CString({fill(action.admit,values)}, '1', '0'))"]
+                states.append(f'state = {{ name = admit_{code}_{index}_{mode}_{flip} trigger_when = "[{asked}]" '+' '.join(f'on_start = "[{call}]"' for call in decided)+' }')
                 refused=conjunction(base,f"EqualTo_string({ADMIT}, '0')",turn,UNFIRED)
-                states.append(f'state = {{ name = refuse_{code}_{index}_{mode}_{flip} trigger_when = "[{refused}]" {body} }}')
-            for number,(gate,missing) in enumerate(action.absent):
-                trigger=conjunction(base,f"GetVariableSystem.Exists('{gate}')",turn,UNFIRED,fill(missing,values))
-                states.append(f'state = {{ name = absent_{code}_{index}_{number}_{mode}_{flip} trigger_when = "[{trigger}]" {body} }}')
+                reason=refusal(action,fill(action.reason,values)) if action.reason else body
+                states.append(f'state = {{ name = refuse_{code}_{index}_{mode}_{flip} trigger_when = "[{refused}]" {reason} }}')
+            for number,(stage,missing,*told) in enumerate(action.absent):
+                later=[f'Not({reached(flag(stage+1))})' for flag in (armed_flag,stage_flag) if stage+1<len(action.stages)]
+                trigger=conjunction(base,reached(stage_flag(stage)),*later,turn,UNFIRED,fill(missing,values))
+                states.append(f'state = {{ name = absent_{code}_{index}_{number}_{mode}_{flip} trigger_when = "[{trigger}]" {refusal(action,*(fill(text,values) for text in told))} }}')
     return 'widget = { size = { 0 0 }'+chr(10)+chr(10).join(states)+chr(10)+'}'
+
+
+@timed_often
+def deadline_widgets():
+    widgets=[]
+    for code,action in enumerate(ACTIONS,1):
+        if not action.deadline:
+            continue
+        allowed=round(action.deadline+len(action.stages)*(STAGE+.05),2)
+        for index,values in variants(action):
+            base=conjunction(equal('interface_action',code),equal('interface_choice',index) if index is not None else '')
+            for mode in (1,2):
+                for flip in (0,1):
+                    turn=conjunction(base,equal('interface_mode',mode),equal('interface_flip',flip),UNFIRED)
+                    waiting=conjunction(reached('interface_map_go') if action.start else '',turn)
+                    mine=f'interface_deadline_{code}_{index}_{mode}_{flip}'
+                    widgets.append(f'widget = {{ size = {{ 0 0 }} state = {{ name = deadline_{code}_{index}_{mode}_{flip} trigger_when = "[{waiting}]" duration = {allowed} '
+                                   f'on_start = "[GetVariableSystem.Set(\'{mine}\', {FIRED})]" '
+                                   f'on_finish = "[GetVariableSystem.Set(\'interface_tick\', GetVariableSystem.Get(\'{mine}\'))]" }} }}')
+                    widgets.append(f'widget = {{ size = {{ 0 0 }} state = {{ name = late_{code}_{index}_{mode}_{flip} trigger_when = "[{conjunction(TICKED,turn)}]" {refusal(action)} }} }}')
+    return widgets
 
 
 @timed_often
@@ -193,11 +224,11 @@ def start_widgets():
             for index,values in variants(action):
                 base=conjunction(equal('interface_action',code),equal('interface_choice',index) if index is not None else '',
                                  *[fill(condition,values) for _,condition in chain if condition])
-                inner=('widget = { size = { 0 0 }\n'+'\n'.join(f'state = {{ name = start_{code}_{index}_{mode}_{flip} trigger_when = "[{conjunction(base,equal("interface_mode",mode),equal("interface_flip",flip))}]" duration = 0.3 '
+                inner=('widget = { size = { 0 0 }\n'+'\n'.join(f'state = {{ name = start_{code}_{index}_{mode}_{flip} trigger_when = "[{conjunction(base,equal("interface_mode",mode),equal("interface_flip",flip),UNFIRED)}]" duration = 0.3 '
                                                                f'on_start = "[GetVariableSystem.Clear(\'interface_map_go\')]" on_start = "[GetVariableSystem.Clear(\'interface_admit\')]" '
                                                                +' '.join(f'on_start = "[{call}]"' for call in CLEAN)+' '
                                                                +' '.join(f'on_start = "[{fill(command,values)}]"' for command in commands)+' '
-                                                               f'on_finish = "[GetVariableSystem.Set(\'interface_map_go\', \'1\')]" }}' for mode in (1,2) for flip in (0,1))+'\n}')
+                                                               f'on_finish = "[GetVariableSystem.Set(\'interface_map_go\', {FIRED})]" }}' for mode in (1,2) for flip in (0,1))+'\n}')
                 widgets.append(wrap(code,action,chain,values,inner))
     return widgets
 
@@ -224,19 +255,18 @@ MAX_STAGES=max(len(action.stages) for action in ACTIONS)
 
 
 STAGE_TIMERS=' '.join(f'state = {{ name = interface_stage_timer_{number} trigger_when = "[GetVariableSystem.Exists(\'{armed_flag(number)}\')]" duration = {STAGE} '
-                      f'on_finish = "[GetVariableSystem.Clear(\'{armed_flag(number)}\')]" on_finish = "[GetVariableSystem.Set(\'{stage_flag(number)}\', \'1\')]" }}'
+                      f'on_finish = "[GetVariableSystem.Set(\'{stage_flag(number)}\', GetVariableSystem.Get(\'{armed_flag(number)}\'))]" on_finish = "[GetVariableSystem.Clear(\'{armed_flag(number)}\')]" }}'
                       for number in range(MAX_STAGES))
 
 
 @timed_often
 def stage_widget(code,action,index,values,number,chain,calls):
-    gate=stage_flag(number-1) if number else 'interface_map_go'
-    base=conjunction(equal('interface_action',code),equal('interface_choice',index) if index is not None else '',f"GetVariableSystem.Exists('{gate}')",
-                     f"Not(GetVariableSystem.Exists('{armed_flag(number)}'))",f"Not(GetVariableSystem.Exists('{stage_flag(number)}'))",
+    base=conjunction(equal('interface_action',code),equal('interface_choice',index) if index is not None else '',reached(stage_flag(number-1) if number else 'interface_map_go'),
+                     f'Not({reached(armed_flag(number))})',f'Not({reached(stage_flag(number))})',
                      *[fill(condition,values) for _,condition in chain if condition])
     starts=' '.join(f'on_start = "[{fill(call,values)}]"' for call in calls(values))
     states=[f'state = {{ name = stage_{code}_{index}_{number}_{mode}_{flip} trigger_when = "[{conjunction(base,equal("interface_mode",mode),equal("interface_flip",flip))}]" '
-            f'{starts} on_start = "[GetVariableSystem.Set(\'{armed_flag(number)}\', \'1\')]" }}' for mode in (1,2) for flip in (0,1)]
+            f'{starts} on_start = "[GetVariableSystem.Set(\'{armed_flag(number)}\', {FIRED})]" }}' for mode in (1,2) for flip in (0,1)]
     return wrap(code,action,listed(chain),values,'widget = { size = { 0 0 }\n'+'\n'.join(states)+'\n}')
 
 
@@ -329,7 +359,7 @@ def ship_navigation():
     states=[]
     for current in range(MAX_SHIP_PAGES+1):
         for step,compare in (('Next','LessThan_int32'),('Prev','GreaterThan_int32')):
-            trigger=conjunction(shipping,"GetVariableSystem.Exists('interface_stage0')",f"EqualTo_int32({page}, '(int32){current}')",f'{compare}({page}, {target})')
+            trigger=conjunction(shipping,reached(stage_flag(0)),f"EqualTo_int32({page}, '(int32){current}')",f'{compare}({page}, {target})')
             states.append(f'state = {{ name = interface_ship_page_{step}_{current} trigger_when = "[{trigger}]" on_start = "[ConstructionPanel.{step}MilitaryShipConstructionQueuePage]" }}')
     return 'widget = { size = { 0 0 } '+' '.join(states)+' }'
 
@@ -352,7 +382,7 @@ DEFERRED_CLEAN=('widget = { size = { 0 0 } '+STAGE_TIMERS+' '+deferred_state('al
 def hud(game_dir,mods=()):
     return ('widget = { name = interface_actions size = { 0 0 } '
             f'visible = "[GreaterThan_CFixedPoint({VAR.format("interface_action")}.GetValue, \'(CFixedPoint)0\')]"\n'
-            +'\n'.join([DEFERRED_CLEAN,*key_widgets(key_table(game_dir,mods)),*action_widgets(False),*start_widgets()])+'\n}\n')
+            +'\n'.join([DEFERRED_CLEAN,*key_widgets(key_table(game_dir,mods)),*action_widgets(False),*start_widgets(),*deadline_widgets()])+'\n}\n')
 
 
 PROPOSAL_CAPTURE=('widget = { size = { 0 0 } state = { name = capture_message duration = 0.001 '
