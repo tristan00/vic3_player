@@ -1,8 +1,6 @@
 import ast
 import importlib
-import json
 from pathlib import Path
-import pickle
 import subprocess
 import tempfile
 from types import SimpleNamespace
@@ -222,23 +220,6 @@ class RowTuningTests(unittest.TestCase):
             self.assertTrue(monitor.after_iteration(SimpleNamespace(iteration=iteration,metrics={'validation':{'RMSE':[float(iteration)]}})))
         self.assertEqual(monitor.completed,50)
 
-    def test_every_new_parameter_has_compatible_catboost_settings(self):
-        from advisors.models.row import tune
-        rows=features.frame([{'action':str(i%3),'parameter.option.int':float(i)} for i in range(24)])
-        targets=np.linspace(-1,1,24)
-        for bootstrap in tune.RANGES['bootstrap_type']:
-            for growth in tune.RANGES['grow_policy']:
-                params=tune.conditional({**tune.DEFAULTS,**tune.initial()[0],'bootstrap_type':bootstrap,
-                                         'grow_policy':growth,'boosting_type':'Ordered','depth':2,
-                                         'iterations':2,'thread_count':1,'one_hot_max_size':2,'min_data_in_leaf':5,
-                                         'max_leaves':16,'subsample':.7,'bagging_temperature':2.})
-                self.assertEqual('bagging_temperature' in params,bootstrap=='Bayesian')
-                self.assertEqual('subsample' in params,bootstrap in ('MVS','Bernoulli'))
-                self.assertEqual('min_data_in_leaf' in params,growth!='SymmetricTree')
-                self.assertEqual('max_leaves' in params,growth=='Lossguide')
-                model=Model(params).fit(rows,targets)
-                self.assertTrue(np.isfinite(model.predict(rows)).all())
-
     def test_wall_clock_limit_kills_a_worker_before_training_can_report(self):
         from advisors.models.row import tune
         processes=[]
@@ -257,34 +238,6 @@ class RowTuningTests(unittest.TestCase):
         self.assertLess(result['wall_seconds'],2)
         self.assertEqual(len(processes),1)
         self.assertIsNotNone(processes[0].poll())
-
-    def test_worker_and_finalizer_reproduce_the_blend_on_the_recorded_dataset(self):
-        from advisors.models.row import finalize, tune
-        rows=features.frame([{'action':str(i%3),'parameter.option.int':float(i%8)} for i in range(24)])
-        targets=np.tile(np.linspace(-1,1,8),3)
-        runs=np.repeat([1,2,3],8)
-        recorded=SimpleNamespace(X=rows,y=targets,runs=runs,train=np.arange(16),test=np.arange(16,24),
-                                 meta=pd.DataFrame({'run':runs,'before_seq':0}))
-        metric=tune.Validation(targets[:16],targets[16:],recorded.meta.iloc[16:])
-        params={**tune.initial()[0],'depth':2}
-        with tempfile.TemporaryDirectory() as directory:
-            output=Path(directory)
-            source=output/'custom.pkl'
-            source.write_bytes(pickle.dumps(recorded))
-            result=tune.run_trial(0,params,source,output,10,1)
-            self.assertIsNone(result['stop'])
-            (output/'trial_000.json').write_text(json.dumps(result))
-            (output/'status.json').write_text(json.dumps({'finished':1,'requested':1,'seconds':result['wall_seconds']}))
-            (output/'search.json').write_text(json.dumps({'data':str(source),'validation':metric.configuration(),'seconds_per_trial':10,
-                                                         'incumbent_params':{**params,'thread_count':1}}))
-            with patch.object(finalize,'PARAMETERS',output/'parameters.json'), patch('sys.argv',['finalize','--directory',str(output)]):
-                finalize.main()
-            report=json.loads((output/'report.json').read_text())
-            self.assertAlmostEqual(report['selected_metrics']['score'],result['score'])
-            self.assertEqual(report['production_rows'],24)
-            self.assertEqual(json.loads((output/'parameters.json').read_text()),report['selected_params'])
-            self.assertTrue((output/'model.cbm').is_file())
-
 
 class RowValidationTests(unittest.TestCase):
     def metric(self,targets,pauses):

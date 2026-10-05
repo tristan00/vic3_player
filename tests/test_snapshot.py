@@ -289,6 +289,23 @@ class RuleTests(unittest.TestCase):
         with mock.patch('interface.options.available.technologies',lambda s:(set(),set(),set(),set())):
             self.assertEqual(RULES['build'](s),[{'state':PLAYER,'building_type':'building_mine'}])
 
+    def test_build_is_not_offered_while_the_government_queue_would_take_a_year_or_more(self):
+        from unittest import mock
+        def offered(*items):
+            s=snapshot({'common/buildings':{'building_mine':{}}},state_history=[{'state':PLAYER,'country':PLAYER,'state_region':3}],
+                       player_construction_queue_item=[{'private':private,'position':position,'state':OTHER,'building_type':'building_farm','speed':speed,'construction_left':left}
+                                                       for position,(private,speed,left) in enumerate(items)],player_treasury=[{'in_default':False}])
+            with mock.patch('interface.options.available.technologies',lambda s:(set(),set(),set(),set())):
+                return RULES['build'](s)
+        mine=[{'state':PLAYER,'building_type':'building_mine'}]
+        self.assertEqual(offered(),mine)
+        self.assertEqual(offered((False,10,300),(False,0,219)),mine)
+        self.assertEqual(offered((False,10,300),(False,0,220)),[])
+        self.assertEqual(offered((False,0,100)),[])
+        self.assertEqual(offered((True,10,9000)),mine)
+        self.assertEqual(offered((True,5,9000),(False,5,259)),mine)
+        self.assertEqual(offered((True,5,9000),(False,5,260)),[])
+
     def test_resource_buildings_are_offered_while_the_state_region_has_capacity_left(self):
         from unittest import mock
         s=snapshot({'common/buildings':{'building_mine':{'building_group':['bg_mining']},'building_camp':{'building_group':['bg_logging']}},

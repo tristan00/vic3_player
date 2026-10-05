@@ -1,3 +1,4 @@
+from functools import lru_cache
 import re
 import sys
 import unittest
@@ -39,6 +40,11 @@ class CatalogueTests(unittest.TestCase):
                 self.assertNotRegex(text,r'\{\w+\}',action.name)
 
 
+@lru_cache(maxsize=None)
+def windows():
+    return gui.windows(DEFAULT_GAME/'game')
+
+
 class GeneratedGuiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -55,7 +61,7 @@ class GeneratedGuiTests(unittest.TestCase):
             self.assertIn(f'(CFixedPoint){code}\')',self.hud)
 
     def test_every_generated_callback_is_bracketed(self):
-        texts=[*gui.windows(DEFAULT_GAME/'game').values(),gui.hud(DEFAULT_GAME/'game')]
+        texts=[*windows().values(),self.hud]
         self.assertEqual([m for t in texts for m in re.findall(r'on_(?:start|finish) = "\[[^"]*"',t) if not m.endswith(']"')],[])
 
     def test_key_codes_are_unique_and_dense(self):
@@ -112,7 +118,7 @@ class DataTypeTests(unittest.TestCase):
         for m in re.finditer(r'^([A-Z][\w.]*)(?:\( [^)]*\))?\nDefinition type: [\w ]+\nReturn type: (\S+)',text,re.M):
             if m[2]!='[unregistered]':
                 returns.setdefault(m[1],m[2])
-        closers={call for text in gui.windows(DEFAULT_GAME/'game').values() for call in re.findall(r'name = interface_close [^}]*on_start = "\[([\w.]+)(?:\([\w.]*\))?\]"',text)}
+        closers={call for text in windows().values() for call in re.findall(r'name = interface_close [^}]*on_start = "\[([\w.]+)(?:\([\w.]*\))?\]"',text)}
         self.assertIn('PopupManager.HideTransportPlannerPopup',closers)
         for call in [*gui.AFTER,*closers]:
             head,_,member=call.partition('.')

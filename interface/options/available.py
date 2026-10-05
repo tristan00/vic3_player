@@ -954,6 +954,16 @@ def group_kinds(s,field,value):
     return s.memo(('group_kinds',field,value),lambda:{kind for kind,fields in s.definitions('common/buildings').items() if marked(next(iter(fields.get('building_group',())),None))})
 
 
+QUEUE_WEEKS=52
+
+
+@timed_often
+def queue_weeks(s):
+    queued=[(speed,left) for private,speed,left in s.rows('player_construction_queue_item','private,speed,construction_left') if not private]
+    pace=sum(speed for speed,_ in queued)
+    return sum(left for _,left in queued)/pace if pace else float('inf') if queued else 0
+
+
 @timed_often
 def buildable(s):
     acquired,_,_,_=technologies(s)
@@ -2596,7 +2606,7 @@ def transferable_subjects(s):
 
 
 RULES={
-    'build':lambda s:[] if in_default(s) else buildable(s),
+    'build':lambda s:[] if in_default(s) or queue_weeks(s)>=QUEUE_WEEKS else buildable(s),
     'offer_treaty_article':lambda s:treaty_articles(s,'directed',True,False),
     'demand_treaty_article':lambda s:treaty_articles(s,'directed',False,False),
     'agree_treaty_article':lambda s:treaty_articles(s,'mutual',True,False),

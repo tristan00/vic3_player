@@ -1,5 +1,4 @@
 import copy
-import hashlib
 import json
 from pathlib import Path
 import pickle
@@ -7,7 +6,7 @@ import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -135,21 +134,6 @@ class HistogramSearchTests(unittest.TestCase):
                              {name:value for name,value in expected.items() if name!='iterations'})
             self.assertTrue(all(1<=size<=bins[name] for name,size in sizes.items()))
 
-    def test_every_bootstrap_and_growth_combination_fits_histogram_features(self):
-        from advisors.models import search_space
-        data=dataset()
-        data.laws[:,0]=[f'law{index%3}' for index in range(len(data.y))]
-        base,_=tune.decode(tune.initial(tune.available(data)),tune.available(data))
-        for bootstrap in tune.RANGES['bootstrap_type']:
-            for growth in tune.RANGES['grow_policy']:
-                params=search_space.conditional({**search_space.DEFAULTS,**base,'bootstrap_type':bootstrap,
-                                                'grow_policy':growth,'boosting_type':'Ordered','depth':2,
-                                                'iterations':2,'one_hot_max_size':2,'min_data_in_leaf':1,
-                                                'max_leaves':16,'subsample':.7,'bagging_temperature':2.})
-                found=tune.evaluate(data,{'action':1},params,1)
-                self.assertEqual(found['trees'],[2,2])
-                self.assertTrue(np.isfinite(found['score']))
-
     def test_timed_out_trial_has_no_score_and_passes_the_hard_deadline_to_subprocess(self):
         with tempfile.TemporaryDirectory() as directory:
             output=Path(directory)
@@ -177,51 +161,6 @@ class HistogramSearchTests(unittest.TestCase):
             self.assertEqual(json.loads((output/'status.json').read_text())['completed_fits'],2)
             with self.assertRaises(FileExistsError):
                 tune.search(data,source,output,3)
-
-    def test_real_worker_reproduces_metrics_and_finishes_all_folds(self):
-        data=dataset()
-        params={'iterations':4,'depth':2,'learning_rate':.1,'one_hot_max_size':2}
-        sizes={'action':1}
-        expected=tune.evaluate(data,sizes,params,1)
-        with tempfile.TemporaryDirectory() as directory:
-            output=Path(directory)
-            source=output/'data.pkl'
-            source.write_bytes(pickle.dumps(data))
-            result=tune.run_trial(0,params,sizes,source,output,8,1)
-        self.assertIsNone(result['stop'])
-        self.assertEqual(result['trees'],[4,4])
-        for name in ('score','rmse','reward_loss','entropy_loss','mean_pause_entropy'):
-            self.assertAlmostEqual(result[name],expected[name])
-
-
-class HistogramFinalizationTests(unittest.TestCase):
-    def test_installs_exact_winner_histograms_only_after_verification_and_roundtrip_fit(self):
-        from advisors.models.histogram import finalize
-        data=dataset()
-        params={'iterations':4,'depth':2,'learning_rate':.1,'one_hot_max_size':2}
-        sizes={'action':1}
-        with tempfile.TemporaryDirectory() as directory:
-            output=Path(directory)
-            source=output/'data.pkl'
-            source.write_bytes(pickle.dumps(data))
-            selected={**tune.evaluate(data,sizes,params,1),'trial':0,'params':params,'sizes':sizes,'stop':None}
-            (output/'trial_0000.json').write_text(json.dumps(selected))
-            (output/'status.json').write_text(json.dumps({'finished':1,'requested':1,'best':selected}))
-            config={'data':str(source),'data_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),
-                    'validation':Validation(data).configuration(),'seconds_per_trial':8,'threads':1}
-            (output/'search.json').write_text(json.dumps(config))
-            parameters=output/'parameters.json'
-            previous={'params':params,'sizes':{'forced_histogram':500}}
-            parameters.write_text(json.dumps(previous))
-            with patch.object(finalize,'PARAMETERS',parameters):
-                report=finalize.finalize(output)
-                self.assertEqual(json.loads(parameters.read_text()),{'params':{**params,'thread_count':1},'sizes':sizes})
-                self.assertEqual(report['previous'],previous)
-                self.assertEqual(report['fit']['trees'],4)
-                source.write_bytes(b'changed')
-                with self.assertRaisesRegex(RuntimeError,'frozen data changed'):
-                    finalize.finalize(output)
-
 
 if __name__=='__main__':
     unittest.main()

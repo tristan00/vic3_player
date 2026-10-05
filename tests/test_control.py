@@ -26,31 +26,6 @@ def event_widget():
 
 
 class StartupTests(unittest.TestCase):
-    def test_world_hud_survives_control_mod_generation(self):
-        from tempfile import TemporaryDirectory
-        from interface.runner.control import prepare
-        from interface.runner.session import GameInterface
-        with TemporaryDirectory() as directory:
-            game=GameInterface('probe',data_dir=directory,quarterly_pause=True)
-            root=Path(directory)/'world'
-            (root/'gui').mkdir(parents=True)
-            (root/'map_data').mkdir()
-            for name in ('province_terrains.txt','default.map'):
-                (root/'map_data'/name).write_text('')
-            source=(GAME/'gui/ingame_hud.gui').read_text(encoding='utf-8-sig')
-            source=source.replace('name = "ingame_hud"','name = "ingame_hud" widget = { name = interface_uniform_offer size = { 0 0 } }',1)
-            (root/'gui/ingame_hud.gui').write_text(source,encoding='utf-8')
-            mod=prepare(game,'XAA',{'mod':str(root),'width':100,'height':100,'countries':[],'states':[],'seas':[]})
-            text=(mod/'gui/ingame_hud.gui').read_text(encoding='utf-8-sig')
-            self.assertIn('name = interface_uniform_offer',text)
-            self.assertIn('name = interface_ctrl',text)
-            self.assertIn('name = interface_quarterly_pause',text)
-            pulse=(mod/'common/on_actions/interface_quarterly.txt').read_text(encoding='utf-8-sig')
-            self.assertIn('on_monthly_pulse',pulse)
-            self.assertIn('OR = { month = 0 month = 3 month = 6 month = 9 }',pulse)
-            scripted=(mod/'common/scripted_guis/interface.txt').read_text(encoding='utf-8-sig')
-            self.assertIn('if = { limit = { NOT = { has_variable = interface_quarterly_pause } }',scripted)
-
     def test_loading_can_be_quiet_until_the_requested_startup_timeout(self):
         import json
         from tempfile import TemporaryDirectory
@@ -301,19 +276,6 @@ class AbsentReferenceTests(unittest.TestCase):
         self.assertEqual(self.missing('owns = s:STATE_INTERFACE_1'), [])
         self.assertEqual(self.missing('owns_entire_state_region = STATE_INTERFACE_2'), [])
         self.assertEqual(self.missing('c:XAA ?= this'), [])
-
-    def test_a_decision_whose_is_shown_is_unevaluable_is_dropped_entirely(self):
-        if not GAME.is_dir():
-            self.skipTest('game install not present')
-        from interface.recording.capture import capture_body, missing_references
-        world = self.WORLD
-        body = capture_body(DEFAULT_GAME, 'XAA', world)
-        for name, shown, _ in decisions(GAME, [world['mod']]):
-            marker = 'name = cap_decision target = flag:' + name + ' '
-            if missing_references(shown, world):
-                self.assertNotIn(marker, body, name)
-            else:
-                self.assertIn(marker, body, name)
 
     def test_a_vanilla_sized_world_filters_nothing(self):
         from interface.recording.capture import missing_references

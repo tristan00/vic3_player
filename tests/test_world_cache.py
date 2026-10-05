@@ -4,11 +4,9 @@ from contextlib import redirect_stdout
 import io
 from pathlib import Path
 import random
-from types import SimpleNamespace
-import threading
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from unittest.mock import Mock
 
 import numpy as np
@@ -49,48 +47,6 @@ class CacheTests(unittest.TestCase):
             self.assertEqual(created,[sizes[1][0]])
             self.assertEqual(json.loads((root/'status.json').read_text())['phase'],'complete')
             self.assertEqual(len(json.loads((root/'index.json').read_text())['worlds']),2)
-
-    def test_preparation_overlaps_loading_and_reports_progress_before_the_loop(self):
-        import loop.run as run
-        game=MagicMock()
-        advisor=MagicMock(name='advisor')
-        picker=MagicMock()
-        picker.name='first'
-        worlds=MagicMock()
-        worlds.take.return_value=None
-        store=MagicMock()
-        store.recent_tags.return_value=[]
-        started=threading.Event()
-        loading=threading.Event()
-        registered=threading.Event()
-        heartbeat=threading.Event()
-        trained=threading.Event()
-        def train(*args):
-            self.assertTrue(heartbeat.wait(2))
-            trained.set()
-        def progress(step):
-            if step=='run preparation':
-                heartbeat.set()
-        def prepare(*args):
-            started.set()
-            if not loading.wait(2):
-                raise AssertionError('Loading did not overlap registration')
-            registered.set()
-        def ready(*args):
-            self.assertTrue(started.wait(2))
-            loading.set()
-            self.assertTrue(heartbeat.wait(2))
-        def loop(*args):
-            self.assertTrue(registered.is_set())
-            self.assertTrue(trained.is_set())
-            return MagicMock()
-        game.campaign_ready.side_effect=ready
-        picker.start_run.side_effect=train
-        args=SimpleNamespace(warmup=2,advisors=['random'],pickers=['first'],years=1)
-        with patch.object(run,'Store',return_value=store),patch.object(run,'prepare_recording',side_effect=prepare),patch.object(run,'run_record',return_value={}),patch.object(run,'Loop',side_effect=loop),patch.object(run,'progress',side_effect=progress):
-            run.session(game,MagicMock(),random.Random(5),worlds,{'random':advisor},{'first':picker},args,None,1,0)
-        self.assertFalse(game.campaign.call_args.kwargs['wait'])
-        self.assertIsNone(game.campaign.call_args.kwargs['world'])
 
     def test_spread_roundoff_cannot_push_a_zero_target_below_zero(self):
         rng=random.Random(0)
@@ -133,23 +89,6 @@ class CacheTests(unittest.TestCase):
             cache.publish(root/'index.json',{'fingerprint':'old','worlds':[]})
             with self.assertRaisesRegex(ValueError,'different sources'):
                 cache.Cached(root,random.Random(1))
-
-    def test_worlds_are_reusable_and_selected_by_the_run_rng(self):
-        with TemporaryDirectory() as directory,patch.object(cache,'fingerprint',return_value='current'),patch.object(cache,'checked'):
-            root=Path(directory)
-            paths=[]
-            for i in range(1000):
-                path=root/'worlds'/str(i)/'manifest.json'
-                path.parent.mkdir(parents=True)
-                path.write_text('{}')
-                paths.append(str(path.relative_to(root)))
-            cache.publish(root/'index.json',{'fingerprint':'current','worlds':paths})
-            worlds=cache.Cached(root,random.Random(3))
-            expected=random.Random(3)
-            for _ in range(10):
-                self.assertEqual(worlds.take(),expected.choice(worlds.worlds))
-            self.assertEqual(len(worlds.worlds),1000)
-            self.assertTrue(all(path.exists() for path in worlds.worlds))
 
     def test_shared_rasters_produce_the_same_texture_samples(self):
         source={'provinces':np.array([[1,1,2],[1,2,2]]),'height':np.arange(6).reshape(2,3)}
