@@ -11,6 +11,8 @@
     "downsize_building": -2,
     "raise_construction_priority": -2,
     "lower_construction_priority": -2,
-    "lower_power_bloc": -1
+    "lower_power_bloc": -1,
+    "military_operations": 1,
+    "relations": 1
   }
 }
