@@ -592,11 +592,22 @@ TOP_PRESTIGE=('GBR','CHI','FRA','RUS','BIC','PRU','AUS','TUR','USA','EGY','JAP',
 
 
 RECENT_ROUNDS=5
+PREPARATION_LIMIT=60
 
 
 @timed_often
 def lineup(arguments,completed):
     return (['random'],['first']) if completed<arguments.warmup else (arguments.advisors,arguments.pickers)
+
+
+@timed
+def warm(pickers):
+    store=Store()
+    with ThreadPoolExecutor(1) as trainer:
+        training=trainer.submit(lambda:[picker.start_run(store,None) for picker in pickers.values()])
+        while not wait([training],timeout=1)[0]:
+            progress('picker warmup')
+        training.result()
 
 
 @timed
@@ -622,11 +633,11 @@ def session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,seconds,c
         game.campaign(tag,world=str(world) if world else None,debug=False,wait=False)
         registration=trainer.submit(prepare_recording,game,store,world)
         loading=trainer.submit(game.campaign_ready,tag,world)
-        deadline=time.monotonic()+180
+        deadline=time.monotonic()+PREPARATION_LIMIT
         while wait([training,registration,loading],timeout=1)[1]:
             progress('run preparation')
             if time.monotonic()>deadline:
-                raise TimeoutError('Run preparation exceeded 180 seconds')
+                raise TimeoutError(f'Run preparation exceeded {PREPARATION_LIMIT} seconds')
         training.result()
         registration.result()
         loading.result()
@@ -666,7 +677,7 @@ def main(argv=None):
     parser.add_argument('--minutes',type=float,default=30)
     parser.add_argument('--seed',type=int,default=int(time.strftime('%Y%m%d%H%M%S')))
     parser.add_argument('--pool',type=int,default=0)
-    parser.add_argument('--world-cache',help='reuse a completed cache containing at least 1000 worlds')
+    parser.add_argument('--world-cache',help='reuse a completed cache')
     parser.add_argument('--vanilla',action='store_true')
     parser.add_argument('--tag')
     parser.add_argument('--weight',nargs='+',default=[],metavar='LEVER=0',help='switches the lever off for every initializer')
@@ -702,10 +713,11 @@ def main(argv=None):
     rng=random.Random(arguments.seed)
     advisors={name:ADVISORS[name](rng.randrange(10**9),weights) for name in sorted(set(arguments.advisors)|{'random'})}
     pickers={name:PICKERS[name]() for name in set(arguments.pickers)|{'first'}}
+    completed=supervise.read_progress(arguments.progress_file) if arguments.progress_file else 0
+    warm({name:pickers[name] for name in lineup(arguments,completed)[1]})
     worlds=Cached(arguments.world_cache,rng) if arguments.world_cache else Vanilla(rng) if arguments.vanilla else WorldPool(rng,arguments.pool,levels) if arguments.pool else Fresh(rng,levels)
     chosen=arguments.tag
     crashes=0
-    completed=supervise.read_progress(arguments.progress_file) if arguments.progress_file else 0
     while completed<arguments.runs:
         try:
             counts=session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,arguments.minutes*60,completed)

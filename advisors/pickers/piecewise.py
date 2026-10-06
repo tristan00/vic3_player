@@ -1,3 +1,5 @@
+from concurrent.futures import ProcessPoolExecutor
+
 import numpy as np
 
 from interface.common import timed, timed_often
@@ -19,11 +21,16 @@ class CatBoostPiecewisePicker:
     @timed
     def start_run(self,store,objective):
         data=load(store.connection,cache=self.cache)
-        self.model=Model().fit(data.X,data.y)
+        self.model=self.fit_apart(data)
         params={name:value for name,value in self.model.params.items() if name!='allow_writing_files'}
         params.update(model_kind='row',training_rows=len(data.y))
         starts=len(data.meta[['run','before_seq']].drop_duplicates())
         self.trained=(starts,len(np.unique(data.runs)),current().seconds,params,self.model.importance())
+
+    @timed
+    def fit_apart(self,data):
+        with ProcessPoolExecutor(1) as fresh:
+            return fresh.submit(Model().fit,data.X,data.y).result()
 
     @timed
     def pick(self,candidates,snapshot):
