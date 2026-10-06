@@ -4,7 +4,7 @@ from functools import cached_property
 from interface.common import DEFAULT_GAME, timed, timed_often
 from interface.recording.spec import TABLE
 from interface.script import read
-from ..catalogue import DUTIES, INSTITUTIONS as INSTITUTION_TYPES, LAW_ACTIONS, LAW_GROUP, LAW_GROUPS, PARAMS, PARTY_ACTIONS
+from ..catalogue import DUTIES, INSTITUTIONS as INSTITUTION_TYPES, LAW_ACTIONS, LAW_GROUP, LAW_GROUPS, NAVAL, PARAMS, PARTY_ACTIONS
 from .rewards import COSTS
 
 TYPED={'law':('law','law_type'),'institution':('institution','institution_type'),'interest_group':('interest_group','interest_group_type'),
@@ -13,21 +13,29 @@ TYPED={'law':('law','law_type'),'institution':('institution','institution_type')
 RAW={'int','choice','event'}
 SYNTHETIC={'strategic_region'}
 NONE='none'
+POLICY=['tax_level','government_wage_level','military_wage_level']
 NUMBERS=['treasury','debt','interest','balance','population','bureaucracy_available','standard_of_living','government_queue_items','government_queue_left',
          'private_queue_items','private_queue_left','construction_capacity','construction_used','construction_paused','balance_gdp','battalions','mobilization_ratio',
-         'wars','army_spending','army_spending_gdp','infamy']
+         'wars','army_spending','army_spending_gdp','infamy','government_spending','government_spending_gdp']+POLICY
 WEEKS_PER_YEAR=52
 LAWS=[f'law.{group}' for group in LAW_GROUPS]
+CATEGORIES=LAWS+['player.country_rank']
 GOODS=[key for key,_ in read(DEFAULT_GAME/'game','common/goods')]
-PRICES=[f'price.{goods}' for goods in GOODS]
+PRICES=[f'price.{goods}' for goods in GOODS]+[f'price_above_world.{goods}' for goods in GOODS]
 INSTITUTIONS=[f'institution.{kind}' for kind in INSTITUTION_TYPES]
 NO_DUTY=DUTIES.index('none')
 DIRECTIONS=('import','export')
 TARIFFS=[f'tariff.{direction}.{goods}' for direction in DIRECTIONS for goods in GOODS]
+TAXES=[f'consumption_tax.{goods}' for goods in GOODS]
+SITE=['site.unemployed','site.peasants','site.standard_of_living','site.buildings_of_type','site.literacy','site.population','site.gdp_share']
+PEOPLE=['lower_strata','middle_strata','upper_strata','subsisting_workforce','unemployed_workforce']
+WORLD_PRICES='''select w.run_id,g.name,w.seq,w.price from world_market_price_sample w join goods g on g.goods=w.goods
+where w.run_id = any(%s) and w.date is not null order by w.run_id,w.goods,w.seq'''
 TERRAIN='''select p.world_id,sr.name,t.name,sum(p.area_pixels) from world_province p join state_region sr on sr.state_region=p.state_region join terrain t on t.terrain=p.terrain
 where p.world_id = any(%s) group by 1,2,3'''
 INTEREST=('expense','interest')
 ARMY=('military_slaves','military_goods','military_wages')
+GOVERNMENT=('government_slaves','government_goods','government_wages')
 KINDS={name:list(params) for name,params in PARAMS.items()}
 LEADER_ACTIONS={name for name,params in KINDS.items() if name in LAW_ACTIONS or any(kind in ('interest_group','character','political_movement') for _,kind in params)}
 
@@ -106,6 +114,12 @@ def laws(active):
 
 
 @timed_often
+def categories(lookup):
+    rank=lookup.country(lookup.player)
+    return lookup.laws+[NONE if rank is None else rank]
+
+
+@timed_often
 def institutions(levels):
     return [float(levels.get(kind,0)) for kind in INSTITUTION_TYPES]
 
@@ -116,8 +130,28 @@ def tariffs(levels):
 
 
 @timed_often
-def prices(found):
-    return [float(found[goods]) if goods in found else float('nan') for goods in GOODS]
+def taxes(taxed):
+    return [float(goods in taxed) for goods in GOODS]
+
+
+@timed_often
+def site(people,living,built,literate,share):
+    lower,middle,upper,subsisting,unemployed=[float('nan')]*5 if people is None else people
+    return [float(unemployed),float(subsisting),*(float('nan') if value is None else float(value) for value in (living,built,literate)),float(lower+middle+upper),
+            float('nan') if share is None else float(share)]
+
+
+@timed_often
+def located(action,params,lookup):
+    if 'building' in params:
+        return lookup.home(params['building']),lookup.building(params['building'])
+    return params['state'],params.get('building_type',NAVAL.get(action))
+
+
+@timed_often
+def prices(found,world):
+    return ([float(found[goods]) if goods in found else float('nan') for goods in GOODS]
+            +[float(found[goods]-world[goods]) if goods in found and goods in world else float('nan') for goods in GOODS])
 
 
 @timed_often
@@ -161,8 +195,13 @@ def interest_line(connection):
 
 
 @timed
-def army_lines(connection):
-    return {line for line, in connection.execute("select line from budget_line where direction='expense' and name = any(%s)",(list(ARMY),)).fetchall()}
+def expense_lines(connection,names):
+    return {line for line, in connection.execute("select line from budget_line where direction='expense' and name = any(%s)",(list(names),)).fetchall()}
+
+
+@timed_often
+def spent(budget,lines):
+    return sum(amount for direction,line,amount in budget if direction=='expense' and line in lines)
 
 
 @timed_often
@@ -227,25 +266,36 @@ class LiveLookup:
         sol=s.map('country_standard_of_living_report','country,average_standard_of_living_by_population').get(s.player)
         gdp=s.map('country_economy_report','country,gdp').get(s.player)
         queue=s.rows('player_construction_queue_item','private,construction_left,position,state,building_type')
-        buildings=s.rows('building','building,building_type,state')
+        buildings=s.rows('building','building,building_type,state,levels')
+        built={}
+        for _,kind,state,levels in buildings:
+            built[state,kind]=built.get((state,kind),0)+levels
         report=next((tuple(found) for country,*found in s.rows('country_construction_report','country,base_construction_speed,used_construction,is_construction_paused')
                      if country==s.player),None)
         line=interest_line(s.connection)
-        lines=army_lines(s.connection)
         budget=s.rows('player_budget_line','direction,line,amount')
+        government=spent(budget,expense_lines(s.connection,GOVERNMENT))
         military=next((tuple(found) for country,*found in s.rows('country_military_report','country,battalions,mobilization_ratio') if country==s.player),None)
         wars=sum(1 for _,country in s.rows('war_participant','war,country') if country==s.player)
         return {'terrain':{region:kind for (_,region),kind in majority(s.connection.execute(TERRAIN,([world],)).fetchall()).items()},
                 'states':{state:(region,country) for state,region,country in s.rows('state','state,state_region,country')},
-                'buildings':{building:building_type for building,building_type,_ in buildings},
+                'buildings':{building:building_type for building,building_type,_,_ in buildings},
+                'homes':{building:state for building,_,state,_ in buildings},
+                'built':built,
+                'people':{state:found for state,*found in s.rows('state_population','state,'+','.join(PEOPLE))},
+                'living':s.map('state_standard_of_living_report','state,average_standard_of_living_all'),
+                'literate':s.map('state_population_report','state,literacy'),
+                'shares':s.map('state_economy_report','state,gdp_contribution_percentage'),
                 'queue':queue,
                 'types':{kind:s.map(table,f'{table},{column}') for kind,(table,column) in TYPED.items()},
                 'characters':s.map('character','character,ideology'),
                 'countries':s.map('country','country,country_rank'),
                 'laws':laws(law_type for law_type,country,active in s.rows('law','law_type,country,active') if country==s.player and active),
-                'prices':prices({goods:price for market,goods,price in s.rows('market_goods','market,goods,price') if market==s.map('country','country,market').get(s.player)}),
+                'prices':prices({goods:price for market,goods,price in s.rows('market_goods','market,goods,price') if market==s.map('country','country,market').get(s.player)},
+                                WorldPrices(s.connection,[s.run_id]).at(s.run_id,s.seq)),
                 'institutions':institutions({kind:level for kind,country,level in s.rows('institution','institution_type,country,investment') if country==s.player}),
                 'tariffs':tariffs({(direction,goods):level for direction,goods,level in s.rows('player_tariff','direction,goods,level')}),
+                'taxes':taxes({goods for goods, in s.rows('player_taxed_goods','goods')}),
                 'answers':answers(s.map('event','event,event_type'),s.rows('event_option','event,option,visible_position,default_option,enabled'),
                                   defined(s.connection,s.ruleset_id,set(s.map('event','event,event_type').values()))),
                 'numbers':[treasury['money'],treasury['principal'],
@@ -253,8 +303,9 @@ class LiveLookup:
                            treasury['balance_trend_current'],population['lower_strata']+population['middle_strata']+population['upper_strata'],
                            politics['power_delta_bureaucracy'],float('nan') if sol is None else sol,*queues(queue),*construction(report),
                            balance_gdp(treasury['balance_trend_current'],gdp),
-                           *army(military,wars,sum(amount for direction,found,amount in budget if direction=='expense' and found in lines),gdp),
-                           s.map('country_diplomacy','country,infamy')[s.player]]}
+                           *army(military,wars,spent(budget,expense_lines(s.connection,ARMY)),gdp),
+                           s.map('country_diplomacy','country,infamy')[s.player],government,balance_gdp(government,gdp),
+                           *s.rows('player_policy',','.join(POLICY))[0]]}
 
     @timed_often
     def state(self,state):
@@ -263,6 +314,14 @@ class LiveLookup:
     @timed_often
     def building(self,ident):
         return self.buildings.get(ident)
+
+    @timed_often
+    def home(self,ident):
+        return self.homes.get(ident)
+
+    @timed_often
+    def site(self,state,kind):
+        return site(self.people.get(state),self.living.get(state),None if kind is None else self.built.get((state,kind),0),self.literate.get(state),self.shares.get(state))
 
     @timed_often
     def typed(self,kind,ident):
@@ -360,6 +419,35 @@ class Samples:
         return None if position<0 else rows[position]
 
 
+class Latest:
+    @timed
+    def __init__(self,connection,table,key,columns,runs):
+        self.index={}
+        for run,ident,seq,*values in connection.execute(f'select run_id,{key},seq,{",".join(columns)} from {table} where run_id = any(%s) order by run_id,{key},seq',(runs,)).fetchall():
+            seqs,rows=self.index.setdefault((run,ident),([],[]))
+            seqs.append(seq)
+            rows.append(values)
+
+    def at(self,run,ident,seq):
+        seqs,rows=self.index.get((run,ident),([],[]))
+        position=bisect.bisect_right(seqs,seq)-1
+        return None if position<0 else rows[position]
+
+
+class WorldPrices:
+    @timed
+    def __init__(self,connection,runs):
+        self.index={}
+        for run,goods,seq,price in connection.execute(WORLD_PRICES,(runs,)).fetchall():
+            seqs,found=self.index.setdefault(run,{}).setdefault(goods,([],[]))
+            seqs.append(seq)
+            found.append(price)
+
+    @timed_often
+    def at(self,run,seq):
+        return {goods:found[position] for goods,(seqs,found) in self.index.get(run,{}).items() if (position:=bisect.bisect_right(seqs,seq)-1)>=0}
+
+
 class History:
     @timed
     def __init__(self,connection,runs):
@@ -369,7 +457,11 @@ class History:
         self.terrain={run:{region:kind for (world,region),kind in terrain.items() if world==worlds[run]} for run in runs}
         load=lambda table,keys,columns:Versions(connection,table,keys,columns,runs)
         self.states=load('state_history',['state'],['state_region','country'])
-        self.buildings=load('building_history',['building'],['building_type','state'])
+        self.buildings=load('building_history',['building'],['building_type','state','levels'])
+        self.people=Latest(connection,'state_population','state',PEOPLE,runs)
+        self.living=load('state_standard_of_living_report',['state'],['average_standard_of_living_all'])
+        self.literate=load('state_population_report',['state'],['literacy'])
+        self.shares=load('state_economy_report',['state'],['gdp_contribution_percentage'])
         self.types={kind:load(table+'_history',[table],[column]) for kind,(table,column) in TYPED.items()}
         self.characters=load('character_history',['character'],['ideology'])
         self.groups=load('interest_group_history',['interest_group'],['country','party','leader'])
@@ -379,9 +471,13 @@ class History:
         self.law_rows=load('law_history',['law'],['law_type','country','active'])
         self.markets=load('country_history',['country'],['market'])
         self.goods=load('market_goods',['market','goods'],['price'])
+        self.world=WorldPrices(connection,runs)
         self.budget=load('player_budget_line',['direction','line'],['amount'])
         self.interest=interest_line(connection)
-        self.army=army_lines(connection)
+        self.army=expense_lines(connection,ARMY)
+        self.government=expense_lines(connection,GOVERNMENT)
+        self.policy=Samples(connection,'player_policy',POLICY,runs)
+        self.taxed=load('player_taxed_goods',['goods'],[])
         self.military=load('country_military_report',['country'],['battalions','mobilization_ratio'])
         self.wars=load('war_participant',['war','country'],['country'])
         self.treasury=Samples(connection,'player_treasury',['money','principal','balance_trend_current'],runs)
@@ -442,11 +538,17 @@ class HistoryLookup:
         sol=self.h.sol.at(self.run,(self.player,),self.seq)
         report=self.h.construction.at(self.run,(self.player,),self.seq)
         gdp=self.h.gdp.at(self.run,(self.player,),self.seq)
+        gdp=None if gdp is None else gdp[0]
+        government=self.spent(self.h.government)
         return [treasury[0],treasury[1],interest[0] if interest else 0,treasury[2],sum(population),politics[0],float('nan') if sol is None else sol[0],
-                *queues(self.queue),*construction(report),balance_gdp(treasury[2],None if gdp is None else gdp[0]),
+                *queues(self.queue),*construction(report),balance_gdp(treasury[2],gdp),
                 *army(self.h.military.at(self.run,(self.player,),self.seq),sum(1 for country, in self.h.wars.live(self.run,self.seq) if country==self.player),
-                      sum(found[0] for line in self.h.army if (found:=self.h.budget.at(self.run,('expense',line),self.seq)) is not None),None if gdp is None else gdp[0]),
-                self.h.infamy.at(self.run,self.seq)[0]]
+                      self.spent(self.h.army),gdp),
+                self.h.infamy.at(self.run,self.seq)[0],government,balance_gdp(government,gdp),*self.h.policy.at(self.run,self.seq)]
+
+    @timed_often
+    def spent(self,lines):
+        return sum(found[0] for line in lines if (found:=self.h.budget.at(self.run,('expense',line),self.seq)) is not None)
 
     @property
     @timed_often
@@ -465,6 +567,11 @@ class HistoryLookup:
 
     @property
     @timed_often
+    def taxes(self):
+        return taxes({goods for goods, in self.h.taxed.by_run.get(self.run,[]) if self.h.taxed.at(self.run,(goods,),self.seq) is not None})
+
+    @property
+    @timed_often
     def laws(self):
         return laws(law_type for law_type,country,active in self.h.law_rows.live(self.run,self.seq) if country==self.player and active)
 
@@ -473,7 +580,7 @@ class HistoryLookup:
     def prices(self):
         market=self.h.markets.at(self.run,(self.player,),self.seq)
         return prices({goods:found[0] for market_id,goods in self.h.goods.by_run.get(self.run,[]) if market and market_id==market[0]
-                       and (found:=self.h.goods.at(self.run,(market_id,goods),self.seq)) is not None})
+                       and (found:=self.h.goods.at(self.run,(market_id,goods),self.seq)) is not None},self.h.world.at(self.run,self.seq))
 
     @timed_often
     def state(self,state):
@@ -483,6 +590,26 @@ class HistoryLookup:
     def building(self,ident):
         found=self.h.buildings.at(self.run,(ident,),self.seq)
         return found[0] if found else None
+
+    @timed_often
+    def home(self,ident):
+        found=self.h.buildings.at(self.run,(ident,),self.seq)
+        return found[1] if found else None
+
+    @cached_property
+    @timed_often
+    def built(self):
+        found={}
+        for key in self.h.buildings.by_run.get(self.run,[]):
+            now=self.h.buildings.at(self.run,key,self.seq)
+            if now is not None:
+                found[now[1],now[0]]=found.get((now[1],now[0]),0)+now[2]
+        return found
+
+    @timed_often
+    def site(self,state,kind):
+        living,literate,share=(None if found is None else found[0] for found in (table.at(self.run,(state,),self.seq) for table in (self.h.living,self.h.literate,self.h.shares)))
+        return site(self.h.people.at(self.run,state,self.seq),living,None if kind is None else self.built.get((state,kind),0),literate,share)
 
     @timed_often
     def typed(self,kind,ident):

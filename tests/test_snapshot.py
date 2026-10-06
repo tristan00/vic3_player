@@ -262,6 +262,26 @@ def snapshot(definitions=None,**tables):
 
 
 class RuleTests(unittest.TestCase):
+    def test_research_queue_requires_every_prerequisite_to_be_researched(self):
+        definitions={'common/technology/technologies':{
+            'base':{},'second':{},'working':{},'waiting':{},'free':{},
+            'unlocked':{'unlocking_technologies':['base']},
+            'both':{'unlocking_technologies':['base','second']},
+            'after_working':{'unlocking_technologies':['working']},
+            'after_waiting':{'unlocking_technologies':['waiting']},
+            'disabled':{'can_research':['no']}}}
+        for acquired,expected in ((['base'],['second','free','unlocked']),(['base','second'],['free','unlocked','both'])):
+            with self.subTest(acquired=acquired):
+                s=snapshot(definitions,
+                           country_research_history=[{'country_research':3,'country':PLAYER,'researching':'working'},
+                                                     {'country_research':4,'country':OTHER}],
+                           country_research_acquired=[{'country_research':3,'technology':kind} for kind in acquired]+
+                                                     [{'country_research':4,'technology':'second'}],
+                           country_research_queued=[{'country_research':3,'technology':'waiting'}])
+                options=[{'technology':kind} for kind in expected]
+                self.assertEqual(RULES['queue_research'](s),options)
+                self.assertEqual(RULES['research'](s),options)
+
     def test_tax_levels_offer_every_level_but_the_current_one(self):
         s=snapshot(player_policy=[{'tax_level':1}])
         self.assertEqual([option['level'] for option in RULES['set_tax_level'](s)],['VeryLow','Medium','High','VeryHigh'])

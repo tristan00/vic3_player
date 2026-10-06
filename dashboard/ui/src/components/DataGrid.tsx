@@ -260,7 +260,7 @@ export function GridTable({
                   const prior = before.get(`${col.name}.before`)
                   const changed = prior !== undefined && cellText(row[prior]) !== cellText(cell)
                   return (
-                    <Fragment key={i}><td className={cn('group/cell px-2 py-1 align-top', ['detail', 'block'].includes(col.name) ? 'min-w-64 whitespace-normal' : 'whitespace-nowrap', right(col) && 'num text-right', changed && 'bg-accent-soft', first(k))}>
+                    <Fragment key={i}><td className={cn('group/cell px-2 py-1 align-top', ['detail', 'block', 'commands'].includes(col.name) ? 'min-w-64 whitespace-normal' : 'whitespace-nowrap', right(col) && 'num text-right', changed && 'bg-accent-soft', first(k))}>
                       <span className="inline-flex items-start gap-1">
                         <CellValue col={col} cell={cell} run={grid.run} seq={row[snapshotColumn]?.ref?.id ?? grid.seq} link={link ? link(col, cell, row) : undefined} />
                         {k === 0 && onRow && <button className="linka ml-2" onClick={(e) => { e.stopPropagation(); onRow(row) }}>Inspect</button>}

@@ -4,7 +4,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { AsOf, useAsOf } from '@/components/AsOf'
 import { DataGrid, Record } from '@/components/DataGrid'
 import { Loading, Tabs, useTab } from '@/components/primitives'
-import { useApi, type S } from '@/lib/api'
+import { Treaty } from '@/components/Treaty'
+import { qs, useApi, type S } from '@/lib/api'
 import { label, n } from '@/lib/format'
 import { Plots, usePlots } from '@/routes/Table'
 
@@ -31,7 +32,7 @@ export function Entity() {
   const id = Number(params.id)
   const a = useAsOf()
   const plot = usePlots()
-  const state = useApi<S['EntityInfo']>(`/api/runs/${run}/entities/${kind}/${id}`, { live: true })
+  const state = useApi<S['EntityInfo']>(`/api/runs/${run}/entities/${kind}/${id}${qs({ seq: a.seq })}`, { live: true })
   const onPlot = (table: string) => (column: string, filters: string[]) => plot.add([table, column, ...filters].join('|'))
   return (
     <Loading state={state}>
@@ -54,6 +55,7 @@ export function Entity() {
           </div>
           <Tabs views={['details', 'history', 'relationships', 'actions']} />
           <Plots run={run} plots={plot.plots} remove={plot.remove} />
+          {view === 'details' && kind === 'treaty' && <Treaty treaty={d.treaty} seq={a.seq} />}
           {(view === 'details' || view === 'history') && <label className="flex flex-wrap items-center gap-3">Entity data<select aria-label="Entity data" value={search.get('table') ?? d.owned.find((t) => t.rows)?.table ?? ''} onChange={(e) => { const next = new URLSearchParams(search); next.set('table', e.target.value); setSearch(next) }}>
             {d.owned.filter((t) => t.rows).map((t) => <option key={t.table} value={t.table}>{label(t.table)} · {n(t.rows)} recorded rows</option>)}
           </select></label>}

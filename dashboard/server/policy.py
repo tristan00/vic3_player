@@ -1,6 +1,6 @@
 from advisors.catalogue import ACTIONS, LEVERS
 from advisors.models import forest, svr
-from advisors.initializers.random import HIGH, LOW
+from advisors.initializers.random import CENTRE, HIGH, LOW, SPREAD
 from advisors.data.endgame import COMPONENTS
 from advisors.data.rewards import DEBT_CAP_FROM_RUN
 
@@ -22,7 +22,7 @@ CATALOGUE='(values '+','.join(f"({position},'{action.name}','{action.lever}','{'
 @db.timed
 def weights(filters,sort,desc,offset,limit):
     specs=[Spec('run','run','r.run_id'),Spec('domain','text','d.domain',label='Kind'),Spec('action','text','a.name',label='Lever'),Spec('weight','number','w.weight'),
-           Spec('initializer','text',INITIALIZER),
+           Spec('centre','number','w.centre',label='Centre (log10)'),Spec('initializer','text',INITIALIZER),
            Spec('method','text',f"case {INITIALIZER} when 'random_smac_weighting' then p.method when 'random_svr_weighting' then v.method end",label='Initializer selection'),
            Spec('svr_linear','number','k.linear',label='SVR linear effect'),Spec('svr_squared','number','k.squared',label='SVR squared effect')]
     source=(f'from run_weight w join run r using (run_id) join advisor_action a using (advisor_action) join {DOMAINS} on d.name=a.name '
@@ -43,14 +43,15 @@ def catalogue(filters,sort,desc,offset,limit):
 
 @db.timed
 def initializers():
-    shared=[('weight range',f'10^{LOW:g} to 10^{HIGH:g}')]
+    shared=[('weight range',f'10^{LOW:g} to 10^{HIGH:g}'),('centre',CENTRE),('spread',SPREAD)]
     learned=[('reward','Building stock + population + GDP'),('reward baseline','Run opening snapshot'),('training target','Rank-normalized reward')]
     settings=lambda pairs:[{'name':name,'value':str(value)} for name,value in pairs]
     return [{'name':'random','title':'Random','settings':settings(shared)},
             {'name':'random_smac_weighting','title':'SMAC',
-             'settings':settings([('trees',forest.TREES),('min runs per leaf',forest.LEAF),('features per split',forest.FEATURES),('run history','All scored runs'),*learned,*shared])},
+             'settings':settings([('trees',forest.TREES),('min runs per leaf',forest.LEAF),('features per split',forest.FEATURES),('run history','All scored runs'),*learned,
+                                  *shared])},
             {'name':'random_svr_weighting','title':'SVR',
-             'settings':settings([('C',svr.C),('epsilon',svr.EPSILON),*learned,*shared])}]
+             'settings':settings([('kernel',svr.KERNEL),('C',svr.C),('epsilon',svr.EPSILON),('search starts',svr.STARTS),*learned,*shared])}]
 
 
 @db.timed

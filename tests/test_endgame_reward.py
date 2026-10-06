@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from advisors.data import endgame
+from advisors.data.features import LAWS
 from advisors.models.histogram import data as histogram
 from advisors.models.row import data as row
 
@@ -80,7 +81,8 @@ class TrainingRewardTests(unittest.TestCase):
 
     def test_both_picker_datasets_use_first_snapshot_of_nonopening_pause(self):
         lookup=SimpleNamespace(numbers=[1.]*len(histogram.NUMBERS),prices=[1.]*len(histogram.PRICES),
-                               institutions=[1.]*len(histogram.INSTITUTIONS),tariffs=[1.]*len(histogram.TARIFFS),laws=['law']*len(histogram.LAWS))
+                               institutions=[1.]*len(histogram.INSTITUTIONS),tariffs=[1.]*len(histogram.TARIFFS),taxes=[1.]*len(histogram.TAXES),
+                               laws=['law']*len(LAWS),player=7,country=lambda ident:'rank_major_power')
         point=SimpleNamespace(state=lookup)
         with patch.object(histogram,'History') as states,patch.object(histogram,'Holdings') as holdings:
             states.return_value.at.return_value=lookup
@@ -91,6 +93,7 @@ class TrainingRewardTests(unittest.TestCase):
             actions=row.load(self.connection)
         expected=(2*math.sqrt(.5)+6+4/math.sqrt(.5))/9
         self.assertAlmostEqual(whole.y[0],expected)
+        self.assertEqual(whole.categories[0,-1],'rank_major_power')
         self.assertAlmostEqual(actions.y[0],expected)
         self.assertEqual(actions.meta.before_seq.tolist(),[2])
         self.assertEqual(actions.meta.baseline_seq.tolist(),[1])

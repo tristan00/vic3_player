@@ -6,14 +6,14 @@ import pandas as pd
 from interface.common import DEFAULT_GAME, timed, timed_often
 from interface.recording.spec import TABLE
 from interface.script import read
-from ...catalogue import ENTITIES, PARAMS
-from ...data.features import History, INSTITUTIONS, LAWS, NUMBERS, PRICES, TARIFFS, LiveLookup, Versions
+from ...catalogue import ENTITIES, PARAMS, SITED
+from ...data.features import CATEGORIES, History, INSTITUTIONS, NUMBERS, PRICES, SITE, TARIFFS, TAXES, LiveLookup, Versions, categories, located
 
 PARAMETERS={name:list(params) for name,params in PARAMS.items()}
 ENTITY={kind:('formation' if kind=='military_formation' else kind) for kind in ENTITIES}
 OMIT={'first_name_key','last_name_key','name_key','localized_name_key','company_name_key','dynamic_name_key','dynamic_adjective_key',
       'map_color_override','color_red','color_green','color_blue','power_bloc_map_texture','trends_initialized'}
-STATE=NUMBERS+PRICES+INSTITUTIONS+TARIFFS
+STATE=NUMBERS+PRICES+INSTITUTIONS+TARIFFS+TAXES
 MISSING='<missing>'
 ABSENT='<not-applicable>'
 TRAITS=sorted(name for name,_ in read(DEFAULT_GAME/'game','common/character_traits'))
@@ -39,7 +39,7 @@ def categorical(column):
 @timed_often
 def fields():
     numeric=list(STATE)
-    categories=list(LAWS)+['action']
+    categories=list(CATEGORIES)+['action']
     for param,kind in sorted({pair for pairs in PARAMETERS.values() for pair in pairs}):
         prefix=f'parameter.{param}.{kind}'
         if kind=='int':
@@ -55,6 +55,7 @@ def fields():
                 else:
                     (categories if categorical(column) else numeric).append(name)
     numeric.extend(f'target_character.trait.{trait}' for trait in TRAITS)
+    numeric.extend(SITE)
     return numeric,categories
 
 
@@ -125,7 +126,7 @@ def context(point):
     state=point.state
     if state.numbers is None:
         raise ValueError('The starting snapshot lacks required player state')
-    return {**dict(zip(STATE,state.numbers+state.prices+state.institutions+state.tariffs)),**dict(zip(LAWS,state.laws))}
+    return {**dict(zip(STATE,state.numbers+state.prices+state.institutions+state.tariffs+state.taxes)),**dict(zip(CATEGORIES,categories(state)))}
 
 
 @timed_often
@@ -161,6 +162,8 @@ def action_features(name,params,point):
                 if character is not None:
                     traits=set(point.traits(character))
                     found.update({f'target_character.trait.{trait}':float(trait in traits) for trait in TRAITS})
+    if name in SITED:
+        found.update(zip(SITE,point.state.site(*located(name,params,point.state))))
     return found
 
 

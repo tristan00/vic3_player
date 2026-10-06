@@ -46,7 +46,7 @@ export function ActionType() {
         <DataGrid id="runs" url={`${base}/runs`} query={{ scope }} />
       </Section>}
       {view === 'executions' && <Section title="Executed actions and targets">
-        <DataGrid id="picks" url={`${base}/picks`} columns={['run', 'n', 'status', 'before_seq', 'after_seq']} query={{ scope }} />
+        <DataGrid id="picks" url={`${base}/picks`} columns={['run', 'n', 'status', 'unverified', 'before_seq', 'after_seq']} query={{ scope }} />
       </Section>}
     </div>
   )

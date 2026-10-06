@@ -14,6 +14,7 @@ from .names import LAYOUTS, labels
 
 LOST_AFTER=.5
 STATUSES=('done','invalid','raced','no_object','ui_leftover')
+OUTCOMES=[*((status,f"l.status='{status}'") for status in STATUSES),('unverified','l.unverified')]
 END_REASONS=('time','years','defeated','debt_cap','ui_stuck','game_crashed','loop_crashed','loop_lost','loop_stalled')
 PLAYER_OWNED=('country',)
 LOOP_PARAMS={'diplomatic_action_state':('country','diplomatic_action','state','side:choice')}
@@ -36,7 +37,8 @@ def runs_grid(filters,sort,desc,offset,limit):
            Spec('game_from','date','(select game_date from snapshot s where s.run_id=r.run_id order by seq limit 1)'),
            Spec('game_to','date','(select game_date from snapshot s where s.run_id=r.run_id order by seq desc limit 1)'),
            Spec('snapshots','number','(select count(*) from snapshot s where s.run_id=r.run_id)'),
-           Spec('actions','number','(select count(*) from loop_action a where a.run_id=r.run_id)')]
+           Spec('actions','number','(select count(*) from loop_action a where a.run_id=r.run_id)'),
+           Spec('unverified','number','(select count(*) from loop_action a where a.run_id=r.run_id and a.unverified)')]
     return grid(specs,RUN_FROM,{},filters,sort or 'run',True if sort is None else desc,offset,limit,None,['run'])
 
 
@@ -128,7 +130,7 @@ def run_outcomes(run_id):
 @db.timed
 def run_groups(run_id,filters,sort,desc,offset,limit):
     values='(values '+','.join(f"('{name}','{group}')" for name,group in GROUPS.items())+') grp(name,grp)'
-    specs=[Spec('group','text','grp.grp'),Spec('actions','number','count(*)')]+[Spec(s,'number',f"count(*) filter (where l.status='{s}')") for s in STATUSES]
+    specs=[Spec('group','text','grp.grp'),Spec('actions','number','count(*)')]+[Spec(name,'number',f'count(*) filter (where {test})') for name,test in OUTCOMES]
     source=f'from loop_action l join action a using (action) join {values} on grp.name=a.name where l.run_id=%(run)s group by grp.grp'
     return grid(specs,source,{'run':run_id},filters,sort or 'actions',True if sort is None else desc,offset,limit,run_id,['group'])
 

@@ -1,5 +1,6 @@
 .venv/
 __pycache__/
+[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]
 .idea/
 .playwright-mcp/
 .claude/settings.local.json
@@ -7,6 +8,8 @@ __pycache__/
 node_modules/
 dashboard/ui/dist/
 catboost_info/
+docs/
+reports/
 
 artifacts/world_fidelity/worlds/
 artifacts/world_fidelity/*.log

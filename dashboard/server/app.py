@@ -228,8 +228,8 @@ def get_entities(run_id:int,kind:str,seq:int|None=None,gone:bool=False,p:Page=De
 
 
 @app.get('/api/runs/{run_id}/entities/{kind}/{ident}')
-def get_entity(run_id:int,kind:str,ident:int)->EntityInfo:
-    return found(tables.entity_info(run_id,entity_kind(kind),ident),f'{kind} {ident} in run {run_id}')
+def get_entity(run_id:int,kind:str,ident:int,seq:int|None=Query(None,ge=0))->EntityInfo:
+    return found(tables.entity_info(run_id,entity_kind(kind),ident,seq),f'{kind} {ident} in run {run_id}')
 
 
 @app.get('/api/runs/{run_id}/entities/{kind}/{ident}/actions')
@@ -267,6 +267,11 @@ def get_meta(table:str,run:int|None=None,p:Page=Depends(page))->Grid:
 @app.get('/api/actions')
 def get_action_stats(scope:str='all',p:Page=Depends(page))->Grid:
     return actions.action_stats(scope,*p.args())
+
+
+@app.get('/api/levers')
+def get_lever_stats(scope:str='all',p:Page=Depends(page))->Grid:
+    return actions.lever_stats(scope,*p.args())
 
 
 @app.get('/api/actions/{name}')

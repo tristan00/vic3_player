@@ -8,7 +8,7 @@ import numpy as np
 from catboost import FeaturesData, Pool
 
 from interface.common import timed, timed_often
-from ...data.features import INSTITUTIONS, LAWS, NUMBERS, PRICES, TARIFFS, History, LiveLookup
+from ...data.features import CATEGORIES, INSTITUTIONS, NUMBERS, PRICES, TARIFFS, TAXES, History, LiveLookup, categories
 from ...data.histograms import Histograms, Holdings, entries, live_holdings
 from ...data.endgame import COMPONENTS, HISTORY, OBJECTIVE, Trajectories, reward, scored_runs
 
@@ -16,7 +16,7 @@ LOG=logging.getLogger('loop')
 DESIGN=json.loads((Path(__file__).parent/'parameters.json').read_text(encoding='utf-8'))
 SIZES=DESIGN['sizes']
 PARAMS={'loss_function':'RMSE','random_seed':0,'thread_count':os.cpu_count(),**DESIGN['params']}
-STATE=NUMBERS+PRICES+INSTITUTIONS+TARIFFS
+STATE=NUMBERS+PRICES+INSTITUTIONS+TARIFFS+TAXES
 BATCH_SIZE='batch_size'
 
 RUNS=HISTORY
@@ -30,8 +30,8 @@ order by la.run_id,la.before_seq,la.n'''
 
 
 @timed_often
-def frame(state,laws,held,sizes,actions,names,y=None):
-    return Pool(FeaturesData(num_feature_data=np.hstack([state,held,sizes,actions]),cat_feature_data=laws,num_feature_names=names,cat_feature_names=LAWS),label=y)
+def frame(state,categorical,held,sizes,actions,names,y=None):
+    return Pool(FeaturesData(num_feature_data=np.hstack([state,held,sizes,actions]),cat_feature_data=categorical,num_feature_names=names,cat_feature_names=CATEGORIES),label=y)
 
 
 @timed_often
@@ -42,7 +42,7 @@ def names(actions,held,sizes):
 @timed_often
 def pool(data,sizes):
     chosen,held,labels=data.actions.columns(sizes),data.held.columns(sizes),names(data.actions,data.held,sizes)
-    return lambda state,actions,y=None:frame(data.state[state],data.laws[state],data.held.counts[np.ix_(state,held)],data.sizes[actions],data.actions.counts[np.ix_(actions,chosen)],labels,y)
+    return lambda state,actions,y=None:frame(data.state[state],data.categories[state],data.held.counts[np.ix_(state,held)],data.sizes[actions],data.actions.counts[np.ix_(actions,chosen)],labels,y)
 
 
 @timed
@@ -73,7 +73,7 @@ def training_rows(connection,runs):
         _,years,parts=outcomes.target(run_id,date,last,baseline,runs[run_id][2]=='defeated')
         batch=list(actions.values())
         acted=entries(batch,lookup)
-        rows[run_id].append((numbers+lookup.prices+lookup.institutions+lookup.tariffs,lookup.laws,acted,holdings.at(lookup),
+        rows[run_id].append((numbers+lookup.prices+lookup.institutions+lookup.tariffs+lookup.taxes,categories(lookup),acted,holdings.at(lookup),
                             [len(batch)],years,parts,seq))
     return rows
 
@@ -107,11 +107,11 @@ class TrainingCache:
 def training_data(connection,cache=None):
     runs={run_id:(first,last,reason) for run_id,first,last,reason in connection.execute(RUNS,scored_runs()).fetchall()}
     rows=training_rows(connection,runs) if cache is None else cache.load(connection,runs)
-    state,laws,acted,held,sizes,groups,changes,pauses=[],[],[],[],[],[],[],[]
+    state,categorical,acted,held,sizes,groups,changes,pauses=[],[],[],[],[],[],[],[]
     for run_id in runs:
         for numbers,active,actions,holdings,size,years,raw,seq in rows[run_id]:
             state.append(numbers)
-            laws.append(active)
+            categorical.append(active)
             acted.append(actions)
             held.append(holdings)
             sizes.append(size)
@@ -119,7 +119,7 @@ def training_data(connection,cache=None):
             pauses.append((run_id,seq))
             changes.append(reward(years,raw))
     y=changes
-    return SimpleNamespace(y=np.array(y),runs=np.array(groups),played=len(runs),state=np.array(state,np.float32).reshape(len(y),len(STATE)),laws=np.array(laws,object).reshape(len(y),len(LAWS)),
+    return SimpleNamespace(y=np.array(y),runs=np.array(groups),played=len(runs),state=np.array(state,np.float32).reshape(len(y),len(STATE)),categories=np.array(categorical,object).reshape(len(y),len(CATEGORIES)),
                            sizes=np.array(sizes,np.float32).reshape(len(y),1),actions=Histograms(acted),held=Histograms(held),pauses=np.array(pauses,int).reshape(len(y),2),objective=OBJECTIVE)
 
 
@@ -135,8 +135,8 @@ class Encoder:
     def live(self,snapshot,batches):
         lookup=LiveLookup(snapshot)
         count=len(batches)
-        state=np.array([lookup.numbers+lookup.prices+lookup.institutions+lookup.tariffs]*count,np.float32)
+        state=np.array([lookup.numbers+lookup.prices+lookup.institutions+lookup.tariffs+lookup.taxes]*count,np.float32)
         held=np.repeat(self.held.count([live_holdings(snapshot)],self.held_columns),count,0)
         actions=self.actions.count([entries(batch,lookup) for batch in batches],self.action_columns)
         sizes=np.array([[len(batch)] for batch in batches],np.float32)
-        return frame(state,np.array([lookup.laws]*count,object),held,sizes,actions,self.labels)
+        return frame(state,np.array([categories(lookup)]*count,object),held,sizes,actions,self.labels)

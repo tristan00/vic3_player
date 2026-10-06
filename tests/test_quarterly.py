@@ -16,6 +16,7 @@ class QuarterlyTests(unittest.TestCase):
     def test_quarter_advance_is_never_saved_as_a_pickable_action(self):
         loop=run.Loop.__new__(run.Loop)
         loop.turn=2
+        loop.late=[]
         loop.game=Mock()
         reader=loop.game.reader.return_value
         reader.date.side_effect=[(0,'1836.1.1.0'),(2160,'1836.4.1.0')]
@@ -77,7 +78,7 @@ class QuarterlyTests(unittest.TestCase):
         from advisors.models.histogram import data
         connection=Mock()
         connection.execute.return_value.fetchall.return_value=[(1,0,0,1,'raise_consumption_taxes','goods',None,'grain')]
-        lookup=SimpleNamespace(numbers=[1.]*len(data.NUMBERS),prices=[],institutions=[],tariffs=[],laws=[])
+        lookup=SimpleNamespace(numbers=[1.]*len(data.NUMBERS),prices=[],institutions=[],tariffs=[],taxes=[],laws=[],player=7,country=lambda ident:'rank_major_power')
         with patch.object(data,'Trajectories') as outcomes,patch.object(data,'History') as history,patch.object(data,'Holdings') as holdings:
             outcomes.return_value.reason.return_value=None
             outcomes.return_value.target.return_value=(1.,1.,dict.fromkeys(data.COMPONENTS,1.))

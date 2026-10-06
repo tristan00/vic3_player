@@ -11,7 +11,7 @@ import psycopg
 from interface.common import timed
 from interface.recording.store import DSN
 from .data import OUTPUT, load, split
-from .features import CATEGORICAL, NUMERIC, STATE
+from .features import CATEGORIES, CATEGORICAL, NUMERIC, STATE
 
 
 @timed
@@ -29,7 +29,7 @@ def main():
     OUTPUT.mkdir(parents=True,exist_ok=True)
     with (OUTPUT/'data.pkl').open('wb') as output:
         pickle.dump(data,output)
-    catalogue=[{'name':name,'type':'categorical' if name in CATEGORICAL else 'numeric','group':'state' if name in STATE or name.startswith('law.') else 'action'} for name in data.X.columns]
+    catalogue=[{'name':name,'type':'categorical' if name in CATEGORICAL else 'numeric','group':'state' if name in STATE or name in CATEGORIES else 'action'} for name in data.X.columns]
     summary={'rows':len(data.y),'features':len(data.X.columns),'numeric':len(NUMERIC),'categorical':len(CATEGORICAL),
              'state_features':sum(row['group']=='state' for row in catalogue),'action_features':sum(row['group']=='action' for row in catalogue),
              'train_rows':len(train),'validation_rows':len(test),'train_runs':np.unique(data.runs[train]).tolist(),'validation_runs':np.unique(data.runs[test]).tolist(),

@@ -514,6 +514,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/levers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Lever Stats */
+        get: operations["get_lever_stats_api_levers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/actions/{name}": {
         parameters: {
             query?: never;
@@ -650,6 +667,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/policy/catalogue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Catalogue */
+        get: operations["get_catalogue_api_policy_catalogue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/policy/picker-actions": {
         parameters: {
             query?: never;
@@ -754,6 +788,7 @@ export interface components {
             references: components["schemas"]["Reference"][];
             /** Actions */
             actions: number;
+            treaty?: components["schemas"]["TreatyInfo"] | null;
         };
         /** GameDate */
         GameDate: {
@@ -1107,6 +1142,30 @@ export interface components {
             keyed: boolean;
             /** Rows */
             rows: number;
+        };
+        /** TreatyInfo */
+        TreatyInfo: {
+            /** Seq */
+            seq: number;
+            first: components["schemas"]["Ref"];
+            second: components["schemas"]["Ref"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "Proposed" | "In force" | "Withdrawn" | "No longer present";
+            entered_into_force_on: components["schemas"]["GameDate"] | null;
+            /** Binding Period Days */
+            binding_period_days: number;
+            binding_until: components["schemas"]["GameDate"] | null;
+            /** Terms */
+            terms: components["schemas"]["TreatyTerm"][];
+        };
+        /** TreatyTerm */
+        TreatyTerm: {
+            article: components["schemas"]["Ref"];
+            source: components["schemas"]["Ref"] | null;
+            target: components["schemas"]["Ref"] | null;
         };
         /** Trial */
         Trial: {
@@ -1881,7 +1940,9 @@ export interface operations {
     };
     get_entity_api_runs__run_id__entities__kind___ident__get: {
         parameters: {
-            query?: never;
+            query?: {
+                seq?: number | null;
+            };
             header?: never;
             path: {
                 run_id: number;
@@ -2158,6 +2219,42 @@ export interface operations {
             };
         };
     };
+    get_lever_stats_api_levers_get: {
+        parameters: {
+            query?: {
+                scope?: string;
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_action_api_actions__name__get: {
         parameters: {
             query?: never;
@@ -2394,6 +2491,41 @@ export interface operations {
         };
     };
     get_weights_api_policy_weights_get: {
+        parameters: {
+            query?: {
+                f?: string[];
+                sort?: string | null;
+                desc?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Grid"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_catalogue_api_policy_catalogue_get: {
         parameters: {
             query?: {
                 f?: string[];

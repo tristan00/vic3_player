@@ -52,6 +52,7 @@ const INITIALIZER_TABLES: Record<string, Record<string, { table: string; title: 
   },
 };
 const WEIGHT_COLUMNS: Record<string, string[]> = {
+  random: ["action", "weight", "centre"],
   random_smac_weighting: ["action", "weight", "method"],
   random_svr_weighting: ["action", "weight", "method", "svr_linear", "svr_squared"],
 };
@@ -90,8 +91,6 @@ function Initializer({ run, name }: { run: number; name: string | null | undefin
   return (
     <>
       <Initializers only={name} />
-      <p className="text-dim text-sm">These are the action sampling weights used by this run. Higher weights make eligible actions more likely to be proposed; zero disables an action.</p>
-      {name === "random" && <p className="text-dim text-sm">The table shows this run’s recorded weights, including uniform or disabled weights in older runs.</p>}
       {labels && <Tabs views={Object.keys(labels)} param="initializer_view" labels={labels} />}
       {shown
         ? <Meta key={shown.table} title={shown.title} table={shown.table} run={run} initial={shown.initial} />

@@ -39,7 +39,7 @@ class TrainingCacheTests(unittest.TestCase):
         self.assertEqual(self.cache.versions,{})
 
     def test_fixed_rewards_and_histograms_keep_all_training_rows(self):
-        rows={run:[([float(run)]*len(pickers.STATE),['law']*len(pickers.LAWS),[('action','construct_infrastructure',run)],[],[run],float(run),
+        rows={run:[([float(run)]*len(pickers.STATE),['law']*len(pickers.CATEGORIES),[('action','construct_infrastructure',run)],[],[run],float(run),
                     {name:float(run)**(index+1) for index,name in enumerate(pickers.COMPONENTS)},run*2)] for run in (1,2,3)}
         self.connection.execute.return_value.fetchall.return_value=[(run,0,run*100,'years') for run in rows]
         with patch.object(pickers,'training_rows',return_value=rows) as load:
@@ -48,7 +48,7 @@ class TrainingCacheTests(unittest.TestCase):
             self.assertEqual(load.call_count,1)
             fresh=pickers.training_data(self.connection)
         np.testing.assert_array_equal(first.y,cached.y)
-        for name in ('state','laws','sizes','runs','y','pauses'):
+        for name in ('state','categories','sizes','runs','y','pauses'):
             np.testing.assert_array_equal(getattr(cached,name),getattr(fresh,name))
         for name in ('actions','held'):
             left,right=getattr(cached,name),getattr(fresh,name)
@@ -60,8 +60,8 @@ class TrainingCacheTests(unittest.TestCase):
     def test_catboost_labels_do_not_change_when_unrelated_runs_are_added(self):
         from advisors.data.endgame import reward
         raw={name:.1 for name in pickers.COMPONENTS}
-        row=([1.]*len(pickers.STATE),['law']*len(pickers.LAWS),[],[],[1],4.,raw,0)
-        extreme=([2.]*len(pickers.STATE),['law']*len(pickers.LAWS),[],[],[1],1.,{name:1000. for name in raw},0)
+        row=([1.]*len(pickers.STATE),['law']*len(pickers.CATEGORIES),[],[],[1],4.,raw,0)
+        extreme=([2.]*len(pickers.STATE),['law']*len(pickers.CATEGORIES),[],[],[1],1.,{name:1000. for name in raw},0)
         self.connection.execute.return_value.fetchall.return_value=[(1,0,100,'years')]
         with patch.object(pickers,'training_rows',return_value={1:[row]}):
             original=pickers.training_data(self.connection)

@@ -1,7 +1,9 @@
+from contextlib import nullcontext
 from datetime import datetime, timezone
 import math
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 import psycopg
 from fastapi.testclient import TestClient
@@ -12,7 +14,7 @@ from dashboard.server.app import app
 from dashboard.server.grid import Spec, cells
 from interface.recording.store import Store
 from interface.timing import RECORDER
-from tests.test_store import DSN, EFFECTS, ENUMS, LAW, MEMBERS, PLAYER, RUN, STEPS, built, clean
+from tests.test_store import DSN, EFFECTS, ENUMS, LAW, MEMBERS, OTHER, PLAYER, RUN, STEPS, built, clean
 
 AT=datetime(2026,9,23,tzinfo=timezone.utc)
 PROPOSAL={'initializer':'random_smac_weighting','reward':'composite','method':'expected_improvement','observations':12,'best_reward':4.5,'predicted_reward':5.0,'uncertainty':.5,'expected_improvement':.7,
@@ -53,9 +55,9 @@ class DashboardTests(unittest.TestCase):
             store.write(built(step),'post_action',AT,1.0)
         store.record_pick(0,[['construct_infrastructure','research_production_technology'],['enact_new_law']],[1.5,-2.0],0)
         store.record_pick(1,[['research_production_technology'],['construct_infrastructure']],[0.5,3.0],1)
-        store.log_action({'turn':1,'seq':1,'advisor':'random','action':'enact_law','params':{'law':LAW},'snapshot':0,'status':'done','ms':5,
+        store.log_action({'turn':1,'seq':1,'advisor':'random','action':'enact_law','params':{'law':LAW},'snapshot':0,'status':'done','ms':5,'unverified':True,
                           'decision':('enact_new_law',{'law':LAW})},1)
-        store.log_action({'turn':1,'seq':2,'advisor':'random','action':'research','params':{'technology':'cotton_gin'},'snapshot':0,'status':'invalid',
+        store.log_action({'turn':1,'seq':2,'advisor':'random','action':'research','params':{'technology':'cotton_gin'},'snapshot':0,'status':'invalid','unverified':False,
                           'detail':'not researchable','decision':('research_production_technology',{'technology':'cotton_gin'})},None)
         store.end_run('time')
         cls.run_id=store.run_id
@@ -75,11 +77,16 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(settings('random_smac_weighting')['run history'],'All scored runs')
         self.assertEqual(settings('random_smac_weighting')['features per split'],forest.FEATURES)
         self.assertEqual(settings('random_svr_weighting')['C'],str(random_svr_weighting.C))
+        self.assertEqual(settings('random_svr_weighting')['kernel'],'rbf')
+        from advisors.initializers.random import CENTRE, SPREAD
+        for name in ADVISORS:
+            self.assertEqual(settings(name)['centre'],str(CENTRE))
+            self.assertEqual(settings(name)['spread'],str(SPREAD))
 
     def test_runs_list_counts_actions_and_status(self):
         found=runs.runs_grid([],None,False,0,100)
         row=next(r for r in rows(found) if r['run']==self.run_id)
-        self.assertEqual((row['actions'],row['snapshots'],row['state'],row['end_reason']),(2,3,'ended','time'))
+        self.assertEqual((row['actions'],row['unverified'],row['snapshots'],row['state'],row['end_reason']),(2,1,3,'ended','time'))
         country=next(r for r in found.rows if r[0].ref.id==self.run_id)[[c.name for c in found.columns].index('country')].ref
         self.assertEqual((country.run,country.kind,country.id,country.label),(self.run_id,'country',PLAYER,'AAA'))
 
@@ -107,6 +114,50 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual((info.ref.label,info.actions),('law_one',1))
         self.assertEqual(tables.entity_info(self.run_id,'country',PLAYER).ref.label,'AAA')
 
+    def test_treaty_details_show_terms_and_status_at_the_selected_snapshot(self):
+        with db.POOL.connection() as connection,connection.transaction(force_rollback=True),patch.object(db,'POOL',SimpleNamespace(connection=lambda:nullcontext(connection))):
+            connection.execute('insert into treaty(run_id,treaty,first_seq) values(%s,77,1)',(self.run_id,))
+            article_type=connection.execute("insert into treaty_article_type(name) values('non_piracy_agreement') returning treaty_article_type").fetchone()['treaty_article_type']
+            mutual_type=connection.execute("insert into treaty_article_type(name) values('defensive_pact') returning treaty_article_type").fetchone()['treaty_article_type']
+            connection.execute('insert into treaty_side(treaty_side) values(0) on conflict do nothing')
+            connection.execute('insert into treaty_history(run_id,treaty,seq,present,first_country,second_country,binding_period,withdrawn_by,withdrawn) '
+                               'values(%s,77,1,true,%s,%s,1825,0,false)',(self.run_id,PLAYER,OTHER))
+            entered=connection.execute('select game_date from snapshot where run_id=%s and seq=2',(self.run_id,)).fetchone()['game_date']
+            connection.execute('insert into treaty_history(run_id,treaty,seq,present,first_country,second_country,entered_into_force_on,binding_period,withdrawn_by,withdrawn) '
+                               'values(%s,77,2,true,%s,%s,%s,1825,0,false)',(self.run_id,PLAYER,OTHER,entered))
+            connection.execute('insert into treaty_article(run_id,treaty_article,first_seq) values(%s,78,1),(%s,79,2)',(self.run_id,self.run_id))
+            connection.execute('insert into treaty_article_history(run_id,treaty_article,seq,present,treaty,treaty_article_type,source_country,target_country) '
+                               'values(%s,78,1,true,77,%s,%s,%s)',(self.run_id,article_type,PLAYER,OTHER))
+            connection.execute('insert into treaty_article_history(run_id,treaty_article,seq,present,treaty,treaty_article_type) '
+                               'values(%s,79,2,true,77,%s)',(self.run_id,mutual_type))
+            client=TestClient(app)
+            url=f'/api/runs/{self.run_id}/entities/treaty/77'
+            self.assertIsNone(client.get(url,params={'seq':0}).json()['treaty'])
+            proposed=client.get(url,params={'seq':1}).json()['treaty']
+            self.assertEqual(proposed['status'],'Proposed')
+            self.assertIsNone(proposed['entered_into_force_on'])
+            self.assertEqual([term['article']['label'] for term in proposed['terms']],['non_piracy_agreement'])
+            response=client.get(url,params={'seq':2})
+            self.assertEqual(response.status_code,200)
+            active=response.json()['treaty']
+            self.assertEqual(response.json()['ref']['label'],'AAA — BBB')
+            self.assertEqual((active['status'],active['first']['id'],active['second']['id']),('In force',PLAYER,OTHER))
+            self.assertEqual(active['binding_period_days'],1825)
+            self.assertEqual(active['binding_until']['hours'],entered+1825*24)
+            term=next(term for term in active['terms'] if term['article']['label']=='non_piracy_agreement')
+            self.assertEqual((term['source']['label'],term['target']['label']),('AAA','BBB'))
+            mutual=next(term for term in active['terms'] if term['article']['label']=='defensive_pact')
+            self.assertIsNone(mutual['source'])
+            self.assertIsNone(mutual['target'])
+            connection.execute('update treaty_history set withdrawn=true where run_id=%s and treaty=77 and seq=2',(self.run_id,))
+            self.assertEqual(client.get(url).json()['treaty']['status'],'Withdrawn')
+            self.assertEqual(client.get(url,params={'seq':1}).json()['treaty']['status'],'Proposed')
+            connection.execute('update treaty_history set present=false,first_country=null,second_country=null,entered_into_force_on=null,'
+                               'binding_period=null,withdrawn_by=null,withdrawn=null where run_id=%s and treaty=77 and seq=2',(self.run_id,))
+            removed=client.get(url).json()['treaty']
+            self.assertEqual((removed['status'],removed['seq']),('No longer present',1))
+            self.assertEqual([term['article']['label'] for term in removed['terms']],['non_piracy_agreement'])
+
     def test_action_params_link_entities_and_stats_split_status(self):
         grid=actions.run_actions(self.run_id,[('n','1')],None,False,0,100)
         law=grid.rows[0][[c.name for c in grid.columns].index('param.law')].ref
@@ -119,6 +170,16 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual((country.run,country.kind,country.id),(self.run_id,'country',PLAYER))
         stats={r['action']:r for r in rows(actions.action_stats(f'run:{self.run_id}',[],None,False,0,500))}
         self.assertEqual((stats['enact_law']['done'],stats['research']['invalid'],stats['build']['picks']),(1,1,0))
+        self.assertEqual((stats['enact_law']['unverified'],stats['research']['unverified']),(1,0))
+        self.assertEqual([r['unverified'] for r in rows(actions.run_actions(self.run_id,[],'n',False,0,100))],['yes','no'])
+        from advisors.catalogue import LEVER, NAMES
+        levers={r['lever']:r for r in rows(actions.lever_stats(f'run:{self.run_id}',[],None,False,0,500))}
+        self.assertEqual(set(levers),set(NAMES))
+        law,research=levers[LEVER['enact_new_law']],levers[LEVER['research_production_technology']]
+        self.assertEqual((law['commands'],law['picks'],law['done'],law['unverified'],law['runs']),('enact_law',1,1,1,1))
+        self.assertEqual((research['commands'],research['picks'],research['invalid'],research['unverified']),('research',1,1,0))
+        self.assertEqual(sum(r['picks'] for r in levers.values()),2)
+        self.assertEqual(TestClient(app).get(f'/api/levers?scope=run:{self.run_id}').json()['total'],len(NAMES))
         details=rows(actions.action_details('research',f'run:{self.run_id}',[],None,False,0,100))
         self.assertEqual([(d['status'],d['detail'],d['count']) for d in details],[('invalid','not researchable',1)])
 
@@ -127,6 +188,8 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(found,{'runs_requested':3,'world_seed':9,'countries':2,'states':1,'tech':0.5,'pop':1.5})
         weights=db.rows('select a.name,w.weight from run_weight w join advisor_action a using (advisor_action) where w.run_id=%s order by 1',(self.run_id,))
         self.assertEqual([(w['name'],w['weight']) for w in weights],[('construct_infrastructure',3.0),('laws',2.0)])
+        centres=db.rows('select a.name,w.centre from run_weight w join advisor_action a using (advisor_action) where w.run_id=%s order by 1',(self.run_id,))
+        self.assertEqual([tuple(row.values()) for row in centres],[('construct_infrastructure',None),('laws',1.5)])
 
     def test_production_method_effects_are_stored_typed(self):
         ruleset=db.value('select ruleset_id from run where run_id=%s',(self.run_id,))
@@ -209,8 +272,8 @@ class DashboardTests(unittest.TestCase):
 
     def test_random_initializer_weights_are_exposed_with_their_source(self):
         found=rows(policy.weights([('run',str(self.run_id))],'weight',True,0,100))
-        self.assertEqual([(r['initializer'],r['method'],r['domain'],r['action'],r['weight']) for r in found],
-                         [('random',None,'construct','construct_infrastructure',3),('random',None,'single','laws',2)])
+        self.assertEqual([(r['initializer'],r['method'],r['domain'],r['action'],r['weight'],r['centre']) for r in found],
+                         [('random',None,'construct','construct_infrastructure',3,None),('random',None,'single','laws',2,1.5)])
         response=TestClient(app).get(f'/api/policy/weights?f=run:{self.run_id}')
         self.assertEqual(response.status_code,200)
         self.assertEqual(response.json()['total'],2)

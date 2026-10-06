@@ -125,6 +125,23 @@ class Reference(BaseModel):
     rows:int
 
 
+class TreatyTerm(BaseModel):
+    article:Ref
+    source:Ref|None
+    target:Ref|None
+
+
+class TreatyInfo(BaseModel):
+    seq:int
+    first:Ref
+    second:Ref
+    status:Literal['Proposed','In force','Withdrawn','No longer present']
+    entered_into_force_on:GameDate|None
+    binding_period_days:int
+    binding_until:GameDate|None
+    terms:list[TreatyTerm]
+
+
 class EntityInfo(BaseModel):
     ref:Ref
     first_seq:int
@@ -133,6 +150,7 @@ class EntityInfo(BaseModel):
     owned:list[TableCount]
     references:list[Reference]
     actions:int
+    treaty:TreatyInfo|None=None
 
 
 class ParamSpec(BaseModel):

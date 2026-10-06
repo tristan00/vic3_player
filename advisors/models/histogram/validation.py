@@ -16,7 +16,7 @@ def candidate_pool(data,fold,sizes):
     rows=np.repeat(fold['pauses'],data.sampling['candidates'])
     actions=data.actions.columns(sizes)
     held=data.held.columns(sizes)
-    return histogram.frame(data.state[rows],data.laws[rows],data.held.counts[np.ix_(rows,held)],
+    return histogram.frame(data.state[rows],data.categories[rows],data.held.counts[np.ix_(rows,held)],
                            fold['sizes'],fold['actions'][:,actions].toarray(),histogram.names(data.actions,data.held,sizes))
 
 

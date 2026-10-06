@@ -35,10 +35,14 @@ LOADING_HOURS=(5000+9000)*365*24
 
 
 @timed
-def _spawn(arguments,directory):
+def _spawn(arguments,directory,*,visible=False):
     command=subprocess.list2cmdline(arguments).replace("'","''")
-    script=("$ErrorActionPreference='Stop'; (Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments "
-            f"@{{CommandLine='{command}';CurrentDirectory='{directory}'}}).ProcessId")
+    directory=str(directory).replace("'","''")
+    script=("$ErrorActionPreference='Stop'; $launchStartup=New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly "
+            f"-Property @{{ShowWindow=[uint16]{int(visible)}}}; "
+            "$launchResult=Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments "
+            f"@{{CommandLine='{command}';CurrentDirectory='{directory}';ProcessStartupInformation=$launchStartup}}; "
+            "if ($launchResult.ReturnValue -ne 0) { throw ('Process creation failed: '+$launchResult.ReturnValue) }; $launchResult.ProcessId")
     encoded=base64.b64encode(script.encode('utf-16-le')).decode('ascii')
     shell=subprocess.Popen(['powershell.exe','-NoProfile','-NonInteractive','-EncodedCommand',encoded],
                            stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,creationflags=subprocess.CREATE_NO_WINDOW)
@@ -162,7 +166,7 @@ class GameInterface:
         arguments=[str(self.exe),'-gdpr-compliant',*(['-debug_mode'] if debug else []),'-skip','-nosounds','-userdir='+self.profile.as_posix(),*arguments]
         started=time.time()
         self.since=time.strftime('%H:%M:%S',time.localtime(started))
-        process=_spawn(arguments,self.exe.parent)
+        process=_spawn(arguments,self.exe.parent,visible=True)
         guard=_spawn([sys.executable,'-m','interface.runner.guard',str(process.pid),repr(process.create_time()),str(self.profile/'gpu_guard.log')],Path(__file__).resolve().parents[2])
         session={'pid':process.pid,'created':process.create_time(),'guard':{'pid':guard.pid,'created':guard.create_time()},'started':started,'arguments':arguments,'mods':mods}
         write_json(self.session_file,session)

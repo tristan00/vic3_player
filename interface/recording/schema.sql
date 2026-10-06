@@ -771,6 +771,7 @@ create table run_weight (
   run_id int4 not null references run,
   advisor_action int4 not null references advisor_action,
   weight float8 not null,
+  centre float8,
   primary key (run_id, advisor_action)
 );
 
@@ -946,6 +947,7 @@ create table loop_action (
   status text not null check (status in ('done', 'invalid', 'raced', 'no_object', 'ui_leftover')),
   detail text,
   ms int4,
+  unverified boolean not null,
   logged_at timestamptz not null,
   primary key (run_id, n),
   unique (run_id, n, action),

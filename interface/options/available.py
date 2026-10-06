@@ -931,12 +931,6 @@ def researchable(s):
 
 
 @timed_often
-def queueable(s):
-    acquired,queued,current,_=technologies(s)
-    return [name for name in s.keys('technology') if name not in acquired|queued|current and researchable_kind(s,name)]
-
-
-@timed_often
 def researchable_kind(s,name):
     return definition(s,'common/technology/technologies',name,'can_research')!=['no']
 
@@ -2673,7 +2667,7 @@ RULES={
     'remove_decree':lambda s:[{'state':state,'decree':kind} for state,kind in sorted(issued_decrees(s))
                              if passes(s,'common/decrees',kind,('state_trigger',),Scope(s,'state',state))],
     'research':lambda s:product(technology=researchable(s)),
-    'queue_research':lambda s:product(technology=queueable(s)),
+    'queue_research':lambda s:product(technology=researchable(s)),
     'dequeue_research':lambda s:product(technology=[kind for owner,kind in s.rows('country_research_queued','country_research,technology') if owner in research(s)]),
     'recruit':recruit,
     **{f'{name}_selected':(lambda s,name=name:RULES[name](s)) for name in ('mobilize','demobilize','raise_conscripts')},

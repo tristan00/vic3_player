@@ -16,7 +16,9 @@ class RandomSmacWeightingAdvisor(RandomAdvisor):
 
     @timed
     def propose(self,X,y,low,high,names=None):
-        return forest.propose(X,y,low,high,np.random.default_rng(self.random.randrange(2**32)),names)
+        names=names or [str(i) for i in range(len(low))]
+        rng=np.random.default_rng(self.random.randrange(2**32))
+        return forest.propose(X,y,low,high,rng,names,random_points=self.candidates(names,forest.CANDIDATES))
 
     @timed
     def start_run(self,store,actions,objective):

@@ -64,17 +64,64 @@ class DebtCapTests(unittest.TestCase):
 
 
 class RandomAdvisorTests(unittest.TestCase):
-    def test_every_weight_is_drawn_over_the_search_range_except_those_switched_off(self):
-        from advisors.initializers.random import HIGH, LOW
-        advisor=RandomAdvisor(1,{'construct_infrastructure':3,'cancel_queued_construction':0})
-        actions=['construct_infrastructure','cancel_queued_construction','research_production']
-        weights=advisor.start_run(None,actions,None)
-        self.assertEqual(weights['cancel_queued_construction'],0)
-        drawn=[advisor.start_run(None,actions,None)[name] for _ in range(200) for name in ('construct_infrastructure','research_production')]
+    def test_every_weight_is_drawn_from_a_bell_around_its_centre_and_zero_switches_a_lever_off(self):
+        import math
+        from unittest import mock
+        from advisors.catalogue import NAMES
+        from advisors.initializers import random as initializer
+        from advisors.initializers.random import CENTRE, CENTRES, HIGH, LOW, SPREAD
+        self.assertLessEqual(set(CENTRES),set(NAMES))
+        self.assertTrue(all(LOW<=centre<=HIGH for centre in CENTRES.values()))
+        centres={'downsize_building':-2.,'construct_innovation':2.,'construct_bureaucracy':1.}
+        advisor=RandomAdvisor(1,{'cancel_queued_construction':0.})
+        actions=['cancel_queued_construction',*centres,'research_production','raise_tax_level']
+        with mock.patch.dict(initializer.CENTRES,centres,clear=True):
+            runs=[advisor.start_run(None,actions,None) for _ in range(2000)]
+        self.assertEqual({weights['cancel_queued_construction'] for weights in runs},{0})
+        self.assertEqual(advisor.excluded,{'cancel_queued_construction'})
+        self.assertEqual(advisor.used,{**centres,'research_production':0.,'raise_tax_level':0.})
+        self.assertEqual((CENTRE,SPREAD),(0,1))
+        share=lambda name,low,high:sum(low<=math.log10(weights[name])<high for weights in runs)/len(runs)
+        self.assertTrue(all(.01<=weights[name]<=100 for weights in runs for name in centres))
+        self.assertAlmostEqual(share('construct_innovation',1,2.001),.683,delta=.04)
+        self.assertAlmostEqual(share('construct_innovation',-2,0),.046,delta=.02)
+        self.assertAlmostEqual(share('downsize_building',-2,-1),.683,delta=.04)
+        self.assertAlmostEqual(share('construct_bureaucracy',0,2.001),.812,delta=.04)
+        self.assertGreater(share('construct_bureaucracy',-2,-1),0)
+        self.assertAlmostEqual(share('research_production',-1,1),.715,delta=.04)
+        self.assertAlmostEqual(share('raise_tax_level',1,2.001),.142,delta=.03)
+        drawn=[weights[name] for weights in runs for name in ('research_production','raise_tax_level')]
         self.assertTrue(all(10**LOW<=weight<=10**HIGH for weight in drawn))
         self.assertEqual(len(set(drawn)),len(drawn))
         self.assertLess(min(drawn),.1)
         self.assertGreater(max(drawn),10)
+
+    def test_smac_and_svr_candidate_pools_use_randoms_centred_distribution(self):
+        import numpy as np
+        from statistics import NormalDist
+        from unittest import mock
+        from advisors.initializers import random, smac, svr
+        history=lambda connection,space:(np.random.default_rng(0).uniform(-2,2,(30,len(space))),np.arange(30.),list(range(30)))
+        store=type('Store',(),{'connection':None})()
+        centres={'downsize_building':-2.,'construct_innovation':2.}
+        actions=[*centres,'research_production','cancel_queued_construction']
+        cases=((smac,smac.RandomSmacWeightingAdvisor,smac.forest,'predict',1,smac.forest.CANDIDATES),
+               (svr,svr.RandomSvrWeightingAdvisor,svr,'best',3,svr.SAMPLES))
+        for module,kind,model,method,argument,count in cases:
+            with self.subTest(initializer=kind.name):
+                advisor=kind(1,{'cancel_queued_construction':0})
+                with mock.patch.object(module,'history',history), mock.patch.dict(random.CENTRES,centres,clear=True), \
+                     mock.patch.object(random,'SPREAD',.75), mock.patch.object(model,method,wraps=getattr(model,method)) as evaluated:
+                    weights=advisor.start_run(store,actions,None)
+                points=np.asarray(evaluated.call_args.args[argument])[:count]
+                self.assertEqual(points.shape,(count,3))
+                self.assertEqual(advisor.used,{**centres,'research_production':0.})
+                self.assertEqual(weights['cancel_queued_construction'],0)
+                self.assertTrue(((points>random.LOW)&(points<random.HIGH)).all())
+                for column,centre in enumerate(advisor.used.values()):
+                    bell=NormalDist(centre,.75)
+                    expected=(bell.cdf(1)-bell.cdf(-1))/(bell.cdf(random.HIGH)-bell.cdf(random.LOW))
+                    self.assertAlmostEqual(np.mean(np.abs(points[:,column])<1),expected,delta=.04)
 
 class RandomSmacWeightingTests(unittest.TestCase):
     def test_one_scored_run_is_enough_for_a_model_proposal_and_none_is_refused(self):
@@ -161,11 +208,26 @@ class RandomSmacWeightingTests(unittest.TestCase):
         self.assertAlmostEqual(found[3],-found[0])
         self.assertAlmostEqual(float(sum(found)),0.0)
 
-    def test_svr_proposal_takes_each_weight_to_the_best_point_of_its_own_curve(self):
+    def test_svr_uses_a_kernel_that_is_not_linear_and_finds_a_peak_inside_the_range(self):
         import numpy as np
-        from advisors.models.svr import best
-        found=best(np.array([1.0,-1.0,0.0,2.0]),np.array([0.0,0.0,-1.0,-1.0]),-2.0,2.0)
-        self.assertEqual(found.tolist(),[2.0,-2.0,0.0,1.0])
+        from sklearn.svm import SVR
+        from advisors.models import svr
+        self.assertEqual(svr.KERNEL,'rbf')
+        rng=np.random.default_rng(0)
+        X=rng.uniform(-2,2,(200,2))
+        y=-(X[:,0]-1)**2-(X[:,1]+.5)**2
+        surface=svr.Surface(X,(y-y.mean())/y.std())
+        library=SVR(kernel=svr.KERNEL,gamma=surface.gamma,C=svr.C,epsilon=svr.EPSILON).fit(surface.scaled(X),(y-y.mean())/y.std())
+        np.testing.assert_allclose([surface.value(point) for point in X[:9]],library.predict(surface.scaled(X[:9])),atol=1e-9)
+        found=svr.best(surface,-2.,2.,RandomAdvisor(1).candidates(['build','research'],svr.SAMPLES))
+        self.assertLess(float(np.abs(found-[1,-.5]).max()),.25)
+        self.assertGreaterEqual(surface.value(found),max(surface.value(point) for point in X))
+        self.assertTrue((surface.curve(found)<0).all())
+        point,step=np.array([.3,-.4]),1e-4
+        slope=[(surface.value(point+step*axis)-surface.value(point-step*axis))/(2*step) for axis in np.eye(2)]
+        curve=[(surface.value(point+step*axis)-2*surface.value(point)+surface.value(point-step*axis))/(2*step**2) for axis in np.eye(2)]
+        np.testing.assert_allclose(surface.slope(point),slope,atol=1e-6)
+        np.testing.assert_allclose(surface.curve(point),curve,atol=1e-4)
 
     def test_svr_advisor_raises_weights_that_raise_the_reward_and_lowers_the_others(self):
         import numpy as np
@@ -178,11 +240,13 @@ class RandomSmacWeightingTests(unittest.TestCase):
         with mock.patch.object(random_svr_weighting,'history',lambda connection,space:(X,y,list(range(80)))):
             weights=advisor.start_run(type('Store',(),{'connection':None})(),['build','downsize','research','raise_queue_item'],None)
         self.assertEqual(weights['raise_queue_item'],0)
-        self.assertEqual(weights['build'],100.0)
-        self.assertEqual(weights['downsize'],0.01)
+        self.assertGreater(weights['build'],10)
+        self.assertLess(weights['downsize'],.1)
+        self.assertTrue(all(.01<=weights[name]<=100 for name in ('build','downsize','research')))
         self.assertEqual(advisor.proposal['method'],'bootstrap_svr')
         self.assertEqual(sum(count for *_,count in advisor.proposal['observed']),80)
         self.assertEqual([name for name,*_ in advisor.proposal['coefficients']],['build','downsize','research'])
+        self.assertEqual(advisor.proposal['bounded'],sum(1 for *_,chosen in advisor.proposal['coefficients'] if abs(chosen)==2))
 
     def test_svr_proposes_from_one_scored_run_and_refuses_none(self):
         import numpy as np
@@ -249,7 +313,7 @@ class RandomSmacWeightingTests(unittest.TestCase):
 
     def test_actions_weighted_zero_stay_excluded(self):
         from advisors.initializers import RandomSmacWeightingAdvisor
-        advisor=RandomSmacWeightingAdvisor(0,{'cancel_queued_construction':0,'construct_infrastructure':3})
+        advisor=RandomSmacWeightingAdvisor(0,{'cancel_queued_construction':0})
         self.assertEqual(advisor.excluded,{'cancel_queued_construction'})
 
 class WorldPoolTests(unittest.TestCase):
@@ -368,7 +432,8 @@ class BatchSamplerTests(unittest.TestCase):
         import contextlib
         import io
         from loop.run import main
-        for weights in (['accept_offers=0','decline_offers=0'],['concede_demand=0','refuse_demand=0'],['agree_to_treaty=0']):
+        for weights in (['accept_offers=0','decline_offers=0'],['concede_demand=0','refuse_demand=0'],['agree_to_treaty=0'],['accept_offers=-1'],['accept_offers=inf'],
+                        ['accept_offers=nan'],['accept_offers=5']):
             with self.assertRaises(SystemExit),contextlib.redirect_stderr(io.StringIO()):
                 main(['--runs','1','--weight',*weights])
 
@@ -485,8 +550,8 @@ class FeatureTests(unittest.TestCase):
     def test_prices_fill_one_number_per_good_and_mark_untraded_goods_missing(self):
         import math
         from advisors.data.features import GOODS, prices
-        found=prices({'grain':30.0})
-        self.assertEqual(len(found),len(GOODS))
+        found=prices({'grain':30.0},{})
+        self.assertEqual(len(found),2*len(GOODS))
         self.assertEqual(found[GOODS.index('grain')],30.0)
         self.assertTrue(math.isnan(found[GOODS.index('fabric')]))
 
@@ -516,14 +581,15 @@ class FeatureTests(unittest.TestCase):
         history=Space(player={1:7},terrain={1:{}},interest=10,treasury=at([100.0,50.0,-3.0]),population=at([10,20,30]),politics=at([4.0]),
                       budget=at((2.0,)),sol=at((8.0,)),construction=at((12.0,10.0,True)),gdp=at((5200.0,)),
                       queue=Space(live=lambda run,seq:[(False,300.0,0,1,'a'),(False,100.0,1,1,'b'),(True,50.0,0,1,'a')]),army={5,6},military=at((20,0.25)),
-                      wars=Space(live=lambda run,seq:[(7,),(9,),(7,)]),infamy=at([12.5]))
+                      wars=Space(live=lambda run,seq:[(7,),(9,),(7,)]),infamy=at([12.5]),government={1,2,3},policy=at([4,0,3]))
         numbers=HistoryLookup(history,1,5).numbers
         self.assertEqual(len(numbers),len(NUMBERS))
         self.assertEqual(dict(zip(NUMBERS,numbers)),{'treasury':100.0,'debt':50.0,'interest':2.0,'balance':-3.0,'population':60,'bureaucracy_available':4.0,
                                                         'standard_of_living':8.0,'government_queue_items':2,'government_queue_left':400.0,'private_queue_items':1,
                                                         'private_queue_left':50.0,'construction_capacity':12.0,'construction_used':10.0,'construction_paused':1.0,
                                                         'balance_gdp':-0.03,'battalions':20,'mobilization_ratio':0.25,'wars':2,'army_spending':4.0,
-                                                        'army_spending_gdp':0.04,'infamy':12.5})
+                                                        'army_spending_gdp':0.04,'infamy':12.5,'government_spending':6.0,'government_spending_gdp':0.06,
+                                                        'tax_level':4,'government_wage_level':0,'military_wage_level':3})
 
     def test_fitting_reports_progress_every_iteration_so_the_stall_watchdog_stays_quiet(self):
         from advisors.models.boosting import Beat
@@ -538,18 +604,19 @@ class FeatureTests(unittest.TestCase):
         from unittest import mock
         from advisors import pickers
         from advisors.models.histogram import data
-        from advisors.data.features import GOODS, INSTITUTION_TYPES, LAW_GROUPS, TARIFFS
+        from advisors.data.features import INSTITUTION_TYPES, LAW_GROUPS, PRICES, TARIFFS, TAXES
         from advisors.data.histograms import BUILDINGS, Histograms
         seen=[]
         class Model:
             def predict(self,data):
                 return np.array([0.1,0.9,0.4])
         class Lookup(self.Lookup):
-            numbers=[1.0,0.0,0.0,0.0,100.0,5.0,20.0,2,300.0,0,0.0,10.0,10.0,0.0,-0.02,12,0.0,0,30.0,0.3,4.0]
+            numbers=[1.0,0.0,0.0,0.0,100.0,5.0,20.0,2,300.0,0,0.0,10.0,10.0,0.0,-0.02,12,0.0,0,30.0,0.3,4.0,40.0,0.4,2,2,2]
             laws=['none']*len(LAW_GROUPS)
-            prices=[1.0]*len(GOODS)
+            prices=[1.0]*len(PRICES)
             institutions=[0.0]*len(INSTITUTION_TYPES)
             tariffs=[3.0]*len(TARIFFS)
+            taxes=[0.0]*len(TAXES)
         picker=pickers.CatBoostPicker()
         picker.model=Model()
         actions=Histograms([[('action','research_production_technology',1),('research_production_technology.technology','a',1)],[('action','enact_new_law',1)]])
@@ -565,7 +632,8 @@ class FeatureTests(unittest.TestCase):
         state,laws,held,batch,actions,names=seen[0]
         self.assertEqual(names[-5:],['player.buildings=farm','batch_size','action=enact_new_law','action=research_production_technology','research_production_technology.technology=a'])
         self.assertEqual(np.hstack([held,batch,actions]).tolist(),[[5,1,0,1,1],[5,1,0,1,0],[5,1,1,0,0]])
-        self.assertEqual((state.shape,laws.shape),((3,len(names)-5),(3,len(LAW_GROUPS))))
+        self.assertEqual((state.shape,laws.shape),((3,len(names)-5),(3,len(LAW_GROUPS)+1)))
+        self.assertEqual(laws[:,-1].tolist(),['rank_major']*3)
 
 
 if __name__=='__main__':

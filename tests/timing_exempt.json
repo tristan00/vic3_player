@@ -1,12 +1,10 @@
 {
  "advisors/data/features.py": {
+  "Latest.at": "hot",
   "Samples.at": "hot",
   "Versions.at": "hot",
   "Versions.live": "hot",
   "resolve": "hot"
- },
- "advisors/data/histograms.py": {
-  "Latest.at": "hot"
  },
  "dashboard/server/__main__.py": "monitor",
  "dashboard/server/grid.py": {

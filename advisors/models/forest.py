@@ -44,12 +44,13 @@ def local_search(forest,starts,best,low,high,rng):
 
 
 @timed
-def propose(X,y,low,high,rng,names=None):
+def propose(X,y,low,high,rng,names=None,random_points=None):
     if not len(y):
         raise ValueError('The forest needs at least one observation')
     names=names or [str(i) for i in range(len(low))]
     forest=RandomForestRegressor(n_estimators=TREES,min_samples_leaf=LEAF,max_features=FEATURES,random_state=int(rng.integers(2**31))).fit(X,y)
-    random_points=rng.uniform(low,high,(CANDIDATES,len(low)))
+    if random_points is None:
+        random_points=rng.uniform(low,high,(CANDIDATES,len(low)))
     climbed,_=local_search(forest,np.clip(X[np.argsort(y)[-STARTS:]],low,high),y.max(),low,high,rng)
     points=np.vstack([random_points,climbed])
     sources=['random']*len(random_points)+['local_search']*len(climbed)

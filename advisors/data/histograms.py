@@ -1,10 +1,8 @@
-import bisect
-
 import numpy as np
 
 from interface.common import timed, timed_often
-from ..catalogue import CANCELLING, PLAY_ACTIONS
-from .features import KINDS, LEADER_ACTIONS, Samples, Versions, queued, resolve
+from ..catalogue import CANCELLING, PLAY_ACTIONS, SITED
+from .features import KINDS, LEADER_ACTIONS, SITE, Latest, Samples, Versions, located, queued, resolve
 
 ACTION='action'
 CHOICE='answers'
@@ -37,8 +35,11 @@ LEADERS=(LEADER_IDEOLOGIES,LEADER_TRAITS)
 @timed_often
 def entries(batch,lookup):
     found=[]
+    sites={}
     for action,params in batch:
         found.append((ACTION,action,1))
+        if action in SITED:
+            sites.setdefault(SITED[action],[]).append(lookup.site(*located(action,params,lookup)))
         if 'event' in params:
             name,default,offered,effects=lookup.answer(params['event'],params['option'])
             found+=[(CHOICE,name,1),(DEFAULT,str(default),1),(OFFERED,OFFERED,offered)]+[(EFFECT,effect,1) for effect,_ in effects]
@@ -58,6 +59,11 @@ def entries(batch,lookup):
             context,pacts=lookup.context(target,params.get('state'))
             found+=[(name,action,value) for name,value in zip(PLAY_CONTEXT,context)]
             found+=[(name,f'{action}.{kind}',1) for name,kind in pacts]
+    for kind,rows in sites.items():
+        for name,values in zip(SITE,zip(*rows)):
+            known=[value for value in values if value==value]
+            if known:
+                found.append((name,kind,sum(known)/len(known)))
     return found
 
 
@@ -84,21 +90,6 @@ def country(groups,ideologies,roles,people):
     found+=[(IDEOLOGIES,str(ideology),1) for ideology in ideologies]+[(ROLES,role,1) for role in roles]
     total=sum(people[:3])
     return found+[(PEOPLE,name,value/total) for name,value in zip(SHARES,people)]
-
-
-class Latest:
-    @timed
-    def __init__(self,connection,table,key,columns,runs):
-        self.index={}
-        for run,ident,seq,*values in connection.execute(f'select run_id,{key},seq,{",".join(columns)} from {table} where run_id = any(%s) order by run_id,{key},seq',(runs,)).fetchall():
-            seqs,rows=self.index.setdefault((run,ident),([],[]))
-            seqs.append(seq)
-            rows.append(values)
-
-    def at(self,run,ident,seq):
-        seqs,rows=self.index.get((run,ident),([],[]))
-        position=bisect.bisect_right(seqs,seq)-1
-        return None if position<0 else rows[position]
 
 
 class Holdings:

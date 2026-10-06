@@ -34,7 +34,6 @@ export function Policy() {
         <p className="text-dim mt-3 text-xs">Completed runs are recalculated with the current fixed reward. Configuration comparisons use the median run score.</p>
       </Section>}
       {view === 'initializer' && <Section title="Action weights">
-        <p className="text-dim mb-3 text-sm">Each run starts with action sampling weights from the random, SMAC or SVR initializer. SMAC and SVR learn from rank-normalized three-metric rewards measured from each run’s opening snapshot.</p>
         <Tabs views={INITIALIZER} param="initializer_view" labels={INITIALIZER_LABELS} />
         {initializer === 'initializers' && <Initializers />}
         {initializer === 'catalogue' && <DataGrid id="catalogue" url="/api/policy/catalogue" live />}

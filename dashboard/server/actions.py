@@ -1,15 +1,18 @@
+from advisors.catalogue import ACTIONS, LEVERS
 from interface.actions.catalogue import BY_NAME
 from interface.recording.spec import ENTITIES
 
 from . import db
 from .grid import Spec, grid, where_clause
 from .models import ParamSpec
-from .runs import GROUPS, LOOP_PARAMS, STATUSES
+from .runs import GROUPS, LOOP_PARAMS, OUTCOMES
 
 ALIASES={'military_formation':'formation'}
 GROUP_VALUES='(values '+','.join(f"('{name}','{group}')" for name,group in GROUPS.items())+') grp(name,grp)'
 ACTION_FROM=f'''from loop_action l join action a using (action) join snapshot s on s.run_id=l.run_id and s.seq=l.before_seq
 join {GROUP_VALUES} on grp.name=a.name'''
+LEVER_VALUES='(values '+','.join(f"('{lever.name}','{lever.domain}',{len(lever.acts)})" for lever in LEVERS)+') lev(name,domain,acts)'
+ACT_VALUES='(values '+','.join(f"('{action.name}','{action.lever}')" for action in ACTIONS)+') act(name,lever)'
 
 
 @db.timed
@@ -45,7 +48,7 @@ def action_grid(where,params,filters,sort,desc,offset,limit,run_id=None):
     base=([Spec('run','run','l.run_id')] if run_id is None else [])+[
         Spec('n','n','l.n',run=None if run_id else 'run'),Spec('turn','number','l.turn'),Spec('game_date','date','s.game_date'),Spec('action','action','a.name'),
         Spec('advisor_action','text','(select d.name from advisor_action d where d.advisor_action=l.advisor_action)',label='Advisor action'),
-        Spec('group','text','grp.grp'),Spec('status','text','l.status'),Spec('detail','text','l.detail'),Spec('ms','number','l.ms'),
+        Spec('group','text','grp.grp'),Spec('status','text','l.status'),Spec('unverified','bool','l.unverified'),Spec('detail','text','l.detail'),Spec('ms','number','l.ms'),
         Spec('before_seq','seq','l.before_seq',run=None if run_id else 'run'),Spec('after_seq','seq','l.after_seq',run=None if run_id else 'run'),
         Spec('logged_at','time','l.logged_at')]
     chosen,extra=where_clause(base,[f for f in filters if not f[0].startswith('param.')])
@@ -92,10 +95,24 @@ def action_stats(scope,filters,sort,desc,offset,limit):
                left join (loop_action l join run r on r.run_id=l.run_id and {where}) on l.action=a.action
                group by grp.name,grp.grp'''
     specs=[Spec('action','action','grp.name'),Spec('group','text','grp.grp'),Spec('runs','number','count(distinct l.run_id)'),Spec('picks','number','count(l.n)')]
-    specs+=[Spec(s,'number',f"count(l.n) filter (where l.status='{s}')") for s in STATUSES]
+    specs+=[Spec(name,'number',f'count(l.n) filter (where {test})') for name,test in OUTCOMES]
     specs+=[Spec('ms_median','number',"percentile_cont(.5) within group (order by l.ms) filter (where l.status='done')"),
             Spec('ms_p90','number',"percentile_cont(.9) within group (order by l.ms) filter (where l.status='done')")]
     return grid(specs,source,params,filters,sort or 'picks',True if sort is None else desc,offset,limit,None,['action'])
+
+
+@db.timed
+def lever_stats(scope,filters,sort,desc,offset,limit):
+    where,params=scope_sql(scope)
+    source=f'''from {LEVER_VALUES} join {ACT_VALUES} on act.lever=lev.name left join advisor_action d on d.name=act.name
+               left join (loop_action l join run r on r.run_id=l.run_id and {where}) on l.advisor_action=d.advisor_action
+               left join action a on a.action=l.action
+               group by lev.name,lev.domain,lev.acts'''
+    specs=[Spec('lever','text','lev.name'),Spec('kind','text','lev.domain'),Spec('acts','number','lev.acts'),
+           Spec('commands','text',"string_agg(distinct a.name,', ')",label='Interface commands executed'),
+           Spec('runs','number','count(distinct l.run_id)'),Spec('picks','number','count(l.n)')]
+    specs+=[Spec(name,'number',f'count(l.n) filter (where {test})') for name,test in OUTCOMES]
+    return grid(specs,source,params,filters,sort or 'picks',True if sort is None else desc,offset,limit,None,['lever'])
 
 
 @db.timed
@@ -104,7 +121,7 @@ def action_runs(name,scope,filters,sort,desc,offset,limit):
     source=f'''from loop_action l join action a using (action) join run r on r.run_id=l.run_id join country_definition d on d.country_definition=r.tag
                where a.name=%(name)s and {where} group by l.run_id,r.player_country,d.name'''
     specs=[Spec('run','run','l.run_id'),Spec('country','ref','r.player_country',entity='country',run='run'),Spec('picks','number','count(*)')]
-    specs+=[Spec(s,'number',f"count(*) filter (where l.status='{s}')") for s in STATUSES]
+    specs+=[Spec(name,'number',f'count(*) filter (where {test})') for name,test in OUTCOMES]
     return grid(specs,source,{**params,'name':name},filters,sort or 'run',True if sort is None else desc,offset,limit,None,['run'])
 
 

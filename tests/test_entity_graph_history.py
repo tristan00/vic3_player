@@ -43,7 +43,7 @@ class ActionHistoryTests(unittest.TestCase):
         self.assertEqual(args,[7,1,2])
         self.assertIn('la.before_seq>=%s',sql)
         self.assertIn('la.before_seq<%s',sql)
-        for forbidden in ('status','after_seq','logged_at','valid','detail'):
+        for forbidden in ('status','after_seq','logged_at','valid','detail','unverified'):
             self.assertNotIn(forbidden,sql)
 
     def test_graph_contains_only_current_world_without_temporal_edges(self):

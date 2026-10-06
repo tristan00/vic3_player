@@ -1,5 +1,8 @@
 import { useSearchParams } from 'react-router-dom'
 import { DataGrid } from '@/components/DataGrid'
+import { Tabs, useTab } from '@/components/primitives'
+
+const VIEWS = ['commands', 'levers']
 
 export function useScope() {
   const [params, setParams] = useSearchParams()
@@ -32,5 +35,13 @@ export function ScopeInput() {
 
 export function Actions() {
   const { scope } = useScope()
-  return <div className="space-y-4"><h1 className="font-semibold">Actions</h1><p className="text-dim">Compare action outcomes and timings. Open an action to inspect its runs and entity targets.</p><DataGrid id="stats" url="/api/actions" query={{ scope }} limit={50} toolbar={<ScopeInput />} /></div>
+  const view = useTab(VIEWS)
+  return (
+    <div className="space-y-4">
+      <h1 className="font-semibold">Actions</h1>
+      <Tabs views={VIEWS} labels={{ commands: 'Interface commands', levers: 'Levers' }} />
+      {view === 'commands' && <><p className="text-dim">Compare action outcomes and timings. Open an action to inspect its runs and entity targets.</p><DataGrid id="stats" url="/api/actions" query={{ scope }} limit={50} toolbar={<ScopeInput />} /></>}
+      {view === 'levers' && <><p className="text-dim">A weight is set on a lever, not on a command. Each lever holds one or more acts, and an act is carried out by the interface commands listed beside it. Commands that were never sent are not listed.</p><DataGrid id="levers" url="/api/levers" query={{ scope }} limit={100} toolbar={<ScopeInput />} /></>}
+    </div>
+  )
 }

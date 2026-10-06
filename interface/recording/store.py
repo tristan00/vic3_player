@@ -230,12 +230,12 @@ class Store:
         return [name for name, in self.connection.execute('select d.name from run r join country_definition d on d.country_definition=r.tag order by run_id desc limit %s',(count,))]
 
     @timed
-    def begin_run(self,started_at,kind,advisors,tag,world,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,generated,weights,picker,candidates,objective,proposal=None,pick_model=None):
+    def begin_run(self,started_at,kind,advisors,tag,world,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,generated,weights,centres,picker,candidates,objective,proposal=None,pick_model=None):
         lost=self.connection.execute("update run set ended_at=heartbeat_at,end_reason='loop_lost' where ended_at is null returning run_id,heartbeat_at").fetchall()
         for run_id,heartbeat_at in lost:
             LOG.error('RUN %s WAS LOST: its loop last beat at %s UTC',run_id,heartbeat_at)
         self.pending={'started_at':started_at,'kind':kind,'advisors':list(advisors),'tag':tag,'world':world,'cli_seed':cli_seed,'run_seed':run_seed,'years':years,'minutes':minutes,'profile':profile,'pool':pool,
-                      'runs_requested':runs_requested,'generated':generated,'weights':dict(weights),
+                      'runs_requested':runs_requested,'generated':generated,'weights':dict(weights),'centres':dict(centres),
                       'picker':picker,'candidates':candidates,'objective':objective,'proposal':proposal,'pick_model':pick_model}
         self.run_id=None
         self.constants=None
@@ -268,7 +268,8 @@ class Store:
             values=pending['generated']
             cursor.execute('update run set tech_variation=%s,country_economy=%s,local_economy=%s,source_regions=%s,ideology_uniformity=%s,primary_culture_share=%s where run_id=%s',
                            (*[values.get(key) for key in ('tech_variation','country_economy','local_economy','source_regions','ideology_uniformity','primary_culture_share')],run_id))
-        self.copy(cursor,'run_weight',('run_id','advisor_action','weight'),[(run_id,action,pending['weights'][name]) for name,action in zip(names,self.names('advisor_action',names))])
+        self.copy(cursor,'run_weight',('run_id','advisor_action','weight','centre'),
+                  [(run_id,action,pending['weights'][name],pending['centres'].get(name)) for name,action in zip(names,self.names('advisor_action',names))])
         self.copy(cursor,'run_advisor',('run_id','position','advisor'),enumerate_rows(run_id,self.names('advisor',pending['advisors'])))
         if pending['proposal'] is not None:
             {'random_smac_weighting':self.record_smac_proposal,'random_svr_weighting':self.record_svr_proposal}[pending['proposal']['initializer']](cursor,run_id,pending['proposal'])
@@ -560,11 +561,15 @@ class Store:
         with self.connection.transaction(),self.connection.cursor() as cursor:
             params=self.parameters(cursor,'action',action,entry['action'],entry['params'])
             decided=[] if decision is None else self.parameters(cursor,'advisor_action',chosen,decision[0],decision[1])
-            cursor.execute('insert into loop_action (run_id,n,turn,advisor,action,advisor_action,before_seq,after_seq,status,detail,ms,logged_at) '
-                           'values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now())',
-                           (self.run_id,entry['seq'],entry['turn'],advisor,action,chosen,entry['snapshot'],after,entry['status'],entry.get('detail'),entry.get('ms')))
+            cursor.execute('insert into loop_action (run_id,n,turn,advisor,action,advisor_action,before_seq,after_seq,status,detail,ms,unverified,logged_at) '
+                           'values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now())',
+                           (self.run_id,entry['seq'],entry['turn'],advisor,action,chosen,entry['snapshot'],after,entry['status'],entry.get('detail'),entry.get('ms'),entry['unverified']))
             self.copy(cursor,'loop_action_param',('run_id','n','action','name','integer_value','text_value'),[(self.run_id,entry['seq'],action,*row) for row in params])
             self.copy(cursor,'loop_decision_param',('run_id','n','advisor_action','name','integer_value','text_value'),[(self.run_id,entry['seq'],chosen,*row) for row in decided])
+
+    @timed_often
+    def verify_action(self,n):
+        self.connection.execute('update loop_action set unverified=false where run_id=%s and n=%s',(self.run_id,n))
 
     @timed_often
     def start_heartbeat(self):

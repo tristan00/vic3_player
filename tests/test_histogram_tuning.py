@@ -19,7 +19,7 @@ from loop import prepare_histogram_tuning as preparation
 
 def dataset():
     data=SimpleNamespace(y=np.array([-3.,-1.,1.,3.,-4.,-2.,2.,4.]),runs=np.repeat(np.arange(4),2),played=4,
-                         state=np.zeros((8,len(histogram.STATE)),np.float32),laws=np.full((8,len(histogram.LAWS)),'law',object),
+                         state=np.zeros((8,len(histogram.STATE)),np.float32),categories=np.full((8,len(histogram.CATEGORIES)),'law',object),
                          sizes=np.array([[index+1] for index in range(8)],np.float32),
                          actions=Histograms([[('action','form_army',index+1)] for index in range(8)]),held=Histograms([[] for _ in range(8)]),
                          pauses=np.array([(run,seq) for run in range(4) for seq in (0,2)]),metric=METRIC.copy(),

@@ -100,7 +100,7 @@ class LeaderFeaturesTests(unittest.TestCase):
         self.assertEqual(actions.counts[1,actions.column[LEADER_IDEOLOGIES,'negotiate_over_law.royalist']],2)
         self.assertFalse(actions.counts[-1].any())
         self.assertFalse(actions.count([[(LEADER_TRAITS,'negotiate_over_law.unseen',1)]],selected).any())
-        data=SimpleNamespace(state=np.zeros((4,len(pickers.STATE)),np.float32),laws=np.full((4,len(pickers.LAWS)),'none',object),
+        data=SimpleNamespace(state=np.zeros((4,len(pickers.STATE)),np.float32),categories=np.full((4,len(pickers.CATEGORIES)),'none',object),
                              sizes=np.ones((4,1),np.float32),actions=actions,held=Histograms([[],[],[],[]]))
         rows=np.arange(4)
         pool=pickers.pool(data,sizes)(rows,rows,np.array([1.,2.,3.,0.]))

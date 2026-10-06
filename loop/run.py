@@ -12,7 +12,8 @@ import threading
 import time
 
 from advisors.catalogue import ANSWERS as ANSWER_ACTIONS, LEVER, NAMES, PROPOSALS
-from advisors.initializers import ADVISORS, RandomAdvisor
+from advisors.initializers import ADVISORS
+from advisors.initializers.random import RandomAdvisor
 from advisors.pickers import PICKERS
 from advisors.data.rewards import draw_objective
 from interface import GameInterface, generate, record
@@ -25,6 +26,7 @@ from interface.world.sampling import SLIDERS, SAMPLING, PER_COUNTRY, world_size
 from interface.world.cache import Cached
 from interface.recording.record import prepare as prepare_recording
 from interface.options import available
+from interface.options.effects import LATER, took_effect, took_effect_later
 from interface.options.stored import Shared, Stored
 from interface.runner.memory import MONTH_STARTS
 from loop import supervise
@@ -48,7 +50,7 @@ PROPOSAL_ANSWERS=(('accept_treaty','decline_treaty'),('accept_demand','reject_de
 ANSWERS=(EVENT,QUICK,*(name for pair in PROPOSAL_ANSWERS for name in pair))
 HOURS_PER_DAY=24
 Decision=namedtuple('Decision','action params command')
-CANDIDATES=(8,50)
+CANDIDATES=100
 HOURS_PER_YEAR=365*HOURS_PER_DAY
 
 
@@ -251,6 +253,7 @@ class Loop:
         self.dirty=0
         self.turn=0
         self.seq=0
+        self.late=[]
 
     @timed_often
     def entry(self,source,name,params,snapshot,decision):
@@ -258,11 +261,30 @@ class Loop:
         return {'turn':self.turn,'seq':self.seq,'advisor':source,'action':name,'params':params,'snapshot':snapshot.seq,'decision':decision}
 
     @timed_often
-    def note(self,entry,after=None):
+    def checked(self,check,entry,before,after):
+        try:
+            return check(entry['action'],before,after,entry['params'])
+        except Exception:
+            LOG.exception('effect check failed for %s %s',entry['action'],entry['params'])
+            return False
+
+    @timed_often
+    def note(self,entry,before=None,after=None):
+        unverified=after is not None and not self.checked(took_effect,entry,before,after)
         self.counts[entry['status']]=self.counts.get(entry['status'],0)+1
-        self.store.log_action(entry,after.seq if after else None)
-        if entry['status']!='done':
-            LOG.warning('%s %s %s %s',entry['status'],entry['action'],entry['params'],entry.get('detail',''))
+        self.store.log_action({**entry,'unverified':unverified},after.seq if after else None)
+        if unverified and entry['action'] in LATER:
+            self.late.append((entry,before))
+        if entry['status']!='done' or unverified:
+            LOG.warning('%s%s %s %s %s',entry['status'],' unverified' if unverified else '',entry['action'],entry['params'],entry.get('detail',''))
+
+    @timed_often
+    def settle_late(self,after):
+        for entry,before in self.late:
+            if self.checked(took_effect_later,entry,before,after):
+                self.store.verify_action(entry['seq'])
+                LOG.info('verified later %s %s %s',entry['seq'],entry['action'],entry['params'])
+        self.late=[]
 
     @timed_often
     def snapshot(self,phase):
@@ -313,17 +335,18 @@ class Loop:
         after=self.snapshot('post_action')
         left=self.open_ui(after)
         if left:
+            detail=f'{"+".join(left)} open after the pause: {" ".join(item["action"] for item,_,_ in batch)}'
             for entry,_,_ in batch:
-                self.note({**entry,'status':'ui_leftover','detail':f'{"+".join(left)} open after the pause: {" ".join(item["action"] for item,_,_ in batch)}'},after)
+                self.note({**entry,'status':'ui_leftover','detail':detail},snapshot,after)
             self.stuck(left)
             return after
         events={combo['event'] for combo in event_options(after)}
         proposers={country for country, in after.rows('player_proposal','country')}
         for entry,_,_ in batch:
             if unanswered(entry,events,proposers):
-                self.note({**entry,'status':'ui_leftover','detail':'still waiting for an answer after the pause'},after)
+                self.note({**entry,'status':'ui_leftover','detail':'still waiting for an answer after the pause'},snapshot,after)
             else:
-                self.note({**entry,'status':'done'},after)
+                self.note({**entry,'status':'done'},snapshot,after)
         return after
 
     @timed_often
@@ -352,15 +375,16 @@ class Loop:
         after=self.snapshot('post_run')
         if not target<=game_hours(after)<target+HOURS_PER_DAY:
             raise RuntimeError(f'Quarterly pause missed its first-day target: {reader.date()[1]}, target hour {target}')
+        self.settle_late(after)
         left=self.open_ui(after)
         if left:
             detail=f'{"+".join(left)} open after advancing to the next quarter'
             for item,_,_ in pending:
-                self.note({**item,'status':'ui_leftover','detail':detail},after)
+                self.note({**item,'status':'ui_leftover','detail':detail},snapshot,after)
             self.stuck(left)
             return after
         for item,_,_ in pending:
-            self.note({**item,'status':'done'},after)
+            self.note({**item,'status':'done'},snapshot,after)
         LOG.info('quarterly pause at %s, longest tick gap %.0f ms',reader.date()[1],longest_gap*1000)
         return after
 
@@ -628,7 +652,7 @@ def session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,seconds,c
     advisor=advisors[rng.choice(advisor_names)]
     advisor.start_run(store,NAMES,objective)
     picker=pickers[rng.choice(picker_names)]
-    candidates=1 if picker.name=='first' else rng.randint(*CANDIDATES)
+    candidates=1 if picker.name=='first' else CANDIDATES
     with ThreadPoolExecutor(3) as trainer:
         training=trainer.submit(picker.start_run,store,objective)
         world=worlds.take()
@@ -671,7 +695,7 @@ def run_record(arguments,kind,world,tag,seed,generated,advisor,picker,candidates
     return {'kind':kind,'world':world,'tag':tag,'cli_seed':arguments.seed,'run_seed':seed,
             'years':arguments.years,'minutes':arguments.minutes,'profile':arguments.profile,'pool':arguments.pool,'runs_requested':arguments.runs,
             'generated':generated,'picker':picker.name,'candidates':candidates,'objective':objective,'weights':{name:advisor.weights[name] for name in NAMES},
-            'proposal':advisor.proposal,'pick_model':picker.trained}
+            'centres':advisor.used,'proposal':advisor.proposal,'pick_model':picker.trained}
 
 
 def main(argv=None):
@@ -689,7 +713,7 @@ def main(argv=None):
     parser.add_argument('--world-cache',help='reuse a completed cache containing at least 1000 worlds')
     parser.add_argument('--vanilla',action='store_true')
     parser.add_argument('--tag')
-    parser.add_argument('--weight',nargs='+',default=[])
+    parser.add_argument('--weight',nargs='+',default=[],metavar='LEVER=0',help='switches the lever off for every initializer')
     supervision=parser.add_mutually_exclusive_group()
     supervision.add_argument('--no-supervisor',action='store_true',help='explicitly run without crash recovery supervision')
     supervision.add_argument('--supervisor',nargs=2,metavar=('PID','CREATED'),help=argparse.SUPPRESS)
@@ -705,6 +729,8 @@ def main(argv=None):
     weights={name:float(value) for name,_,value in (item.partition('=') for item in arguments.weight)}
     if set(weights)-set(NAMES):
         parser.error(f'--weight takes lever names; unknown: {sorted(set(weights)-set(NAMES))}')
+    if any(weights.values()):
+        parser.error(f'--weight only switches a lever off with lever=0: {sorted(name for name,value in weights.items() if value)}')
     silenced=sorted({(LEVER[accept],LEVER[decline]) for accept,decline in PROPOSALS if weights.get(LEVER[accept])==0 and weights.get(LEVER[decline])==0})
     if silenced:
         parser.error(f'--weight cannot switch off both answers to a proposal: {silenced}')

@@ -5,7 +5,7 @@ from interface.common import timed
 from interface.timing import current
 from .random import HIGH, LOW, RandomAdvisor
 from ..data.weights import history, normalized
-from ..models.svr import C, EPSILON, best, fit
+from ..models.svr import C, EPSILON, SAMPLES, Surface, best
 
 LOG=logging.getLogger('loop')
 
@@ -23,10 +23,11 @@ class RandomSvrWeightingAdvisor(RandomAdvisor):
         rng=np.random.default_rng(self.random.randrange(2**32))
         rows=rng.integers(len(y),size=len(y))
         draws=np.bincount(rows,minlength=len(y))
-        linear,squared,predict=fit(X,target,rows,rng)
-        x=best(linear,squared,LOW,HIGH)
-        record={'initializer':self.name,'method':'bootstrap_svr','observations':len(y),'c':C,'epsilon':EPSILON,'predicted_reward':float(predict(x[None,:])[0]),
-                'bounded':int(np.sum((x==LOW)|(x==HIGH))),'coefficients':[(name,float(a),float(b),float(chosen)) for name,a,b,chosen in zip(space,linear,squared,x)]}
+        surface=Surface(X[rows],target[rows])
+        x=best(surface,LOW,HIGH,self.candidates(space,SAMPLES))
+        record={'initializer':self.name,'method':'bootstrap_svr','observations':len(y),'c':C,'epsilon':EPSILON,'predicted_reward':surface.value(x),
+                'bounded':int(np.sum((x==LOW)|(x==HIGH))),
+                'coefficients':[(name,float(a),float(b),float(chosen)) for name,a,b,chosen in zip(space,surface.slope(x),surface.curve(x),x)]}
         record['observed']=[(run_id,float(reward),float(value),int(count)) for run_id,reward,value,count in zip(runs,y,target,draws)]
         record['seconds']=current().seconds
         self.proposal=record

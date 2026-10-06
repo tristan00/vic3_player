@@ -96,9 +96,9 @@ export function Run() {
             <Link className="linka text-xs" to={`/policy/runs/${run}?view=picker`}>Block selection & picker</Link>
           </div>
           <Tabs views={VIEWS} />
-          {view === 'overview' && <div className="space-y-6"><Section title="Recent actions"><DataGrid id="recent" url={`/api/runs/${run}/actions`} columns={['n', 'action', 'status', 'before_seq', 'after_seq']} limit={10} live /></Section><Section title="Outcomes"><Outcomes run={run} /></Section></div>}
+          {view === 'overview' && <div className="space-y-6"><Section title="Recent actions"><DataGrid id="recent" url={`/api/runs/${run}/actions`} columns={['n', 'action', 'status', 'unverified', 'before_seq', 'after_seq']} limit={10} live /></Section><Section title="Outcomes"><Outcomes run={run} /></Section></div>}
           {view === 'record' && <RecordView run={run} />}
-          {view === 'actions' && <DataGrid id="actions" url={`/api/runs/${run}/actions`} columns={['n', 'action', 'status', 'detail', 'before_seq', 'after_seq']} live />}
+          {view === 'actions' && <DataGrid id="actions" url={`/api/runs/${run}/actions`} columns={['n', 'action', 'status', 'unverified', 'detail', 'before_seq', 'after_seq']} live />}
           {view === 'blocks' && <DataGrid id="blocks" url={`/api/runs/${run}/blocks`} live />}
           {view === 'snapshots' && <DataGrid id="snapshots" url="/api/meta/snapshot" fixed={[`run_id:${run}`]} initial={{ sort: 'seq', desc: true }} live />}
           {view === 'countries' && <DataGrid id="countries" url={`/api/runs/${run}/entities/country`} live />}
