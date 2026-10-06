@@ -5,9 +5,9 @@ from interface.common import timed, timed_often
 from .rewards import BUILDINGS, COSTS, ENDED, HOURS_PER_YEAR, OWNERS, PLAYED, PLAYERS, SNAPSHOTS, built, scored_runs, value_at
 
 COMPONENTS=('stock','population','gdp')
-NAME='endgame_three_v1'
+NAME='endgame_three_v2'
 OBJECTIVE={'name':NAME,'weights':{'stock':1/9,'population':6/9,'gdp':2/9},
-           'alphas':{'stock':.5,'population':1.,'gdp':-.5},'window_years':1.,'defeat':'zero_terminal'}
+           'alphas':{'stock':.5,'population':1.,'gdp':-.5},'window_years':1.}
 HISTORY=f'''select r.run_id,min(s.game_date),max(s.game_date),r.end_reason
 {ENDED}
 {PLAYED}'''
@@ -25,7 +25,7 @@ def reward(years,parts):
 
 
 @timed_often
-def breakdown(start,end,baseline,points,defeated=False):
+def breakdown(start,end,baseline,points):
     years=(end-start)/HOURS_PER_YEAR
     if years<=0 or not math.isfinite(years):
         raise ValueError('Endgame reward requires positive duration')
@@ -36,7 +36,7 @@ def breakdown(start,end,baseline,points,defeated=False):
         base=baseline[name]
         if base<=0 or not math.isfinite(base):
             raise ValueError('Endgame reward requires positive finite baselines')
-        last=0. if defeated else value_at(points[name],end)/base
+        last=value_at(points[name],end)/base
         previous=1. if beginning==start else value_at(points[name],beginning)/base
         if min(last,previous)<0 or not all(math.isfinite(v) for v in (last,previous)):
             raise ValueError('Endgame reward requires nonnegative finite outcomes')
@@ -48,12 +48,12 @@ def breakdown(start,end,baseline,points,defeated=False):
         parts.append({'component':name,'start_value':base,'end_ratio':last,'recent_change':change,'part':part,
                       'weight':weight,'alpha':alpha,'duration_factor':factor,'contribution':weight*factor*part})
     raw={part['component']:part['part'] for part in parts}
-    return {'years':years,'window_years':window,'score':reward(years,raw),'defeated':defeated,'parts':parts}
+    return {'years':years,'window_years':window,'score':reward(years,raw),'parts':parts}
 
 
 @timed_often
-def target(start,end,baseline,points,defeated=False):
-    result=breakdown(start,end,baseline,points,defeated)
+def target(start,end,baseline,points):
+    result=breakdown(start,end,baseline,points)
     return result['score'],result['years'],{part['component']:part['part'] for part in result['parts']}
 
 
@@ -99,12 +99,12 @@ class Trajectories:
         return None
 
     @timed_often
-    def target(self,run,start,end,baseline,defeated):
-        return target(start,end,baseline,{name:self.points[name][run] for name in COMPONENTS},defeated)
+    def target(self,run,start,end,baseline):
+        return target(start,end,baseline,{name:self.points[name][run] for name in COMPONENTS})
 
     @timed_often
-    def breakdown(self,run,start,end,baseline,defeated):
-        return {'baseline_seq':self.starts[run,start],**breakdown(start,end,baseline,{name:self.points[name][run] for name in COMPONENTS},defeated)}
+    def breakdown(self,run,start,end,baseline):
+        return {'baseline_seq':self.starts[run,start],**breakdown(start,end,baseline,{name:self.points[name][run] for name in COMPONENTS})}
 
 
 @timed
@@ -114,10 +114,10 @@ def outcomes(connection,runs=None):
         found=[row for row in found if row[0] in runs]
     history=Trajectories(connection,[run for run,*_ in found])
     scores={}
-    for run,first,last,reason in found:
+    for run,first,last,_ in found:
         baseline=history.baseline(run,first)
         if history.reason(run,first,last,baseline) is None:
-            scores[run]=history.breakdown(run,first,last,baseline,reason=='defeated')
+            scores[run]=history.breakdown(run,first,last,baseline)
     return scores
 
 

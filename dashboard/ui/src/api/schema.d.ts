@@ -1089,8 +1089,6 @@ export interface components {
             baseline_seq: number | null;
             /** Score */
             score: number | null;
-            /** Defeated */
-            defeated: boolean;
             /** Unavailable Reason */
             unavailable_reason?: string | null;
             /** Parts */

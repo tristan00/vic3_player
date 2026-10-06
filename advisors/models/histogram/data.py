@@ -70,7 +70,7 @@ def training_rows(connection,runs):
         last=runs[run_id][1]
         if outcomes.reason(run_id,date,last,baseline) is not None:
             continue
-        _,years,parts=outcomes.target(run_id,date,last,baseline,runs[run_id][2]=='defeated')
+        _,years,parts=outcomes.target(run_id,date,last,baseline)
         batch=list(actions.values())
         acted=entries(batch,lookup)
         rows[run_id].append((numbers+lookup.prices+lookup.institutions+lookup.tariffs+lookup.taxes,categories(lookup),acted,holdings.at(lookup),

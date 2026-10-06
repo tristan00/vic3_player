@@ -36,13 +36,12 @@ class EndgameRewardTests(unittest.TestCase):
         _,_,parts=endgame.target(0,2*Y,dict.fromkeys(endgame.COMPONENTS,100),points)
         self.assertEqual(parts,{'stock':1.,'population':0.,'gdp':1.})
 
-    def test_defeat_zeroes_terminal_levels_but_not_window_start(self):
+    def test_terminal_levels_and_window_start_use_recorded_values(self):
         points={name:[(0,100),(Y,150),(2*Y,200)] for name in endgame.COMPONENTS}
         baseline=dict.fromkeys(endgame.COMPONENTS,100)
-        score,_,parts=endgame.target(0,2*Y,baseline,points,defeated=True)
-        self.assertEqual(parts,{'stock':-.75,'population':-1.5,'gdp':-.75})
-        self.assertAlmostEqual(score,(-.75*math.sqrt(2)-18-1.5/math.sqrt(2))/9)
-        self.assertGreater(endgame.target(0,2*Y,baseline,points)[0],score)
+        score,_,parts=endgame.target(0,2*Y,baseline,points)
+        self.assertEqual(parts,{'stock':1.25,'population':.5,'gdp':1.25})
+        self.assertAlmostEqual(score,(1.25*math.sqrt(2)+6+2.5/math.sqrt(2))/9)
 
     def test_zero_ending_stock_is_finite_and_zero_starting_stock_is_ineligible(self):
         points={name:[(0,100),(Y,0)] for name in endgame.COMPONENTS}
@@ -75,31 +74,37 @@ class TrainingRewardTests(unittest.TestCase):
         self.assertEqual(history.baseline(1,0),dict.fromkeys(endgame.COMPONENTS,100))
         self.assertEqual(history.baseline(1,4*Y),dict.fromkeys(endgame.COMPONENTS,200))
         self.assertEqual(history.starts[1,4*Y],1)
-        actual=endgame.rewards(self.connection)[1]
         expected=(math.sqrt(4.5)*3.5+6*4.5*3+7/math.sqrt(4.5))/9
-        self.assertAlmostEqual(actual,expected)
+        for reason in ('time','years','defeated','debt_cap'):
+            with self.subTest(reason=reason):
+                self.tables[endgame.HISTORY]=[(1,0,4.5*Y,reason)]
+                self.assertAlmostEqual(endgame.rewards(self.connection)[1],expected)
+                self.assertEqual([part['end_ratio'] for part in endgame.outcomes(self.connection)[1]['parts']],[4.,4.,4.])
 
     def test_both_picker_datasets_use_first_snapshot_of_nonopening_pause(self):
         lookup=SimpleNamespace(numbers=[1.]*len(histogram.NUMBERS),prices=[1.]*len(histogram.PRICES),
                                institutions=[1.]*len(histogram.INSTITUTIONS),tariffs=[1.]*len(histogram.TARIFFS),taxes=[1.]*len(histogram.TAXES),
                                laws=['law']*len(LAWS),player=7,country=lambda ident:'rank_major_power')
         point=SimpleNamespace(state=lookup)
-        with patch.object(histogram,'History') as states,patch.object(histogram,'Holdings') as holdings:
-            states.return_value.at.return_value=lookup
-            holdings.return_value.at.return_value=[]
-            whole=histogram.training_data(self.connection)
-        with patch.object(row,'Historical') as states,patch.object(row,'context',return_value={'treasury':1.}),patch.object(row,'action_features',return_value={'action':'raise_consumption_taxes'}):
-            states.return_value.at.return_value=point
-            actions=row.load(self.connection)
         expected=(2*math.sqrt(.5)+6+4/math.sqrt(.5))/9
-        self.assertAlmostEqual(whole.y[0],expected)
-        self.assertEqual(whole.categories[0,-1],'rank_major_power')
-        self.assertAlmostEqual(actions.y[0],expected)
-        self.assertEqual(actions.meta.before_seq.tolist(),[2])
-        self.assertEqual(actions.meta.baseline_seq.tolist(),[1])
-        self.assertEqual(actions.meta.years.tolist(),[.5])
-        for name in endgame.COMPONENTS:
-            self.assertEqual(actions.meta[f'baseline.{name}'].tolist(),[200])
+        for reason in ('time','years','defeated','debt_cap'):
+            with self.subTest(reason=reason):
+                self.tables[endgame.HISTORY]=[(1,0,4.5*Y,reason)]
+                with patch.object(histogram,'History') as states,patch.object(histogram,'Holdings') as holdings:
+                    states.return_value.at.return_value=lookup
+                    holdings.return_value.at.return_value=[]
+                    whole=histogram.training_data(self.connection)
+                with patch.object(row,'Historical') as states,patch.object(row,'context',return_value={'treasury':1.}),patch.object(row,'action_features',return_value={'action':'raise_consumption_taxes'}):
+                    states.return_value.at.return_value=point
+                    actions=row.load(self.connection)
+                self.assertAlmostEqual(whole.y[0],expected)
+                self.assertEqual(whole.categories[0,-1],'rank_major_power')
+                self.assertAlmostEqual(actions.y[0],expected)
+                self.assertEqual(actions.meta.before_seq.tolist(),[2])
+                self.assertEqual(actions.meta.baseline_seq.tolist(),[1])
+                self.assertEqual(actions.meta.years.tolist(),[.5])
+                for name in endgame.COMPONENTS:
+                    self.assertEqual(actions.meta[f'baseline.{name}'].tolist(),[200])
 
     def test_picker_caches_reload_when_end_reason_changes_without_date_changes(self):
         first={1:(0,2*Y,'debt_cap')}
@@ -124,17 +129,22 @@ class TrainingRewardTests(unittest.TestCase):
         pool=Mock()
         pool.connection.return_value.__enter__=Mock(return_value=SimpleNamespace(cursor=lambda **kwargs:self.connection))
         pool.connection.return_value.__exit__=Mock(return_value=False)
-        with patch.object(runs.db,'POOL',pool),patch.object(runs.db,'row',return_value={'ended_at':'now','end_reason':'debt_cap'}),patch.object(runs.db,'value',return_value=4*Y):
-            whole=runs.run_reward(1)
-            pause=TestClient(app).get('/api/policy/runs/1/reward?seq=2')
-        self.assertEqual(pause.status_code,200)
-        pause=pause.json()
-        self.assertEqual(whole.baseline_seq,0)
-        self.assertEqual((pause['baseline_seq'],pause['years'],pause['window_years']),(1,.5,.5))
-        self.assertAlmostEqual(pause['score'],(2*math.sqrt(.5)+6+4/math.sqrt(.5))/9)
-        self.assertAlmostEqual(sum(p['contribution'] for p in pause['parts']),pause['score'])
-        self.assertEqual([p['start_value'] for p in pause['parts']],[200,200,200])
-        self.assertNotEqual(whole.score,pause['score'])
+        for reason in ('time','years','defeated','debt_cap'):
+            with self.subTest(reason=reason):
+                self.tables[endgame.HISTORY]=[(1,0,4.5*Y,reason)]
+                with patch.object(runs.db,'POOL',pool),patch.object(runs.db,'row',return_value={'ended_at':'now','end_reason':reason}),patch.object(runs.db,'value',return_value=4*Y):
+                    whole=runs.run_reward(1)
+                    pause=TestClient(app).get('/api/policy/runs/1/reward?seq=2')
+                self.assertEqual(pause.status_code,200)
+                pause=pause.json()
+                self.assertEqual(whole.baseline_seq,0)
+                self.assertEqual([p.end_ratio for p in whole.parts],[4.,4.,4.])
+                self.assertEqual([p['end_ratio'] for p in pause['parts']],[2.,2.,2.])
+                self.assertEqual((pause['baseline_seq'],pause['years'],pause['window_years']),(1,.5,.5))
+                self.assertAlmostEqual(pause['score'],(2*math.sqrt(.5)+6+4/math.sqrt(.5))/9)
+                self.assertAlmostEqual(sum(p['contribution'] for p in pause['parts']),pause['score'])
+                self.assertEqual([p['start_value'] for p in pause['parts']],[200,200,200])
+                self.assertNotEqual(whole.score,pause['score'])
 
 
 if __name__=='__main__':

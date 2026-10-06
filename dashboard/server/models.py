@@ -91,7 +91,6 @@ class RunReward(BaseModel):
     window_years:float|None
     baseline_seq:int|None
     score:float|None
-    defeated:bool
     unavailable_reason:str|None=None
     parts:list[RewardPart]
 

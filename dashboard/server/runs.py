@@ -91,14 +91,14 @@ def run_reward(run_id,seq=None):
     date=None if seq is None else db.value('select game_date from snapshot where run_id=%s and seq=%s',(run_id,seq))
     if seq is not None and date is None:
         return None
-    empty=RunReward(name=NAME,years=None,window_years=None,baseline_seq=None,score=None,defeated=found['end_reason']=='defeated',parts=[],
+    empty=RunReward(name=NAME,years=None,window_years=None,baseline_seq=None,score=None,parts=[],
                     unavailable_reason='Reward is available after the run ends.' if found['ended_at'] is None else 'This run has no eligible scoring interval.')
     with db.POOL.connection() as connection:
         cursor=connection.cursor(row_factory=tuple_row)
         bounds=[row for row in cursor.execute(HISTORY,scored_runs()).fetchall() if row[0]==run_id]
         if not bounds:
             return empty
-        _,first,last,reason=bounds[0]
+        _,first,last,_=bounds[0]
         start=first if date is None else date
         history=Trajectories(cursor,[run_id])
         baseline=history.baseline(run_id,start)
@@ -108,7 +108,7 @@ def run_reward(run_id,seq=None):
                                       'missing_start_measurement':'A starting metric was not recorded.',
                                       'nonpositive_baseline':'All three starting metrics must be positive and finite.'}[omitted]
             return empty
-        result=history.breakdown(run_id,start,last,baseline,reason=='defeated')
+        result=history.breakdown(run_id,start,last,baseline)
     return RunReward(name=NAME,**result)
 
 

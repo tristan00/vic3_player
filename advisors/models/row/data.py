@@ -46,7 +46,7 @@ def training_rows(connection,bounds):
             if reason:
                 starts[key]=(reason,None)
             else:
-                _,years,parts=outcomes.target(run,date,last,baseline,bounds[run][2]=='defeated')
+                _,years,parts=outcomes.target(run,date,last,baseline)
                 starts[key]=(None,(point,context(point),years,baseline,parts))
         reason,prepared=starts[key]
         if reason:
