@@ -259,20 +259,22 @@ LEVERS=[
                                            ('set_fleet_ship_design',(SHIP_TYPE,INDEX,FORMATION)),('scrap_ship_design',DESIGN),('refit_fleet',(FORMATION,)),
                                            ('cancel_fleet_refit',(FORMATION,)),('refit_every_fleet',()),('cancel_every_refit',()),('refit_fleet_in_port',(FORMATION,)),
                                            ('refit_every_fleet_in_port',()),('refit_ship',(SHIP,)),('cancel_ship_refit',(SHIP,)),('rebuild_ship_to_design',(SHIP,INDEX)))),
-    Lever('disposition_of_forces',SINGLE,(('form_army',(('option','int'),)),('move_battalions',(FORMATION,('target','military_formation'))),('recruit_commander',(CHARACTER,)),
-                                           ('recruit_commander_for',(CHARACTER,FORMATION)),('give_command',(CHARACTER,FORMATION)),('take_away_command',(CHARACTER,)),
-                                           ('promote_officer',(CHARACTER,)),('station_army',(FORMATION,STATE)),('station_army_at_headquarters',(FORMATION,REGION)),
+    Lever('military_leadership',SINGLE,(('recruit_commander',(CHARACTER,)),('recruit_commander_for',(CHARACTER,FORMATION)),
+                                      ('give_command',(CHARACTER,FORMATION)),('take_away_command',(CHARACTER,)),('promote_officer',(CHARACTER,)))),
+    Lever('military_organisation',SINGLE,(('form_army',(('option','int'),)),('move_battalions',(FORMATION,('target','military_formation'))),
+                                        ('send_new_ships_to_fleet',(FORMATION,)),('send_new_ships_to_reserve',()),('form_fleet',(('option','int'),)),
+                                        ('divide_army',(FORMATION,)),('divide_fleet',(FORMATION,)),('combine_armies',(FORMATION,SOURCE)),
+                                        ('combine_fleets',(FORMATION,SOURCE)),('move_ships',(FORMATION,TARGET)),('move_ship',(SHIP,TARGET)),
+                                        ('appoint_flagship',(SHIP,)),('dismiss_flagship',(SHIP,)))),
+    Lever('military_operations',SINGLE,(('station_army',(FORMATION,STATE)),('station_army_at_headquarters',(FORMATION,REGION)),
                                            ('rehome_army',(FORMATION,REGION)),('send_to_front',(FORMATION,('front','int'))),('defend_against_invasion',(FORMATION,('front','int'))),
                                            ('set_objective',(FORMATION,STATE)),('clear_objective',(FORMATION,STATE)),('give_order',(CHARACTER,ORDER)),
                                            ('start_fleet_mission',(FORMATION,MISSION)),('end_fleet_mission',(FORMATION,)),('plan_invasion',(FORMATION,STATE)),
                                            ('plan_seaborne_invasion',(FORMATION,FLEET,STATE)),('call_off_invasion',(FORMATION,)),('embark_troops',(FORMATION,FLEET)),
-                                           ('land_troops',(FORMATION,)),('set_army_supply_priority',(FORMATION,('level','choice'))),('set_army_flag',(FORMATION,('flag','int'))),
-                                           ('set_army_lending',(FORMATION,INDEX)),('send_new_ships_to_fleet',(FORMATION,)),('send_new_ships_to_reserve',()),
-                                           ('recall_fleet_for_repairs',(FORMATION,)),('form_fleet',(('option','int'),)),('divide_army',(FORMATION,)),('divide_fleet',(FORMATION,)),
-                                           ('combine_armies',(FORMATION,SOURCE)),('combine_fleets',(FORMATION,SOURCE)),('move_ships',(FORMATION,TARGET)),('move_ship',(SHIP,TARGET)),
+                                           ('land_troops',(FORMATION,)),('set_army_supply_priority',(FORMATION,('level','choice'))),
+                                           ('set_army_lending',(FORMATION,INDEX)),('recall_fleet_for_repairs',(FORMATION,)),
                                            ('change_fleet_mission',(FORMATION,MISSION)),('change_fleet_mission_area',(FORMATION,REGION)),('station_fleet_in_state',(FORMATION,STATE)),
-                                           ('rebase_fleet',(FORMATION,REGION)),('defend_against_invasion_at_sea',(FORMATION,FRONT)),('appoint_flagship',(SHIP,)),
-                                           ('dismiss_flagship',(SHIP,)))),
+                                           ('rebase_fleet',(FORMATION,REGION)),('defend_against_invasion_at_sea',(FORMATION,FRONT)))),
     Lever('make_peace',SINGLE,(('offer_peace',(WAR,)),('offer_white_peace',(WAR,)),('accept_peace_offer',(WAR,)),('press_war_goal',(PLAY,GOAL,COUNTRY)),
                                ('drop_war_goal',(PLAY,GOAL,COUNTRY)))),
     Lever('national_decisions',SINGLE,(('take_national_decision',(DECISION,)),('take_journal_option',(ENTRY,('button','int'))),('default_on_debt',()),
@@ -292,6 +294,7 @@ ACTIONS=[Action(name,lever.domain,params,lever.name) for lever in [*LEVERS,EVENT
 BY_NAME={action.name:action for action in ACTIONS}
 LEVER={action.name:action.lever for action in ACTIONS}
 PARAMS={action.name:action.params for action in ACTIONS}
+RECORDED_PARAMS={**PARAMS,'set_army_flag':(FORMATION,('flag','int'))}
 KEYS=frozenset(kind for params in PARAMS.values() for _,kind in params)-frozenset(ENTITIES)-{'int','choice'}
 ANSWERS=frozenset({'answer_event',*(name for names in PROPOSALS for name in names)})
 LAW_ACTIONS=frozenset(name for name,params in PARAMS.items() if LAW in params)

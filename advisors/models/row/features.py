@@ -6,10 +6,10 @@ import pandas as pd
 from interface.common import DEFAULT_GAME, timed, timed_often
 from interface.recording.spec import TABLE
 from interface.script import read
-from ...catalogue import ENTITIES, PARAMS, SITED
+from ...catalogue import ENTITIES, RECORDED_PARAMS, SITED
 from ...data.features import CATEGORIES, History, INSTITUTIONS, NUMBERS, PRICES, SITE, TARIFFS, TAXES, LiveLookup, Versions, categories, located
 
-PARAMETERS={name:list(params) for name,params in PARAMS.items()}
+PARAMETERS={name:list(params) for name,params in RECORDED_PARAMS.items()}
 ENTITY={kind:('formation' if kind=='military_formation' else kind) for kind in ENTITIES}
 OMIT={'first_name_key','last_name_key','name_key','localized_name_key','company_name_key','dynamic_name_key','dynamic_adjective_key',
       'map_color_override','color_red','color_green','color_blue','power_bloc_map_texture','trends_initialized'}

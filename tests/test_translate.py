@@ -111,10 +111,10 @@ def everything():
 
 
 class CatalogueTests(unittest.TestCase):
-    def test_there_are_ninety_three_levers_in_their_blocks(self):
-        self.assertEqual(len(C.NAMES),93)
-        self.assertEqual(len(set(C.NAMES)),93)
-        self.assertEqual(Counter(lever.domain for lever in C.LEVERS),{C.CONSTRUCT:12,C.QUEUE:7,C.RAISE:27,C.LOWER:27,C.SINGLE:16,C.ANSWER:4})
+    def test_there_are_ninety_five_levers_in_their_blocks(self):
+        self.assertEqual(len(C.NAMES),95)
+        self.assertEqual(len(set(C.NAMES)),95)
+        self.assertEqual(Counter(lever.domain for lever in C.LEVERS),{C.CONSTRUCT:12,C.QUEUE:7,C.RAISE:27,C.LOWER:27,C.SINGLE:18,C.ANSWER:4})
         self.assertEqual([lever.name for lever in C.LEVERS if lever.domain==C.CONSTRUCT],list(C.SECTORS))
         self.assertEqual({lever.name.removeprefix('raise_') for lever in C.LEVERS if lever.domain==C.RAISE},
                          {lever.name.removeprefix('lower_') for lever in C.LEVERS if lever.domain==C.LOWER})
@@ -135,6 +135,18 @@ class CatalogueTests(unittest.TestCase):
 
     def test_no_lever_or_act_carries_the_name_of_an_interface_command(self):
         self.assertEqual((set(C.NAMES)|set(C.PARAMS))&set(COMMANDS),set())
+
+    def test_military_commands_have_three_independent_levers_and_flags_are_retired(self):
+        self.assertNotIn('disposition_of_forces',C.NAMES)
+        self.assertEqual({lever.name:len(lever.acts) for lever in C.LEVERS if lever.name.startswith('military_')},
+                         {'military_leadership':5,'military_organisation':13,'military_operations':23})
+        for name,lever in (('recruit_commander','military_leadership'),('promote_officer','military_leadership'),
+                           ('combine_armies','military_organisation'),('move_ship','military_organisation'),
+                           ('send_to_front','military_operations'),('give_order','military_operations'),('recall_fleet_for_repairs','military_operations')):
+            self.assertEqual(C.LEVER[name],lever)
+        self.assertNotIn('set_army_flag',C.PARAMS)
+        self.assertNotIn('set_formation_flag',COMMANDS)
+        self.assertEqual(offer({'set_formation_flag':[{'military_formation':7,'flag':1}]}),{})
 
     def test_only_construction_is_split_by_building_type(self):
         self.assertEqual(len(PLACED),len(set(PLACED)))
@@ -477,8 +489,8 @@ class TranslationTests(unittest.TestCase):
         self.assertEqual(found['embark_troops'],[Choice(boarding,[('embark_formation',boarding)])])
         self.assertEqual(found['interact_with_character'],[Choice(person,[('character_interaction',person)])])
         self.assertEqual(found['replace_bloc_principle'][0].params,{'slot':0,'power_bloc_principle':'principle_x_1'})
-        self.assertEqual({name:C.LEVER[name] for name in found},{'plan_invasion':'disposition_of_forces','plan_seaborne_invasion':'disposition_of_forces',
-                                                                 'embark_troops':'disposition_of_forces','promote_officer':'disposition_of_forces',
+        self.assertEqual({name:C.LEVER[name] for name in found},{'plan_invasion':'military_operations','plan_seaborne_invasion':'military_operations',
+                                                                 'embark_troops':'military_operations','promote_officer':'military_leadership',
                                                                  'interact_with_character':'interact_with_character','replace_bloc_principle':'raise_power_bloc'})
 
     def test_peace_goals_are_pressed_or_dropped_by_their_present_state(self):

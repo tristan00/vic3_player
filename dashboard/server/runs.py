@@ -17,8 +17,8 @@ STATUSES=('done','invalid','raced','no_object','ui_leftover')
 OUTCOMES=[*((status,f"l.status='{status}'") for status in STATUSES),('unverified','l.unverified')]
 END_REASONS=('time','years','defeated','debt_cap','ui_stuck','game_crashed','loop_crashed','loop_lost','loop_stalled')
 PLAYER_OWNED=('country',)
-LOOP_PARAMS={'diplomatic_action_state':('country','diplomatic_action','state','side:choice')}
-GROUPS={**GROUP,'diplomatic_action_state':'diplomacy'}
+LOOP_PARAMS={'diplomatic_action_state':('country','diplomatic_action','state','side:choice'),'set_formation_flag':('military_formation','flag:int')}
+GROUPS={**GROUP,'diplomatic_action_state':'diplomacy','set_formation_flag':'army'}
 STATE=(f"case when r.ended_at is not null then 'ended' when extract(epoch from now()-r.heartbeat_at)>{LOST_AFTER} then 'lost' "
        f"when extract(epoch from now()-r.progress_at)>{STALL_LIMIT} then 'stalled' else 'running' end")
 RUN_FROM='from run r join country_definition d on d.country_definition=r.tag'

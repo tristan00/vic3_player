@@ -15,6 +15,12 @@ from advisors.models.row.model import Model, pool
 
 
 class RowTests(unittest.TestCase):
+    def test_retired_flag_choices_keep_their_action_and_parameters_in_training(self):
+        point=SimpleNamespace(hours=0,entity=lambda table,ident:None)
+        rows=features.frame([features.action_features('set_army_flag',{'military_formation':7,'flag':3},point)])
+        self.assertEqual(rows.action.tolist(),['set_army_flag'])
+        self.assertEqual(rows['parameter.flag.int'].tolist(),[3.])
+
     def test_target_is_full_future_reward_without_an_action_count_argument(self):
         years=data.HOURS_PER_YEAR
         points={name:[(0,100),(years,200)] for name in data.COMPONENTS}

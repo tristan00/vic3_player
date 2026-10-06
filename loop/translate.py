@@ -62,7 +62,7 @@ PLAIN={'downsize_building':('downsize',),'raise_subsidies':('subsidies_on',),'lo
        'set_objective':('set_strategic_objective',),'clear_objective':('cancel_strategic_objective_selected',),'give_order':('commander_order',),
        'start_fleet_mission':('start_naval_mission','start_naval_mission_selected'),'end_fleet_mission':('end_naval_mission','end_naval_mission_selected'),
        'plan_invasion':('plan_land_invasion',),'plan_seaborne_invasion':('plan_naval_invasion',),'call_off_invasion':('cancel_invasion',),'embark_troops':('embark_formation',),
-       'land_troops':('disembark',),'set_army_supply_priority':('set_supply_priority',),'set_army_flag':('set_formation_flag',),'set_army_lending':('set_borrow_setting',),
+       'land_troops':('disembark',),'set_army_supply_priority':('set_supply_priority',),'set_army_lending':('set_borrow_setting',),
        'send_new_ships_to_fleet':('set_default_construction_fleet',),'send_new_ships_to_reserve':('clear_default_construction_fleet',),'recall_fleet_for_repairs':('recall_fleet',),
        'offer_peace':('propose_peace',),
        'offer_white_peace':('white_peace',),'accept_peace_offer':('toggle_accept_peace',),'take_national_decision':('take_decision',),

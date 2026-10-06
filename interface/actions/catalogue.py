@@ -203,7 +203,6 @@ def selected(name,params,command):
     return Action(name,tuple(params.split()),command,start=SELECT_ARMY,why=SELECTION)
 
 
-RENAME_POPUP=('gui/military_formation_panel.gui','name = military_formation_change_name_popup')
 
 
 OPEN_SHIPS=(("InformationPanelBar.OpenConstructionPanelTab(GetPlayer.Self, 'ships')",),((),))
@@ -652,10 +651,6 @@ ACTIONS=(
     Action('station_selected',('military_formation','strategic_region'),'Hq.GetStationSelectedFormationsCommand',start=SELECT_ARMY,why=SELECTION,transport=True,
            overseas=('Hq.GetStates','State.RequiresNavalTransportForSelectedFormations','State.ShowTransportPlannerForSelectedFormation'),
            datamodels=(('AccessPlayer.AccessLandHQs','ObjectsEqual(Hq.GetStrategicRegion.Self, {strategic_region}.Self)'),)),
-    Action('set_formation_flag',('military_formation','flag:int'),'MilitaryFormationChangeNamePopup.Confirm',window=RENAME_POPUP,
-           start=(('PopupManager.ShowMilitaryFormationChangeName(MilitaryFormation.Self)',),FORMATION[:1]),cleanup=('PopupManager.HideMilitaryFormationChangeName',),
-           stages=((RENAME_POPUP,(('MilitaryFormationChangeNamePopup.GetArmyFormationFlags','EqualTo_int32(PdxGuiWidget.AccessParent.GetIndexInDataModel, {flag})'),),
-                    lambda values:['MilitaryFormationChangeNamePopup.OnSelectFlag(MilitaryFormationFlag.AccessSelf)']),)),
     *(act(f'{verb}_ship_item','index:int',f'ShipConstruction.{command}',window=SHIP_PAGES,start=OPEN_SHIPS,
           stages=((SHIP_PAGES,(),lambda values:['ConstructionPanel.ShowMilitaryShipConstructions']),),
           datamodels=(('ConstructionPanel.GetShipConstructions','EqualTo_int32(ShipConstruction.GetIndex, {index})'),))
@@ -845,7 +840,7 @@ GROUPS={
     'politics':('enact_law','cancel_enactment','impose_law','repeal_amendment','toggle_bolster_movement','toggle_suppress_movement','negotiate','reform_government','reform_government_party',
                 'set_institution_level','stop_institution_change','issue_decree','remove_decree'),
     'research':('research','queue_research','dequeue_research'),
-    'army':('defend_invasion','set_formation_flag','station_selected','deploy_selected_to_front','mobilize_selected','demobilize_selected','raise_conscripts_selected','cancel_strategic_objective_selected','set_borrow_setting','transfer_battalions','upgrade_all_units','create_army','recruit_from_formation','activate_conscription_center','disembark','deploy_to_front','station_formation','rehome_formation','set_strategic_objective','cancel_invasion','recruit','mobilize','demobilize','raise_conscripts','disband_formation','mobilize_all','demobilize_all','toggle_mobilization_option',
+    'army':('defend_invasion','station_selected','deploy_selected_to_front','mobilize_selected','demobilize_selected','raise_conscripts_selected','cancel_strategic_objective_selected','set_borrow_setting','transfer_battalions','upgrade_all_units','create_army','recruit_from_formation','activate_conscription_center','disembark','deploy_to_front','station_formation','rehome_formation','set_strategic_objective','cancel_invasion','recruit','mobilize','demobilize','raise_conscripts','disband_formation','mobilize_all','demobilize_all','toggle_mobilization_option',
             'set_supply_priority','disband_regulars','disband_conscripts','upgrade_regulars','upgrade_conscripts','set_default_unit_type','embark_formation','plan_land_invasion','plan_naval_invasion','split_army','merge_armies','disband_unit'),
     'navy':('recall_fleet','raise_ship_item','lower_ship_item','first_ship_item','last_ship_item','cancel_ship_item','set_default_construction_fleet','clear_default_construction_fleet','decommission_ship','build_ship','build_ship_for','cancel_ship','start_naval_mission','end_naval_mission','start_naval_mission_selected','end_naval_mission_selected','pause_ship_construction','resume_ship_construction','set_supply_ship_construction','design_ship_template','edit_ship_template','retrofit_fleet','cancel_retrofit_fleet','retrofit_all','cancel_retrofit_all',
             'set_default_ship_template','set_fleet_ship_template','delete_ship_template','transfer_ships','split_fleet','transfer_ship','merge_fleets','create_fleet',

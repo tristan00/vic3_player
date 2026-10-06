@@ -154,8 +154,6 @@ def state_regions(s):
     return s.memo('state_regions',compute)
 
 
-ARMY_FLAGS=15
-NAME_CHARACTERS=30
 
 
 @timed_often
@@ -2699,9 +2697,6 @@ RULES={
                                                         if f in fleets and not docked and not recalled and health<1]),
     **{f'{verb}_ship_item':(lambda s,skip=skip:product(index=ship_items(s)[skip[0]:len(ship_items(s))-skip[1]]))
        for verb,skip in (('raise',(1,0)),('first',(1,0)),('lower',(0,1)),('last',(0,1)),('cancel',(0,0)))},
-    'set_formation_flag':lambda s:[{'military_formation':f,'flag':flag} for f in s.formations('army')
-                                   if (name:=formation_report(s,f,'display_name')) is not None and len(name)<=NAME_CHARACTERS
-                                   for flag in range(ARMY_FLAGS) if flag!=s.map('formation','formation,flag').get(f)],
     'station_selected':lambda s:[{'military_formation':f,'strategic_region':region} for f in settled(s,s.formations('army')) if not demobilizing(s,f)
                                  for region in sorted({region for kind,region in hq_regions(s).values() if kind==0})
                                  if region not in (home_region(s,f),state_regions(s).get(s.map('formation_status','formation,target_location').get(f))) and reaches(s,f,region)],

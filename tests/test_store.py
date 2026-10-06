@@ -7,7 +7,7 @@ import psycopg
 
 from advisors.models.histogram.data import PARAMS
 from interface.options.stored import Stored
-from interface.recording.store import Store, digest, install
+from interface.recording.store import SCHEMA, Store, digest, install
 from interface.recording.spec import TABLES
 from interface.recording.tables import Built
 
@@ -143,6 +143,18 @@ class StoreTests(unittest.TestCase):
         self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
         row=self.store.connection.execute('select ideology_uniformity,primary_culture_share,copies,tech_variation,country_economy,local_economy,source_regions from run where run_id=%s',(self.store.run_id,)).fetchone()
         self.assertEqual(row,(.4,.7,.2,1.2,.8,1.1,2))
+
+    def test_military_weight_migration_preserves_originals_and_existing_new_weights(self):
+        self.store.pending['weights']={'disposition_of_forces':7.5,'military_operations':2.}
+        self.store.pending['centres']={'disposition_of_forces':.5,'military_operations':-1.}
+        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+        c=self.store.connection
+        migration=SCHEMA.with_name('migrate_military_levers.sql').read_text(encoding='utf-8')
+        c.execute(migration)
+        c.execute(migration)
+        self.assertEqual(c.execute('select a.name,w.weight,w.centre from run_weight w join advisor_action a using (advisor_action) '
+                                   'where run_id=%s order by a.name',(self.store.run_id,)).fetchall(),
+                         [('disposition_of_forces',7.5,.5),('military_leadership',7.5,.5),('military_operations',2.,-1.),('military_organisation',7.5,.5)])
 
     def test_versions_tombstones_and_query_layer(self):
         self.write_all()

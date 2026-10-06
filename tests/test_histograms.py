@@ -21,6 +21,11 @@ class Table:
 
 
 class EntriesTests(unittest.TestCase):
+    def test_retired_flag_choices_remain_in_historical_batches(self):
+        found=entries([('set_army_flag',{'military_formation':7,'flag':3}),('form_army',{'option':30})],LOOKUP)
+        self.assertEqual([value for name,value,_ in found if name==ACTION],['set_army_flag','form_army'])
+        self.assertIn(('set_army_flag.flag','flag=3',1),found)
+
     def test_each_action_counts_its_type_and_each_parameter_it_carries(self):
         found=entries([('raise_consumption_taxes',{'goods':'grain'}),('raise_consumption_taxes',{'goods':'tools'})],LOOKUP)
         self.assertEqual([name for name,_,_ in found],[ACTION,'raise_consumption_taxes.goods',ACTION,'raise_consumption_taxes.goods'])

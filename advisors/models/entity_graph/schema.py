@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass
 from interface.recording.spec import ENTITIES
 
 from interface.common import timed_often
-from ...catalogue import KEYS, PARAMS
+from ...catalogue import KEYS, RECORDED_PARAMS
 
 
 OMIT={'name_key','first_name_key','last_name_key','localized_name_key','dynamic_name_key','dynamic_adjective_key',
@@ -11,7 +11,7 @@ OMIT={'name_key','first_name_key','last_name_key','localized_name_key','dynamic_
       'privatizable','recruitable','can_toll_straits','can_close_straits','has_bloc_mandates','historical',
       'current_location','target_location','target_other','invasion','power_bloc_map_texture'}
 ENTITY_PARAMETERS={'military_formation':'formation',**{kind:kind for kind in ENTITIES if kind!='event' and kind not in KEYS}}
-PARAMETERS={name:dict(params) for name,params in PARAMS.items()}
+PARAMETERS={name:dict(params) for name,params in RECORDED_PARAMS.items()}
 for action_parameters in PARAMETERS.values():
     if 'front' in action_parameters:
         action_parameters['front']='front'

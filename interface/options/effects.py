@@ -482,7 +482,6 @@ EFFECTS={
     'disband_unit':lambda b,a,combat_unit:not a.rows('combat_unit','combat_unit',combat_unit=combat_unit),
     **{name:(lambda b,a,military_formation,front:a.map('formation_status','formation,target_location').get(military_formation)==front)
        for name in ('deploy_to_front','deploy_selected_to_front','defend_invasion','defend_invasion_fleet')},
-    'set_formation_flag':lambda b,a,military_formation,flag:a.map('formation','formation,flag').get(military_formation)==flag,
     'set_borrow_setting':lambda b,a,military_formation,index:bool(a.rows('formation_borrow_setting','formation',formation=military_formation,position=index,selected=True)),
     'set_strategic_objective':lambda b,a,military_formation,state:formation_setting(a,military_formation,'strategic_objective') is not None
                               and formation_setting(a,military_formation,'strategic_objective')&SLOT==state&SLOT,

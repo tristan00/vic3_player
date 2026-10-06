@@ -4,7 +4,7 @@ from functools import cached_property
 from interface.common import DEFAULT_GAME, timed, timed_often
 from interface.recording.spec import TABLE
 from interface.script import read
-from ..catalogue import DUTIES, INSTITUTIONS as INSTITUTION_TYPES, LAW_ACTIONS, LAW_GROUP, LAW_GROUPS, NAVAL, PARAMS, PARTY_ACTIONS
+from ..catalogue import DUTIES, INSTITUTIONS as INSTITUTION_TYPES, LAW_ACTIONS, LAW_GROUP, LAW_GROUPS, NAVAL, RECORDED_PARAMS, PARTY_ACTIONS
 from .rewards import COSTS
 
 TYPED={'law':('law','law_type'),'institution':('institution','institution_type'),'interest_group':('interest_group','interest_group_type'),
@@ -36,7 +36,7 @@ where p.world_id = any(%s) group by 1,2,3'''
 INTEREST=('expense','interest')
 ARMY=('military_slaves','military_goods','military_wages')
 GOVERNMENT=('government_slaves','government_goods','government_wages')
-KINDS={name:list(params) for name,params in PARAMS.items()}
+KINDS={name:list(params) for name,params in RECORDED_PARAMS.items()}
 LEADER_ACTIONS={name for name,params in KINDS.items() if name in LAW_ACTIONS or any(kind in ('interest_group','character','political_movement') for _,kind in params)}
 
 
