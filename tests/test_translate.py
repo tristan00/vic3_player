@@ -111,10 +111,10 @@ def everything():
 
 
 class CatalogueTests(unittest.TestCase):
-    def test_there_are_ninety_five_levers_in_their_blocks(self):
-        self.assertEqual(len(C.NAMES),95)
-        self.assertEqual(len(set(C.NAMES)),95)
-        self.assertEqual(Counter(lever.domain for lever in C.LEVERS),{C.CONSTRUCT:12,C.QUEUE:7,C.RAISE:27,C.LOWER:27,C.SINGLE:18,C.ANSWER:4})
+    def test_there_are_ninety_six_levers_in_their_blocks(self):
+        self.assertEqual(len(C.NAMES),96)
+        self.assertEqual(len(set(C.NAMES)),96)
+        self.assertEqual(Counter(lever.domain for lever in C.LEVERS),{C.CONSTRUCT:12,C.QUEUE:7,C.RAISE:27,C.LOWER:27,C.SINGLE:19,C.ANSWER:4})
         self.assertEqual([lever.name for lever in C.LEVERS if lever.domain==C.CONSTRUCT],list(C.SECTORS))
         self.assertEqual({lever.name.removeprefix('raise_') for lever in C.LEVERS if lever.domain==C.RAISE},
                          {lever.name.removeprefix('lower_') for lever in C.LEVERS if lever.domain==C.LOWER})
@@ -135,6 +135,18 @@ class CatalogueTests(unittest.TestCase):
 
     def test_no_lever_or_act_carries_the_name_of_an_interface_command(self):
         self.assertEqual((set(C.NAMES)|set(C.PARAMS))&set(COMMANDS),set())
+
+    def test_starting_and_stopping_relation_changes_share_only_the_relations_lever(self):
+        options={'diplomatic_action':[{'country':3,'diplomatic_action':name} for name in ('increase_relations','damage_relations','rivalry','fund_lobbies')],
+                 'break_pact':[{'country':3,'diplomatic_action':name} for name in ('increase_relations','damage_relations')]}
+        found=offer(options)
+        expected={'improve_relations':('diplomatic_action','increase_relations'),'damage_relations':('diplomatic_action','damage_relations'),
+                  'stop_improving_relations':('break_pact','increase_relations'),'stop_damaging_relations':('break_pact','damage_relations')}
+        self.assertEqual({name for name,lever in C.LEVER.items() if lever=='relations'},set(expected))
+        for name,(command,kind) in expected.items():
+            self.assertEqual(found[name],[Choice({'country':3},[(command,{'country':3,'diplomatic_action':kind})])])
+        self.assertEqual(C.LEVER['declare_rivalry'],'lower_relations')
+        self.assertEqual(C.LEVER['fund_lobby'],'raise_relations')
 
     def test_military_commands_have_three_independent_levers_and_flags_are_retired(self):
         self.assertNotIn('disposition_of_forces',C.NAMES)
@@ -413,7 +425,7 @@ class TranslationTests(unittest.TestCase):
             self.assertEqual(found[name][0].params,{'country':3})
         self.assertEqual({C.LEVER[name] for name in ('lower_embargoes','end_rivalry','stop_damaging_relations','stop_improving_relations','end_service_exemption',
                                                      'take_back_subject_market','grant_independence')},
-                         {'lower_embargoes','raise_relations','lower_relations','raise_hold_over_subjects','lower_hold_over_subjects'})
+                         {'lower_embargoes','raise_relations','relations','raise_hold_over_subjects','lower_hold_over_subjects'})
         named={action for actions in ENDED.values() for action in actions}
         self.assertEqual({choice.params['diplomatic_action'] for choice in found[C.OTHER_PACT]},set(pact_terms())-named)
         self.assertEqual(sum(len(choices) for choices in found.values()),len(pact_terms()))

@@ -141,8 +141,9 @@ def retracting(kind):
 def state_deals(lever):
     return tuple((name,(COUNTRY,STATE)) for home,name in STATE_DEALS.values() if home==lever)
 SUBJECT_PACTS=('protectorate','puppet','dominion','personal_union','vassal','tributary','colony','chartered_company','crown_land')
-ESTABLISHED={'raise_relations':{'improve_relations':'increase_relations','forgive_obligation':'redeem_obligation','fund_lobby':'fund_lobbies'},
-             'lower_relations':{'damage_relations':'damage_relations','declare_rivalry':'rivalry','expel_diplomats':'expel_diplomats','violate_neutrality':'violate_sovereignty',
+ESTABLISHED={'relations':{'improve_relations':'increase_relations','damage_relations':'damage_relations'},
+             'raise_relations':{'forgive_obligation':'redeem_obligation','fund_lobby':'fund_lobbies'},
+             'lower_relations':{'declare_rivalry':'rivalry','expel_diplomats':'expel_diplomats','violate_neutrality':'violate_sovereignty',
                                 'support_separatists':'support_separatism','stage_coup':'orchestrate_coup'},
              'raise_embargoes':{'raise_embargoes':'embargo'},
              'raise_power_bloc':{'invite_to_power_bloc':'invite_to_power_bloc','subjugate_bloc_member':'force_become_subject','force_bloc_regime_change':'force_regime_change',
@@ -157,8 +158,9 @@ ESTABLISHED={'raise_relations':{'improve_relations':'increase_relations','forgiv
                                   'ask_for_knowledge_sharing':'da_request_knowledge_sharing','ask_for_market_control':'request_market_control',
                                   'ask_for_investment_rights':'da_subject_request_investment_rights','ask_for_colonial_governor':'da_request_colonial_governor'}}
 ENDED={'lower_embargoes':{'lower_embargoes':('embargo',)},
-       'raise_relations':{'stop_damaging_relations':('damage_relations',),'end_rivalry':('rivalry',),'stop_supporting_separatists':('support_separatism',),'call_off_coup':('orchestrate_coup',)},
-       'lower_relations':{'stop_improving_relations':('increase_relations',),'stop_funding_lobby':('fund_lobbies',)},
+       'relations':{'stop_improving_relations':('increase_relations',),'stop_damaging_relations':('damage_relations',)},
+       'raise_relations':{'end_rivalry':('rivalry',),'stop_supporting_separatists':('support_separatism',),'call_off_coup':('orchestrate_coup',)},
+       'lower_relations':{'stop_funding_lobby':('fund_lobbies',)},
        'raise_hold_over_subjects':{'end_service_exemption':('exempt_from_service',),'take_back_subject_market':('grant_own_market',),'end_payment_relief':('decrease_payments',),
                                    'stop_supporting_subject_regime':('da_support_regime',),'stop_sharing_knowledge':('da_knowledge_sharing',),
                                    'withdraw_subject_investment_rights':('da_overlord_grant_investment_rights',)},
@@ -220,6 +222,7 @@ LEVERS=[
     *pair('political_movements',(('bolster_movement',(MOVEMENT,)),('stop_suppressing_movement',(MOVEMENT,))),
           (('suppress_movement',(MOVEMENT,)),('stop_bolstering_movement',(MOVEMENT,)))),
     *dealings('relations',((OTHER_PACT,(COUNTRY,PACT)),*proposing('diplomatic')),retracting('diplomatic')),
+    Lever('relations',SINGLE,(*dealt('relations'),*dealt('relations',ENDED))),
     *pair('security_treaties',proposing('security'),retracting('security')),
     *dealings('power_bloc',(('found_power_bloc',(IDENTITY,PRINCIPLE)),('ask_to_join_power_bloc',(BLOC,)),('adopt_bloc_principle',(PRINCIPLE,)),
                             ('replace_bloc_principle',(SLOT,PRINCIPLE)),*proposing('bloc')),

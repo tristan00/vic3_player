@@ -156,6 +156,22 @@ class StoreTests(unittest.TestCase):
                                    'where run_id=%s order by a.name',(self.store.run_id,)).fetchall(),
                          [('disposition_of_forces',7.5,.5),('military_leadership',7.5,.5),('military_operations',2.,-1.),('military_organisation',7.5,.5)])
 
+    def test_relations_migration_uses_log_space_midpoint_and_keeps_recorded_weights(self):
+        self.store.pending['weights']={'raise_relations':4.,'lower_relations':9.}
+        self.store.pending['centres']={'raise_relations':-1.,'lower_relations':1.}
+        self.store.write(built(STEPS[0]),'start',datetime(2026,9,23,tzinfo=timezone.utc),1.0)
+        c=self.store.connection
+        migration=SCHEMA.with_name('migrate_relations_lever.sql').read_text(encoding='utf-8')
+        c.execute(migration)
+        self.assertEqual(c.execute('select a.name,w.weight,w.centre from run_weight w join advisor_action a using (advisor_action) '
+                                   'where run_id=%s order by a.name',(self.store.run_id,)).fetchall(),
+                         [('lower_relations',9.,1.),('raise_relations',4.,-1.),('relations',6.,0.)])
+        c.execute("update run_weight set weight=3.,centre=.5 where run_id=%s and advisor_action=(select advisor_action from advisor_action where name='relations')",
+                  (self.store.run_id,))
+        c.execute(migration)
+        self.assertEqual(c.execute("select weight,centre from run_weight where run_id=%s and advisor_action=(select advisor_action from advisor_action where name='relations')",
+                                   (self.store.run_id,)).fetchone(),(3.,.5))
+
     def test_versions_tombstones_and_query_layer(self):
         self.write_all()
         c=self.store.connection
