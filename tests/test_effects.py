@@ -80,6 +80,51 @@ class TransitionTests(unittest.TestCase):
         self.assertFalse(effects.took_effect('offer_treaty_article',before,after,params))
         self.assertFalse(effects.took_effect('agree_treaty_article',after,after,params))
 
+    def test_moving_to_end_ignores_construction_added_later_in_the_batch(self):
+        def queued(kinds):
+            return snapshot(player_construction_queue_item=[{'private':False,'position':i,'state':3,'building_type':kind} for i,kind in enumerate(kinds)])
+        params={'state':3,'building_type':'a'}
+        before=queued(['a','b'])
+        self.assertTrue(effects.took_effect('last_queue_item',before,queued(['b','a','c']),params))
+        self.assertFalse(effects.took_effect('last_queue_item',before,queued(['a','b','c']),params))
+        self.assertFalse(effects.took_effect('last_queue_item',queued(['b','a']),queued(['b','a','c']),params))
+        self.assertFalse(effects.took_effect('last_queue_item',before,queued(['b','c']),params))
+
+    def test_breaking_our_one_sided_pact_does_not_require_theirs_to_end(self):
+        before=snapshot(pact_history=[pact(1,PLAYER,OTHER),pact(2,OTHER,PLAYER)])
+        after=snapshot(pact_history=[pact(2,OTHER,PLAYER)])
+        params={'country':OTHER,'diplomatic_action':'increase_relations'}
+        self.assertTrue(effects.took_effect_later('break_pact',before,after,params))
+        self.assertFalse(effects.took_effect_later('break_pact',before,before,params))
+
+    def test_a_request_can_create_a_differently_named_reverse_pact(self):
+        before=snapshot()
+        before.given_definitions={'common/diplomatic_actions':{'da_request_support_regime':{'reverse_pact':['da_support_regime']}}}
+        after=snapshot(pact_history=[pact(1,OTHER,PLAYER,'da_support_regime')])
+        params={'country':OTHER,'diplomatic_action':'da_request_support_regime'}
+        self.assertTrue(effects.took_effect_later('diplomatic_action',before,after,params))
+        self.assertFalse(effects.took_effect_later('diplomatic_action',before,before,params))
+
+    def test_abandoning_a_petition_is_verified_when_its_button_disappears(self):
+        entry={'journal_entry':1,'journal_entry_type':'je_government_petition','active':True}
+        button={'journal_entry_type':'je_government_petition','scripted_button':'je_government_petition_go_away_button'}
+        before=snapshot(journal_entry_history=[entry],player_journal_button=[button])
+        before.given_definitions={'common/journal_entries':{'je_government_petition':{'scripted_button':['je_government_petition_go_away_button']}}}
+        after=snapshot(journal_entry_history=[entry])
+        params={'journal_entry':1,'button':0}
+        self.assertTrue(effects.took_effect('press_journal_button',before,after,params))
+        self.assertFalse(effects.took_effect('press_journal_button',before,before,params))
+
+    def test_caudillo_decree_requires_its_recorded_modifier(self):
+        entry={'journal_entry':1,'journal_entry_type':'je_caudillo','active':True}
+        button={'journal_entry_type':'je_caudillo','scripted_button':'caudillo_decree_button'}
+        before=snapshot(journal_entry_history=[entry],player_journal_button=[button])
+        before.given_definitions={'common/journal_entries':{'je_caudillo':{'scripted_button':['caudillo_decree_button']}}}
+        after=snapshot(country_timed_modifier=[{'country':PLAYER,'modifier':'caudillo_rule_by_decree_modifier'}])
+        params={'journal_entry':1,'button':0}
+        self.assertTrue(effects.took_effect('press_journal_button',before,after,params))
+        self.assertFalse(effects.took_effect('press_journal_button',before,before,params))
+
 
 class RecordingTests(unittest.TestCase):
     def loop(self):

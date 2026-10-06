@@ -978,7 +978,7 @@ def buildable(s):
                 continue
             if (state,kind) in queued:
                 continue
-            if passes(s,'common/buildings',kind,('potential','possible','can_build','can_build_government'),Scope(s,'state',state)):
+            if passes(s,'common/buildings',kind,('potential','possible','can_build','can_build_government'),Scope(s,'state',state,{'investor_country':('country',s.player)})):
                 combos.append({'state':state,'building_type':kind})
     return combos
 
@@ -2046,6 +2046,24 @@ def treaty_partners(s):
 
 
 @timed_often
+def treaty_allowed(s,country):
+    return s.memo(('treaty_allowed',country),lambda:passes(s,'common/scripted_rules','can_sign_treaty_with',('body',),country_scope(s,other_country=('country',country))))
+
+
+@timed_often
+def compatible_article(article,selected):
+    return not set(stated('common/treaty_articles',article,'mutual_exclusions'))&set(selected)
+
+
+@timed_often
+def threatened_articles(s):
+    if not dlc_feature(s,'ep2_content'):
+        return []
+    return [option for option in treaty_articles(s,'directed',False,False)
+            if passes(s,'common/scripted_rules','can_threaten_naval_hostilities',('body',),country_scope(s,other_country=('country',option['country'])))]
+
+
+@timed_often
 def articles_between(s):
     def compute():
         return {(source,target,kind) for treaty,kind,source,target in s.rows('treaty_article','treaty,treaty_article_type,source_country,target_country')
@@ -2097,6 +2115,8 @@ def treaty_articles(s,kind,offered,goods,amending=False):
         if fields.get('kind')!=[kind] or not fitting or not set(fields.get('unlocked_by_technologies',()))<=acquired:
             continue
         for country in sorted(set(standing_treaties(s).values())) if amending else treaty_partners(s):
+            if not treaty_allowed(s,country):
+                continue
             source,target=(s.player,country) if offered else (country,s.player)
             if not passes(s,'common/treaty_articles',article,('visible','possible'),parties(s,source,target)):
                 continue
@@ -2479,7 +2499,8 @@ def amendments(s,kind,offered):
     for treaty,article in s.rows('treaty_article','treaty,treaty_article_type'):
         held.setdefault(treaty,set()).add(article)
     return [{'treaty':treaty,'treaty_article':option['treaty_article']} for treaty,country in sorted(standing_treaties(s).items())
-            for option in treaty_articles(s,kind,offered,False,amending=True) if option['country']==country and option['treaty_article'] not in held.get(treaty,())]
+            for option in treaty_articles(s,kind,offered,False,amending=True) if option['country']==country and option['treaty_article'] not in held.get(treaty,())
+            and compatible_article(option['treaty_article'],held.get(treaty,()))]
 
 
 @timed_often
@@ -2845,7 +2866,7 @@ RULES={
     **{f'{verb}_obliged_treaty_article':(lambda s,kind=kind,offered=offered:[{**option,'obligation':promise} for option in treaty_articles(s,kind,offered,False)
                                                                            for promise in promises(s,option['country'])])
        for verb,kind,offered in (('offer','directed',True),('demand','directed',False),('agree','mutual',True))},
-    'threaten_treaty_article':lambda s:treaty_articles(s,'directed',False,False) if dlc_feature(s,'ep2_content') else [],
+    'threaten_treaty_article':threatened_articles,
     'work_out_treaty_article':lambda s:treaty_articles(s,'directed',False,False),
     'exchange_treaty_articles':exchanges,
     **{f'amend_{verb}_treaty_article':(lambda s,kind=kind,offered=offered:amendments(s,kind,offered)) for verb,kind,offered in (('offer','directed',True),('demand','directed',False),('agree','mutual',True))},

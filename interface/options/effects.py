@@ -4,6 +4,7 @@ from .available import (SLOT, TARIFF_CODES, armies, bloc_principles, changing, c
                         enacting_laws, event_options, formation_report, formation_setting, home_region, in_default, in_force, incorporation, involved, issued_decrees, latest_design,
                         leaning, metric, monopolies, own_templates, ownership_classes, play_members, player_blocs, player_value, power_bloc_members, principal, private_levels,
                         privatization_requested, queued_buildings, recruitable, selected_units, setting, ship_paused, ship_queues, state_regions, strait_sides, strait_value,
+                        definition, journal_button, shown_buttons, pact_terms,
                         technologies, trade_level)
 
 
@@ -21,6 +22,14 @@ def methods(s):
 def place(s,state,building_type):
     queue=construction_queue(s)
     return queue.index((state,building_type)) if (state,building_type) in queue else None
+
+
+@timed_often
+def queued_last(b,a,state,building_type):
+    queue=construction_queue(a)
+    previous=[item for item in construction_queue(b) if item in queue]
+    item=(state,building_type)
+    return item in previous and queue.index(item)==max(queue.index(other) for other in previous)
 
 
 @timed_often
@@ -78,6 +87,8 @@ def between(s,country,kind):
 
 @timed_often
 def joined(b,a,country,diplomatic_action,**picked):
+    reverse=definition(b,'common/diplomatic_actions',diplomatic_action,'reverse_pact')
+    diplomatic_action=reverse[0] if reverse else diplomatic_action
     return bool(between(a,country,diplomatic_action)-between(b,country,diplomatic_action))
 
 
@@ -89,7 +100,23 @@ def acted(b,a,country,diplomatic_action,**picked):
 
 @timed_often
 def broken(b,a,country,diplomatic_action):
-    return bool(between(b,country,diplomatic_action)) and not between(b,country,diplomatic_action)&between(a,country,diplomatic_action)
+    two_sided=pact_terms()[diplomatic_action][2] is not None
+    ours={ident for ident,first,second,kind in b.rows('pact','pact,first_country,second_country,pact_type')
+          if kind==diplomatic_action and (first==b.player and second==country or two_sided and first==country and second==b.player)}
+    return bool(ours) and not ours&between(a,country,diplomatic_action)
+
+
+@timed_often
+def pressed_journal(b,a,journal_entry,button):
+    picked=journal_button(b,journal_entry,button)
+    if picked is None:
+        return False
+    entry,name=picked
+    if name in ('je_government_petition_go_away_button','negotiation_go_away_button'):
+        return name not in shown_buttons(a,entry)
+    if name=='caudillo_decree_button':
+        return bool(a.rows('country_timed_modifier','modifier',country=a.player,modifier='caudillo_rule_by_decree_modifier'))
+    return False
 
 
 @timed_often
@@ -307,7 +334,7 @@ EFFECTS={
     'raise_queue_item':lambda b,a,state,building_type:place(a,state,building_type) is not None and place(a,state,building_type)<place(b,state,building_type),
     'first_queue_item':lambda b,a,state,building_type:place(a,state,building_type)==0,
     'lower_queue_item':lambda b,a,state,building_type:place(a,state,building_type) is not None and place(a,state,building_type)>place(b,state,building_type),
-    'last_queue_item':lambda b,a,state,building_type:place(a,state,building_type)==len(construction_queue(a))-1,
+    'last_queue_item':queued_last,
     'nationalize':lambda b,a,building,levels:private_levels(a).get(building,0)<=private_levels(b).get(building,0)-levels,
     'toggle_privatization':lambda b,a,building:privatization_requested(a,building)!=privatization_requested(b,building),
     'toggle_monopoly':lambda b,a,building_type:(building_type in monopolies(a))!=(building_type in monopolies(b)),
@@ -509,9 +536,10 @@ EFFECTS={
     'revoke_region_charter':revoked,
     'pause':lambda b,a:bool(a.meta['paused']),
     'unpause':lambda b,a:a.hours>b.hours,
+    'press_journal_button':pressed_journal,
 }
 LATER={name:EFFECTS[name] for name in ('break_pact','disband_unit','decommission_ship','disband_formation','disband_regulars','disband_conscripts','repeal_amendment',
-                                        'request_join_power_bloc','start_play_confirmed','withdraw_treaty','capitulate','remove_company')}
+                                        'request_join_power_bloc','start_play_confirmed','withdraw_treaty','capitulate','remove_company','merge_armies','merge_fleets')}
 LATER.update({name:joined for name in ('diplomatic_action','diplomatic_action_obligation')})
 LATER.update({'diplomatic_action_first_state':lambda b,a,country,diplomatic_action,state,obligation:joined(b,a,country,diplomatic_action) or owner(a,state)==country,
               'diplomatic_action_second_state':lambda b,a,country,diplomatic_action,state,obligation:joined(b,a,country,diplomatic_action) or owner(a,state)==a.player,
@@ -524,8 +552,7 @@ UNSEEN={'set_speed':'a snapshot is taken paused and records no speed',
         'unassign_flagship':'which ship is the flagship is not recorded',
         'retrofit_ship':'the refit of a single ship is not recorded',
         'cancel_retrofit_ship':'the refit of a single ship is not recorded',
-        'toggle_accept_peace':'our answer to a peace offer is not recorded',
-        'press_journal_button':'a journal button does whatever its script says'}
+        'toggle_accept_peace':'our answer to a peace offer is not recorded'}
 
 
 @timed_often

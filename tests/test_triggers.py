@@ -8,6 +8,20 @@ from interface.script import BLOCK_FIELDS, body, fields, read
 
 
 class TriggerTests(unittest.TestCase):
+    def test_country_rank_can_compare_two_scoped_countries(self):
+        s=Memory(7,{'country_history':[{'country':7,'country_rank':'minor_power'},{'country':9,'country_rank':'great_power'}]},
+                 {'common/country_ranks':{'minor_power':{'rank_value':['2']},'great_power':{'rank_value':['6']}}})
+        scope=country_scope(s,other_country=('country',9))
+        self.assertFalse(evaluate(parse('country_rank > scope:other_country.country_rank'),scope))
+        self.assertTrue(evaluate(parse('scope:other_country.country_rank > root.country_rank'),scope))
+        self.assertTrue(evaluate(parse('country_rank < rank_value:great_power'),scope))
+
+    def test_temporary_scopes_are_available_to_later_conditions(self):
+        s=Memory(7,{'country_history':[{'country':7},{'country':9}]})
+        scope=country_scope(s,other_country=('country',9))
+        self.assertTrue(evaluate(parse('scope:other_country = { save_temporary_scope_as = target_country } scope:target_country = { this = scope:other_country }'),scope))
+        self.assertEqual(scope.saved['target_country'],('country',9))
+
     def test_parse_keeps_nesting_and_comparisons(self):
         nodes=parse('has_trait = brave OR = { a = b c ?= { value >= 0.5 } }')
         self.assertEqual(nodes[0],('has_trait','=','brave'))

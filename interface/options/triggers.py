@@ -596,6 +596,9 @@ def test(key,operator,value,scope):
         return dlc_feature(scope.s,value)
     if key=='always':
         return yes(value)
+    if key=='save_temporary_scope_as':
+        scope.saved[value]=(scope.kind,scope.ident)
+        return True
     if key=='has_variable':
         UNKNOWN[key]+=1
         return None
@@ -850,7 +853,7 @@ def rank_of(s,country):
 
 
 RELATION_THRESHOLDS={'friendly':80,'amicable':50,'cordial':20,'neutral':-19,'poor':-20,'cold':-50,'hostile':-80}
-METRIC_KEYS={'gdp':'GetGDP','prestige':'GetPrestige','infamy':'GetInfamy','government_legitimacy':'GetGovernmentLegitimacy',
+METRIC_KEYS={'gdp':'GetGDP','prestige':'GetPrestige','infamy':'GetInfamy','government_legitimacy':'GetGovernmentLegitimacy','navy_size':'GetNumShips',
              **{f'produced_{power}':f"GetPowerIncome('{power}')" for power in ('authority','influence','bureaucracy')}}
 
 
@@ -875,6 +878,11 @@ def country_test(key,operator,value,scope):
             other=metric(s,found.country(),METRIC_KEYS[key]) if found else 0
         return COMPARE[operator](metric(s,country,METRIC_KEYS[key]),other)
     if key=='country_rank':
+        if value.endswith('.country_rank'):
+            other=target(scope,value[:-len('.country_rank')])
+            if other is None:
+                raise Unknown(f'country rank scope {value} is not captured')
+            return COMPARE[operator](rank_of(s,country),rank_of(s,other.country()))
         return COMPARE[operator](rank_of(s,country),float(next(iter(s.definitions('common/country_ranks').get(value.split(':',1)[-1],{}).get('rank_value',[])),-1)))
     if key in ('is_revolutionary','is_insurrectionary'):
         return not yes(value)
@@ -1014,7 +1022,7 @@ def modifiers(s,kind,ident):
     raise Unknown(f'{kind} timed modifiers are not captured')
 
 
-HANDLED={'AND','OR','NOT','NOR','NAND','any_scope_war','calc_true_if','amount','custom_tooltip','hidden_trigger','custom_description','has_dlc_feature','always','has_variable',
+HANDLED={'AND','OR','NOT','NOR','NAND','any_scope_war','calc_true_if','amount','custom_tooltip','hidden_trigger','custom_description','has_dlc_feature','always','has_variable','save_temporary_scope_as',
          'any_scope_state','any_scope_building','any_scope_character','any_primary_culture','any_subject_or_below','any_interest_group','count','limit',
          'trigger_if','trigger_else_if','trigger_else','text','target','value','has_technology_researched','has_law','has_law_or_variant',
          'is_subject','is_subject_of','is_at_war','has_journal_entry','is_diplomatic_play_enemy_of','this','has_modifier','is_country_type','has_government_type','game_date','liberty_desire',

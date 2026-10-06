@@ -166,6 +166,35 @@ class GateTests(unittest.TestCase):
 
 
 class RatificationTests(unittest.TestCase):
+    def test_treaty_proposals_respect_the_general_signing_rule(self):
+        definitions={'common/treaty_articles':{'article':{'kind':['directed']}},
+                     'common/scripted_rules':{'can_sign_treaty_with':{'body':['NOT = { is_diplomatic_play_enemy_of = scope:other_country }']}}}
+        s=snapshot(definitions,player_diplomatic_option=[{'target_country':OTHER,'action_type':'rivalry','possible':True}],
+                   diplomatic_play_history=[{'diplomatic_play':1,'initiator':PLAYER,'target':OTHER}])
+        with patch.object(available,'technologies',lambda s:(set(),set(),set(),set())),patch.object(available,'ratification',lambda:{'article':''}):
+            self.assertEqual(RULES['offer_treaty_article'](s),[])
+            self.assertEqual(RULES['demand_treaty_article'](s),[])
+
+    def test_naval_threats_require_the_ship_count_in_the_game_rule(self):
+        definitions={'common/treaty_articles':{'article':{'kind':['directed']}},
+                     'common/scripted_rules':{'can_threaten_naval_hostilities':{'body':['navy_size >= 10']}}}
+        with patch.object(available,'technologies',lambda s:(set(),set(),set(),set())),patch.object(available,'ratification',lambda:{'article':''}),patch.object(Memory,'dlc',('ep2',)):
+            for ships in (0,9,10):
+                s=snapshot(definitions,player_diplomatic_option=[{'target_country':OTHER,'action_type':'rivalry','possible':True}],
+                           country_military_report=[{'country':PLAYER,'num_ships':ships}])
+                self.assertEqual(bool(RULES['threaten_treaty_article'](s)),ships>=10)
+
+    def test_amendments_do_not_add_mutually_exclusive_articles(self):
+        s=snapshot(treaty_article_history=[{'treaty':1,'treaty_article_type':'guarantee_independence'}])
+        with patch.object(available,'standing_treaties',return_value={1:OTHER}),patch.object(available,'treaty_articles',return_value=[{'country':OTHER,'treaty_article':'alliance'}]):
+            self.assertEqual(available.amendments(s,'mutual',True),[])
+
+    def test_building_rules_receive_the_investing_country(self):
+        definitions={'common/buildings':{'trade':{'can_build_government':['scope:investor_country = { always = no }']}}}
+        s=snapshot(definitions,state_history=[{'state':1,'country':PLAYER,'state_region':'x'}])
+        with patch.object(available,'technologies',lambda s:(set(),set(),set(),set())):
+            self.assertEqual(available.buildable(s),[])
+
     def test_an_article_the_game_would_not_ratify_is_not_offered(self):
         articles={'refused':{'kind':['directed']},'ratified':{'kind':['directed']},'unknown':{'kind':['directed']}}
         terms={'refused':'always = no','ratified':'always = yes','unknown':'a_trigger_the_evaluator_does_not_know = yes'}
