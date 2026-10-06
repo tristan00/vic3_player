@@ -20,10 +20,10 @@ def historical(seq):
     population.index={1:([0,4,8],POPULATIONS)}
     legitimacy=Versions.__new__(Versions)
     legitimacy.index={(1,(7,)):([0,4,6],[(35,),(80,),None]),(1,(9,)):([0],[(99,)])}
-    empty=SimpleNamespace(at=lambda *args:None,live=lambda *args:[])
+    empty=SimpleNamespace(at=lambda *args:None,live=lambda *args:[],by_run={})
     history=SimpleNamespace(player={1:7},terrain={1:{}},treasury=constant([100.,20.,5.]),population=population,politics=constant([0.]),
                             legitimacy=legitimacy,budget=empty,interest=1,sol=empty,construction=empty,gdp=empty,military=empty,
-                            government=set(),army=set(),wars=empty,queue=empty,infamy=constant([0.]),policy=constant([0,0,0]))
+                            government=set(),army=set(),wars=empty,queue=empty,groups=empty,infamy=constant([0.]),policy=constant([0,0,0]))
     return HistoryLookup(history,1,seq)
 
 

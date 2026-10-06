@@ -335,8 +335,6 @@
     "play.truce": 3,
     "player.buildings": 2,
     "player.character_ideologies": 4,
-    "player.interest_group_approval": 3,
-    "player.interest_groups_in_government": 8,
     "player.population_shares": 2,
     "press_war_goal.country": 4,
     "press_war_goal.diplomatic_play": 1,

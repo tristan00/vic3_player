@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from advisors.models.histogram import data as pickers
-from advisors.data.histograms import ACTION, APPROVAL, BUILDINGS, CLOUT, GOVERNING, IDEOLOGIES, METHODS, PEOPLE, QUEUE, QUEUE_POSITION, QUEUE_PROGRESS, ROLES, Histograms, Holdings, country, entries
+from advisors.data.histograms import ACTION, BUILDINGS, IDEOLOGIES, METHODS, PEOPLE, QUEUE, QUEUE_POSITION, QUEUE_PROGRESS, ROLES, Histograms, Holdings, country, entries
 from advisors.models.histogram.tune import decode, initial, space
 
 LOOKUP=SimpleNamespace(player=1,terrain={},state=lambda state:(None,None),building=lambda ident:None,typed=lambda kind,ident:None,character=lambda ident:None,
@@ -66,21 +66,19 @@ class HoldingsTests(unittest.TestCase):
         holdings=Holdings.__new__(Holdings)
         holdings.buildings=Table({(1,):('farm',10,4),(2,):('mine',20,2),(3,):None})
         holdings.methods=Table({(1,'tools'):(),(2,'picks'):(),(1,'old'):None})
-        holdings.groups=Table({(1,):('landowners',7,True),(2,):('devout',8,True),(3,):('unions',7,False)})
-        holdings.stats=SimpleNamespace(at=lambda run,group,seq:{1:[.6,5.0],2:[.3,1.0]}.get(group))
         holdings.characters=Table({(1,):(7,'royalist'),(2,):(8,'radical'),(3,):None})
         holdings.roles=Table({(1,'ruler'):(),(1,'general'):(),(2,'ruler'):(),(1,'old'):None})
         holdings.people=SimpleNamespace(at=lambda run,seq:[60,30,10,20,5])
         lookup=SimpleNamespace(run=1,seq=5,player=7,state=lambda state:(None,7 if state==10 else 8))
-        self.assertEqual(holdings.at(lookup),[(BUILDINGS,'farm',4),(METHODS,'tools',4),(CLOUT,'landowners',.6),(APPROVAL,'landowners',5.0),(GOVERNING,'landowners',1.0),
+        self.assertEqual(holdings.at(lookup),[(BUILDINGS,'farm',4),(METHODS,'tools',4),
                                               (IDEOLOGIES,'royalist',1),(ROLES,'ruler',1),(ROLES,'general',1),
                                               (PEOPLE,'lower_strata',.6),(PEOPLE,'middle_strata',.3),(PEOPLE,'upper_strata',.1),(PEOPLE,'radicals',.2),(PEOPLE,'loyalists',.05)])
 
     def test_country_histograms_obey_the_tuned_design(self):
-        histograms=Histograms([country([('landowners',True,.6,5.0),('devout',False,.3,-2.0)],['royalist',None],['ruler'],[60,30,10,20,5])])
-        chosen={name:2 for name in (CLOUT,APPROVAL)}
-        self.assertEqual(len(histograms.columns(chosen)),4)
-        self.assertEqual(histograms.labels(chosen),[APPROVAL+'=devout',APPROVAL+'=landowners',CLOUT+'=devout',CLOUT+'=landowners'])
+        histograms=Histograms([country(['royalist',None],['ruler'],[60,30,10,20,5])])
+        chosen={name:2 for name in (IDEOLOGIES,ROLES)}
+        self.assertEqual(len(histograms.columns(chosen)),3)
+        self.assertEqual(histograms.labels(chosen),[IDEOLOGIES+'=None',IDEOLOGIES+'=royalist',ROLES+'=ruler'])
         self.assertEqual({name:size for name,size in pickers.SIZES.items() if name in pickers.DESIGN['sizes']},pickers.DESIGN['sizes'])
 
 

@@ -576,15 +576,17 @@ class FeatureTests(unittest.TestCase):
 
     def test_numbers_split_the_queue_by_owner_and_include_construction_use_and_yearly_balance_over_gdp(self):
         from types import SimpleNamespace as Space
-        from advisors.data.features import NUMBERS, HistoryLookup
+        from advisors.data.features import GROUP_FEATURES, NUMBERS, HistoryLookup
         at=lambda value:Space(at=lambda run,key_or_seq,seq=None:value)
         history=Space(player={1:7},terrain={1:{}},interest=10,treasury=at([100.0,50.0,-3.0]),population=at([10,20,30,15]),politics=at([4.0]),legitimacy=at([75]),
                       budget=at((2.0,)),sol=at((8.0,)),construction=at((12.0,10.0,True)),gdp=at((5200.0,)),
                       queue=Space(live=lambda run,seq:[(False,300.0,0,1,'a'),(False,100.0,1,1,'b'),(True,50.0,0,1,'a')]),army={5,6},military=at((20,0.25)),
-                      wars=Space(live=lambda run,seq:[(7,),(9,),(7,)]),infamy=at([12.5]),government={1,2,3},policy=at([4,0,3]))
+                      wars=Space(live=lambda run,seq:[(7,),(9,),(7,)]),groups=Space(by_run={}),infamy=at([12.5]),government={1,2,3},policy=at([4,0,3]))
         numbers=HistoryLookup(history,1,5).numbers
         self.assertEqual(len(numbers),len(NUMBERS))
-        self.assertEqual(dict(zip(NUMBERS,numbers)),{'treasury':100.0,'debt':50.0,'interest':2.0,'balance':-3.0,'population':60,'bureaucracy_available':4.0,
+        found=dict(zip(NUMBERS,numbers))
+        self.assertTrue(all(math.isnan(found.pop(name)) for name in GROUP_FEATURES))
+        self.assertEqual(found,{'treasury':100.0,'debt':50.0,'interest':2.0,'balance':-3.0,'population':60,'bureaucracy_available':4.0,
                                                         'standard_of_living':8.0,'government_queue_items':2,'government_queue_left':400.0,'private_queue_items':1,
                                                         'private_queue_left':50.0,'construction_capacity':12.0,'construction_used':10.0,'construction_paused':1.0,
                                                         'balance_gdp':-0.03,'battalions':20,'mobilization_ratio':0.25,'wars':2,'army_spending':4.0,

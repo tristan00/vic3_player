@@ -14,9 +14,12 @@ RAW={'int','choice','event'}
 SYNTHETIC={'strategic_region'}
 NONE='none'
 POLICY=['tax_level','government_wage_level','military_wage_level']
+INTEREST_GROUPS=sorted(name for name,_ in read(DEFAULT_GAME/'game','common/interest_groups'))
+GROUP_METRICS=('clout','approval','in_government')
+GROUP_FEATURES=[f'player.interest_group.{kind}.{metric}' for kind in INTEREST_GROUPS for metric in GROUP_METRICS]
 NUMBERS=['treasury','debt','interest','balance','population','bureaucracy_available','standard_of_living','government_queue_items','government_queue_left',
          'private_queue_items','private_queue_left','construction_capacity','construction_used','construction_paused','balance_gdp','battalions','mobilization_ratio',
-         'wars','army_spending','army_spending_gdp','infamy','government_legitimacy','radicals_percent','government_spending','government_spending_gdp']+POLICY
+         'wars','army_spending','army_spending_gdp','infamy','government_legitimacy','radicals_percent']+GROUP_FEATURES+['government_spending','government_spending_gdp']+POLICY
 WEEKS_PER_YEAR=52
 LAWS=[f'law.{group}' for group in LAW_GROUPS]
 CATEGORIES=LAWS+['player.country_rank']
@@ -66,6 +69,13 @@ def balance_gdp(balance,gdp):
 @timed_often
 def radicals_percent(radicals,population):
     return 100*radicals/population if population else float('nan')
+
+
+@timed_often
+def interest_group_values(groups,stats,player):
+    missing=float('nan')
+    values={kind:(*stats.get(group,(missing,missing)),float(government)) for group,country,kind,government in groups if country==player}
+    return [value for kind in INTEREST_GROUPS for value in values.get(kind,(missing,missing,missing))]
 
 
 @timed_often
@@ -271,6 +281,8 @@ class LiveLookup:
         politics=dict(zip(names,rows[0]))
         sol=s.map('country_standard_of_living_report','country,average_standard_of_living_by_population').get(s.player)
         legitimacy=s.map('country_politics_report','country,government_legitimacy').get(s.player)
+        groups=interest_group_values(s.rows('interest_group','interest_group,country,interest_group_type,in_government'),
+                                     {group:(clout,approval) for group,clout,approval in s.rows('interest_group_stats','interest_group,clout,approval')},s.player)
         gdp=s.map('country_economy_report','country,gdp').get(s.player)
         queue=s.rows('player_construction_queue_item','private,construction_left,position,state,building_type')
         buildings=s.rows('building','building,building_type,state,levels')
@@ -312,7 +324,7 @@ class LiveLookup:
                            balance_gdp(treasury['balance_trend_current'],gdp),
                            *army(military,wars,spent(budget,expense_lines(s.connection,ARMY)),gdp),
                            s.map('country_diplomacy','country,infamy')[s.player],float('nan') if legitimacy is None else legitimacy,
-                           radicals_percent(population['radicals'],total),government,balance_gdp(government,gdp),
+                           radicals_percent(population['radicals'],total),*groups,government,balance_gdp(government,gdp),
                            *s.rows('player_policy',','.join(POLICY))[0]]}
 
     @timed_often
@@ -472,7 +484,8 @@ class History:
         self.shares=load('state_economy_report',['state'],['gdp_contribution_percentage'])
         self.types={kind:load(table+'_history',[table],[column]) for kind,(table,column) in TYPED.items()}
         self.characters=load('character_history',['character'],['ideology'])
-        self.groups=load('interest_group_history',['interest_group'],['country','party','leader'])
+        self.groups=load('interest_group_history',['interest_group'],['country','party','leader','interest_group_type','in_government'])
+        self.group_stats=Latest(connection,'interest_group_stats','interest_group',['clout','approval'],runs)
         self.traits=load('character_assigned_trait',['character','character_trait'],[])
         self.movements=load('interest_group_movement_support',['interest_group','political_movement'],['clout'])
         self.countries=load('country_history',['country'],['country_rank'])
@@ -555,8 +568,22 @@ class HistoryLookup:
                 *queues(self.queue),*construction(report),balance_gdp(treasury[2],gdp),
                 *army(self.h.military.at(self.run,(self.player,),self.seq),sum(1 for country, in self.h.wars.live(self.run,self.seq) if country==self.player),
                       self.spent(self.h.army),gdp),
-                self.h.infamy.at(self.run,self.seq)[0],float('nan') if legitimacy is None else legitimacy[0],radicals_percent(population[3],total),
+                self.h.infamy.at(self.run,self.seq)[0],float('nan') if legitimacy is None else legitimacy[0],radicals_percent(population[3],total),*self.interest_groups,
                 government,balance_gdp(government,gdp),*self.h.policy.at(self.run,self.seq)]
+
+    @cached_property
+    @timed_often
+    def interest_groups(self):
+        groups=[]
+        stats={}
+        for group, in self.h.groups.by_run.get(self.run,[]):
+            found=self.h.groups.at(self.run,(group,),self.seq)
+            if found is not None and found[0]==self.player:
+                groups.append((group,found[0],found[3],found[4]))
+                rating=self.h.group_stats.at(self.run,group,self.seq)
+                if rating is not None:
+                    stats[group]=rating
+        return interest_group_values(groups,stats,self.player)
 
     @timed_often
     def spent(self,lines):
@@ -637,7 +664,7 @@ class HistoryLookup:
     @timed_often
     def leadership(self):
         h=self.h
-        groups={group:found for group, in h.groups.by_run.get(self.run,[]) if (found:=h.groups.at(self.run,(group,),self.seq)) is not None}
+        groups={group:found[:3] for group, in h.groups.by_run.get(self.run,[]) if (found:=h.groups.at(self.run,(group,),self.seq)) is not None}
         characters={character:found[0] for character, in h.characters.by_run.get(self.run,[]) if (found:=h.characters.at(self.run,(character,),self.seq)) is not None}
         traits=[key for key in h.traits.by_run.get(self.run,[]) if h.traits.at(self.run,key,self.seq) is not None]
         movements=[(*key,found[0]) for key in h.movements.by_run.get(self.run,[]) if (found:=h.movements.at(self.run,key,self.seq)) is not None]

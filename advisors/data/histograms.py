@@ -2,7 +2,7 @@ import numpy as np
 
 from interface.common import timed, timed_often
 from ..catalogue import CANCELLING, PLAY_ACTIONS, SITED
-from .features import KINDS, LEADER_ACTIONS, SITE, Latest, Samples, Versions, located, queued, resolve
+from .features import KINDS, LEADER_ACTIONS, SITE, Samples, Versions, located, queued, resolve
 
 ACTION='action'
 CHOICE='answers'
@@ -13,13 +13,10 @@ DETAIL='answers.effect_details'
 ANSWER=(CHOICE,DEFAULT,OFFERED,EFFECT,DETAIL)
 BUILDINGS='player.buildings'
 METHODS='player.production_methods'
-CLOUT='player.interest_group_clout'
-APPROVAL='player.interest_group_approval'
-GOVERNING='player.interest_groups_in_government'
 ROLES='player.character_roles'
 IDEOLOGIES='player.character_ideologies'
 PEOPLE='player.population_shares'
-COUNTRY=(CLOUT,APPROVAL,GOVERNING,ROLES,IDEOLOGIES,PEOPLE)
+COUNTRY=(ROLES,IDEOLOGIES,PEOPLE)
 QUEUE_POSITION='cancelled.queue_position'
 QUEUE_PROGRESS='cancelled.queue_progress'
 QUEUE=(QUEUE_POSITION,QUEUE_PROGRESS)
@@ -70,24 +67,17 @@ def entries(batch,lookup):
 @timed_often
 def live_holdings(snapshot):
     levels={building:count for building,_,count in snapshot.buildings()}
-    clout=snapshot.map('interest_group_stats','interest_group,clout')
-    approval=snapshot.map('interest_group_stats','interest_group,approval')
-    groups=[(kind,governs,clout[group],approval[group]) for group,kind,governs in snapshot.rows('interest_group','interest_group,interest_group_type,in_government',country=snapshot.player)
-            if group in clout]
     characters=dict(snapshot.rows('character','character,ideology',country=snapshot.player))
     roles=[role for character,role in snapshot.rows('character_assigned_role','character,character_role') if character in characters]
     names,rows=snapshot.table('player_population')
     return ([(BUILDINGS,kind,count) for _,kind,count in snapshot.buildings()]+[(METHODS,method,levels[building])
              for building,method in snapshot.rows('building_production_method_active','building,production_method') if building in levels]
-            +country(groups,characters.values(),roles,[rows[0][names.index(name)] for name in SHARES]))
+            +country(characters.values(),roles,[rows[0][names.index(name)] for name in SHARES]))
 
 
 @timed_often
-def country(groups,ideologies,roles,people):
-    found=[]
-    for kind,governs,clout,approval in groups:
-        found+=[(CLOUT,kind,clout),(APPROVAL,kind,approval),(GOVERNING,kind,float(governs))]
-    found+=[(IDEOLOGIES,str(ideology),1) for ideology in ideologies]+[(ROLES,role,1) for role in roles]
+def country(ideologies,roles,people):
+    found=[(IDEOLOGIES,str(ideology),1) for ideology in ideologies]+[(ROLES,role,1) for role in roles]
     total=sum(people[:3])
     return found+[(PEOPLE,name,value/total) for name,value in zip(SHARES,people)]
 
@@ -97,8 +87,6 @@ class Holdings:
     def __init__(self,connection,runs):
         self.buildings=Versions(connection,'building_history',['building'],['building_type','state','levels'],runs)
         self.methods=Versions(connection,'building_production_method_active',['building','production_method'],[],runs)
-        self.groups=Versions(connection,'interest_group_history',['interest_group'],['interest_group_type','country','in_government'],runs)
-        self.stats=Latest(connection,'interest_group_stats','interest_group',['clout','approval'],runs)
         self.characters=Versions(connection,'character_history',['character'],['country','ideology'],runs)
         self.roles=Versions(connection,'character_assigned_role',['character','character_role'],[],runs)
         self.people=Samples(connection,'player_population',list(SHARES),runs)
@@ -117,19 +105,13 @@ class Holdings:
                 found.append((BUILDINGS,now[0],now[2]))
         found+=[(METHODS,method,levels[building]) for building,method in self.methods.by_run.get(lookup.run,[])
                 if building in levels and self.methods.at(lookup.run,(building,method),lookup.seq) is not None]
-        groups=[]
-        for key in self.groups.by_run.get(lookup.run,[]):
-            now=self.groups.at(lookup.run,key,lookup.seq)
-            stats=self.stats.at(lookup.run,key[0],lookup.seq)
-            if now is not None and now[1]==lookup.player and stats is not None:
-                groups.append((now[0],now[2],*stats))
         characters={}
         for key in self.characters.by_run.get(lookup.run,[]):
             now=self.characters.at(lookup.run,key,lookup.seq)
             if now is not None and now[0]==lookup.player:
                 characters[key[0]]=now[1]
         roles=[role for character,role in self.roles.by_run.get(lookup.run,[]) if character in characters and self.roles.at(lookup.run,(character,role),lookup.seq) is not None]
-        return found+country(groups,characters.values(),roles,self.people.at(lookup.run,lookup.seq))
+        return found+country(characters.values(),roles,self.people.at(lookup.run,lookup.seq))
 
 
 class Histograms:
