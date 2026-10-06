@@ -1,18 +1,5 @@
 {
   "default": 0,
   "spread": 1,
-  "centres": {
-    "construct_construction_capacity": 2,
-    "raise_mobilisation": 2,
-    "construct_raw_materials": 1,
-    "construct_industrial_goods": 1,
-    "halt_construction": -2,
-    "cancel_queued_construction": -2,
-    "downsize_building": -2,
-    "raise_construction_priority": -2,
-    "lower_construction_priority": -2,
-    "lower_power_bloc": -1,
-    "military_operations": 1,
-    "relations": 1
-  }
+  "centres": {}
 }

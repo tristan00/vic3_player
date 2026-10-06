@@ -963,7 +963,6 @@ def buildable(s):
     built={(state,kind):levels for kind,state,levels in s.rows('building','building_type,state,levels')}
     regions={ident:region for ident,region in s.rows('state','state,state_region',country=s.player)}
     arable={region:set(fields.get('arable_resources',())) for region,fields in s.definitions('map_data/state_regions').items()}
-    queued=set(s.rows('player_construction_queue_item','state,building_type'))
     combos=[]
     for kind,fields in s.definitions('common/buildings').items():
         if fields.get('buildable')==['no'] or fields.get('recruits_combat_units')==['yes'] or not set(fields.get('unlocking_technologies',()))<=acquired:
@@ -973,8 +972,6 @@ def buildable(s):
                 if kind not in arable.get(region,set()) or free_arable(s,state)<1:
                     continue
             elif kind in group_kinds(s,'capped_by_resources','yes') and capacity.get((region,kind),0)<=built.get((state,kind),0):
-                continue
-            if (state,kind) in queued:
                 continue
             if passes(s,'common/buildings',kind,('potential','possible','can_build','can_build_government'),Scope(s,'state',state,{'investor_country':('country',s.player)})):
                 combos.append({'state':state,'building_type':kind})
@@ -1015,6 +1012,13 @@ def settled(s,formations):
 def war_fronts(s):
     wars=set(s.wars())
     return sorted({front for front,war in s.rows('front_side','front,war') if war in wars})
+
+
+@timed_often
+def strategic_objective_states(s):
+    wars=set(s.wars())&{war for war,dead,peace in s.rows('war','war,dead,peace_date') if not dead and peace is None}
+    countries={country for war,country in s.rows('war_participant','war,country') if war in wars}
+    return [state for state,country in s.rows('state','state,country') if country in countries]
 
 
 @timed_often
@@ -1488,6 +1492,12 @@ def principal(s):
     sides,_=involved(s)
     ends=s.map('diplomatic_play','diplomatic_play,end_date')
     return sorted(ident for ident,pair in sides.items() if s.player in pair and ends.get(ident) is None)
+
+
+@timed_often
+def mobilization_committed(s):
+    ends=s.map('diplomatic_play','diplomatic_play,end_date')
+    return bool(principal(s)) or any(s.player in members and ends.get(play) is None for (play,side),members in play_members(s).items())
 
 
 @timed_often
@@ -2735,11 +2745,11 @@ RULES={
                                              for kind in unit_types_unlocked(s) for formation in s.formations('army')] if 'law_peasant_levies' not in active_laws(s) else [],
     'disembark':lambda s:product(military_formation=[f for armies_ in [set(s.formations('army'))] for f, in s.rows('formation_report','formation',embarked=True) if f in armies_]),
     'cancel_invasion':lambda s:product(military_formation=[f for manned in [set(s.formations())] for f, in s.rows('formation_report','formation',invading=True) if f in manned]),
-    'mobilize':lambda s:product(military_formation=[f for f in armies(s,False) if not demobilizing(s,f)] if principal(s) else []),
+    'mobilize':lambda s:product(military_formation=[f for f in armies(s,False) if not demobilizing(s,f)] if mobilization_committed(s) else []),
     'demobilize':lambda s:product(military_formation=armies(s,True)),
     'raise_conscripts':lambda s:product(military_formation=[i for i,r in s.rows('formation_status','formation,raised_conscripts') if i in armies(s,True) and not r and at_home(s,i)]),
     'disband_formation':lambda s:product(military_formation=[f for f in s.formations() if all(idle_room(s,c) for c in leaders(s,f))]),
-    'mobilize_all':lambda s:[{}] if principal(s) and [f for f in armies(s,False) if not demobilizing(s,f)] else [],
+    'mobilize_all':lambda s:[{}] if mobilization_committed(s) and [f for f in armies(s,False) if not demobilizing(s,f)] else [],
     'demobilize_all':lambda s:[{}] if armies(s,True) else [],
     'toggle_mobilization_option':lambda s:[{'military_formation':formation,'mobilization_option':option} for formation in settled(s,s.formations('army'))
                                            for option in mobilization_options(s,formation)],
@@ -2911,7 +2921,7 @@ RULES={
     'cancel_strategic_objective_selected':lambda s:[{'military_formation':f,'state':objective&SLOT} for idle in [set(settled(s,s.formations('army')))]
                                                     for f,objective in s.rows('formation_private','formation,strategic_objective')
                                                     if f in idle and objective is not None],
-    'set_strategic_objective':lambda s:[{'military_formation':f,'state':st} for f in settled(s,s.formations('army')) for st in s.states()
+    'set_strategic_objective':lambda s:[{'military_formation':f,'state':st} for states in [strategic_objective_states(s)] for f in settled(s,s.formations('army')) for st in states
                                         if st!=formation_setting(s,f,'strategic_objective')],
     'pick_principle':lambda s:[{'slot':len(held),'power_bloc_principle':levels[0]} for held in [bloc_principles(s)] if bloc_leader(s) and mandates(s) and len(held)<PRINCIPLE_SLOTS
                                for identity in [bloc_identity(s)]
