@@ -578,7 +578,7 @@ class FeatureTests(unittest.TestCase):
         from types import SimpleNamespace as Space
         from advisors.data.features import NUMBERS, HistoryLookup
         at=lambda value:Space(at=lambda run,key_or_seq,seq=None:value)
-        history=Space(player={1:7},terrain={1:{}},interest=10,treasury=at([100.0,50.0,-3.0]),population=at([10,20,30]),politics=at([4.0]),
+        history=Space(player={1:7},terrain={1:{}},interest=10,treasury=at([100.0,50.0,-3.0]),population=at([10,20,30,15]),politics=at([4.0]),legitimacy=at([75]),
                       budget=at((2.0,)),sol=at((8.0,)),construction=at((12.0,10.0,True)),gdp=at((5200.0,)),
                       queue=Space(live=lambda run,seq:[(False,300.0,0,1,'a'),(False,100.0,1,1,'b'),(True,50.0,0,1,'a')]),army={5,6},military=at((20,0.25)),
                       wars=Space(live=lambda run,seq:[(7,),(9,),(7,)]),infamy=at([12.5]),government={1,2,3},policy=at([4,0,3]))
@@ -588,7 +588,8 @@ class FeatureTests(unittest.TestCase):
                                                         'standard_of_living':8.0,'government_queue_items':2,'government_queue_left':400.0,'private_queue_items':1,
                                                         'private_queue_left':50.0,'construction_capacity':12.0,'construction_used':10.0,'construction_paused':1.0,
                                                         'balance_gdp':-0.03,'battalions':20,'mobilization_ratio':0.25,'wars':2,'army_spending':4.0,
-                                                        'army_spending_gdp':0.04,'infamy':12.5,'government_spending':6.0,'government_spending_gdp':0.06,
+                                                        'army_spending_gdp':0.04,'infamy':12.5,'government_legitimacy':75,'radicals_percent':25.0,
+                                                        'government_spending':6.0,'government_spending_gdp':0.06,
                                                         'tax_level':4,'government_wage_level':0,'military_wage_level':3})
 
     def test_fitting_reports_progress_every_iteration_so_the_stall_watchdog_stays_quiet(self):
@@ -604,14 +605,14 @@ class FeatureTests(unittest.TestCase):
         from unittest import mock
         from advisors import pickers
         from advisors.models.histogram import data
-        from advisors.data.features import INSTITUTION_TYPES, LAW_GROUPS, PRICES, TARIFFS, TAXES
+        from advisors.data.features import INSTITUTION_TYPES, LAW_GROUPS, NUMBERS, PRICES, TARIFFS, TAXES
         from advisors.data.histograms import BUILDINGS, Histograms
         seen=[]
         class Model:
             def predict(self,data):
                 return np.array([0.1,0.9,0.4])
         class Lookup(self.Lookup):
-            numbers=[1.0,0.0,0.0,0.0,100.0,5.0,20.0,2,300.0,0,0.0,10.0,10.0,0.0,-0.02,12,0.0,0,30.0,0.3,4.0,40.0,0.4,2,2,2]
+            numbers=[1.0]*len(NUMBERS)
             laws=['none']*len(LAW_GROUPS)
             prices=[1.0]*len(PRICES)
             institutions=[0.0]*len(INSTITUTION_TYPES)

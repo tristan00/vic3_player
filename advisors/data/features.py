@@ -16,7 +16,7 @@ NONE='none'
 POLICY=['tax_level','government_wage_level','military_wage_level']
 NUMBERS=['treasury','debt','interest','balance','population','bureaucracy_available','standard_of_living','government_queue_items','government_queue_left',
          'private_queue_items','private_queue_left','construction_capacity','construction_used','construction_paused','balance_gdp','battalions','mobilization_ratio',
-         'wars','army_spending','army_spending_gdp','infamy','government_spending','government_spending_gdp']+POLICY
+         'wars','army_spending','army_spending_gdp','infamy','government_legitimacy','radicals_percent','government_spending','government_spending_gdp']+POLICY
 WEEKS_PER_YEAR=52
 LAWS=[f'law.{group}' for group in LAW_GROUPS]
 CATEGORIES=LAWS+['player.country_rank']
@@ -61,6 +61,11 @@ def construction(report):
 @timed_often
 def balance_gdp(balance,gdp):
     return WEEKS_PER_YEAR*balance/gdp if gdp else float('nan')
+
+
+@timed_often
+def radicals_percent(radicals,population):
+    return 100*radicals/population if population else float('nan')
 
 
 @timed_often
@@ -261,9 +266,11 @@ class LiveLookup:
         treasury=dict(zip(names,rows[0]))
         names,rows=s.table('player_population')
         population=dict(zip(names,rows[0]))
+        total=population['lower_strata']+population['middle_strata']+population['upper_strata']
         names,rows=s.table('player_politics')
         politics=dict(zip(names,rows[0]))
         sol=s.map('country_standard_of_living_report','country,average_standard_of_living_by_population').get(s.player)
+        legitimacy=s.map('country_politics_report','country,government_legitimacy').get(s.player)
         gdp=s.map('country_economy_report','country,gdp').get(s.player)
         queue=s.rows('player_construction_queue_item','private,construction_left,position,state,building_type')
         buildings=s.rows('building','building,building_type,state,levels')
@@ -300,11 +307,12 @@ class LiveLookup:
                                   defined(s.connection,s.ruleset_id,set(s.map('event','event,event_type').values()))),
                 'numbers':[treasury['money'],treasury['principal'],
                            sum(amount for direction,found,amount in budget if direction==INTEREST[0] and found==line),
-                           treasury['balance_trend_current'],population['lower_strata']+population['middle_strata']+population['upper_strata'],
+                           treasury['balance_trend_current'],total,
                            politics['power_delta_bureaucracy'],float('nan') if sol is None else sol,*queues(queue),*construction(report),
                            balance_gdp(treasury['balance_trend_current'],gdp),
                            *army(military,wars,spent(budget,expense_lines(s.connection,ARMY)),gdp),
-                           s.map('country_diplomacy','country,infamy')[s.player],government,balance_gdp(government,gdp),
+                           s.map('country_diplomacy','country,infamy')[s.player],float('nan') if legitimacy is None else legitimacy,
+                           radicals_percent(population['radicals'],total),government,balance_gdp(government,gdp),
                            *s.rows('player_policy',','.join(POLICY))[0]]}
 
     @timed_often
@@ -481,8 +489,9 @@ class History:
         self.military=load('country_military_report',['country'],['battalions','mobilization_ratio'])
         self.wars=load('war_participant',['war','country'],['country'])
         self.treasury=Samples(connection,'player_treasury',['money','principal','balance_trend_current'],runs)
-        self.population=Samples(connection,'player_population',['lower_strata','middle_strata','upper_strata'],runs)
+        self.population=Samples(connection,'player_population',['lower_strata','middle_strata','upper_strata','radicals'],runs)
         self.politics=Samples(connection,'player_politics',['power_delta_bureaucracy'],runs)
+        self.legitimacy=load('country_politics_report',['country'],['government_legitimacy'])
         self.infamy=Samples(connection,'country_diplomacy',['infamy'],runs,'country')
         self.sol=load('country_standard_of_living_report',['country'],['average_standard_of_living_by_population'])
         self.gdp=load('country_economy_report',['country'],['gdp'])
@@ -534,17 +543,20 @@ class HistoryLookup:
         politics=self.h.politics.at(self.run,self.seq)
         if treasury is None or population is None or politics is None:
             return None
+        total=sum(population[:3])
+        legitimacy=self.h.legitimacy.at(self.run,(self.player,),self.seq)
         interest=self.h.budget.at(self.run,(INTEREST[0],self.h.interest),self.seq)
         sol=self.h.sol.at(self.run,(self.player,),self.seq)
         report=self.h.construction.at(self.run,(self.player,),self.seq)
         gdp=self.h.gdp.at(self.run,(self.player,),self.seq)
         gdp=None if gdp is None else gdp[0]
         government=self.spent(self.h.government)
-        return [treasury[0],treasury[1],interest[0] if interest else 0,treasury[2],sum(population),politics[0],float('nan') if sol is None else sol[0],
+        return [treasury[0],treasury[1],interest[0] if interest else 0,treasury[2],total,politics[0],float('nan') if sol is None else sol[0],
                 *queues(self.queue),*construction(report),balance_gdp(treasury[2],gdp),
                 *army(self.h.military.at(self.run,(self.player,),self.seq),sum(1 for country, in self.h.wars.live(self.run,self.seq) if country==self.player),
                       self.spent(self.h.army),gdp),
-                self.h.infamy.at(self.run,self.seq)[0],government,balance_gdp(government,gdp),*self.h.policy.at(self.run,self.seq)]
+                self.h.infamy.at(self.run,self.seq)[0],float('nan') if legitimacy is None else legitimacy[0],radicals_percent(population[3],total),
+                government,balance_gdp(government,gdp),*self.h.policy.at(self.run,self.seq)]
 
     @timed_often
     def spent(self,lines):
