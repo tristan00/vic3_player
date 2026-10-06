@@ -12,11 +12,11 @@ def levels(record):
 
 
 @timed_often
-def expected(records,factor,special):
+def expected(records,factor,scales):
     counts=collections.Counter()
     for record in records:
         kind=scalar(record,'building')
-        scale=1 if kind in special else factor
+        scale=scales.get(kind,factor)
         counts[kind]+=int(scalar(record,'level') or 0)
         for key,ownership in blocks(body(record)):
             if key=='add_ownership':
@@ -25,7 +25,7 @@ def expected(records,factor,special):
 
 
 @timed_often
-def project(records,tag,state,tags,states,owners,factor,special,companies):
+def project(records,tag,state,tags,states,owners,factor,scales,companies):
     from .project import commands
 
     groups=collections.defaultdict(list)
@@ -34,7 +34,7 @@ def project(records,tag,state,tags,states,owners,factor,special,companies):
     output=[]
     for kind,group in groups.items():
         ownership=collections.Counter()
-        scale=1 if kind in special else factor
+        scale=scales.get(kind,factor)
         direct=sum(int(scalar(record,'level') or 0) for record in group)
         representative=max(group,key=levels)
         fields=[f'{key} {op} {value}' for key,op,value in commands(body(representative)) if key not in ('add_ownership','level')]
@@ -56,7 +56,7 @@ def project(records,tag,state,tags,states,owners,factor,special,companies):
                         fields_owner=f'type = {scalar(owner,"type")} country = "c:{companies[scalar(owner,"type")]}"'
                     else:
                         owner_kind='country'
-                        target=tag if kind in special else tags[source] if source in tags else tag
+                        target=tag if kind in scales else tags[source] if source in tags else tag
                         fields_owner=f'country = "c:{target}"'
                     ownership[owner_kind,fields_owner]+=count
         if direct:

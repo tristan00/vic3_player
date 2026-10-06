@@ -7,8 +7,12 @@ from ..script import blocks, body, scalar
 from .nations import _rgb, _tags, _techs, level, word
 from .source import development, integer_counts, moments, spread
 from .buildings import expected, project
-from .military import military
+from .military import military as formations
+from .international import connect, found, members, pacts
 from .cultures import population
+
+
+TYPES={'recognized':.9,'company':.1}
 
 
 @timed_often
@@ -143,16 +147,19 @@ def politics(text,data,techs,capacity):
 
 @timed
 def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_uniformity=0,copies=0,
-            tech_variation=1,country_economy=1,local_economy=1,primary_culture_share=None):
+            tech_variation=1,country_economy=1,local_economy=1,primary_culture_share=None,military=1,interconnectedness=0):
     by_id={s['id']:s for s in states}
     region_of={s['id']:r['key'] for r in strategic for s in r['states']}
     identity_rng=random.Random(rng.getrandbits(64))
     control_rng=random.Random(rng.getrandbits(64))
     culture_rng=random.Random(rng.getrandbits(64))
+    relation_rng=random.Random(rng.getrandbits(64))
+    economy_rng=random.Random(rng.getrandbits(64))
     eligible=sorted(tag for tag,source in data['source_countries'].items() if source['type']!='decentralized')
     if len(groups)>len(eligible):
         raise ValueError(f'Need at most {len(eligible)} countries')
     donors=rng.sample(eligible,len(groups))
+    types=[kind if kind in TYPES else identity_rng.choices(list(TYPES),list(TYPES.values()))[0] for kind in (data['source_countries'][donor]['type'] for donor in donors)]
     tags=_tags(len(groups),data['tags'])
     count=round(len(groups)*copies)
     selected=identity_rng.sample(range(len(groups)),count)
@@ -163,7 +170,7 @@ def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_u
     for state in states:
         state_map.setdefault(state['source']['key'],state['key'])
     region_map={r['source_region']:r['key'] for r in strategic}
-    economy_reference=development(states,groups,country_economy,local_economy,data['military_buildings'],sources)
+    economies=development(economy_rng,states,groups,country_economy,local_economy)
     counts,tech_reference=tech_counts(data,sources,donors,tech,tech_variation)
     histories={folder:[] for folder in data['history']}
     files={}
@@ -188,9 +195,14 @@ def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_u
         if candidates:
             company_states[key]=min(candidates,key=lambda s:(s['source']['key']!=home,-holdings[s['key']],s['id']))['key']
     companies={key:state_countries[state] for key,state in company_states.items()}
-    special=data['military_buildings']|{'building_government_administration','building_construction_sector','building_trade_center'}
+    scales={kind:military if kind in data['military_buildings'] else 1
+            for kind in data['military_buildings']|{'building_government_administration','building_construction_sector','building_trade_center'}}
     for state in states:
-        state['buildings']=expected(state['source']['building_records'],state['economic_scale'],special)
+        state['buildings']=expected(state['source']['building_records'],state['economic_scale'],scales)
+    overlords,blocs=connect(relation_rng,interconnectedness,[sum(sum(by_id[i]['buildings'].values()) for i in group) for group in groups],
+                            types,[by_id[i]['center'] for i in capitals],data['subject_rules'])
+    bloc_of={member:bloc for bloc in blocs for member in bloc['members']}
+    vanilla_blocs={}
     for index,(tag,donor,group,capital_id,count) in enumerate(zip(tags,donors,groups,capitals,counts)):
         source=data['source_countries'][donor]
         capital=by_id[capital_id]
@@ -225,6 +237,7 @@ def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_u
         histories['countries'].append(f'c:{tag} ?= {{ {country_text} }}')
         definition=re.sub(r'^'+donor+r'\s*=',tag+' =',source['definition'],count=1)
         definition=re.sub(r'\bcapital\s*=\s*STATE_\w+',f'capital = {capital["key"]}',definition)
+        definition=re.sub(r'\bcountry_type\s*=\s*\w+',f'country_type = {types[index]}',definition)
         definitions.append(definition)
         if tag!=donor:
             name=word(identity_rng)
@@ -237,14 +250,20 @@ def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_u
                 continue
             text=' '.join(data['history'][folder].get('c:'+donor,[]))
             if folder=='diplomacy':
-                for key,op,value in commands(text):
-                    if key=='add_liberty_desire':
-                        histories['global'].append(f'c:{tag} = {{ if = {{ limit = {{ is_subject = yes }} {key} {op} {value} }} }}')
-                text='\n'.join(f'{key} {op} {value}' for key,op,value in commands(text) if key!='add_liberty_desire')
+                mates={tags[i] for i in bloc_of[index]['members']} if index in bloc_of else set()
+                text='\n'.join(f'{key} {op} {value}' for key,op,value in commands(text) if key!='add_liberty_desire' and
+                               not (key=='create_diplomatic_pact' and scalar(value,'type') in data['subject_types']) and
+                               not (key in ('create_diplomatic_pact','set_relations') and tag_map.get((scalar(value,'country') or '').removeprefix('c:')) in mates))
+            if folder=='power_blocs':
+                text=re.sub(r'\bmember\s*=\s*c:\w+','',text) if bloc_of.get(index,{'leader':index})['leader']==index else ''
             text=history_text(text,local_tags,local_states,region_map)
+            if folder=='power_blocs' and 'create_power_bloc' in text:
+                vanilla_blocs[index]=scalar(text,'identity')
+                if index in bloc_of:
+                    text=re.sub(r'create_power_bloc\s*=\s*\{',lambda start:start[0]+members(bloc_of[index],tags),text,count=1)
             if text:
                 histories[folder].append(f'c:{tag} ?= {{ {text} }}')
-        military_history=military(data,donor,tag,[by_id[i] for i in group],region_of)
+        military_history=formations(data,donor,tag,[by_id[i] for i in group],region_of,military)
         if military_history:
             histories['military_formations'].append(f'c:{tag} ?= {{ {military_history} }}')
         for ident in group:
@@ -261,17 +280,33 @@ def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_u
                                        f'{state_effects} }}')
             histories['pops'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {" ".join(state["pop_records"])} }} }}')
             buildings=project(state['eligible_records'],tag,state['key'],local_tags,own_states,state_countries,
-                              state['economic_scale'],special,companies)
+                              state['economic_scale'],scales,companies)
             state['generated_buildings']=' '.join(buildings)
             histories['buildings'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {state["generated_buildings"]} }} }}')
             if original['trade_history']:
                 histories['trade'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {history_text(original['trade_history'],local_tags,own_states,region_map)} }} }}')
-        countries.append({'tag':tag,'name':name,'source':donor,'copy':donor if tag==donor else None,'country_type':source['type'],
+        countries.append({'tag':tag,'name':name,'source':donor,'copy':donor if tag==donor else None,'country_type':types[index],
                           'states':[by_id[i]['key'] for i in group],'capital':capital['key'],'culture':source['cultures'][0],
-                          'cultures':source['cultures'],'primary_culture_share':realized,'ideology_uniformity':uniformity,
+                          'cultures':source['cultures'],'primary_culture_share':realized,'ideology_uniformity':uniformity,'country_economy':economies[index],
                           'tech_count':len(techs),'technologies':sorted(techs),
                           'starting_laws':{data['law_groups'][law]:law for law in re.findall(r'activate_law\s*=\s*law_type:(\w+)',country_text)},
                           'provinces':[p for i in group for p in by_id[i]['province_codes']]})
+    for number,bloc in enumerate(blocs,1):
+        if bloc['leader'] in vanilla_blocs:
+            bloc['identity']=vanilla_blocs[bloc['leader']]
+        else:
+            text,name,bloc['identity']=found(relation_rng,number,bloc,tags,countries[bloc['leader']]['starting_laws'],data['bloc_principles'])
+            histories['power_blocs'].append(text)
+            localization.append(name)
+    histories['diplomacy'].extend(pacts(overlords,blocs,tags))
+    for index,country in enumerate(countries):
+        overlord,kind=overlords.get(index,(None,None))
+        country.update(overlord=None if overlord is None else tags[overlord],subject_type=kind,
+                       power_bloc=tags[bloc_of[index]['leader']] if index in bloc_of else tags[index] if index in vanilla_blocs else None)
+    power_blocs=[{'leader':tags[bloc['leader']],'identity':bloc['identity'],'vanilla':bloc['leader'] in vanilla_blocs,
+                  'members':[tags[i] for i in bloc['members']],'independent_members':[tags[i] for i in bloc['independent']]} for bloc in blocs]
+    power_blocs+=[{'leader':tags[index],'identity':identity,'vanilla':True,'members':[tags[index]],'independent_members':[]}
+                  for index,identity in vanilla_blocs.items() if index not in bloc_of]
     for folder,lines in histories.items():
         if folder not in ('countries','states','pops','buildings','trade','military_formations','military_deployments'):
             for key,records in data['history'][folder].items():
@@ -294,4 +329,4 @@ def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_u
     files['common/country_definitions/interface.txt']='\n'.join(definitions)
     tech_reference.update(realized_mean=moments([c['tech_count'] for c in countries])[0],
                           realized_sd=moments([c['tech_count'] for c in countries])[1])
-    return {'countries':countries,'files':files,'localization':localization,'tech_reference':tech_reference,'economy_reference':economy_reference}
+    return {'countries':countries,'files':files,'localization':localization,'tech_reference':tech_reference,'power_blocs':power_blocs}

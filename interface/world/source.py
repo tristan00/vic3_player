@@ -151,46 +151,20 @@ def assignments(rng,regions,sources):
             state['source_region']=origin
 
 
-@timed_often
-def economic_levels(state,military):
-    return sum(sum(int(n) for n in re.findall(r'\blevels\s*=\s*(\d+)',record))
-               for record in state['building_records']
-               if scalar(record,'building') not in military|{'building_government_administration','building_construction_sector','building_trade_center'})
-
-
 @timed
-def development(states,groups,country_variation,local_variation,military,sources):
-    templates=[s for pool in sources.values() for s in pool]
-    source_values={s['key']:economic_levels(s,military)/s['population'] for s in templates}
-    members=sorted({s['owner'] for s in templates})
-    country_values={tag:moments([source_values[s['key']] for s in templates if s['owner']==tag])[0] for tag in members}
-    homes={tag:max(sources,key=lambda region:sum(s['owner']==tag for s in sources[region])) for tag in members}
-    regional={region:moments([country_values[t] for t in members if homes[t]==region])[0] for region in set(homes.values())}
-    center=moments(list(country_values.values()))[0]
-    country_sd=moments([country_values[t]-regional[homes[t]] for t in members])[1]
-    local_sd=moments([source_values[s['key']]-country_values[s['owner']] for s in templates])[1]
+def development(rng,states,groups,country_economy,local_economy):
     by_id={s['id']:s for s in states}
-    densities={s['id']:source_values[s['source']['key']] for s in states}
-    means=[moments([densities[i] for i in group])[0] for group in groups]
-    if country_variation==local_variation==1:
-        for state in states:
-            state['economic_scale']=1.0
-    else:
-        sampled=moments(means)[1]
-        targets=spread(means,country_variation*country_sd/sampled if sampled else 0,center=center)
-        for group,target in zip(groups,targets):
-            values=[densities[i] for i in group]
-            within=moments(values)[1]
-            desired=spread(values,local_variation*local_sd/within if within else 0,center=target)
-            for index,value,wanted in zip(group,values,desired):
-                state=by_id[index]
-                source=state['source']
-                limits=[cap/source['buildings'][kind] for kind,cap in source['capped'].items() if source['buildings'].get(kind)]
-                farms=sum(source['buildings'].get(kind,0) for kind in source['arable_resources'])
-                if farms:
-                    limits.append(source['arable_land']/farms)
-                state['economic_scale']=min([wanted/value,*limits]) if value else 1.0
-    realized=[moments([densities[i]*by_id[i]['economic_scale'] for i in group])[0] for group in groups]
-    return {'unit':'productive building levels per person','reference_mean':center,'reference_country_sd':country_sd,
-            'reference_local_sd':local_sd,'requested_country_sd':country_variation*country_sd,'requested_local_sd':local_variation*local_sd,
-            'realized_mean_before_rounding':moments(realized)[0],'realized_country_sd_before_rounding':moments(realized)[1]}
+    drawn=lambda value:rng.uniform(*value) if isinstance(value,(tuple,list)) else value
+    countries=[]
+    for group in groups:
+        countries.append(drawn(country_economy))
+        for index in group:
+            state=by_id[index]
+            source=state['source']
+            limits=[cap/source['buildings'][kind] for kind,cap in source['capped'].items() if source['buildings'].get(kind)]
+            farms=sum(source['buildings'].get(kind,0) for kind in source['arable_resources'])
+            if farms:
+                limits.append(source['arable_land']/farms)
+            state['local_economy']=drawn(local_economy)
+            state['economic_scale']=min([countries[-1]*state['local_economy'],*limits])
+    return countries

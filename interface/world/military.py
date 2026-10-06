@@ -3,6 +3,7 @@ import re
 
 from ..common import timed, timed_often
 from ..script import blocks, body, scalar
+from .source import integer_counts
 
 
 @timed
@@ -21,7 +22,16 @@ def units(data):
 
 
 @timed_often
-def military(data,donor,tag,states,regions):
+def fleet(value,scale):
+    ships=[record for kind,record in blocks(body(value)) if kind=='ship']
+    counts=integer_counts([int(scalar(record,'count') or 1)*scale for record in ships])
+    for record,count in zip(ships,counts):
+        value=value.replace(record,re.sub(r'\bcount\s*=\s*\d+',f'count = {count}',record) if count else '',1)
+    return value if sum(counts) else None
+
+
+@timed_often
+def military(data,donor,tag,states,regions,scale):
     from .project import commands
 
     output=[]
@@ -37,7 +47,7 @@ def military(data,donor,tag,states,regions):
         if scalar(value,'type')=='army':
             if scope:
                 removed.add(scope)
-        elif coast:
+        elif coast and (value:=fleet(value,scale)):
             value=re.sub(r'\bhq_region\s*=\s*sr:\w+',f'hq_region = sr:{regions[coast[0]["id"]]}',value)
             value=re.sub(r'\bSTATE_\w+',coast[0]['key'],value)
             output.append(f'{key} {op} {value}')

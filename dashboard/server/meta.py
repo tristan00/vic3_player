@@ -68,7 +68,7 @@ def meta_grid(table,filters,sort,desc,offset,limit,run_id=None):
 
 
 RUN_GROUPS={'lifecycle':['kind','started_at','heartbeat_at','progress_at','progress_step','longest_step','longest_step_ms','ended_at','end_reason','end_detail','game_exited_at'],
-            'world':['tag','player_country','world_file','world_id','world_seed','countries','states','tech','pop','modernity','copies','diversity','military','ideology_uniformity','primary_culture_share','tech_variation','country_economy','local_economy',
+            'world':['tag','player_country','world_file','world_id','world_seed','countries','states','tech','pop','modernity','copies','diversity','military','ideology_uniformity','primary_culture_share','interconnectedness','tech_variation','country_economy','local_economy',
                      'source_regions','ruleset_id','first_start'],
             'launch':['cli_seed','run_seed','runs_requested','years','minutes','game_speed','profile','pool','custom_rng_seed','source_session']}
 POLICY_GROUPS={'legacy':['objective_gdp','objective_population','objective_sol','objective_stock','objective_alpha'],'picker':['picker','candidates']}

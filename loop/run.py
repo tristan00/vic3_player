@@ -22,7 +22,7 @@ from loop.conflicts import invalidates, targets
 from interface.common import STALL_LIMIT, GameCrashed, progress, progress_age, timed, timed_often
 from interface.recording.store import Store
 from interface.timing import RECORDER, current, span
-from interface.world.sampling import SLIDERS, SAMPLING, PER_COUNTRY, world_size
+from interface.world.sampling import SLIDERS, SAMPLING, PER_COUNTRY, PER_STATE, world_size
 from interface.world.cache import Cached
 from interface.recording.record import prepare as prepare_recording
 from interface.options import available
@@ -635,8 +635,8 @@ def session(game,watchdog,rng,worlds,advisors,pickers,arguments,chosen,seconds,c
     seed=rng.randrange(10**9)
     name=world.parent.name if world else 'vanilla'
     generated=None if world is None else {'seed':manifest['seed'],'countries':len(manifest['countries']),'states':len(manifest['states']),
-                                          'pop':1,'diversity':None,'military':None,
-                                          **{name:next(country for country in manifest['countries'] if country['tag']==tag)[name] if name in PER_COUNTRY else manifest[name] for name in SLIDERS}}
+                                          'pop':1,'diversity':None,
+                                          **{name:next(country for country in manifest['countries'] if country['tag']==tag)[name] if name in PER_COUNTRY else manifest[name] for name in SLIDERS if name not in PER_STATE}}
     loop=Loop(game,[advisor],random.Random(seed),store,run_record(arguments,'vanilla' if world is None else 'mini',name,tag,seed,generated,advisor,picker,candidates,objective),picker,candidates)
     watchdog.store=store
     counts=loop.run(arguments.years,seconds)

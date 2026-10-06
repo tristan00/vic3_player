@@ -20,7 +20,7 @@ from .project import nations
 from .source import assignments, select_regions
 from .audit import audit
 
-MAP={'states':(20,50),'country_share':(1/8,1/5),'tech':.5,'ideology_uniformity':0,'primary_culture_share':None,'copies':0,
+MAP={'states':(10,30),'country_share':(1/8,1/5),'tech':.5,'ideology_uniformity':0,'primary_culture_share':None,'copies':0,
      'tech_variation':1,'country_economy':1,'local_economy':1,'source_regions':1}
 PROVINCE_PIXELS=2000
 SEA_ID=3000
@@ -579,17 +579,18 @@ def _network(cells,kinds,points,regions,state_neighbours,seas,borders,height,rng
 
 
 @timed
-def generate(seed,countries,states,tech=.5,ideology_uniformity=0,copies=0,tech_variation=1,country_economy=1,local_economy=1,source_regions=1,primary_culture_share=None,
-             *,game_dir=DEFAULT_GAME,data_dir=DEFAULT_DATA,region_keys=None,source_data=None):
+def generate(seed,countries,states,tech=.5,ideology_uniformity=0,copies=1,tech_variation=1,country_economy=1,local_economy=1,source_regions=1,primary_culture_share=None,
+             military=1,interconnectedness=0,*,game_dir=DEFAULT_GAME,data_dir=DEFAULT_DATA,region_keys=None,source_data=None):
     if not 1<=countries<=states:
         raise ValueError('Need at least one country and no more countries than states')
-    if not 0<=tech<=1 or not 0<=copies<=1 or any(not 0<=v<=2 for v in (tech_variation,country_economy,local_economy)):
-        raise ValueError('tech/copies must be within 0..1 and variation multipliers within 0..2')
-    for name,value in (('ideology_uniformity',ideology_uniformity),('primary_culture_share',primary_culture_share)):
+    if any(not 0<=v<=1 for v in (tech,copies,military,interconnectedness)) or not 0<=tech_variation<=2:
+        raise ValueError('tech/copies/military/interconnectedness must be within 0..1 and tech_variation within 0..2')
+    for name,value,top in (('ideology_uniformity',ideology_uniformity,1),('primary_culture_share',primary_culture_share,1),
+                           ('country_economy',country_economy,2),('local_economy',local_economy,2)):
         if value is None and name=='primary_culture_share':
             continue
-        if not (0<=value<=1 if isinstance(value,(int,float)) else isinstance(value,(tuple,list)) and len(value)==2 and 0<=value[0]<=value[1]<=1):
-            raise ValueError(f'{name} must be within 0..1')
+        if not (0<=value<=top if isinstance(value,(int,float)) else isinstance(value,(tuple,list)) and len(value)==2 and 0<=value[0]<=value[1]<=top):
+            raise ValueError(f'{name} must be within 0..{top}')
     if not isinstance(source_regions,int) or not 1<=source_regions<=states:
         raise ValueError('source_regions must be an integer between one and the state count')
     game=Path(game_dir)/'game'
@@ -691,7 +692,8 @@ def generate(seed,countries,states,tech=.5,ideology_uniformity=0,copies=0,tech_v
     ownership,capitals=_grow([s['id'] for s in regions],state_neighbours,state_centers,countries,[w/sum(weights)*states for w in weights],rng,False)
     _detach(rng,ownership,capitals,state_neighbours,{s['id'] for s in regions if s['coastal']},round(states*SECONDARY_SHARE+rng.random()-.5))
     groups=[[s['id'] for s in regions if ownership[s['id']]==i] for i in range(countries)]
-    world=nations(rng,data,regions,groups,capitals,strategic,sources,tech,ideology_uniformity,copies,tech_variation,country_economy,local_economy,primary_culture_share)
+    world=nations(rng,data,regions,groups,capitals,strategic,sources,tech,ideology_uniformity,copies,tech_variation,country_economy,local_economy,primary_culture_share,
+                  military,interconnectedness)
     used=set()
     for state in regions:
         state['name']=word(rng,used)
@@ -784,12 +786,13 @@ def generate(seed,countries,states,tech=.5,ideology_uniformity=0,copies=0,tech_v
         'supported_game_version':'1.13.*','short_description':'Random miniature world','tags':[],'relationships':[],'game_custom_data':{'replace_paths':replace}})
     manifest={'seed':seed,'tech':tech,'ideology_uniformity':ideology_uniformity,'primary_culture_share':primary_culture_share,'copies':copies,'tech_variation':tech_variation,
               'country_economy':country_economy,'local_economy':local_economy,'source_regions':source_regions,
-              'source_region_keys':list(sources),'tech_reference':world['tech_reference'],'economy_reference':world['economy_reference'],
+              'military':military,'interconnectedness':interconnectedness,'power_blocs':world['power_blocs'],
+              'source_region_keys':list(sources),'tech_reference':world['tech_reference'],
               'strategic_regions':[{'key':r['key'],'source_region':r['source_region'],'states':[s['key'] for s in r['states']]} for r in strategic],
               'width':width,'height':height,'mod':str((out/'mod').resolve()),'countries':world['countries'],
               'states':[{'id':s['id'],'key':s['key'],'name':s['name'],'country':s['country'],'provinces':s['province_codes'],'coastal':s['coastal'],
                          'hubs':s['hubs'],'template':s['template'],'source_region':s['source_region'],
-                         'economic_scale':s['economic_scale'],'buildings':s['buildings'],'excluded_buildings':s['excluded_buildings']} for s in regions],
+                         'local_economy':s['local_economy'],'economic_scale':s['economic_scale'],'buildings':s['buildings'],'excluded_buildings':s['excluded_buildings']} for s in regions],
               'seas':[{'id':s['id'],'key':s['key'],'name':s['name'],'province':codes[s['province']]} for s in seas],
               'lakes':[codes[p] for p in lakes],
               'straits':[{'from':codes[s['from']],'to':codes[s['to']]} for s in chokepoints]}

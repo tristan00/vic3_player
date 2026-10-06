@@ -197,6 +197,7 @@ create table run (
   source_regions int2,
   ideology_uniformity float8 check (ideology_uniformity between 0 and 1),
   primary_culture_share float8 check (primary_culture_share between 0 and 1),
+  interconnectedness float8 check (interconnectedness between 0 and 1),
   picker text not null check (picker in ('first', 'catboost', 'catboost_piecewise')),
   candidates int2 not null check (candidates >= 1),
   objective_gdp float8 not null check (objective_gdp between 0 and 1),

@@ -9,7 +9,7 @@ from PIL import Image
 from scipy import ndimage
 
 from ..common import timed, timed_often
-from ..script import blocks, body, clean, entries, keys, read, scalar, script_files
+from ..script import blocks, body, clean, entries, fields, keys, read, scalar, script_files
 from .source import reference
 
 
@@ -313,6 +313,15 @@ def _relations(game):
     text=lambda folder:'\n'.join(clean(path) for path in script_files(game,'common/history/'+folder))
     counts=collections.Counter(re.findall(r'\bcountry\s*=\s*c:(\w+)',text('states')))
     subject_types={key.removeprefix('subject_type_') for key,_ in read(game,'common/subject_types')}
+    subject_rules={}
+    for key,value in read(game,'common/subject_types'):
+        rule=dict(fields(body(value)))
+        if rule['overlord_must_be_higher_rank']==['yes'] and {'minor_power','unrecognized_regional_power'}&set(rule['valid_overlord_ranks']):
+            subject_rules[key.removeprefix('subject_type_')]=(set(rule['valid_overlord_country_types']),set(rule['valid_subject_country_types']))
+    bloc_principles=collections.defaultdict(list)
+    for _,value in read(game,'common/power_bloc_principle_groups'):
+        if scalar(value,'primary_for_identity'):
+            bloc_principles[scalar(value,'primary_for_identity')].append(dict(fields(body(value)))['levels'][0])
     pacts=[(scalar(block,'type'),tag,scalar(block,'country').removeprefix('c:')) for _,tag,value in entries(game,'common/history/diplomacy')
            for kind,block in blocks(body(value)) if kind=='create_diplomatic_pact']
     subjects={b for kind,_,b in pacts if kind in subject_types}
@@ -338,7 +347,7 @@ def _relations(game):
             'relation_values':[int(v) for v in re.findall(r'set_relations\s*=\s*\{[^}]*?value\s*=\s*(-?\d+)',text('diplomacy'))],
             'lobbies':[(scalar(block,'type'),scalar(block,'add_interest_group').removeprefix('ig:'))
                        for block in re.findall(r'create_political_lobby\s*=\s*\{([^{}]*)\}',text('lobbies'))],
-            'blocs':blocs}
+            'blocs':blocs,'subject_rules':subject_rules,'bloc_principles':dict(bloc_principles)}
 
 
 @timed_often

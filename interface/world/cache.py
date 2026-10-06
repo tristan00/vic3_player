@@ -23,7 +23,6 @@ from .vanilla import boxes, rasters, vanilla
 
 ROOT=Path(__file__).resolve().parents[2]
 DEFAULT_CACHE=DEFAULT_DATA/'world_cache'
-MINIMUM=1000
 SOURCES=None
 
 
@@ -115,8 +114,6 @@ def build_one(root,game,size):
 @timed
 def build(root,game,count,workers,seed):
     root=Path(root).resolve()
-    if count<MINIMUM or workers<1:
-        raise ValueError(f'Use at least {MINIMUM} worlds and one worker')
     root.mkdir(parents=True,exist_ok=True)
     with open(root/'build.lock','a+b') as lock:
         lock.seek(0)
@@ -182,8 +179,6 @@ class Cached:
         if index['fingerprint']!=fingerprint(game):
             raise ValueError('Cached worlds were generated from different sources; rebuild in a new directory')
         self.worlds=sorted({(self.root/path).resolve() for path in index['worlds']})
-        if len(self.worlds)<MINIMUM:
-            raise ValueError(f'World cache needs at least {MINIMUM} completed worlds; found {len(self.worlds)}')
         if any(not path.is_relative_to(self.root/'worlds') or not path.is_file() for path in self.worlds):
             raise ValueError('World cache contains missing or misplaced manifests')
         self.rng=rng
@@ -201,8 +196,8 @@ def main(argv=None):
     parser.add_argument('command',choices=('build','status'))
     parser.add_argument('--directory',type=Path,default=DEFAULT_CACHE)
     parser.add_argument('--game-dir',type=Path,default=DEFAULT_GAME)
-    parser.add_argument('--count',type=int,default=MINIMUM)
-    parser.add_argument('--workers',type=int,default=4)
+    parser.add_argument('--count',type=int,default=1000)
+    parser.add_argument('--workers',type=int,default=20)
     parser.add_argument('--seed',type=int)
     parser.add_argument('--foreground',action='store_true',help=argparse.SUPPRESS)
     args=parser.parse_args(argv)
@@ -211,8 +206,6 @@ def main(argv=None):
         state['running']=psutil.pid_exists(state['pid']) and psutil.Process(state['pid']).create_time()==state['created']
         print(json.dumps(state,indent=2))
         return
-    if args.count<MINIMUM or args.workers<1:
-        parser.error(f'Use at least {MINIMUM} worlds and one worker')
     if not args.foreground:
         args.directory.mkdir(parents=True,exist_ok=True)
         command=[sys.executable,'-m','interface.world.cache','build','--foreground','--directory',str(args.directory.resolve()),
