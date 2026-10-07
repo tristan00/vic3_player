@@ -9,7 +9,7 @@ export function Runs() {
     <div>
       <h1 className="mb-4 font-semibold">Runs</h1>
       <Tabs views={VIEWS} />
-      {view === 'rounds' ? <DataGrid id="rounds" url="/api/rounds" live /> : <DataGrid id="runs" url="/api/runs" columns={['run', 'country', 'state', 'end_reason', 'game_to', 'snapshots', 'actions', 'unverified']} link={(col, cell, row) => ['snapshots', 'actions'].includes(col.name) && cell.num != null ? `/runs/${row[0].ref!.id}?view=${col.name}` : undefined} live />}
+      {view === 'rounds' ? <DataGrid id="rounds" url="/api/rounds" live /> : <DataGrid id="runs" url="/api/runs" columns={['run', 'country', 'state', 'started_at', 'end_reason', 'game_to', 'snapshots', 'actions', 'unverified']} link={(col, cell, row) => ['snapshots', 'actions'].includes(col.name) && cell.num != null ? `/runs/${row[0].ref!.id}?view=${col.name}` : undefined} live />}
     </div>
   )
 }

@@ -958,7 +958,7 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: "running" | "stalled" | "lost" | "ended";
+            state: "open" | "ended";
         };
         /** ParamSpec */
         ParamSpec: {
@@ -1067,7 +1067,7 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: "running" | "stalled" | "lost" | "ended";
+            state: "open" | "ended";
             /** Last Seq */
             last_seq: number | null;
             /** Last Action */

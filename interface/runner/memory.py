@@ -1,10 +1,8 @@
 import ctypes
 from ctypes import wintypes
-from datetime import datetime, timezone
 import json
 from pathlib import Path
 import struct
-import threading
 import time
 import weakref
 
@@ -34,75 +32,28 @@ kernel.WriteProcessMemory.argtypes=kernel.ReadProcessMemory.argtypes
 kernel.CloseHandle.argtypes=[wintypes.HANDLE]
 kernel.WaitForSingleObject.restype=wintypes.DWORD
 kernel.WaitForSingleObject.argtypes=[wintypes.HANDLE,wintypes.DWORD]
-kernel.GetProcessTimes.argtypes=[wintypes.HANDLE]+[ctypes.POINTER(wintypes.FILETIME)]*4
 psapi.EnumProcessModules.argtypes=[wintypes.HANDLE,ctypes.POINTER(wintypes.HMODULE),wintypes.DWORD,ctypes.POINTER(wintypes.DWORD)]
 PROCESS_ACCESS=0x100410
 WAIT_OBJECT_0=0
-FILETIME_EPOCH_SECONDS=11644473600
-WATCH_INTERVAL=.05
 
 
 class Process:
     @timed_often
-    def __init__(self,pid):
+    def __init__(self,pid,access=PROCESS_ACCESS):
         self.pid=pid
-        self.handle=kernel.OpenProcess(PROCESS_ACCESS,False,pid)
+        self.handle=kernel.OpenProcess(access,False,pid)
         if not self.handle:
             raise ctypes.WinError(ctypes.get_last_error())
-        self._close=weakref.finalize(self,kernel.CloseHandle,self.handle)
+        self.close=weakref.finalize(self,kernel.CloseHandle,self.handle)
         modules=(wintypes.HMODULE*1)();needed=wintypes.DWORD()
-        if not psapi.EnumProcessModules(self.handle,modules,ctypes.sizeof(modules),ctypes.byref(needed)):
+        if not psapi.EnumProcessModules(self.handle,modules,ctypes.sizeof(modules),ctypes.byref(needed)) or not modules[0]:
             raise ctypes.WinError(ctypes.get_last_error())
-        if not modules[0]:
-            raise OSError(f'process {pid} has not loaded its executable yet')
         self.base=modules[0]
 
     @timed_often
-    def exited(self):
-        return kernel.WaitForSingleObject(self.handle,0)==WAIT_OBJECT_0
-
-    @timed_often
-    def readable(self):
-        data=ctypes.create_string_buffer(8);count=ctypes.c_size_t()
-        return bool(kernel.ReadProcessMemory(self.handle,self.base,data,8,ctypes.byref(count)))
-
-    @timed_often
-    def gone(self):
-        return self.exited() or not self.readable()
-
-    @timed_often
-    def exits_within(self,milliseconds):
-        return kernel.WaitForSingleObject(self.handle,milliseconds)==WAIT_OBJECT_0
-
-    @timed_often
-    def exit_time(self):
-        times=[wintypes.FILETIME() for _ in range(4)]
-        if not kernel.GetProcessTimes(self.handle,*(ctypes.byref(t) for t in times)):
-            raise ctypes.WinError(ctypes.get_last_error())
-        exit_=(times[1].dwHighDateTime<<32)|times[1].dwLowDateTime
-        return datetime.fromtimestamp(exit_/10**7-FILETIME_EPOCH_SECONDS,timezone.utc)
-
-    @timed_often
     def check(self):
-        if self.gone():
-            raise GameCrashed(f'The game process {self.pid} is '+('exited' if self.exited() else 'shutting down, its memory is unreadable'))
-
-    @timed_often
-    def watch(self,alert):
-        stopped=threading.Event()
-        def wait():
-            while not stopped.wait(WATCH_INTERVAL):
-                if self.gone():
-                    alert()
-                    return
-        threading.Thread(target=wait,daemon=True,name='game-watch').start()
-        return stopped
-
-    @timed_often
-    def close(self):
-        self._close()
-        self.handle=None
-
+        if kernel.WaitForSingleObject(self.handle,0)==WAIT_OBJECT_0:
+            raise GameCrashed(f'The game process {self.pid} exited')
 
 @timed_often
 def outputs(name,spec):

@@ -117,7 +117,7 @@ def snapshot_meta(tables,label):
     constants={'player_country':player['country'][0],'game_speed':state['speed'][0],'first_start':bool(state['first_start'][0]),
                'custom_rng_seed':label(state['custom_rng_seed'][0]),'game_rules':[label(setting) for _,setting in ordered]}
     meta={'game_date':state['date'][0],'local_date_time':state['local_date_time'][0],
-          'paused':bool(control['paused'][0]) if control['paused'] else None,'speed':control['speed'][0] if control['paused'] else None,
+          'paused':bool(control['paused'][0]) if control['paused'] else None,'speed':state['speed'][0],
           'ui_panel_open':bool(ui['panel'][0]),'ui_interaction_open':bool(ui['interaction'][0]),'ui_map_list_open':bool(ui['map_list'][0])}
     return constants,meta,windows['name']
 

@@ -36,5 +36,6 @@ export function when(iso: string): string {
 export const HOURS_PER_YEAR = 365 * 24
 
 export function label(key: string): string {
+  if (key === 'ideology_uniformity') return 'character ideology randomization'
   return key.replaceAll('_', ' ')
 }

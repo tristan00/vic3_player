@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 ColumnKind=Literal['number','bool','text','date','time','ref','run','seq','n','action','table','kind','round']
-LiveState=Literal['running','stalled','lost','ended']
+LiveState=Literal['open','ended']
 
 
 class GameDate(BaseModel):

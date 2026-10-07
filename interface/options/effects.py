@@ -1,9 +1,9 @@
 from ..actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, LEVELS, TOLL_LEVELS
 from ..common import timed_often
-from .available import (SLOT, TARIFF_CODES, armies, bloc_principles, changing, colonies, construction_paused, construction_queue, cooling, diplomatic_possible,
+from .available import (SLOT, TARIFF_CODES, armies, bloc_principles, changing, colonies, construction_paused, construction_queue, cooling,
                         enacting_laws, event_options, formation_report, formation_setting, home_region, in_default, in_force, incorporation, involved, issued_decrees, latest_design,
                         leaning, metric, monopolies, own_templates, ownership_classes, play_members, player_blocs, player_value, power_bloc_members, principal, private_levels,
-                        privatization_requested, queued_buildings, recruitable, selected_units, setting, ship_paused, ship_queues, state_regions, strait_sides, strait_value,
+                        privatization_requested, recruitable, selected_units, setting, ship_paused, ship_queues, state_regions, strait_sides, strait_value,
                         definition, journal_button, shown_buttons, pact_terms,
                         technologies, trade_level)
 
@@ -95,7 +95,8 @@ def joined(b,a,country,diplomatic_action,**picked):
 @timed_often
 def acted(b,a,country,diplomatic_action,**picked):
     return (joined(b,a,country,diplomatic_action)
-            or (country,diplomatic_action) in diplomatic_possible(b) and (country,diplomatic_action) not in diplomatic_possible(a))
+            or bool(set(a.rows('diplomatic_action','diplomatic_action',first_country=a.player,second_country=country,action_type=diplomatic_action))
+                    -set(b.rows('diplomatic_action','diplomatic_action',first_country=b.player,second_country=country,action_type=diplomatic_action))))
 
 
 @timed_often
@@ -320,9 +321,15 @@ def queued(s,building_type,state):
     return (state,building_type) in construction_queue(s)
 
 
+@timed_often
+def cancelled(b,a,building):
+    site=next(((state,kind) for ident,state,kind in b.rows('building','building,state,building_type') if ident==building),None)
+    return site is not None and construction_queue(a).count(site)<construction_queue(b).count(site)
+
+
 EFFECTS={
-    'build':lambda b,a,state,building_type:(state,building_type) in construction_queue(a),
-    'cancel_construction':lambda b,a,building:building not in queued_buildings(a),
+    'build':lambda b,a,state,building_type:construction_queue(a).count((state,building_type))>construction_queue(b).count((state,building_type)),
+    'cancel_construction':cancelled,
     'downsize':lambda b,a,building:levels(a).get(building,0)<levels(b).get(building,0),
     'pause_construction':lambda b,a:construction_paused(a),
     'pause_all_construction':lambda b,a:construction_paused(a),
@@ -330,7 +337,7 @@ EFFECTS={
     'resume_all_construction':lambda b,a:not construction_paused(a),
     'pause_construction_output':lambda b,a,building:bool(setting(a,building,'output_paused')),
     'resume_construction_output':lambda b,a,building:not setting(a,building,'output_paused'),
-    'cancel_queue_item':lambda b,a,state,building_type:place(a,state,building_type) is None,
+    'cancel_queue_item':lambda b,a,state,building_type:construction_queue(a).count((state,building_type))<construction_queue(b).count((state,building_type)),
     'raise_queue_item':lambda b,a,state,building_type:place(a,state,building_type) is not None and place(a,state,building_type)<place(b,state,building_type),
     'first_queue_item':lambda b,a,state,building_type:place(a,state,building_type)==0,
     'lower_queue_item':lambda b,a,state,building_type:place(a,state,building_type) is not None and place(a,state,building_type)>place(b,state,building_type),
@@ -470,10 +477,10 @@ EFFECTS={
     'station_formation':lambda b,a,military_formation,state:state in heading(a,military_formation),
     'station_selected':lambda b,a,military_formation,strategic_region:strategic_region in {state_regions(a).get(spot) for spot in heading(a,military_formation)},
     'rehome_formation':lambda b,a,military_formation,strategic_region:home_region(a,military_formation)==strategic_region,
-    'create_army':lambda b,a,option:len(raised(a,0))>len(raised(b,0)),
-    'create_fleet':lambda b,a,option:len(raised(a,1))>len(raised(b,1)),
-    'split_army':lambda b,a,military_formation:len(raised(a,0))>len(raised(b,0)),
-    'split_fleet':lambda b,a,military_formation:len(raised(a,1))>len(raised(b,1)),
+    'create_army':lambda b,a,option:bool(set(raised(a,0))-set(raised(b,0))),
+    'create_fleet':lambda b,a,option:bool(set(raised(a,1))-set(raised(b,1))),
+    'split_army':lambda b,a,military_formation:bool(set(raised(a,0))-set(raised(b,0))),
+    'split_fleet':lambda b,a,military_formation:bool(set(raised(a,1))-set(raised(b,1))),
     'transfer_battalions':lambda b,a,military_formation,target:len(units(a,target))>len(units(b,target)),
     'transfer_ships':lambda b,a,military_formation,target:len(ships(a,target))>len(ships(b,target)),
     'transfer_ship':lambda b,a,ship,target:a.map('ship','ship,fleet').get(ship)==target,
@@ -534,6 +541,7 @@ EFFECTS={
     'revoke_building_charter':revoked,
     'revoke_region_charter':revoked,
     'pause':lambda b,a:bool(a.meta['paused']),
+    'set_speed':lambda b,a,speed:a.meta['speed']==int(speed),
     'unpause':lambda b,a:a.hours>b.hours,
     'press_journal_button':pressed_journal,
 }
@@ -545,8 +553,7 @@ LATER.update({'diplomatic_action_first_state':lambda b,a,country,diplomatic_acti
               'diplomatic_action_states':lambda b,a,country,diplomatic_action,given,taken,obligation:joined(b,a,country,diplomatic_action)
                                          or owner(a,given)==country and owner(a,taken)==a.player})
 LATER.update({name:(lambda b,a,war:war not in a.wars()) for name in ('propose_peace','white_peace')})
-UNSEEN={'set_speed':'a snapshot is taken paused and records no speed',
-        'toggle_naval_mission_region':'the regions of a naval mission are not recorded',
+UNSEEN={'toggle_naval_mission_region':'the regions of a naval mission are not recorded',
         'assign_flagship':'which ship is the flagship is not recorded',
         'unassign_flagship':'which ship is the flagship is not recorded',
         'retrofit_ship':'the refit of a single ship is not recorded',

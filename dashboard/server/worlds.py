@@ -120,6 +120,27 @@ def buildings(text):
 
 
 @db.timed
+def diplomacy(text):
+    relations={}
+    pacts={}
+    for country,record in blocks(body(text)):
+        if not country.startswith('c:'):
+            continue
+        first=country.removeprefix('c:')
+        for command,value in blocks(body(record)):
+            target=scalar(value,'country')
+            if not target or not target.startswith('c:'):
+                continue
+            second=target.removeprefix('c:')
+            if command=='set_relations':
+                relations[tuple(sorted((first,second)))]=int(scalar(value,'value'))
+            elif command=='create_diplomatic_pact':
+                pacts[first,second,scalar(value,'type')]=None
+    return {'relations':[{'first':a,'second':b,'value':v} for (a,b),v in relations.items()],
+            'pacts':[{'first':a,'second':b,'type':kind} for a,b,kind in pacts]}
+
+
+@db.timed
 def detail(key,run=None):
     entry=catalog().get(key)
     if entry is None:
@@ -130,7 +151,8 @@ def detail(key,run=None):
     run=run if run is not None else runs[0]['run_id'] if runs else None
     result=summary(entry,runs)
     m=entry['manifest'] or {}
-    result.update(manifest=m,selected_run=run,states=[],countries=m.get('countries',[]),audit=None,directory=str(entry['directory']) if entry['directory'] else None)
+    result.update(manifest=m,selected_run=run,states=[],countries=m.get('countries',[]),audit=None,diplomacy=None,
+                  power_blocs=m.get('power_blocs'),directory=str(entry['directory']) if entry['directory'] else None)
     regions={}
     histories={}
     if entry['world_id'] is not None:
@@ -139,7 +161,11 @@ def detail(key,run=None):
             if asset['name']=='audit.json':
                 result['audit']=json.loads(text)
             elif asset['name'].startswith('history/'):
-                histories[Path(asset['name']).stem]=script_records(text)
+                folder=Path(asset['name']).stem
+                if folder=='diplomacy':
+                    result['diplomacy']=diplomacy(text)
+                else:
+                    histories[folder]=script_records(text)
             else:
                 regions.update(dict(blocks(text)))
     directory=entry['directory']
@@ -153,6 +179,9 @@ def detail(key,run=None):
                 path=directory/f'mod/common/history/{folder}/interface.txt'
                 if folder not in histories and path.exists():
                     histories[folder]=script_records(path.read_text(encoding='utf-8-sig'))
+            path=directory/'mod/common/history/diplomacy/interface.txt'
+            if result['diplomacy'] is None and path.exists():
+                result['diplomacy']=diplomacy(path.read_text(encoding='utf-8-sig'))
             audit=directory/'audit.json'
             if result['audit'] is None and audit.exists():
                 result['audit']=json.loads(audit.read_bytes())

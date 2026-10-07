@@ -14,6 +14,10 @@ SETTLED={'station_formation','station_selected','rehome_formation','plan_land_in
 DELETES={'disband_formation':'military_formation','decommission_ship':'ship','disband_unit':'combat_unit','withdraw_treaty':'treaty'}
 PLAYS={'start_play_country','start_play_state','start_play_liberation'}
 RELATIONS={'increase_relations','damage_relations'}
+RESEARCH={'research','queue_research','dequeue_research'}
+POLICIES={'set_tax_level','set_government_wages','set_military_wages','set_supply_ship_construction'}
+DIPLOMACY={'diplomatic_action','diplomatic_action_first_state','diplomatic_action_second_state','diplomatic_action_states'}
+CONSTRUCTION_QUEUE=QUEUE|{'build','cancel_construction'}
 
 
 @timed_often
@@ -37,6 +41,26 @@ def canonical(name,params):
 def targets(name,params,links={}):
     name,params=canonical(name,params)
     found={('command',name,tuple(sorted(params.items())))}|negotiations(name,params,links)
+    if name in RESEARCH:
+        found.add(('research_technology',params['technology']))
+    if name=='research':
+        found.add(('research_reset',))
+    if name=='dequeue_research':
+        found.add(('research_queue',))
+    if name in POLICIES:
+        found.add(('policy',name))
+    if name in DIPLOMACY:
+        found.add(('diplomatic_proposal',params['country'],params['diplomatic_action']))
+    if 'character' in params:
+        found.add(('character_change',params['character']))
+    if name in ('assign_commander','hire_commander_for'):
+        found.add(('commander_assignment',params['military_formation']))
+    if name in CONSTRUCTION_QUEUE:
+        found.add(('construction_queue',))
+    if name in QUEUE-{'cancel_queue_item'}:
+        found.add(('queue_order',))
+    if 'ship_type' in params and ('index' in params or name=='design_ship_template'):
+        found.add(('ship_templates',params['ship_type']))
     if name=='diplomatic_action' and params['diplomatic_action'] in RELATIONS:
         found.add(('relations',params['country']))
     if name in PLAYS:
@@ -56,8 +80,8 @@ def targets(name,params,links={}):
         if formation is not None:
             found.add((operation,formation))
     if name=='raise_conscripts':
-        found.add(('conscriptions',formation))
-    if name in QUEUE:
+        found.update({('conscriptions',formation),('conscriptions',)})
+    if name in QUEUE or name=='build':
         found.add(('queued',params['state'],params['building_type']))
     if name=='cancel_construction':
         site=links.get(('building_site',params['building']))
@@ -80,6 +104,24 @@ def targets(name,params,links={}):
 def invalidates(name,params,links={}):
     name,params=canonical(name,params)
     found={('command',name,tuple(sorted(params.items())))}|negotiations(name,params,links)
+    if name in RESEARCH:
+        found.update({('research_reset',),('research_technology',params['technology'])})
+    if name=='research':
+        found.add(('research_queue',))
+    if name in POLICIES:
+        found.add(('policy',name))
+    if name in DIPLOMACY:
+        found.add(('diplomatic_proposal',params['country'],params['diplomatic_action']))
+    if 'character' in params:
+        found.add(('character_change',params['character']))
+    if name in ('assign_commander','hire_commander_for'):
+        found.add(('commander_assignment',params['military_formation']))
+    if name in CONSTRUCTION_QUEUE:
+        found.add(('queue_order',))
+    if name in QUEUE-{'cancel_queue_item'}:
+        found.add(('construction_queue',))
+    if 'ship_type' in params and ('index' in params or name=='design_ship_template'):
+        found.add(('ship_templates',params['ship_type']))
     if name=='diplomatic_action' and params['diplomatic_action'] in RELATIONS:
         found.add(('relations',params['country']))
     if name in ('merge_armies','merge_fleets'):
@@ -96,7 +138,11 @@ def invalidates(name,params,links={}):
     if name in ('mobilize_all','demobilize_all'):
         found.add((name.removesuffix('_all'),))
     if name=='raise_conscripts':
+        found.update({('conscriptions',formation),('demobilize',formation),('demobilize',)})
+    if name=='demobilize':
         found.add(('conscriptions',formation))
+    if name=='demobilize_all':
+        found.add(('conscriptions',))
     if name in ('build','cancel_queue_item'):
         found.add(('queued',params['state'],params['building_type']))
     if name=='cancel_construction':

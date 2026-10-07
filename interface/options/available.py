@@ -2001,6 +2001,7 @@ def pact_cost_multiplier(s,country,action):
 def diplomatic_allowed(s,country,action):
     return (set(definition(s,'common/diplomatic_actions',action,'unlocking_technologies'))<=technologies(s)[0]
             and (country,action) in diplomatic_possible(s)
+            and not s.rows('diplomatic_action','diplomatic_action',first_country=s.player,second_country=country,action_type=action)
             and passes(s,'common/diplomatic_actions',action,('maintain',),country_scope(s,target_country=('country',country),actor=('country',s.player)))
             and action_group_allows(s,action,country) and not pact_between(s,action,country)
             and metric(s,"GetPowerDelta('influence')")>=float(next(iter(definition(s,'common/diplomatic_actions',action,'pact_cost')),0))*pact_cost_multiplier(s,country,action)
@@ -2747,7 +2748,7 @@ RULES={
     'cancel_invasion':lambda s:product(military_formation=[f for manned in [set(s.formations())] for f, in s.rows('formation_report','formation',invading=True) if f in manned]),
     'mobilize':lambda s:product(military_formation=[f for f in armies(s,False) if not demobilizing(s,f)] if mobilization_committed(s) else []),
     'demobilize':lambda s:product(military_formation=armies(s,True)),
-    'raise_conscripts':lambda s:product(military_formation=[i for i,r in s.rows('formation_status','formation,raised_conscripts') if i in armies(s,True) and not r and at_home(s,i)]),
+    'raise_conscripts':lambda s:product(military_formation=[i for i,r in s.rows('formation_status','formation,raised_conscripts') if i in armies(s,True) and not r and at_home(s,i) and conscript_types(s,i)]),
     'disband_formation':lambda s:product(military_formation=[f for f in s.formations() if all(idle_room(s,c) for c in leaders(s,f))]),
     'mobilize_all':lambda s:[{}] if mobilization_committed(s) and [f for f in armies(s,False) if not demobilizing(s,f)] else [],
     'demobilize_all':lambda s:[{}] if armies(s,True) else [],
@@ -2933,7 +2934,7 @@ RULES={
     'toggle_charter':charter_toggles,
     'pause':lambda s:[{}],
     'unpause':lambda s:[{}],
-    'set_speed':lambda s:product(speed=(FASTEST_SPEED,)),
+    'set_speed':lambda s:product(speed=() if s.meta['speed']==int(FASTEST_SPEED) else (FASTEST_SPEED,)),
     'take_decision':lambda s:product(decision=[name for name, in s.rows('player_decision','decision') if decidable(s,name)]),
     'toggle_ignore_decision':lambda s:product(decision=[name for name, in s.rows('player_decision','decision')]),
 }

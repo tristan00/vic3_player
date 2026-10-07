@@ -2,17 +2,11 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import logging
-import multiprocessing
-import os
 from pathlib import Path
-import queue
-import time
-
-import psutil
 import psycopg
 
-from ..common import PROGRESS_AT, PROGRESS_STEP, PROGRESS_VERSION, STALL_LIMIT, progress, read_progress, timed, timed_often
-from ..timing import COLUMNS, INTERVAL_COLUMNS, RECORDER, span
+from ..common import progress, timed, timed_often
+from ..timing import COLUMNS, INTERVAL_COLUMNS, RECORDER
 from .spec import CLOSED,ENTITIES,TABLES,VOCABULARIES
 
 DSN='host=127.0.0.1 port=55433 dbname=vic3 user=postgres'
@@ -21,9 +15,6 @@ LOG=logging.getLogger('interface')
 SLOT=0xffffff
 FIXED={'pact_history':('first_country','second_country'),'treaty_history':('first_country','second_country'),
        'diplomatic_action_history':('first_country','second_country')}
-HEARTBEAT=.1
-SLOW_BEAT=.25
-TIMING_EVERY=1
 ANALYZERS=8
 
 
@@ -231,25 +222,14 @@ class Store:
 
     @timed
     def begin_run(self,started_at,kind,advisors,tag,world,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,generated,weights,centres,picker,candidates,objective,proposal=None,pick_model=None):
-        lost=self.connection.execute("update run set ended_at=heartbeat_at,end_reason='loop_lost' where ended_at is null returning run_id,heartbeat_at").fetchall()
-        for run_id,heartbeat_at in lost:
-            LOG.error('RUN %s WAS LOST: its loop last beat at %s UTC',run_id,heartbeat_at)
+        self.connection.execute("update run set ended_at=heartbeat_at,end_reason='loop_lost' where ended_at is null")
         self.pending={'started_at':started_at,'kind':kind,'advisors':list(advisors),'tag':tag,'world':world,'cli_seed':cli_seed,'run_seed':run_seed,'years':years,'minutes':minutes,'profile':profile,'pool':pool,
                       'runs_requested':runs_requested,'generated':generated,'weights':dict(weights),'centres':dict(centres),
                       'picker':picker,'candidates':candidates,'objective':objective,'proposal':proposal,'pick_model':pick_model}
-        self.run_id=None
-        self.constants=None
+        self.run_id=self.constants=None
         self.seq=0
-        self.beating=multiprocessing.Event()
-        self.beat_run=multiprocessing.Value('i',0,lock=False)
-        self.beat_timing=multiprocessing.Queue()
-        self.beater=multiprocessing.Process(target=heartbeat,args=(self.dsn,self.beat_run,PROGRESS_VERSION,PROGRESS_AT,PROGRESS_STEP,self.beating,os.getpid(),self.beat_timing),
-                                            daemon=True,name='heartbeat')
-        self.beater.start()
         self.anchored={entity:set() for entity in ENTITIES}
-        self.previous={}
-        self.samples={}
-        self.fixed={}
+        self.previous,self.samples,self.fixed={},{},{}
 
     @timed
     def open_run(self,cursor,constants):
@@ -419,8 +399,6 @@ class Store:
 
     @timed
     def write(self,built,phase,taken_at,read_ms):
-        if not self.beater.is_alive():
-            raise RuntimeError(f'The heartbeat process exited with code {self.beater.exitcode}')
         seq=self.seq
         live=self.live(built.rows)
         present={entity:set(slots.values()) for entity,slots in live.items()}
@@ -479,10 +457,8 @@ class Store:
                 self.copy(cursor,name,columns,rows)
             self.record_timing(cursor,seq)
             self.validate(cursor,seq,written)
-            if opening:
-                cursor.execute('update run set heartbeat_at=clock_timestamp(),progress_at=clock_timestamp() where run_id=%s',(self.run_id,))
+            cursor.execute('update run set heartbeat_at=clock_timestamp(),progress_at=clock_timestamp(),progress_step=%s where run_id=%s',(phase,self.run_id))
         if opening:
-            self.start_heartbeat()
             self.analyze([name for name,(_,rows) in written.items() if rows])
         for entity,idents in anchors.items():
             self.anchored[entity].update(idents)
@@ -494,19 +470,10 @@ class Store:
 
     @timed
     def record_timing(self,cursor,seq=None):
-        self.absorb()
         cursor.execute('delete from run_timing where run_id=%s',(self.run_id,))
         self.copy(cursor,'run_timing',('run_id',*COLUMNS),[(self.run_id,*row) for row in RECORDER.totals()])
         if seq is not None:
             self.copy(cursor,'snapshot_timing',('run_id','seq',*INTERVAL_COLUMNS),[(self.run_id,seq,*row) for row in RECORDER.drain()])
-
-    @timed_often
-    def absorb(self):
-        while True:
-            try:
-                RECORDER.merge(self.beat_timing.get_nowait())
-            except queue.Empty:
-                return
 
     @timed
     def analyze(self,tables):
@@ -571,74 +538,13 @@ class Store:
     def verify_action(self,n):
         self.connection.execute('update loop_action set unverified=false where run_id=%s and n=%s',(self.run_id,n))
 
-    @timed_often
-    def start_heartbeat(self):
-        self.beat_run.value=self.run_id
-
-    @timed
-    def flag_stalled(self,step,age):
-        with psycopg.connect(self.dsn,autocommit=True) as connection:
-            connection.execute("update run set ended_at=now(),end_reason='loop_stalled',end_detail=%s where run_id=%s and ended_at is null",
-                               (f'{step} made no progress for {age:.1f} s; the limit is {STALL_LIMIT} s',self.run_id))
-
-    @timed
-    def flag_game_exit(self,exited_at):
-        with psycopg.connect(self.dsn,autocommit=True) as connection:
-            if exited_at is None:
-                connection.execute("update run set ended_at=now(),end_reason='game_crashed' where run_id=%s and ended_at is null",(self.run_id,))
-            else:
-                connection.execute("update run set game_exited_at=%s where run_id=%s and end_reason='game_crashed' and game_exited_at is null",(exited_at,self.run_id))
-
     @timed
     def end_run(self,reason,detail=None,game_exited_at=None):
-        if self.beater is not None:
-            self.beating.set()
-            while self.beater.is_alive():
-                self.absorb()
-                self.beater.join(HEARTBEAT)
-            self.absorb()
-            self.beater=None
-        self.connection.execute('update run set ended_at=now(),end_reason=%s,end_detail=%s,game_exited_at=%s where run_id=%s and ended_at is null',
-                                (reason,detail,game_exited_at,self.run_id))
         if self.run_id is not None:
+            self.connection.execute('update run set ended_at=now(),end_reason=%s,end_detail=%s,game_exited_at=%s where run_id=%s and ended_at is null',
+                                    (reason,detail,game_exited_at,self.run_id))
             with self.connection.transaction(),self.connection.cursor() as cursor:
                 self.record_timing(cursor)
-
-
-def heartbeat(dsn,run,version,at,step,stop,parent,timings):
-    logging.basicConfig(level=logging.WARNING,format='%(asctime)s %(message)s')
-    with psycopg.connect(dsn,autocommit=True) as connection:
-        connection.execute('set synchronous_commit = off')
-        longest=0
-        due=sent=time.monotonic()
-        while not stop.is_set():
-            if not psutil.pid_exists(parent):
-                timings.cancel_join_thread()
-                return
-            if not run.value:
-                stop.wait(HEARTBEAT/10)
-                due=time.monotonic()
-                continue
-            read=read_progress(version,at,step)
-            if read is None:
-                continue
-            name,age=read
-            woke=time.monotonic()
-            with span('interface.recording.store.heartbeat.beat','interface',logging.DEBUG) as beat:
-                if age>longest:
-                    longest=age
-                    connection.execute('update run set longest_step=%s,longest_step_ms=%s where run_id=%s',(name,round(age*1000),run.value))
-                connection.execute("update run set heartbeat_at=now(),progress_at=now()-%s*interval '1 second',progress_step=%s where run_id=%s",
-                                   (age,name,run.value))
-            done=time.monotonic()
-            if done-due>SLOW_BEAT:
-                LOG.warning('SLOW BEAT in %s: woke %.3f s late, update took %.3f s',name,woke-due,beat.seconds)
-            if done-sent>=TIMING_EVERY:
-                timings.put(RECORDER.take())
-                sent=done
-            due=time.monotonic()+HEARTBEAT
-            stop.wait(HEARTBEAT)
-        timings.put(RECORDER.take())
 
 
 @timed_often
