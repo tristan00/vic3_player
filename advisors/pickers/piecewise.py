@@ -37,6 +37,8 @@ class CatBoostPiecewisePicker:
         counts=np.array([len(candidate) for candidate in candidates])
         if not len(counts) or (counts==0).any():
             raise ValueError('Candidate sequences must contain at least one action')
+        if (counts!=counts[0]).any():
+            raise ValueError('Piecewise candidates must have equal lengths')
         actions=[]
         unique={}
         indices=[]
@@ -48,5 +50,5 @@ class CatBoostPiecewisePicker:
                     actions.append((name,params))
                 indices.append(unique[key])
         predictions=self.model.predict(live(snapshot,actions))[indices]
-        scores=np.add.reduceat(predictions,np.r_[0,np.cumsum(counts)[:-1]])/counts
+        scores=np.add.reduceat(predictions,np.r_[0,np.cumsum(counts)[:-1]])
         return int(np.argmax(scores)),scores.tolist()

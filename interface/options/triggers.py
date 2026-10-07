@@ -39,15 +39,16 @@ def parse(text):
 
 
 class Scope:
-    def __init__(self,snapshot,kind,ident,saved=None,root=None):
+    def __init__(self,snapshot,kind,ident,saved=None,root=None,previous=None):
         self.s=snapshot
         self.kind=kind
         self.ident=ident
         self.saved=saved or {}
         self.root=root or self
+        self.previous=previous
 
     def to(self,kind,ident):
-        return Scope(self.s,kind,ident,self.saved,self.root)
+        return Scope(self.s,kind,ident,self.saved,self.root,self)
 
     def country(self):
         s=self.s
@@ -59,6 +60,8 @@ class Scope:
             return self.to('state',s.map('building','building,state').get(self.ident)).country()
         if self.kind=='character':
             return s.map('character','character,country').get(self.ident)
+        if self.kind=='company':
+            return s.map('company','company,country').get(self.ident)
         if self.kind=='formation':
             return s.map('formation','formation,country').get(self.ident)
         if self.kind=='interest_group':
@@ -448,6 +451,8 @@ def children(scope,iterator):
                 if owner==country and s.player in (owner,other)]
     if iterator=='any_interest_group':
         return [scope.to('interest_group',ident) for ident, in s.rows('interest_group','interest_group',country=country)]
+    if iterator=='any_company':
+        return [scope.to('company',ident) for ident, in s.rows('company','company',country=country)]
     if iterator=='any_primary_culture':
         return [scope.to('culture',ident) for ident, in s.rows('country_culture','culture',country=country)]
     if iterator=='any_scope_war':
@@ -480,6 +485,8 @@ def step(scope,name):
         return scope.to('state_region',s.map('state','state,state_region').get(scope.ident))
     if name=='this':
         return scope
+    if name=='prev':
+        return scope.previous
     if name.startswith('c:'):
         found=tagged(s).get(name[2:])
         return scope.to('country',found) if found is not None else None
@@ -499,6 +506,9 @@ def step(scope,name):
     if name=='top_overlord':
         country=scope.country()
         return scope.to('country',top_overlord(s,country)) if country is not None else None
+    if name=='overlord':
+        found=next(iter(overlords(s,scope.country())),None)
+        return scope.to('country',found) if found is not None else None
     if name=='power_bloc':
         found=s.map('country','country,power_bloc').get(scope.country())
         return scope.to('power_bloc',found) if found is not None else None
@@ -552,7 +562,7 @@ def target(scope,name):
     return scope
 
 
-SCOPES={'root','ROOT','owner','ruler','heir','interest_group','commander_military_formation','state_region','power_bloc','market','top_overlord','leader','capital'}
+SCOPES={'root','ROOT','this','prev','owner','ruler','heir','interest_group','commander_military_formation','state_region','power_bloc','market','top_overlord','overlord','leader','capital'}
 
 
 @timed_often
@@ -599,6 +609,8 @@ def test(key,operator,value,scope):
     if key=='save_temporary_scope_as':
         scope.saved[value]=(scope.kind,scope.ident)
         return True
+    if key=='exists' and isinstance(value,str) and is_scope(value):
+        return None if unsupplied(scope,value) else target(scope,value) is not None
     if key=='has_variable':
         UNKNOWN[key]+=1
         return None
@@ -620,9 +632,11 @@ def test(key,operator,value,scope):
             return None
         found=target(scope,key)
         return bool(found) and evaluate(value,found)
-    if key.startswith(('c:','s:')) and isinstance(value,str):
+    if is_scope(key) and isinstance(value,str) and is_scope(value):
+        if unsupplied(scope,key) or unsupplied(scope,value):
+            return None
         left,right=target(scope,key),target(scope,value)
-        return bool(left) and bool(right) and (left.kind,left.ident)==(right.kind,right.ident)
+        return bool(left) and bool(right) and COMPARE['=' if operator=='?=' else operator]((left.kind,left.ident),(right.kind,right.ident))
     body=scripted(key,scope)
     if body is not None:
         result=evaluate(body,scope)
@@ -946,6 +960,9 @@ def country_test(key,operator,value,scope):
         return bool(laws(s,country)&COMMAND_LAWS)==yes(value)
     if key=='is_direct_subject_of':
         return resolve(scope,value) in overlords(s,country)
+    if key=='has_subject_relation_with':
+        other=resolve(scope,value)
+        return other in overlords(s,country)|indirect_overlords(s,country) or country in overlords(s,other)|indirect_overlords(s,other)
     if key=='has_technology_researched':
         return value in technologies(s,country)
     if key in ('has_law','has_law_or_variant'):

@@ -101,7 +101,7 @@ def acted(b,a,country,diplomatic_action,**picked):
 
 @timed_often
 def broken(b,a,country,diplomatic_action):
-    two_sided=pact_terms()[diplomatic_action][2] is not None
+    two_sided=pact_terms()[diplomatic_action][1] is not None
     ours={ident for ident,first,second,kind in b.rows('pact','pact,first_country,second_country,pact_type')
           if kind==diplomatic_action and (first==b.player and second==country or two_sided and first==country and second==b.player)}
     return bool(ours) and not ours&between(a,country,diplomatic_action)

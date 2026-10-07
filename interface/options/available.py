@@ -336,7 +336,7 @@ def play_allowed(s,play,liberating=False,**saved):
     target=saved.get('target_country',(None,None))[1]
     if any(debug_goal(s,goal) for goal in definition(s,'common/diplomatic_plays',play,'war_goal')):
         return False
-    if (target,'player_owes') in obligations(s):
+    if any((country,'player_owes') in obligations(s) for country in {target}|overlords(s,target)|indirect_overlords(s,target)):
         return False
     kinds={next(iter(definition(s,'common/war_goal_types',goal,'kind')),'') for goal in definition(s,'common/diplomatic_plays',play,'war_goal')}
     if kinds&AUTONOMY_GOALS:
@@ -1796,7 +1796,7 @@ def may_leave(s):
     bloc=next(iter(power_bloc_of(s,s.player)))
     identity=s.map('power_bloc','power_bloc,power_bloc_identity').get(bloc)
     joined=s.map('country','country,power_bloc_join_date').get(s.player)
-    return (joined is not None and now(s)>=months_later(joined,BLOC_MEMBERSHIP_MONTHS)
+    return (joined is not None and now(s)>months_later(joined,BLOC_MEMBERSHIP_MONTHS)+joined%24
             and passes(s,'common/power_bloc_identities',identity,('can_leave',),country_scope(s)))
 
 
@@ -1984,11 +1984,11 @@ LOBBY_PACT_COST_MAX=.5
 
 
 @timed_often
-def pact_cost_multiplier(s,country,action):
+def pact_cost_multiplier(s,country,action,hostile=None):
     infamy=s.map('country_diplomacy','country,infamy').get(s.player) or 0
     clout=s.map('interest_group_stats','interest_group,clout')
     members=s.grouped('political_lobby_member','political_lobby,interest_group')
-    hostile=definition(s,'common/diplomatic_actions',action,'pact_hostile')==['yes']
+    hostile=definition(s,'common/diplomatic_actions',action,'pact_hostile')==['yes'] if hostile is None else hostile
     lobbied=sum(clout.get(group,0)*(1 if kind.startswith('lobby_pro')==hostile else -1)
                 for lobby,owner,target,kind in s.rows('political_lobby','political_lobby,country,target_country,political_lobby_type')
                 if owner==s.player and target==country for group in members.get(lobby,[]))
@@ -2115,6 +2115,16 @@ def ratifiable(s,article,source,target):
 
 
 @timed_often
+def article_cost(s,article,source,target):
+    payer=stated('common/treaty_articles',article,'maintenance_paid_by')
+    if payer and (source if payer==['source_country'] else target)!=s.player:
+        return 0
+    other=target if source==s.player else source
+    return float(next(iter(stated('common/treaty_articles',article,'cost')),0))*pact_cost_multiplier(
+        s,other,article,'hostile' in stated('common/treaty_articles',article,'flags'))
+
+
+@timed_often
 def treaty_articles(s,kind,offered,goods,amending=False):
     acquired=technologies(s)[0]
     combos=[]
@@ -2127,6 +2137,8 @@ def treaty_articles(s,kind,offered,goods,amending=False):
             if not treaty_allowed(s,country):
                 continue
             source,target=(s.player,country) if offered else (country,s.player)
+            if not amending and article_cost(s,article,source,target)>max(0,metric(s,"GetPowerDelta('influence')")):
+                continue
             if not passes(s,'common/treaty_articles',article,('visible','possible'),parties(s,source,target)):
                 continue
             if not ratifiable(s,article,source,target):
@@ -2148,31 +2160,21 @@ def pact_terms():
         found=dict(fields(body(text)))
         if 'pact' in found and found.get('can_select_to_break')!=['no']:
             inner=dict(fields(' '.join(found['pact'])))
-            terms[name]=(int(inner.get('forced_duration',['0'])[0]),' '.join(inner.get('actor_can_break',())),
+            terms[name]=(' '.join(inner.get('actor_can_break',())),
                          None if inner.get('is_two_sided_pact')==['no'] else ' '.join(inner.get('target_can_break',())))
     return terms
 
 
 @timed_often
-def snapshot_hours(s,seq):
-    return s.memo(('snapshot_hours',seq),lambda:s.connection.execute('select game_date from snapshot where run_id=%s and seq=%s',(s.run_id,seq)).fetchone()[0])
-
-
-@timed_often
-def opening_seq(s):
-    return s.memo('opening_seq',lambda:s.connection.execute('select min(seq) from snapshot where run_id=%s',(s.run_id,)).fetchone()[0])
-
-
-@timed_often
 def breakable_pacts(s):
-    seen=s.first_seen('pact')
+    expiry={pact:months_later(start,max(0,months))+start%24 for pact,start,months in s.rows('pact_private','pact,start_date,forced_duration')}
     found=[]
     for pact,first,second,kind in s.rows('pact','pact,first_country,second_country,pact_type'):
         if s.player not in (first,second) or kind not in pact_terms():
             continue
-        months,began,joined=pact_terms()[kind]
+        began,joined=pact_terms()[kind]
         can_break,other=(began,second) if first==s.player else (joined,first)
-        if can_break is None or seen[pact]!=opening_seq(s) and now(s)<months_later(snapshot_hours(s,seen[pact]),months):
+        if can_break is None or pact not in expiry or now(s)<=expiry[pact]:
             continue
         if evaluate(parsed(can_break),country_scope(s,target_country=('country',other),actor=('country',s.player))) is not False:
             found.append({'country':other,'diplomatic_action':kind})
@@ -2181,15 +2183,22 @@ def breakable_pacts(s):
 
 @timed_often
 def replaceable_principles(s):
-    held=bloc_principles(s)
     if not bloc_leader(s) or not mandates(s):
         return []
+    slots=[(position,kind) for bloc,kind,position in s.rows('power_bloc_adopted_principle','power_bloc,power_bloc_principle,position')
+           if bloc in player_blocs(s)]
+    if any(position is None for position,_ in slots):
+        return []
+    held={kind for _,kind in slots}
     identity=bloc_identity(s)
     groups=s.definitions('common/power_bloc_principle_groups')
-    return [{'slot':slot,'power_bloc_principle':levels[0]} for slot in range(len(held)) for group in groups
+    primary={kind for group in groups if definition(s,'common/power_bloc_principle_groups',group,'primary_for_identity')==[identity]
+             for kind in definition(s,'common/power_bloc_principle_groups',group,'levels')}
+    return [{'slot':slot,'power_bloc_principle':levels[0]} for slot,current in sorted(slots) for group in groups
             for levels in [definition(s,'common/power_bloc_principle_groups',group,'levels')] if levels and not set(levels)&held and principle_allowed(s,levels[0])
             and definition(s,'common/power_bloc_principle_groups',group,'unlocking_identity') in ([],[identity])
-            and definition(s,'common/power_bloc_principle_groups',group,'blocking_identity')!=[identity]]
+            and definition(s,'common/power_bloc_principle_groups',group,'blocking_identity')!=[identity]
+            and ((held-{current})|{levels[0]})&primary]
 
 
 @timed_often
@@ -2484,7 +2493,7 @@ def input_articles(s,offered,kind):
 def promises(s,country):
     owed=obligations(s)
     return [name for name,usable in (('OweObligation',(country,'player_owes') not in owed),('CallInObligation',(country,'owes_player') in owed),
-                                     ('AskForObligation',(country,'owes_player') not in owed)) if usable]
+                                     ('AskForObligation',not any(other==country for other,_ in owed))) if usable]
 
 
 @timed_often
@@ -2515,10 +2524,11 @@ def amendments(s,kind,offered):
 @timed_often
 def droppable(s,kind,offered):
     treaties=standing_treaties(s)
+    articles=s.rows('treaty_article','treaty,treaty_article_type,source_country,target_country')
     found=[]
-    for treaty,article,source,target in s.rows('treaty_article','treaty,treaty_article_type,source_country,target_country'):
+    for treaty,article,source,target in articles:
         fields=s.definitions('common/treaty_articles').get(article,{})
-        if treaty in treaties and fields.get('kind')==[kind] and 'can_be_renegotiated' in stated('common/treaty_articles',article,'flags') \
+        if treaty in treaties and sum(t==treaty for t,_,_,_ in articles)>1 and fields.get('kind')==[kind] and 'can_be_renegotiated' in stated('common/treaty_articles',article,'flags') \
                 and (kind=='mutual' or (source==s.player)==offered):
             found.append({'treaty':treaty,'treaty_article':article})
     return found
@@ -2696,7 +2706,7 @@ RULES={
     'issue_decree':decrees,
     'remove_decree':lambda s:[{'state':state,'decree':kind} for state,kind in sorted(issued_decrees(s))
                              if passes(s,'common/decrees',kind,('state_trigger',),Scope(s,'state',state))],
-    'research':lambda s:product(technology=researchable(s)),
+    'research':lambda s:[] if technologies(s)[2]-{None} else product(technology=researchable(s)),
     'queue_research':lambda s:product(technology=researchable(s)),
     'dequeue_research':lambda s:product(technology=[kind for owner,kind in s.rows('country_research_queued','country_research,technology') if owner in research(s)]),
     'recruit':recruit,
@@ -2730,8 +2740,8 @@ RULES={
     'defend_invasion_fleet':lambda s:[{'military_formation':fleet,'front':front} for front,ended in invasions(s) if not ended for fleet in free_fleets(s)],
     'assign_flagship':lambda s:product(ship=[ship for ship,_ in fleet_ships(s) if stated('common/ship_types',ship_kinds(s)[ship],'can_be_flagship')==['yes']]),
     'unassign_flagship':lambda s:product(ship=[ship for ship,_ in fleet_ships(s)]),
-    'retrofit_ship':lambda s:product(ship=[ship for ship,_ in fleet_ships(s)]),
-    'cancel_retrofit_ship':lambda s:product(ship=[ship for ship,_ in fleet_ships(s)]),
+    'retrofit_ship':lambda s:product(ship=[ship for ship,fleet in fleet_ships(s) if formation_report(s,fleet,'retrofittable')]),
+    'cancel_retrofit_ship':lambda s:product(ship=[ship for ship,fleet in fleet_ships(s) if fleet in retrofit_fleets(s,True)]),
     'change_ship_template':ship_template_choices,
     'retrofit_fleet_and_station':lambda s:product(military_formation=retrofit_fleets(s,False)),
     'retrofit_all_and_station':lambda s:[{}] if retrofit_fleets(s,False) else [],
@@ -2787,7 +2797,9 @@ RULES={
     'set_default_ship_template':lambda s:[{'ship_type':kind,'index':index} for kind,index in sorted(non_default_templates(s))],
     'set_fleet_ship_template':fleet_templates,
     'delete_ship_template':lambda s:[{'ship_type':kind,'index':index} for (kind,index),template in sorted(own_templates(s).items())
-                                     if sum(1 for other,_ in own_templates(s) if other==kind)>1 and template not in templates_in_construction(s)],
+                                     if sum(1 for other,_ in own_templates(s) if other==kind)>1 and template not in templates_in_construction(s)
+                                     and not {version for owner,version in s.rows('ship_template_version_list','ship_template,ship_template_version') if owner==template}
+                                             &{version for version, in s.rows('ship','version')}],
     'retrofit_fleet':lambda s:product(military_formation=retrofit_fleets(s,False)),
     'cancel_retrofit_fleet':lambda s:product(military_formation=retrofit_fleets(s,True)),
     'retrofit_all':lambda s:[{}] if retrofit_fleets(s,False) else [],

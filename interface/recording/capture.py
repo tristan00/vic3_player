@@ -404,7 +404,7 @@ def object_lists():
         collect('cap_obj_power_bloc','power_bloc ?='),
         collect('cap_obj_front','every_scope_war =','every_scope_front ='),
         collect('cap_obj_invasion','every_scope_war =','every_scope_front =','invasion ?='),
-        collect('cap_obj_strait','every_scope_strait ='),
+        collect('cap_obj_strait','every_country =','every_scope_strait ='),
         collect('cap_obj_treaty_enforced','every_scope_treaty =',limit='is_enforced = yes enforced_on_country ?= { this = scope:actor }'),
         collect('cap_obj_state','every_state ='),
     ])

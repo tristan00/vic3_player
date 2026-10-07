@@ -1,5 +1,8 @@
 from interface.actions.catalogue import BY_NAME
 from interface.common import timed_often
+from interface.options.available import (BLOC_INFLUENCE, DEFAULT_TAX_COST, MAX_MONOPOLIES, MONOPOLY_COST, MOVEMENT_COST, article_cost,
+                                        authority, bulk_subset, definition, metric, money, monopolies, nationalization_cost,
+                                        ownership_classes, pact_cost_multiplier, private_levels, ship_kinds)
 
 
 ALIASES={f'{name}_selected':name for name in ('mobilize','demobilize','raise_conscripts','start_naval_mission','end_naval_mission')}
@@ -18,6 +21,102 @@ RESEARCH={'research','queue_research','dequeue_research'}
 POLICIES={'set_tax_level','set_government_wages','set_military_wages','set_supply_ship_construction'}
 DIPLOMACY={'diplomatic_action','diplomatic_action_first_state','diplomatic_action_second_state','diplomatic_action_states'}
 CONSTRUCTION_QUEUE=QUEUE|{'build','cancel_construction'}
+
+
+@timed_often
+def context(snapshot):
+    return {**{('building_site',i):(s,k) for i,s,k in snapshot.rows('building','building,state,building_type')},
+            **{('ship',s):('military_formation',f) for s,f in snapshot.rows('ship','ship,fleet') if f is not None},
+            **{('ship_type',s):k for s,k in ship_kinds(snapshot).items()},
+            **{('combat_unit',i):f for i,f in snapshot.rows('combat_unit','combat_unit,formation')},
+            **{('method_group',(k,m)):g for k,g,m in snapshot.methods},
+            **{('ownership',i):k for i,k in ownership_classes(snapshot).items()},
+            **{('treaty',t):('country',b if a==snapshot.player else a) for t,a,b in snapshot.rows('treaty','treaty,first_country,second_country')}}
+
+
+@timed_often
+def changes(name,params,links):
+    found=set()
+    buildings=([params['building']] if 'building' in params else
+               [ident for (key,ident),site in links.items() if key=='building_site' and site[0]==params.get('state')
+                and site[1]==params.get('building_type',site[1]) and (params.get('ownership','any')=='any' or params['ownership'] in links.get(('ownership',ident),()))])
+    if 'production_method' in params:
+        found.update(('building_method',i,links.get(('method_group',(links.get(('building_site',i),(None,None))[1],params['production_method'])),params['production_method'])) for i in buildings)
+    if name in ('reset_production_methods','reset_building_production_methods'):
+        found.update(('building_method',i,group) for i in buildings for (key,kind),group in links.items()
+                     if key=='method_group' and kind[0]==links.get(('building_site',i),(None,None))[1])
+    if 'subsidies' in name:
+        found.update(('building_subsidy',i) for i in buildings)
+    if name in ('nationalize','bulk_nationalize_state','bulk_expropriate_state','toggle_privatization'):
+        found.update(('building_ownership',i) for i in buildings)
+    if name.startswith(('set_import_','set_export_')):
+        found.add(('trade_policy',name.split('_')[1],params['goods']))
+    if name in ('toggle_bolster_movement','toggle_suppress_movement'):
+        found.add(('movement_policy',params['political_movement']))
+    if name in ('issue_decree','remove_decree'):
+        found.add(('state_decrees',params['state']))
+    if name in ('reform_government','reform_government_party'):
+        found.add(('government',))
+    if name in ('move_capital','move_market_capital'):
+        found.add((name,))
+    if name in ('form_power_bloc','request_join_power_bloc','leave_power_bloc'):
+        found.add(('bloc_membership',))
+    if name in ('form_power_bloc','request_join_power_bloc','leave_power_bloc','pick_principle','replace_principle','upgrade_principle'):
+        found.add(('bloc_principles',))
+    if name=='toggle_monopoly':
+        found.add(('monopoly',params['building_type']))
+    if name.startswith(('retrofit_','cancel_retrofit_')) or name in ('change_ship_template','decommission_ship'):
+        ships=([params['ship']] if 'ship' in params else [i for (key,i),formation in links.items() if key=='ship'
+                and (params.get('military_formation') is None or formation[1]==params['military_formation'])])
+        found.update(('ship_refit',i) for i in ships)
+        found.update(('ship_templates',links[('ship_type',i)]) for i in ships if ('ship_type',i) in links)
+    if name=='set_fleet_ship_template':
+        found.update(('ship_refit',i) for (key,i),formation in links.items() if key=='ship' and formation[1]==params['military_formation'])
+    if name in ('build_ship','build_ship_for','cancel_ship','cancel_ship_for'):
+        found.add(('ship_templates',params['ship_type']))
+    if name in ('disband_regulars','disband_conscripts','transfer_battalions'):
+        found.update(('object','combat_unit',i) for (key,i),formation in links.items() if key=='combat_unit' and formation==params.get('military_formation'))
+    return found
+
+
+@timed_often
+def resources(snapshot):
+    return {'authority':max(0,authority(snapshot)),'influence':max(0,metric(snapshot,"GetPowerDelta('influence')")),
+            'money':max(0,money(snapshot)),'monopolies':max(0,MAX_MONOPOLIES-len(monopolies(snapshot)))}
+
+
+@timed_often
+def cost(snapshot,name,params):
+    needed={}
+    if name=='issue_decree':
+        needed['authority']=float(next(iter(definition(snapshot,'common/decrees',params['decree'],'cost')),0))
+    if name=='toggle_consumption_tax' and not snapshot.rows('player_taxed_goods','goods',goods=params['goods']):
+        needed['authority']=float(next(iter(definition(snapshot,'common/goods',params['goods'],'consumption_tax_cost')),DEFAULT_TAX_COST))
+    if name in ('toggle_bolster_movement','toggle_suppress_movement') and snapshot.map('political_movement','political_movement,managed_status').get(params['political_movement']) is None:
+        needed['authority']=MOVEMENT_COST
+    if name=='toggle_monopoly' and params['building_type'] not in monopolies(snapshot):
+        needed.update(authority=MONOPOLY_COST,monopolies=1)
+    if name=='character_interaction' and params['interaction'] in ('patronize','ostracize','retire_daimyo','grant_peerage'):
+        interaction=params['interaction']
+        needed['authority']=25 if interaction=='grant_peerage' else 100
+        if interaction=='patronize' and any(trait in ('opium_addiction','alcoholic','cocaine_addiction','expensive_tastes')
+                                          for trait, in snapshot.rows('character_assigned_trait','character_trait',character=params['character'])):
+            needed['authority']+=50
+    if name=='nationalize':
+        needed['money']=nationalization_cost(snapshot,params['building'])*params['levels']
+    if name=='bulk_nationalize_state':
+        levels=private_levels(snapshot)
+        needed['money']=sum(nationalization_cost(snapshot,i)*levels.get(i,0) for i in bulk_subset(snapshot,**params))
+    if name in DIPLOMACY|{'diplomatic_action_obligation'}:
+        needed['influence']=float(next(iter(definition(snapshot,'common/diplomatic_actions',params['diplomatic_action'],'pact_cost')),0))*pact_cost_multiplier(snapshot,params['country'],params['diplomatic_action'])
+    if 'treaty_article' in params and 'country' in params and name.startswith(('offer_','demand_','agree_','work_out_','exchange_','threaten_')) and 'sway' not in name:
+        source,target=(params['country'],snapshot.player) if name.startswith(('demand_','work_out_','threaten_')) else (snapshot.player,params['country'])
+        needed['influence']=article_cost(snapshot,params['treaty_article'],source,target)
+        if name=='exchange_treaty_articles':
+            needed['influence']+=article_cost(snapshot,params['demand'],params['country'],snapshot.player)
+    if name=='form_power_bloc':
+        needed['influence']=BLOC_INFLUENCE
+    return needed
 
 
 @timed_often
@@ -40,7 +139,7 @@ def canonical(name,params):
 @timed_often
 def targets(name,params,links={}):
     name,params=canonical(name,params)
-    found={('command',name,tuple(sorted(params.items())))}|negotiations(name,params,links)
+    found={('command',name,tuple(sorted(params.items())))}|negotiations(name,params,links)|changes(name,params,links)
     if name in RESEARCH:
         found.add(('research_technology',params['technology']))
     if name=='research':
@@ -50,7 +149,7 @@ def targets(name,params,links={}):
     if name in POLICIES:
         found.add(('policy',name))
     if name in DIPLOMACY:
-        found.add(('diplomatic_proposal',params['country'],params['diplomatic_action']))
+        found.add(('diplomatic_proposal',params['country']))
     if 'character' in params:
         found.add(('character_change',params['character']))
     if name in ('assign_commander','hire_commander_for'):
@@ -103,7 +202,7 @@ def targets(name,params,links={}):
 @timed_often
 def invalidates(name,params,links={}):
     name,params=canonical(name,params)
-    found={('command',name,tuple(sorted(params.items())))}|negotiations(name,params,links)
+    found={('command',name,tuple(sorted(params.items())))}|negotiations(name,params,links)|changes(name,params,links)
     if name in RESEARCH:
         found.update({('research_reset',),('research_technology',params['technology'])})
     if name=='research':
@@ -111,7 +210,7 @@ def invalidates(name,params,links={}):
     if name in POLICIES:
         found.add(('policy',name))
     if name in DIPLOMACY:
-        found.add(('diplomatic_proposal',params['country'],params['diplomatic_action']))
+        found.add(('diplomatic_proposal',params['country']))
     if 'character' in params:
         found.add(('character_change',params['character']))
     if name in ('assign_commander','hire_commander_for'):

@@ -35,6 +35,7 @@ def runs_grid(filters,sort,desc,offset,limit):
            Spec('game_to','date','(select game_date from snapshot s where s.run_id=r.run_id order by seq desc limit 1)'),
            Spec('snapshots','number','(select count(*) from snapshot s where s.run_id=r.run_id)'),
            Spec('actions','number','(select count(*) from loop_action a where a.run_id=r.run_id)'),
+           Spec('invalid','number',"(select count(*) from loop_action a where a.run_id=r.run_id and a.status='invalid')"),
            Spec('unverified','number','(select count(*) from loop_action a where a.run_id=r.run_id and a.unverified)')]
     return grid(specs,RUN_FROM,{},filters,sort or 'run',True if sort is None else desc,offset,limit,None,['run'])
 

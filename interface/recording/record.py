@@ -402,7 +402,7 @@ def _scripted(tables,snapshot,held,tags,label,player,living,world,maps):
     put(tables,'market_goods_consumed_by',[('goods','text'),('consumer','text')],
                sorted({(goods,consumer) for consumer in ('government','military') for goods in held.flags('cap_consumed_'+consumer)}))
     put(tables,'strait_endpoint',[('strait','int4'),('first_state','int4'),('second_state','int4'),('strait_type','text')],
-               sorted((strait,ident(first),ident(second),text(kind)) for strait,first,second,kind in held.fields('strait',held.listed('cap_obj_strait'),('first','second','type'))))
+               sorted({(strait,ident(first),ident(second),text(kind)) for strait,first,second,kind in held.fields('strait',held.listed('cap_obj_strait'),('first','second','type'))}))
     put(tables,'strait_power',[('power','text')],sorted((power,) for power in set(held.flags('cap_strait_power'))))
     put(tables,'ui_open',[(name,'int4') for name,_ in UI_CHECKS],[tuple(flag(held.variables['cap_ui_'+name]) for name,_ in UI_CHECKS)])
     put(tables,'ui_window',[('name','text')],sorted((name,) for name in set(held.flags('cap_open'))))

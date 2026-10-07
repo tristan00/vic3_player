@@ -2232,13 +2232,16 @@
       ]
     },
     "pact": {
-      "disposition": "public",
-      "drop": [
+      "disposition": "split",
+      "drop": [],
+      "private": [
         "forced_duration",
         "start_date"
       ],
       "owner": [
-        "none"
+        "either",
+        "targets_first",
+        "targets_second"
       ]
     },
     "party": {

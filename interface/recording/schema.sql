@@ -2267,6 +2267,20 @@ create table pact_history (
   check (present or num_nonnulls(first_country, second_country, pact_type, liberty_desire) = 0)
 );
 
+create table pact_private (
+  run_id int4 not null,
+  pact int4 not null,
+  seq int4 not null,
+  present bool not null,
+  start_date game_hours,
+  forced_duration int4,
+  primary key (run_id, pact, seq),
+  foreign key (run_id, pact) references pact,
+  foreign key (run_id, seq) references snapshot,
+  check (present = (num_nulls(start_date, forced_duration) = 0)),
+  check (present or num_nonnulls(start_date, forced_duration) = 0)
+);
+
 create table diplomatic_catalyst_history (
   run_id int4 not null,
   diplomatic_catalyst int4 not null,
@@ -2437,10 +2451,12 @@ create table power_bloc_adopted_principle (
   power_bloc_principle int2 not null,
   seq int4 not null,
   present bool not null,
+  position int2,
   primary key (run_id, power_bloc, power_bloc_principle, seq),
   foreign key (run_id, power_bloc) references power_bloc,
   foreign key (run_id, seq) references snapshot,
-  foreign key (power_bloc_principle) references power_bloc_principle
+  foreign key (power_bloc_principle) references power_bloc_principle,
+  check (present or num_nonnulls(position) = 0)
 );
 
 create table interest_history (
@@ -5423,6 +5439,10 @@ create function pact_at(run int4, at int4) returns table ("pact" int4, "seq" int
   select l.pact, l.seq, l.first_country, l.second_country, l.pact_type, l.liberty_desire from pact a, lateral (select pact, seq, first_country, second_country, pact_type, liberty_desire, present from pact_history t where t.run_id = run and t.pact = a.pact and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
+create function pact_private_at(run int4, at int4) returns table ("pact" int4, "seq" int4, "start_date" game_hours, "forced_duration" int4) language sql stable as $$
+  select l.pact, l.seq, l.start_date, l.forced_duration from pact a, lateral (select pact, seq, start_date, forced_duration, present from pact_private t where t.run_id = run and t.pact = a.pact and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
+$$;
+
 create function diplomatic_catalyst_at(run int4, at int4) returns table ("diplomatic_catalyst" int4, "seq" int4, "diplomatic_catalyst_type" int2) language sql stable as $$
   select l.diplomatic_catalyst, l.seq, l.diplomatic_catalyst_type from diplomatic_catalyst a, lateral (select diplomatic_catalyst, seq, diplomatic_catalyst_type, present from diplomatic_catalyst_history t where t.run_id = run and t.diplomatic_catalyst = a.diplomatic_catalyst and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
@@ -5459,8 +5479,8 @@ create function power_bloc_at(run int4, at int4) returns table ("power_bloc" int
   select l.power_bloc, l.seq, l.power_bloc_identity, l.power_bloc_map_texture, l.cohesion, l.mandate_progress from power_bloc a, lateral (select power_bloc, seq, power_bloc_identity, power_bloc_map_texture, cohesion, mandate_progress, present from power_bloc_history t where t.run_id = run and t.power_bloc = a.power_bloc and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
-create function power_bloc_adopted_principle_at(run int4, at int4) returns table ("power_bloc" int4, "power_bloc_principle" int2, "seq" int4) language sql stable as $$
-  select l.power_bloc, l.power_bloc_principle, l.seq from power_bloc a, lateral (select distinct on (power_bloc_principle) power_bloc, power_bloc_principle, seq, present from power_bloc_adopted_principle t where t.run_id = run and t.power_bloc = a.power_bloc and t.seq <= at order by power_bloc_principle desc, t.seq desc) l where a.run_id = run and l.present
+create function power_bloc_adopted_principle_at(run int4, at int4) returns table ("power_bloc" int4, "power_bloc_principle" int2, "seq" int4, "position" int2) language sql stable as $$
+  select l.power_bloc, l.power_bloc_principle, l.seq, l.position from power_bloc a, lateral (select distinct on (power_bloc_principle) power_bloc, power_bloc_principle, seq, position, present from power_bloc_adopted_principle t where t.run_id = run and t.power_bloc = a.power_bloc and t.seq <= at order by power_bloc_principle desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
 create function interest_at(run int4, at int4) returns table ("interest" int4, "seq" int4, "country" int4, "strategic_region" int2, "involvement" float8) language sql stable as $$
@@ -6161,6 +6181,7 @@ create index player_colonization_paused_seq on player_colonization_paused using 
 create index ui_open_window_seq on ui_open_window using brin (run_id, seq) with (autosummarize = on);
 create index player_relation_seq on player_relation using brin (run_id, seq) with (autosummarize = on);
 create index pact_history_seq on pact_history using brin (run_id, seq) with (autosummarize = on);
+create index pact_private_seq on pact_private using brin (run_id, seq) with (autosummarize = on);
 create index diplomatic_catalyst_history_seq on diplomatic_catalyst_history using brin (run_id, seq) with (autosummarize = on);
 create index diplomatic_catalyst_private_seq on diplomatic_catalyst_private using brin (run_id, seq) with (autosummarize = on);
 create index diplomatic_action_history_seq on diplomatic_action_history using brin (run_id, seq) with (autosummarize = on);

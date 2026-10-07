@@ -198,6 +198,7 @@ listing('ui_open_window',[v('ui_window')],(),'player')
 
 listing('player_relation',[rr('country')],[f('relations',I2),f('improve_relations',F),f('tension',F),d('player_truce'),d('country_truce')],'player')
 entity('pact',[rr('first_country','country'),rr('second_country','country'),v('pact_type','diplomatic_action_type'),f('liberty_desire',F)])
+private('pact',[f('start_date',H),f('forced_duration',I4)])
 entity('diplomatic_catalyst',[v('diplomatic_catalyst_type')])
 private('diplomatic_catalyst',[r('country'),r('target_country','country'),f('date',H)])
 entity('diplomatic_action',[rr('first_country','country'),rr('second_country','country'),v('action_type','diplomatic_action_type')])
@@ -209,7 +210,7 @@ entity('treaty',[rr('first_country','country'),rr('second_country','country'),d(
                  f('withdrawn',B)])
 entity('treaty_article',[rr('treaty'),v('treaty_article_type'),r('source_country','country'),r('target_country','country')])
 entity('power_bloc',[v('power_bloc_identity'),v('power_bloc_map_texture'),f('cohesion',F),f('mandate_progress',F)])
-child('power_bloc_adopted_principle','power_bloc',[v('power_bloc_principle')])
+child('power_bloc_adopted_principle','power_bloc',[v('power_bloc_principle')],[o('position',I2)])
 entity('interest',[rr('country'),v('strategic_region'),f('involvement',F)])
 
 entity('state',[v('state_region'),ov('localized_name_key','localization_key'),r('country'),r('mass_migration_culture','culture'),

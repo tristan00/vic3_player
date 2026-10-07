@@ -3,14 +3,13 @@ from contextlib import contextmanager, redirect_stdout, redirect_stderr
 from datetime import datetime, timezone
 from pathlib import Path
 import psutil, psycopg
-from advisors.catalogue import ANSWERS, LEVER, NAMES, PROPOSALS
+from advisors.catalogue import NAMES
 from advisors.initializers import ADVISORS
 from advisors.pickers import PICKERS
 from advisors.data.rewards import draw_objective
 from interface import GameInterface, record
 from interface.actions import Executor
 from interface.common import DEFAULT_DATA, GameCrashed, timed, write_json
-from interface.options import available
 from interface.options.available import FASTEST_SPEED
 from interface.options.effects import LATER, took_effect, took_effect_later
 from interface.options.stored import Shared, Stored
@@ -19,12 +18,10 @@ from interface.timing import RECORDER
 from interface.runner.session import _spawn, process as owner
 from interface.world.cache import Cached
 from interface.world.sampling import SLIDERS, PER_COUNTRY, PER_STATE
-from loop.conflicts import invalidates, targets
-from loop.translate import offer
+from loop.sampling import batches, block_length
 
 STATE=DEFAULT_DATA/'collection.json'
 DEFAULTS=dict(profile='actions',world_cache='',runs=1,warmup=0,years=100.,minutes=30.,seed=int(time.time()),advisors=['random'],pickers=['first'])
-FINISH={'capitulate','back_down','white_peace','declare_bankruptcy','leave_power_bloc'}
 
 @contextmanager
 def state():
@@ -44,6 +41,7 @@ def launch(data):
     process=_spawn([sys.executable,'-m','loop.run','_work'],Path(__file__).resolve().parents[1])
     data.update(pid=process.pid,created=process.create_time(),active=data['settings'],phase='starting',stop=False,restart=False,error=None,run_id=None,snapshot=None,game_hours=None)
 
+
 @timed
 def redraw(connection,run_id,seq,count,seed,weights=None,snapshot=None):
     snapshot=Stored(connection,run_id,seq) if snapshot is None else snapshot
@@ -52,36 +50,6 @@ def redraw(connection,run_id,seq,count,seed,weights=None,snapshot=None):
         'select a.name,w.weight from run_weight w join advisor_action a using(advisor_action) where w.run_id=%s',(run_id,)))
     return snapshot,[[(name,params) for name,params,_ in block] for block in batches(snapshot,advisor,count)]
 
-@timed
-def batches(snapshot,advisor,count):
-    rng,weights,offered=advisor.random,{'answer_event':1,**advisor.weights},offer(snapshot,available(snapshot))
-    links={**{('building_site',i):(s,k) for i,s,k in snapshot.rows('building','building,state,building_type')},
-           **{('ship',s):('military_formation',f) for s,f in snapshot.rows('ship','ship,fleet') if f is not None},
-           **{('treaty',t):('country',b if a==snapshot.player else a) for t,a,b in snapshot.rows('treaty','treaty,first_country,second_country')}}
-    questions=[[('answer_event',c) for c in offered.get('answer_event',[]) if c.params['event']==event]
-               for event in sorted({c.params['event'] for c in offered.get('answer_event',[])})]
-    questions+=[[(n,c) for n in pair for c in offered.get(n,[]) if c.params['country']==country]
-                for pair in PROPOSALS for country in sorted({c.params['country'] for n in pair for c in offered.get(n,[])})]
-    groups=questions[:16]+[[(n,c) for n,items in offered.items() if n not in ANSWERS and n!='abandon_law_enactment' for c in items]]
-    pools=[[(n,c,command,targets(*command,links)) for n,c in group for command in c.commands] for group in groups]
-    blocks=[]
-    for _ in range(count):
-        block,claimed=[],set()
-        size=rng.choices(range(6,17),weights=range(11,0,-1))[0]
-        for pool in pools[:-1]+pools[-1:]*max(0,size-len(pools)+1):
-            live=[item for item in pool if not item[3]&claimed and weights[LEVER[item[0]]]>0]
-            levers=sorted({LEVER[n] for n,_,_,_ in live})
-            if not levers: break
-            lever=rng.choices(levers,weights=[weights[n] for n in levers])[0]
-            name=rng.choice(sorted({n for n,_,_,_ in live if LEVER[n]==lever}))
-            choice=rng.choice(list({id(c):c for n,c,_,_ in live if n==name}.values()))
-            command=rng.choice([command for n,c,command,_ in live if n==name and c is choice])
-            block.append((name,choice.params,command))
-            claimed.update(invalidates(*command,links))
-            if command[0] in FINISH: break
-        if not block: raise RuntimeError('No selectable action')
-        blocks.append(block)
-    return blocks
 
 @timed
 def play(game,store,advisor,picker,settings):
@@ -100,7 +68,8 @@ def play(game,store,advisor,picker,settings):
             treasury=snapshot.rows('player_treasury','principal,credit')
             if treasury and 0<treasury[0][0]>=treasury[0][1]: return 'debt_cap'
             turn+=1
-            drawn=batches(snapshot,advisor,1 if picker.name=='first' else 100)
+            length=block_length(advisor.random) if picker.name=='catboost_piecewise' else None
+            drawn=batches(snapshot,advisor,1 if picker.name=='first' else 100,length)
             chosen,predictions=picker.pick([[(n,p) for n,p,_ in b] for b in drawn],snapshot)
             if predictions is not None:
                 store.record_pick(snapshot.seq,[[n for n,_,_ in b] for b in drawn],predictions,chosen)

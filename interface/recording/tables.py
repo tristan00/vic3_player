@@ -475,6 +475,9 @@ def diplomacy(c):
     if t:
         for ident,first,second,kind,liberty in zip(t['ident'],t['targets_first'],t['targets_second'],t['pact_action'],t['liberty_desire']):
             c.add('pact_history',pact=ident,first_country=first,second_country=second,pact_type=c.label(kind),liberty_desire=liberty)
+        ids=idents(t)
+        for i,start,duration in c.rows('pact_private','id','start_date','forced_duration'):
+            c.add('pact_private',pact=ids[i],start_date=start,forced_duration=duration)
     t=c.table('diplomatic_catalyst')
     if t:
         ids=idents(t)
@@ -520,8 +523,8 @@ def diplomacy(c):
             c.add('power_bloc_history',power_bloc=ident,power_bloc_identity=c.label(identity),power_bloc_map_texture=c.label(texture),cohesion=cohesion,
                   mandate_progress=progress)
         for i,items in c.children('power_bloc_principles','id','value').items():
-            for principle, in items:
-                c.add('power_bloc_adopted_principle',power_bloc=ids[i],power_bloc_principle=c.label(principle))
+            for position,(principle,) in enumerate(items):
+                c.add('power_bloc_adopted_principle',power_bloc=ids[i],power_bloc_principle=c.label(principle),position=position)
     t=c.table('interest')
     if t:
         for ident,country,region,involvement in zip(t['ident'],t['country'],t['strategic_region'],t['current_involvement']):
