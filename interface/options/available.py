@@ -2243,13 +2243,17 @@ def invadable(s):
 
 @timed_often
 def land_invasions(s):
-    return [{'military_formation':army,'state':state} for army in ashore(s) for state in invadable(s)]
+    return [{'military_formation':army,'state':state} for army in settled(s,s.formations('army'))
+            if formation_report(s,army,'embarked') and not formation_report(s,army,'invading') and not demobilizing(s,army) for state in invadable(s) if trigger_coastal(s,state)]
 
 
 @timed_often
 def naval_invasions(s):
     fleets=[fleet for fleet in s.formations('fleet') if not formation_report(s,fleet,'retrofitting') and not formation_report(s,fleet,'invading')]
-    return [{'military_formation':army,'fleet':fleet,'state':state} for army in ashore(s) for fleet in fleets for state in invadable(s) if trigger_coastal(s,state)]
+    components=march_components(s)
+    return [{'military_formation':army,'fleet':fleet,'state':state} for army in ashore(s)
+            if any(components.get(port,set())&components.get(located(s,army),set()) for port in port_states(s))
+            for fleet in fleets for state in invadable(s) if trigger_coastal(s,state)]
 
 
 @timed_often
@@ -2391,11 +2395,16 @@ def naval_regions(s):
 
 
 @timed_often
-def port_regions(s):
+def port_states(s):
     def compute():
         located=s.map('building','building,state')
-        return {state_regions(s).get(located[ident]) for ident,kind,levels in s.buildings() if kind=='building_port' and levels}
-    return s.memo('port_regions',compute)
+        return {located[ident] for ident,kind,levels in s.buildings() if kind=='building_port' and levels}
+    return s.memo('port_states',compute)
+
+
+@timed_often
+def port_regions(s):
+    return {state_regions(s).get(state) for state in port_states(s)}
 
 
 @timed_often
@@ -2788,7 +2797,8 @@ RULES={
     'station_fleet':lambda s:[{'military_formation':fleet,'state':state} for fleet in free_fleets(s) for state in s.states()
                               if trigger_coastal(s,state) and state!=s.map('formation_status','formation,target_location').get(fleet)],
     'rehome_fleet':lambda s:[{'military_formation':fleet,'strategic_region':region} for fleet in free_fleets(s) for region in naval_regions(s)
-                             if region!=hq_regions(s)[home_of(s,fleet)][1] and region in port_regions(s)],
+                             if region not in (hq_regions(s)[home_of(s,fleet)][1],state_regions(s).get(s.map('formation_status','formation,target_location').get(fleet)))
+                             and region in port_regions(s)],
     'defend_invasion_fleet':lambda s:[{'military_formation':fleet,'front':front} for front,ended in invasions(s) if not ended for fleet in free_fleets(s)],
     'assign_flagship':lambda s:product(ship=[ship for ship,_ in fleet_ships(s) if stated('common/ship_types',ship_kinds(s)[ship],'can_be_flagship')==['yes']]),
     'unassign_flagship':lambda s:[],
