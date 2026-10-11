@@ -15,7 +15,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import FileResponse, Response
 
 from interface.common import evidence
-from . import actions, db, names, runs, tables, tuning, worlds
+from . import actions, buildings, db, names, runs, tables, tuning, worlds
 
 LOG=logging.getLogger('dashboard')
 DIST=Folder(__file__).resolve().parent/'ui'/'dist'
@@ -160,6 +160,12 @@ def run_detail(run:RUN):
 @db.often
 def run_series(run:RUN):
     return db.reply(runs.series(run))
+
+
+@app.get('/api/runs/{run}/buildings')
+@db.often
+def run_buildings(run:RUN):
+    return db.reply(buildings.series(run))
 
 
 @app.get('/api/runs/{run}/actions')
