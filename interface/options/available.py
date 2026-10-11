@@ -2791,7 +2791,7 @@ RULES={
                              if region!=hq_regions(s)[home_of(s,fleet)][1] and region in port_regions(s)],
     'defend_invasion_fleet':lambda s:[{'military_formation':fleet,'front':front} for front,ended in invasions(s) if not ended for fleet in free_fleets(s)],
     'assign_flagship':lambda s:product(ship=[ship for ship,_ in fleet_ships(s) if stated('common/ship_types',ship_kinds(s)[ship],'can_be_flagship')==['yes']]),
-    'unassign_flagship':lambda s:product(ship=[ship for ship,_ in fleet_ships(s)]),
+    'unassign_flagship':lambda s:[],
     'retrofit_ship':lambda s:product(ship=[ship for ship,fleet in fleet_ships(s) if formation_report(s,fleet,'retrofittable')]),
     'cancel_retrofit_ship':lambda s:product(ship=[ship for ship,fleet in fleet_ships(s) if fleet in retrofit_fleets(s,True)]),
     'change_ship_template':ship_template_choices,
