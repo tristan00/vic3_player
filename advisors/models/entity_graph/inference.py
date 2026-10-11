@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from .experiment import restore
 from .model import collate
 from .schema import COMPONENTS, GRAPH_VERSION, HORIZONS
@@ -25,7 +25,7 @@ def baseline(data):
     stock=sum(COSTS[types[r['building_type']]]*r['levels'] for r in snapshot['building_history'] if r['state'] in owned and types[r['building_type']] in COSTS)
     result=np.array([gdp,population,sol,stock],float)
     if not np.isfinite(result).all() or min(result)<=0:
-        raise ValueError('Four positive finite baseline measurements are required')
+        raise ValueError(evidence(result=result))
     return result
 
 
@@ -35,7 +35,7 @@ class Forecaster:
         self.model,self.checkpoint=restore(Path(checkpoint),device)
         self.encoder=load(Path(encoder))
         if self.checkpoint.get('graph_version')!=GRAPH_VERSION or getattr(self.encoder,'graph_version',None)!=GRAPH_VERSION:
-            raise ValueError('Checkpoint or encoder is obsolete; rebuild and fit the recurrent model')
+            raise ValueError(evidence(checkpoint=self.checkpoint.get('graph_version'),encoder=getattr(self.encoder,'graph_version',None),expected=GRAPH_VERSION))
         self.mean=np.array(self.checkpoint['mean'])
         self.scale=np.array(self.checkpoint['scale'])
         self.device=device
@@ -54,11 +54,11 @@ class Forecaster:
     @timed
     def observe(self,data):
         if self.run is not None and data['run']!=self.run:
-            raise ValueError('Reset recurrent memory before changing runs')
+            raise ValueError(evidence(held=self.run,given=data['run']))
         if self.seq is not None and data['seq']<=self.seq:
-            raise ValueError('Recurrent observations must advance in snapshot order')
+            raise ValueError(evidence(held=self.seq,given=data['seq']))
         if self.pending:
-            raise ValueError('Commit the selected action before advancing to another observation')
+            raise ValueError(evidence(run=self.run,seq=self.seq,pending=bool(self.pending)))
         self.raw,self.audit=build_world(data)
         self.data=data
         graph=self.encoder.graph(self.raw)
@@ -80,9 +80,9 @@ class Forecaster:
     @timed
     def commit(self,actions):
         if self.observation is None:
-            raise ValueError('Observe a world before committing an action')
+            raise ValueError(evidence(observation=self.observation))
         if getattr(self,'committed_seq',None)==(self.run,self.seq):
-            raise ValueError('An action was already committed at this snapshot')
+            raise ValueError(evidence(run=self.run,seq=self.seq))
         with torch.inference_mode():
             self.memory=self.model.commit(self.observation,self.propose(actions))
         self.pending=False
@@ -91,11 +91,11 @@ class Forecaster:
     @timed
     def forecast(self,data,blocks):
         if not blocks:
-            raise ValueError('At least one complete candidate block is required')
+            raise ValueError(evidence(blocks=blocks))
         if (self.run,self.seq)!=(data['run'],data['seq']):
             self.observe(data)
         if getattr(self,'committed_seq',None)==(self.run,self.seq):
-            raise ValueError('Cannot score a past decision after committing it')
+            raise ValueError(evidence(run=self.run,seq=self.seq))
         previous=torch.backends.cuda.matmul.allow_tf32
         torch.backends.cuda.matmul.allow_tf32=False
         try:
@@ -107,7 +107,7 @@ class Forecaster:
         current=baseline(data)
         values=np.exp(ratios)*current
         if not np.isfinite(values).all():
-            raise ValueError('Forecast exceeds finite output range')
+            raise ValueError(evidence(values=values))
         return {'horizons_days':HORIZONS,'components':COMPONENTS,'baseline':current,'log_ratios':ratios,'values':values,'audit':self.audit}
 
     @timed
@@ -115,13 +115,13 @@ class Forecaster:
         if self.run is not None and self.run!=snapshot.run_id:
             self.reset()
         if self.seq is not None and snapshot.seq<self.seq:
-            raise ValueError('Reset and replay before requesting an earlier decision')
+            raise ValueError(evidence(held=self.seq,given=snapshot.seq))
         reader=WorldReader(snapshot.connection,snapshot.run_id)
         if snapshot.seq not in reader.dates:
-            raise ValueError('The requested snapshot does not exist')
+            raise ValueError(evidence(run=snapshot.run_id,seq=snapshot.seq))
         if self.seq is not None and self.seq<snapshot.seq and self.pending:
             if self.seq not in reader.actions:
-                raise ValueError('The preceding selected action must be recorded before recurrence advances')
+                raise ValueError(evidence(run=snapshot.run_id,seq=self.seq))
             self.commit(reader.actions[self.seq])
         for seq in sorted(at for at in reader.dates if at<=snapshot.seq and (self.seq is None or at>self.seq)):
             data=reader.read(seq)

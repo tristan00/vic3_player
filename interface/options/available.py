@@ -2,7 +2,7 @@ import re
 from functools import lru_cache
 
 from ..actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, ACTIONS, LEVELS, TOLL_LEVELS
-from ..common import DEFAULT_GAME, progress, timed, timed_often
+from ..common import DEFAULT_GAME, evidence, progress, timed, timed_often
 from ..script import body, fields, read
 from ..recording.spec import METRIC_COLUMNS
 from ..runner.memory import MONTH_STARTS
@@ -1207,7 +1207,7 @@ def metric(s,name):
 @timed_often
 def need(value,what):
     if value is None:
-        raise RuntimeError(f'{what} is not captured')
+        raise RuntimeError(evidence(what=what))
     return value
 
 

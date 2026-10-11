@@ -11,7 +11,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
 from scipy.spatial import cKDTree
 
-from ..common import timed, write_json, write_script, timed_often
+from ..common import evidence, timed, write_json, write_script, timed_often
 from ..script import blocks, body, clean, read, scalar
 from .vanilla import textures
 from .nations import word
@@ -140,7 +140,7 @@ def _cells(domain,land_count,sea_count,nrng):
         cells[jy+1,jx+1]=cells[jy,jx+1]
         domain[jy+1,jx+1]=domain[jy,jx+1]
     else:
-        raise RuntimeError('Four-way province junctions could not be removed')
+        raise RuntimeError(evidence(junctions=len(jy)))
     ids,cells=np.unique(cells,return_inverse=True)
     cells=cells.reshape(domain.shape).astype(np.int32)+1
     kinds=np.zeros(len(ids)+1,dtype=np.int8)
@@ -212,7 +212,7 @@ def _grow(nodes,neighbours,centers,count,weights,rng,every=True,candidates=None)
     pools=[p for p in pools if p]
     for members,n in zip(pools,_split(count,[len(c) for c in pools],every)):
         if n>len(members):
-            raise ValueError('Not enough compatible provinces to seed the requested states')
+            raise ValueError(evidence(requested=n,available=len(members)))
         chosen=[rng.choice(members)] if n else []
         while len(chosen)<n:
             chosen.append(max(members,key=lambda m:min(np.hypot(*(centers[m]-centers[c])) for c in chosen)))
@@ -486,7 +486,7 @@ def _path(crop,start,stop,box,factor,spacing):
     node,chain=index[b],[]
     while node!=index[a]:
         if node<0:
-            raise RuntimeError(f'No route from {start} to {stop}')
+            raise RuntimeError(evidence(start=start,stop=stop))
         chain.append(node);node=previous[node]
     chain=chain[::-1][:-1][spacing//factor-1::spacing//factor]
     middle=[(x0+(n%w)*factor+factor//2,y0+(n//w)*factor+factor//2) for n in chain]

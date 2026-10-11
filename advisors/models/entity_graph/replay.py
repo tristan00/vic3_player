@@ -1,6 +1,6 @@
 import heapq
 
-from interface.common import timed
+from interface.common import evidence, timed
 from interface.options.stored import Stored
 from interface.recording.spec import TABLE
 from .source import keys
@@ -11,7 +11,7 @@ class ReplayReader(WorldReader):
     @timed
     def __init__(self,connection,run,stop,chunk_size=16):
         if chunk_size<1:
-            raise ValueError('Replay chunk size must be positive')
+            raise ValueError(evidence(chunk_size=chunk_size))
         super().__init__(connection,run)
         self.stop=stop
         self.chunk_size=chunk_size
@@ -55,11 +55,11 @@ class ReplayReader(WorldReader):
     @timed
     def advance(self,seq):
         if seq<self.position:
-            raise ValueError('Observation replay cannot move backwards')
+            raise ValueError(evidence(seq=seq,position=self.position))
         if seq>self.stop:
-            raise ValueError('Observation replay exceeds its requested boundary')
+            raise ValueError(evidence(seq=seq,stop=self.stop))
         if self.position>=0 and self.dates[seq]<self.dates[self.position]:
-            raise ValueError('Observation replay cannot move backwards in game time')
+            raise ValueError(evidence(seq=seq,position=self.position,date=self.dates[seq],held=self.dates[self.position]))
         while self.position<seq:
             if self.position==self.loaded:
                 self.load()

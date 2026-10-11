@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import sys
 
+from interface.common import evidence
 from interface.runner.session import _spawn
 from . import ROOT
 from .storage import read, write
@@ -28,10 +29,10 @@ def main():
     directory=args.directory or ROOT/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     if args.command=='start':
         if args.differentiation_weight is None or args.reward_weight is None:
-            parser.error('Starting a search requires --differentiation-weight and --reward-weight')
+            parser.error(evidence(differentiation_weight=args.differentiation_weight,reward_weight=args.reward_weight))
         weights=normalize({'differentiation':args.differentiation_weight,'reward':args.reward_weight})
         if min(args.trials,args.points_per_run,args.threads,args.memory_gb)<=0 or args.threads>20 or not math.isfinite(args.memory_gb):
-            raise ValueError('Invalid tuning budget')
+            raise ValueError(evidence(trials=args.trials,points_per_run=args.points_per_run,threads=args.threads,memory_gb=args.memory_gb))
         directory.mkdir(parents=True,exist_ok=False)
         write(directory/'request.json',{'data':str(args.data.resolve()) if args.data else None,'models':list(dict.fromkeys(args.models)),
               'trials':args.trials,'points_per_run':args.points_per_run,'threads':args.threads,'memory_gb':args.memory_gb,'seed':args.seed,'install':args.install,'initial_weights':weights})
@@ -42,7 +43,7 @@ def main():
             from interface.runner.session import process
             status=read(directory/'status.json')
             if process(status) is not None:
-                raise ValueError('This tuning job is already running')
+                raise ValueError(evidence(directory=directory,pid=process(status).pid))
             for model in read(directory/'request.json')['models']:
                 path=directory/model/'status.json'
                 if path.exists():

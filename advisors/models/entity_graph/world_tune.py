@@ -8,7 +8,7 @@ import time
 import numpy as np
 import torch
 
-from interface.common import timed
+from interface.common import evidence, timed
 from .experiment import restore
 from .job import record
 from .model import Configuration
@@ -21,7 +21,7 @@ from .world_experiment import evaluate, fit
 @timed
 def configurations(count,epochs):
     if not 1<=count<=12:
-        raise ValueError('This initial search supports one to twelve fits')
+        raise ValueError(evidence(count=count))
     baseline=Configuration(epochs=epochs)
     found={'full_world':baseline}
     rng=np.random.default_rng(20261001)
@@ -46,23 +46,23 @@ def search(packed,output,trials,epochs,wait_for):
     try:
         while not (packed/'complete.json').exists():
             if wait_for is None:
-                raise ValueError('World preparation is incomplete')
+                raise ValueError(evidence(wait_for=wait_for,path=packed/'complete.json'))
             status=json.loads(wait_for.read_text())
             if status['state']=='failed':
-                raise RuntimeError('World preparation failed')
+                raise RuntimeError(evidence(status=status))
             if status['state']=='complete':
-                raise RuntimeError('Preparation exited without a complete dataset')
+                raise RuntimeError(evidence(status=status,path=packed/'complete.json'))
             time.sleep(5)
         manifest=json.loads((packed/'dataset.json').read_text())
         if manifest.get('graph_version')!=GRAPH_VERSION:
-            raise ValueError('Dataset graph version does not match the search')
+            raise ValueError(evidence(found=manifest.get('graph_version'),expected=GRAPH_VERSION))
         validate_dataset(manifest)
         plan={'graph_version':GRAPH_VERSION,'configurations':{name:config.mapping() for name,config in planned.items()},
               'source_sha256':manifest['source_sha256'],'packed':str(packed.resolve()),
               'criterion':'.1 normalized reward RMSE + .9 (1 - candidate entropy)',
               'epoch_selection':'validation normalized sequence RMSE','test_not_used_for_selection':True}
         if (output/'search.json').exists() and json.loads((output/'search.json').read_text())!=plan:
-            raise ValueError('Output directory contains a different search plan')
+            raise ValueError(evidence(path=output/'search.json'))
         record(output/'search.json',plan)
         torch.set_num_threads(4)
         torch.backends.cuda.matmul.allow_tf32=False
@@ -73,7 +73,7 @@ def search(packed,output,trials,epochs,wait_for):
             if (target/'result.json').exists():
                 result=json.loads((target/'result.json').read_text())
                 if result.get('graph_version')!=GRAPH_VERSION or result['configuration']!=config.mapping():
-                    raise ValueError('Saved fit does not match this search')
+                    raise ValueError(evidence(found=result.get('graph_version'),expected=GRAPH_VERSION,saved=result['configuration'],searched=config.mapping()))
             else:
                 try:
                     result=fit(packed,target,'full_world',config,manifest)
@@ -89,7 +89,7 @@ def search(packed,output,trials,epochs,wait_for):
             gc.collect()
             torch.cuda.empty_cache()
         if not results:
-            raise RuntimeError('No full-world configuration completed')
+            raise RuntimeError(evidence(results=results))
         selected=min(results,key=lambda row:row['validation']['score'])['name']
         record(output/'selection.json',{'baseline':'full_world','selected':selected,'criterion':plan['criterion'],
                                         'epoch_selection':plan['epoch_selection'],'test_not_used_for_selection':True})

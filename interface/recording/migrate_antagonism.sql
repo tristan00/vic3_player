@@ -5,7 +5,7 @@ set local lock_timeout = '3s';
 do $$
 begin
   if (select encode(digest, 'hex') from schema_digest) is distinct from '5e29e5d60e94a06b0be9f7acfbd5da219dd4b5112fac43a53bc15632f436cc4b' then
-    raise exception 'Unexpected source schema for antagonism migration';
+    raise exception 'migrate_antagonism.sql digest=% expected=5e29e5d60e94a06b0be9f7acfbd5da219dd4b5112fac43a53bc15632f436cc4b', (select encode(digest, 'hex') from schema_digest);
   end if;
 end $$;
 

@@ -10,7 +10,7 @@ import time
 import numpy as np
 import psycopg
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from interface.options.stored import Shared
 from interface.recording.store import DSN
 from .encoding import Encoder, Survey, fragment
@@ -34,7 +34,7 @@ def read(path,materialize=True):
     with (path if materialize else path.with_suffix('.record.pkl')).open('rb') as stream:
         value=pickle.load(stream)
     if value.get('graph_version')!=GRAPH_VERSION:
-        raise ValueError('Graph storage is obsolete; rebuild recurrent frames')
+        raise ValueError(evidence(found=value.get('graph_version'),expected=GRAPH_VERSION))
     return value
 
 
@@ -53,21 +53,21 @@ class Identities:
 def validate_dataset(manifest):
     rows=manifest['rows']
     if manifest.get('graph_version')!=GRAPH_VERSION or manifest.get('storage')!='recurrent_frames':
-        raise ValueError('Dataset must use recurrent frames; rebuild obsolete graphs')
+        raise ValueError(evidence(graph_version=manifest.get('graph_version'),expected=GRAPH_VERSION,storage=manifest.get('storage')))
     if manifest.get('coverage')!='all_recorded_decisions' or manifest.get('total_recorded_pauses')!=len(rows):
-        raise ValueError('Dataset must contain every recorded decision; rebuild without sampling')
+        raise ValueError(evidence(coverage=manifest.get('coverage'),total_recorded_pauses=manifest.get('total_recorded_pauses'),rows=len(rows)))
     if len({(row['run'],row['seq']) for row in rows})!=len(rows):
-        raise ValueError('Dataset contains duplicate decisions')
+        raise ValueError(evidence(distinct=len({(row['run'],row['seq']) for row in rows}),rows=len(rows)))
     frames=manifest.get('frames',[])
     if len({(row['run'],row['seq']) for row in frames})!=len(frames):
-        raise ValueError('Dataset contains duplicate observations')
+        raise ValueError(evidence(distinct=len({(row['run'],row['seq']) for row in frames}),frames=len(frames)))
     decisions={(row['run'],row['seq'],row['split']) for row in rows}
     if {(row['run'],row['seq'],row['split']) for row in frames if row['decision']}!=decisions:
-        raise ValueError('Recurrent frames must include every decision in its assigned split')
+        raise ValueError(evidence(decisions=len(decisions),framed=len({(row['run'],row['seq'],row['split']) for row in frames if row['decision']})))
     splits={}
     for row in frames:
         if splits.setdefault(row['run'],row['split'])!=row['split']:
-            raise ValueError('All observations in a run must belong to the same split')
+            raise ValueError(evidence(run=row['run'],split=row['split'],held=splits[row['run']]))
 
 
 @timed
@@ -135,9 +135,9 @@ def extract_frames(arguments):
         if shared is not None:
             shared.names.update(reader.vocabulary)
         if len(tasks)!=len(chosen) or sorted(chosen)!=sorted(reader.actions):
-            raise ValueError(f'Source must contain every recorded decision for run {run}')
+            raise ValueError(evidence(run=run,tasks=len(tasks),chosen=len(chosen),recorded=len(reader.actions)))
         if len({task['split'] for task in tasks})!=1:
-            raise ValueError('A run cannot cross dataset splits')
+            raise ValueError(evidence(run=run,splits=sorted({task['split'] for task in tasks})))
         for seq in sorted(at for at in reader.dates if at<=max(chosen)):
             started=time.monotonic()
             data=reader.read(seq)
@@ -232,7 +232,7 @@ def pack_run(arguments):
                 found[key]=remap(found[key]['graph'],found[key]['encoder'],encoder)
         found['deltas']=[remap(delta['graph'],delta['encoder'],encoder) for delta in found['deltas']]
         if any(not np.isfinite(graph['values']).all() for graph in (found['graph'],found['proposal'],*found['deltas']) if graph is not None):
-            raise ValueError(f'Nonfinite world features in {path}')
+            raise ValueError(evidence(path=path))
         write(path.with_suffix('.pkl'),found)
         path.unlink()
 
@@ -241,7 +241,7 @@ def pack_run(arguments):
 def prepare(source,output,workers):
     manifest=json.loads((source/'dataset.json').read_text())
     if manifest.get('coverage')!='all_recorded_decisions' or len(manifest['tasks'])!=manifest['total_recorded_pauses']:
-        raise ValueError('Source must contain every recorded decision; export it again without sampling')
+        raise ValueError(evidence(coverage=manifest.get('coverage'),tasks=len(manifest['tasks']),total_recorded_pauses=manifest['total_recorded_pauses']))
     output.mkdir(parents=True,exist_ok=False)
     runs=sorted({t['run'] for t in manifest['tasks']})
     started=time.monotonic()
@@ -252,7 +252,7 @@ def prepare(source,output,workers):
     expected={(t['run'],t['seq']) for t in manifest['tasks']}
     observed={(r['run'],r['seq']) for r in rows}
     if expected!=observed or len(rows)!=len(manifest['tasks']):
-        raise ValueError('Graph creation must cover every source decision exactly once')
+        raise ValueError(evidence(expected=len(expected),observed=len(observed),rows=len(rows),tasks=len(manifest['tasks'])))
     encoder=Encoder(load(output/f'{row["run"]}_{row["seq"]}.survey.gz') for row in frames if row['split']=='train')
     save(output/'encoder.pkl.gz',encoder)
     with ProcessPoolExecutor(max_workers=workers) as pool:

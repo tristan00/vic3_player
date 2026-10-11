@@ -1,6 +1,7 @@
 import re
 from pathlib import Path
 
+from ..common import evidence
 from .spec import CHECKS,CLOSED,ENTITIES,ENUMS,TABLES,VOCABULARIES,Col,I4
 
 HERE=Path(__file__).parent
@@ -20,15 +21,15 @@ def references(table,columns):
     for column in columns:
         if column.entity:
             if column.entity not in ENTITIES:
-                raise SystemExit(f'{table}.{column.name} references unknown entity {column.entity}')
+                raise SystemExit(evidence(table=table,column=column.name,entity=column.entity))
             lines.append(f'  foreign key (run_id, {column.name}) references {column.entity}')
         elif column.vocabulary:
             if column.vocabulary not in VOCABULARIES:
-                raise SystemExit(f'{table}.{column.name} references unknown vocabulary {column.vocabulary}')
+                raise SystemExit(evidence(table=table,column=column.name,vocabulary=column.vocabulary))
             lines.append(f'  foreign key ({column.name}) references {column.vocabulary}')
         elif column.enum:
             if column.enum not in ENUMS:
-                raise SystemExit(f'{table}.{column.name} references unknown enum {column.enum}')
+                raise SystemExit(evidence(table=table,column=column.name,enum=column.enum))
             lines.append(f'  foreign key ({column.name}) references {column.enum}')
         elif column.check:
             lines.append(f"  check ({column.name} in ({', '.join(repr(value) for value in CHECKS[column.check])}))")
@@ -53,7 +54,7 @@ def emit(table):
     lines+=[definition(c,not versioned and not c.optional) for c in table.columns]
     names=[c.name for c in keys+table.columns]
     if len(names)!=len(set(names)):
-        raise SystemExit(f'{table.name} repeats a column: {names}')
+        raise SystemExit(evidence(table=table.name,names=names))
     ordering=[k.name for k in keys]+(['n'] if table.kind=='sample' else ['seq'])
     lines.append(f"  primary key (run_id, {', '.join(ordering)})")
     if table.owner:
@@ -66,7 +67,7 @@ def emit(table):
             lines.append(f"  check (present = (num_nulls({', '.join(required)}) = 0))")
         lines.append(f"  check (present or num_nonnulls({', '.join(c.name for c in table.columns)}) = 0)")
     if table.kind in ('subject','singleton') and all(c.optional for c in table.columns):
-        raise SystemExit(f'{table.name} has no required column')
+        raise SystemExit(evidence(table=table.name))
     if table.name=='player_budget_line':
         lines.append('  foreign key (direction, line) references budget_line')
     return f'create table {table.name} (\n'+',\n'.join(lines)+'\n);\n'
@@ -137,14 +138,14 @@ def main():
     sql=''.join(parts)
     names=re.findall(r'create table (\w+)',sql)
     if len(names)!=len(set(names)):
-        raise SystemExit(f'duplicate tables {sorted(n for n in set(names) if names.count(n)>1)}')
+        raise SystemExit(evidence(tables=sorted(n for n in set(names) if names.count(n)>1)))
     columns={}
     for table in TABLES:
         for column in key_columns(table)+table.columns:
             columns.setdefault(column.name,set()).add(kind(column))
     clashes={name:types for name,types in columns.items() if len(types)>1}
     if clashes:
-        raise SystemExit(f'one name, several types: {clashes}')
+        raise SystemExit(evidence(clashes=clashes))
     open('D:/vic3_agent/interface/recording/schema.sql','w',newline='\n').write(sql)
     widest=sorted(((len(t.columns)+len(t.keys),t.name) for t in TABLES),reverse=True)[:6]
     print(len(names),'tables',len(ENTITIES),'entities',len(order),'functions','widest',widest)

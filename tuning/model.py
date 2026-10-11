@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from catboost import CatBoostRegressor, Pool
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from .features import Encoder
 from .metrics import scale
 from .space import model_params
@@ -49,7 +49,7 @@ class PickerModel:
         self.estimator.fit(pool(frame,(y-self.mean)/self.scale,weights,self.params['thread_count']),
                            callbacks=[] if monitor is None else [monitor])
         if self.estimator.tree_count_!=self.params['iterations']:
-            raise ValueError('Incomplete model fit cannot be scored')
+            raise ValueError(evidence(trees=self.estimator.tree_count_,iterations=self.params['iterations']))
         self.feature_count=len(frame.columns)
         if self.encoder.model=='row':
             self.estimator.drop_unused_features()

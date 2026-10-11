@@ -2,7 +2,7 @@ begin;
 do $$
 begin
   if (select encode(digest, 'hex') from schema_digest) <> 'e18f43ce2bcb62e438ee0bc00a8858ea683d8dfcf3d29ba7feef9a06216594fc' then
-    raise exception 'Unexpected source schema for international migration';
+    raise exception 'migrate_international.sql digest=% expected=e18f43ce2bcb62e438ee0bc00a8858ea683d8dfcf3d29ba7feef9a06216594fc', (select encode(digest, 'hex') from schema_digest);
   end if;
 end $$;
 alter table run add column interconnectedness float8 check (interconnectedness between 0 and 1);

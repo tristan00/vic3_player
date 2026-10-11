@@ -5,6 +5,7 @@ import logging
 import math
 from math import log2
 from pathlib import Path
+import sys
 import threading
 from threading import get_ident
 import time
@@ -22,6 +23,11 @@ TRACE=ContextVar('timing_trace',default=None)
 
 def ms(ns):
     return ns/NS_PER_MS
+
+
+def evidence(**variables):
+    frame=sys._getframe(1)
+    return ' '.join([f'{frame.f_code.co_filename}:{frame.f_lineno}',frame.f_code.co_qualname,*(f'{name}={value!r}' for name,value in variables.items())])
 
 
 class Stats:
@@ -180,7 +186,7 @@ def timer(log,stamp=None,level=logging.INFO):
 
     def timed(function):
         if inspect.isgeneratorfunction(function) or inspect.iscoroutinefunction(function) or inspect.isasyncgenfunction(function):
-            raise TypeError(f'{function.__qualname__} is a generator or coroutine; timing the call would measure only its creation')
+            raise TypeError(evidence(function=function.__qualname__))
         name=span_name(function)
         if stamp is None:
             @wraps(function)

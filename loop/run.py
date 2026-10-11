@@ -10,7 +10,7 @@ from advisors.pickers import PICKERS
 from advisors.data.rewards import draw_objective
 from interface import GameInterface, record
 from interface.actions import Executor
-from interface.common import DEFAULT_DATA, GameCrashed, timed, write_json
+from interface.common import DEFAULT_DATA, Defeated, GameCrashed, evidence, timed, write_json
 from interface.options.available import FASTEST_SPEED
 from interface.options.effects import LATER, took_effect, took_effect_later
 from interface.options.stored import Shared, Stored
@@ -98,12 +98,12 @@ def play(game,store,advisor,picker,settings):
                             if current!=hours:
                                 hours,moved=current,time.monotonic()
                             if time.monotonic()-moved>5:
-                                raise TimeoutError('The game date stopped advancing')
+                                raise TimeoutError(evidence(hours=hours,target=target,stalled=time.monotonic()-moved))
                             time.sleep(.02)
                         time.sleep(.25)
                 after=capture(phase)
                 if phase=='post_run' and not target<=after.hours<target+24:
-                    raise RuntimeError('The game missed the quarterly pause')
+                    raise RuntimeError(evidence(target=target,hours=after.hours))
                 open_ui=any(after.meta['ui_'+name+'_open'] for name in ('panel','interaction','map_list')) or bool(after.rows('ui_open_window','ui_window'))
                 for entry in pending:
                     entry['unverified']=entry['status']=='done' and not took_effect(entry['action'],snapshot,after,entry['params'])
@@ -152,7 +152,7 @@ def collect(settings,completed):
         store.world_reports(world)
         store.end_run(reason)
     except BaseException as error:
-        defeated='no longer owns any state' in str(error)
+        defeated=isinstance(error,Defeated)
         store.end_run('defeated' if defeated else 'game_crashed' if isinstance(error,GameCrashed) else 'loop_crashed',None if defeated else str(error)[:500])
         if not defeated: raise
     finally:
@@ -166,7 +166,7 @@ def work():
     try:
         while True:
             with state() as data:
-                if owner(data)!=psutil.Process(): raise RuntimeError('This process does not own the collection')
+                if owner(data)!=psutil.Process(): raise RuntimeError(evidence(owner=owner(data),process=psutil.Process()))
                 if data['stop']:
                     data['phase']='stopped'
                     return
@@ -184,22 +184,22 @@ def work():
         with state() as data:
             if owner(data)==psutil.Process():
                 data.update(phase='failed',error=f'{type(error).__name__}: {error}')
-        logging.exception('Collection failed')
+        logging.exception(evidence())
         raise
 
 def main(argv=None):
     parser=argparse.ArgumentParser(allow_abbrev=False)
     parser.add_argument('command',choices=('start','resume','status','configure','restart','stop','cancel','_work'))
-    parser.add_argument('--now',action='store_true',help='stop the current run immediately')
-    parser.add_argument('--completed',type=int,help='completed runs when starting an existing collection')
+    parser.add_argument('--now',action='store_true')
+    parser.add_argument('--completed',type=int)
     for name,value in DEFAULTS.items():
         parser.add_argument('--'+name.replace('_','-'),type=str if isinstance(value,list) else type(value),
                             nargs='+' if isinstance(value,list) else None,default=argparse.SUPPRESS)
     args=vars(parser.parse_args(argv))
     command,now,completed=args.pop('command'),args.pop('now'),args.pop('completed')
     if (args and command not in ('start','resume','configure','restart')) or (now and command!='stop'):
-        parser.error('settings apply to start/resume/configure/restart; --now applies to stop')
-    if completed is not None and (command!='start' or completed<0): parser.error('--completed requires start and a nonnegative count')
+        parser.error(evidence(command=command,settings=sorted(args),now=now))
+    if completed is not None and (command!='start' or completed<0): parser.error(evidence(command=command,completed=completed))
     if command=='_work':
         with open(DEFAULT_DATA/'collection.log','a',encoding='utf-8',buffering=1) as log,redirect_stdout(log),redirect_stderr(log):
             logging.basicConfig(level=logging.INFO,stream=log,format='%(asctime)s %(message)s',force=True)
@@ -210,17 +210,17 @@ def main(argv=None):
             phase='lost' if not running and data.get('phase') in ('starting','running') else data.get('phase','absent')
             print(json.dumps({**data,'alive':bool(running),'phase':phase},indent=2))
             return
-        if not data and command!='start': parser.error('No saved collection; use start first')
-        if running and command in ('start','resume'): parser.error('A collection is already running')
+        if not data and command!='start': parser.error(evidence(command=command,path=STATE))
+        if running and command in ('start','resume'): parser.error(evidence(command=command,pid=running.pid))
         settings={**(DEFAULTS if command=='start' else data['settings']),**args}
         if command in ('start','resume','configure','restart'):
             if settings['runs']<1 or settings['warmup']<0 or any(not math.isfinite(settings[n]) or settings[n]<=0 for n in ('years','minutes')):
-                parser.error('runs, years and minutes must be finite and positive; warmup must be nonnegative')
+                parser.error(evidence(runs=settings['runs'],warmup=settings['warmup'],years=settings['years'],minutes=settings['minutes']))
             if not settings['profile'] or Path(settings['profile']).name!=settings['profile'] or settings['profile'] in ('.','..'):
-                parser.error('profile must be a directory name')
-            if not set(settings['advisors'])<=ADVISORS.keys() or not set(settings['pickers'])<=PICKERS.keys(): parser.error('unknown advisor or picker')
+                parser.error(evidence(profile=settings['profile']))
+            if not set(settings['advisors'])<=ADVISORS.keys() or not set(settings['pickers'])<=PICKERS.keys(): parser.error(evidence(advisors=settings['advisors'],pickers=settings['pickers'],known_advisors=sorted(ADVISORS),known_pickers=sorted(PICKERS)))
             if not settings['world_cache'] or any(not (Path(directory)/'bank.json').is_file() for directory in settings['world_cache']):
-                parser.error('world-cache must list directories that each have a bank.json')
+                parser.error(evidence(world_cache=settings['world_cache']))
             settings['world_cache']=sorted({str(Path(directory).resolve()) for directory in settings['world_cache']})
             data['settings']=settings
         if command=='cancel': data.update(stop=False,restart=False,settings=data['active'].copy() if running else settings)

@@ -4,7 +4,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from interface.common import timed
+from interface.common import evidence, timed
 from interface.recording.spec import TABLE
 from ...catalogue import NAVAL
 from ...data.features import PEOPLE, SITE
@@ -51,7 +51,7 @@ def parameters(connection,actions,selection):
     for position,(run,seq,hours,name,params) in enumerate(actions):
         expected=PARAMETERS[name]
         if set(params)!={param for param,kind in expected}:
-            raise ValueError(f'{name} parameters differ from the catalogue')
+            raise ValueError(evidence(name=name,params=sorted(params),expected=expected))
         for param,kind in expected:
             prefix=f'parameter.{param}.{kind}'
             if selection.parameters.get(prefix) or prefix in result:

@@ -8,7 +8,7 @@ import numpy as np
 import psycopg
 import torch
 
-from interface.common import timed
+from interface.common import evidence, timed
 from interface.recording.store import DSN
 from .inference import Forecaster
 from .source import candidates
@@ -28,7 +28,7 @@ def verify(root):
         connection.execute('set transaction isolation level repeatable read read only')
         blocks=candidates(connection,run,seq,30,20261001+run*1009+seq)
     if blocks!=recorded['actions']:
-        raise ValueError('Fresh candidate generator differs from evaluated blocks')
+        raise ValueError(evidence(run=run,seq=seq,drawn=len(blocks),recorded=len(recorded['actions'])))
     names=[r['name'] for r in json.loads((output/'results.json').read_text())]
     for name in names:
         started=time.monotonic()
@@ -57,7 +57,7 @@ def main():
     while args.wait_for:
         status=json.loads(args.wait_for.read_text())
         if status['state']=='failed':
-            raise RuntimeError('Training did not complete')
+            raise RuntimeError(evidence(status=status))
         if status['state']=='complete':
             break
         time.sleep(5)

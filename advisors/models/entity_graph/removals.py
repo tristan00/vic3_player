@@ -2,7 +2,7 @@ from collections import Counter
 
 import numpy as np
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from interface.recording.spec import ENTITIES, TABLE
 from .graph import Graph
 from .source import keys
@@ -53,7 +53,7 @@ def plan(graph,data):
         is_foreign=(node['seq'],kind,node['key']) in foreign
         nodes[i]=(1 if is_foreign and kind in FOREIGN_FACTS else 0)|(2 if kind in POLITICAL_FACTS else 0)|(4 if kind=='state_pop_need' else 0)
         if kind in ENTITIES and nodes[i]:
-            raise ValueError('A removal targets a core world entity')
+            raise ValueError(evidence(kind=kind,index=i,removal=nodes[i]))
         attrs.append({key:(1 if is_foreign and key in FOREIGN_FIELDS else 0)|(2 if key in POLITICAL_FIELDS else 0) for key in node['attrs']})
     return nodes,attrs
 
@@ -74,7 +74,7 @@ def derive(graph,data,name):
     nodes=[{**graph.nodes[i],'attrs':{key:value for key,value in graph.nodes[i]['attrs'].items() if not attr_bits[i][key]&selected}} for i in keep]
     edges=[(remap[a],remap[b],r,w) for a,b,r,w in graph.edges if a in remap and b in remap]
     if Counter((n['seq'],n['kind'],n['key']) for n in graph.nodes if n['kind'] in ENTITIES)!=Counter((n['seq'],n['kind'],n['key']) for n in nodes if n['kind'] in ENTITIES):
-        raise ValueError('A removal lost a core entity')
+        raise ValueError(evidence(before=sum(n['kind'] in ENTITIES for n in graph.nodes),after=sum(n['kind'] in ENTITIES for n in nodes)))
     return Graph(nodes,edges,remap[graph.player],remap[graph.block],graph.audit)
 
 

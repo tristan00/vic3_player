@@ -10,7 +10,7 @@ import numpy as np
 import psycopg
 import torch
 
-from interface.common import timed
+from interface.common import evidence, timed
 from interface.recording.store import DSN
 from .encoding import Encoder, Survey
 from .model import Configuration, Network, collate
@@ -118,7 +118,7 @@ def accessibility(data,actions):
     history_difference=float(abs(third_prediction-first_prediction).max())
     repeat_difference=float(abs(repeated_prediction-first_prediction).max())
     if not min(gradient,history_gradient)>0 or not min(difference,history_difference)>max(1e-8,repeat_difference*4) or not np.isfinite([second_prediction,third_prediction]).all():
-        raise ValueError('Spatial or prior action change did not reach the recurrent model')
+        raise ValueError(evidence(gradient=gradient,history_gradient=history_gradient,difference=difference,history_difference=history_difference,repeat_difference=repeat_difference,second_prediction=second_prediction,third_prediction=third_prediction))
     result={'probe':'untrained fixed-seed network; two synthetic consecutive observations of one recorded world; input accessibility, not forecast accuracy',
             'formation':row['formation'],'x_before':original,'x_after':row['x'],'distance_embedding_gradient':gradient,
             'max_output_change':difference,'gpu_peak_bytes':torch.cuda.max_memory_allocated(),

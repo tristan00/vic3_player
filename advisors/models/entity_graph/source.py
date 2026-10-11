@@ -10,7 +10,7 @@ import time
 import numpy as np
 import psycopg
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from interface.recording.spec import TABLE
 from interface.recording.store import DSN
 from .schema import COMPONENTS, HORIZONS, PARAMETERS
@@ -127,13 +127,13 @@ def candidates(connection,run,seq,count,seed,snapshot=None):
     from loop.run import redraw
     snapshot,drawn=redraw(connection,run,seq,count,seed,snapshot=snapshot)
     if len(drawn)!=count:
-        raise ValueError('Candidate generator returned the wrong number of blocks')
+        raise ValueError(evidence(run=run,seq=seq,drawn=len(drawn),count=count))
     for block in drawn:
         if not block:
-            raise ValueError('Candidate block must contain an action')
+            raise ValueError(evidence(run=run,seq=seq,block=block))
         for name,params in block:
             if set(params)!=set(PARAMETERS[name]):
-                raise ValueError(f'Incomplete generated parameters: {name}: {params}')
+                raise ValueError(evidence(name=name,params=params,expected=PARAMETERS[name]))
     return drawn
 
 

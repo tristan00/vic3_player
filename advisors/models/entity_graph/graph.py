@@ -5,7 +5,7 @@ from operator import itemgetter
 
 import numpy as np
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from .schema import ENTITY_PARAMETERS, PARAMETERS
 
 
@@ -44,7 +44,7 @@ class Builder:
         if not self.design.edges or source is None or target is None:
             return
         if not math.isfinite(weight):
-            raise ValueError(f'Nonfinite edge weight for {relation}')
+            raise ValueError(evidence(relation=relation,weight=weight))
         self.edges.append((source,target,relation,float(weight)))
         if self.design.reverse if reverse is None else reverse:
             if relation not in self.inverse_relations:
@@ -93,13 +93,13 @@ class Builder:
     @timed
     def candidate(self,actions,seq,hour,player):
         if not actions:
-            raise ValueError('An action block must contain at least one action')
+            raise ValueError(evidence(actions=actions,seq=seq))
         block=self.node('action_block','candidate',seq,hour,{'size':float(len(actions))})
         self.edge(self.find(seq,'country',player),block,'candidate.player')
         previous=None
         for position,(name,params) in enumerate(actions):
             if set(params)!=set(PARAMETERS[name]):
-                raise ValueError(f'Action parameters do not match the catalogue: {name}')
+                raise ValueError(evidence(name=name,params=params,expected=PARAMETERS[name]))
             attrs={'action':name,'position':float(position)}
             targets=[]
             for param,value in params.items():
@@ -131,12 +131,12 @@ class Builder:
 def audit(graph,start):
     count=len(graph.nodes)
     if any(node['hour']>start for node in graph.nodes):
-        raise ValueError('Graph contains a future observation')
+        raise ValueError(evidence(start=start,latest=max(node['hour'] for node in graph.nodes)))
     indices=graph.connections()
     if (indices<0).any() or (indices>=count).any():
-        raise ValueError('Graph has a dangling edge')
+        raise ValueError(evidence(count=count,lowest=int(indices.min()),highest=int(indices.max())))
     relations=Counter(map(itemgetter(2),graph.edges))
     if any(relation.startswith('temporal.') for relation in relations):
-        raise ValueError('Recurrent graphs cannot contain temporal edges')
+        raise ValueError(evidence(temporal=sorted(relation for relation in relations if relation.startswith('temporal.'))))
     return {'node_types':dict(Counter(n['kind'] for n in graph.nodes)),
             'relations':dict(relations),**graph.audit}

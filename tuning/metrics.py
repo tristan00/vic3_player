@@ -1,6 +1,6 @@
 import numpy as np
 
-from interface.common import timed_often
+from interface.common import evidence, timed_often
 
 SPEC={'name':'option_separation_v1','candidates':100,'entropy_resolution':.01,'spread_scale':.1,
       'aggregation':'equal snapshots within equal runs',
@@ -16,10 +16,10 @@ def loss(metrics,weights):
 def scale(targets,weights=None):
     values=np.asarray(targets,dtype=float)
     if values.ndim!=1 or len(values)<2 or not np.isfinite(values).all():
-        raise ValueError('Training targets must be a finite vector with at least two observations')
+        raise ValueError(evidence(shape=values.shape,finite=bool(np.isfinite(values).all())))
     result=float(np.sqrt(np.average((values-np.average(values,weights=weights))**2,weights=weights)))
     if result<=np.finfo(float).eps*max(1.,float(np.max(np.abs(values)))):
-        raise ValueError('Training rewards have no usable variation')
+        raise ValueError(evidence(result=result))
     return result
 
 
@@ -27,7 +27,7 @@ def scale(targets,weights=None):
 def differentiation(predictions,training_scale):
     values=np.asarray(predictions,dtype=float)
     if values.shape!=(100,) or not np.isfinite(values).all() or not np.isfinite(training_scale) or training_scale<=0:
-        raise ValueError('Differentiation requires 100 finite predictions and a positive training scale')
+        raise ValueError(evidence(shape=values.shape,finite=bool(np.isfinite(values).all()),training_scale=training_scale))
     ordered=np.sort(values)
     tolerance=training_scale*SPEC['entropy_resolution']
     counts=[]
@@ -50,7 +50,7 @@ def differentiation(predictions,training_scale):
 @timed_often
 def summarize(points,weights):
     if not points:
-        raise ValueError('Validation requires held-out snapshots')
+        raise ValueError(evidence(points=points))
     runs=sorted({point['run'] for point in points})
     by_run=[{key:float(np.mean([p[key] for p in points if p['run']==run]))
              for key in ('mse','normalized_mse','entropy','std','spread','differentiation')} for run in runs]
@@ -62,5 +62,5 @@ def summarize(points,weights):
     result={**means,'rmse':rmse,'normalized_rmse':normalized_rmse,'reward_loss':reward_loss,'score':score,
             'snapshots':len(points),'runs':len(runs),'collapsed_fraction':float(np.mean([p['differentiation']==0 for p in points]))}
     if not all(np.isfinite(value) for value in result.values()):
-        raise ValueError('Nonfinite validation metrics')
+        raise ValueError(evidence(result=result))
     return result

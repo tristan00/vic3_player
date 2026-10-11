@@ -8,6 +8,7 @@ import traceback
 import psutil
 
 from .storage import read, write
+from interface.common import evidence
 from interface.timing import COLUMNS, RECORDER
 
 
@@ -21,7 +22,7 @@ def main():
     owner=psutil.Process()
     owner.cpu_affinity(owner.cpu_affinity()[:20])
     if not 1<=threads<=20:
-        raise ValueError('Training must use between 1 and 20 threads')
+        raise ValueError(evidence(threads=threads))
     for name in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','NUMEXPR_NUM_THREADS'):
         os.environ[name]=str(threads)
     logging.basicConfig(filename=output.with_suffix('.log'),level=logging.INFO,format='%(asctime)s %(message)s')

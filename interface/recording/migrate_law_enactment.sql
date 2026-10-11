@@ -5,7 +5,7 @@ set local lock_timeout = '3s';
 do $$
 begin
   if (select encode(digest, 'hex') from schema_digest) <> '280705c4cb77f8b0a94196bcc19fcacbf98a44fc267b43d5fd8127dbe8d26bc8' then
-    raise exception 'Unexpected source schema for law enactment migration';
+    raise exception 'migrate_law_enactment.sql digest=% expected=280705c4cb77f8b0a94196bcc19fcacbf98a44fc267b43d5fd8127dbe8d26bc8', (select encode(digest, 'hex') from schema_digest);
   end if;
 end $$;
 

@@ -2,7 +2,7 @@ import json
 import re
 from threading import Lock
 
-from interface.common import DEFAULT_GAME
+from interface.common import DEFAULT_GAME, evidence
 from interface.recording.spec import CLOSED, ENTITIES, TABLE
 
 from . import db
@@ -71,7 +71,7 @@ def key(table,code):
             VOCABULARY.pop(table,None)
         found=vocabulary(table)
     if code not in found:
-        raise ValueError(f'{table} has no {code}')
+        raise ValueError(evidence(table=table,code=code))
     return found[code]
 
 

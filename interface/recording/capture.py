@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import re
 
-from ..common import timed, timed_often
+from ..common import evidence, timed, timed_often
 from ..script import alerts, blocks, body, character_interactions, decisions, diplomatic_actions, diplomatic_state_triggers, journal_buttons, production_methods, read
 from ..visibility import Visibility
 
@@ -220,7 +220,7 @@ def fixed(expression,kind):
         return expression
     if kind=='bool':
         return f"Select_CFixedPoint({expression},'(CFixedPoint)1','(CFixedPoint)0')"
-    raise ValueError(f'No fixed-point conversion for {kind}')
+    raise ValueError(evidence(kind=kind))
 
 
 @timed_often

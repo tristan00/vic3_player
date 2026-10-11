@@ -5,7 +5,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 
 
 @dataclass(frozen=True)
@@ -98,7 +98,7 @@ class Network(nn.Module):
     def __init__(self,tokens,kinds,relations,configuration):
         super().__init__()
         if configuration.sequence_length<1:
-            raise ValueError('Recurrent sequence length must be positive')
+            raise ValueError(evidence(sequence_length=configuration.sequence_length))
         width=configuration.width
         self.configuration=configuration
         self.kinds=kinds
@@ -123,7 +123,7 @@ class Network(nn.Module):
     @timed_often
     def observe(self,batch,memory,hour):
         if len(batch['player'])!=1 or bool(batch['action'].any()):
-            raise ValueError('A recurrent observation contains one world and no proposed actions')
+            raise ValueError(evidence(players=len(batch['player']),actions=bool(batch['action'].any())))
         h=self.embed(batch)
         ids=batch['identity']
         size=int(ids.max())+1
@@ -133,7 +133,7 @@ class Network(nn.Module):
             elapsed=0.
         else:
             if hour<memory.hour:
-                raise ValueError('Recurrent observations must follow game time')
+                raise ValueError(evidence(hour=hour,held=memory.hour))
             previous=F.pad(memory.nodes,(0,0,0,max(0,size-len(memory.nodes))))
             global_state=memory.global_state
             elapsed=np.log1p((hour-memory.hour)/24)

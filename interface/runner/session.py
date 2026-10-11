@@ -2,7 +2,7 @@ import base64, ctypes, json, subprocess, time
 from contextlib import nullcontext
 from pathlib import Path
 import psutil
-from ..common import DEFAULT_DATA, DEFAULT_GAME, timed, write_json
+from ..common import DEFAULT_DATA, DEFAULT_GAME, evidence, timed, write_json
 from .memory import Process, Reader, kernel
 from .tail import LogTail
 
@@ -35,7 +35,7 @@ def patch_harvest(pid):
         address=process.base+0xe7c89c
         found=ctypes.create_string_buffer(len(expected))
         if not kernel.ReadProcessMemory(process.handle,address,found,len(expected),None) or found.raw!=expected:
-            raise RuntimeError('Unsupported small-map harvest code signature')
+            raise RuntimeError(evidence(address=hex(address),found=found.raw,expected=expected))
         old=ctypes.c_ulong()
         if not kernel.VirtualProtectEx(process.handle,address+3,1,0x40,ctypes.byref(old)): raise ctypes.WinError()
         try:
@@ -92,7 +92,7 @@ class GameInterface:
         from ..world.buildings import loaded
         from ..world.relationships import loaded as relationships
         if any((p.info['name'] or '').lower()=='victoria3.exe' for p in psutil.process_iter(['name'])):
-            raise RuntimeError('Victoria 3 is already running')
+            raise RuntimeError(evidence(running=[p.pid for p in psutil.process_iter(['name']) if (p.info['name'] or '').lower()=='victoria3.exe']))
         manifest=json.loads(Path(world).read_text(encoding='utf-8')) if world else None
         mods=([manifest['mod']] if manifest else [])+[str(prepare(self,tag,manifest))]
         settings=self.profile/'pdx_settings.json'
@@ -119,14 +119,14 @@ class GameInterface:
         deadline=time.monotonic()+180
         while 'INTERFACE|end|'+token not in self.log_since(0):
             if not process.is_running() or time.monotonic()>deadline:
-                raise RuntimeError('The game did not initialize')
+                raise RuntimeError(evidence(running=process.is_running(),token=token))
             time.sleep(.1)
         reader=self.reader()
         countries,_=reader.table('country')
         code=countries['country_definition'][countries['id'].tolist().index(reader.player())]
         if reader.names[int(code)-1][1]!=tag:
-            raise RuntimeError('The game loaded a different player')
+            raise RuntimeError(evidence(loaded=reader.names[int(code)-1][1],tag=tag))
         for name,check,errors in (('opening_buildings',loaded,'differences'),('opening_relationships',relationships,'errors')):
             report=check(reader,manifest)
             write_json(Path(world).parent/(name+'.json'),report)
-            if report[errors]: raise RuntimeError(f'{name}: {report[errors]}')
+            if report[errors]: raise RuntimeError(evidence(name=name,errors=report[errors]))

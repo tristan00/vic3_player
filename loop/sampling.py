@@ -1,5 +1,5 @@
 from advisors.catalogue import ANSWERS, LEVER, PROPOSALS
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from interface.options import available
 from .conflicts import context, cost, invalidates, resources, targets
 from .translate import offer
@@ -32,7 +32,7 @@ class Sampler:
     @timed_often
     def block(self,length):
         if length<1:
-            raise ValueError('Block length must be positive')
+            raise ValueError(evidence(length=length))
         block,claimed,budget=[],set(),self.budget.copy()
         pools=[pool[:] for pool in self.pools]
         question=0
@@ -44,7 +44,7 @@ class Sampler:
                 question+=1
             live=[item for item in pools[question] if position==length-1 or item[2][0] not in FINISH]
             if not live:
-                raise RuntimeError(f'No selectable action for slot {position+1} of {length}')
+                raise RuntimeError(evidence(slot=position+1,length=length))
             levers=sorted({LEVER[item[0]] for item in live})
             lever=self.random.choices(levers,weights=[self.weights[name] for name in levers])[0]
             name=self.random.choice(sorted({item[0] for item in live if LEVER[item[0]]==lever}))

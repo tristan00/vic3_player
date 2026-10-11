@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from ..common import timed, timed_often
+from ..common import evidence, timed, timed_often
 from ..script import event_namespaces, keys
 from .catalogue import ACTIONS, EVENT_WINDOW, KEYS, PROPOSALS, SHIP_PAGE, SHIP_PAGES, TRANSPORT_PLANNER, TYPES
 
@@ -54,9 +54,9 @@ def bindings(action):
         elif kind=='choice':
             values[name]='{'+name+'}'
         else:
-            raise ValueError(f'{action.name}: unknown parameter {param}')
+            raise ValueError(evidence(name=action.name,param=param))
     if slot>SLOTS:
-        raise ValueError(f'{action.name}: more than {SLOTS} object parameters')
+        raise ValueError(evidence(name=action.name,slot=slot,slots=SLOTS))
     return values
 
 
@@ -403,21 +403,21 @@ def windows(game_dir,mods=()):
         text=files.get(path) or (game_dir/path).read_text(encoding='utf-8-sig')
         if anchor.startswith('name = ') or anchor.startswith('datacontext = '):
             if text.count(anchor)!=1:
-                raise RuntimeError(f'{path}: anchor {anchor!r} occurs {text.count(anchor)} times')
+                raise RuntimeError(evidence(path=path,anchor=anchor,occurs=text.count(anchor)))
             files[path]=text.replace(anchor,anchor+'\n'+'\n'.join(inners))
             continue
         if anchor.startswith('onclick'):
             files[path]=text.replace(anchor,anchor+'\n'+'\n'.join(inners))
             continue
         if text.count(anchor)!=1:
-            raise RuntimeError(f'{path}: anchor {anchor!r} occurs {text.count(anchor)} times')
+            raise RuntimeError(evidence(path=path,anchor=anchor,occurs=text.count(anchor)))
         item=text.index('item = {',text.index(anchor))
         opener=text.index('{',text.index('=',item+len('item = {'))+1)+1
         files[path]=text[:opener]+'\n'+'\n'.join(inners)+'\n'+text[opener:]
     popups=files.get('gui/popups.gui') or (game_dir/'gui/popups.gui').read_text(encoding='utf-8-sig')
     for anchor,call in CONFIRM_ANSWERS:
         if anchor not in popups:
-            raise RuntimeError(f'gui/popups.gui: anchor {anchor!r} missing')
+            raise RuntimeError(evidence(anchor=anchor))
         popups=popups.replace(anchor,anchor+'\n'+confirm_answer(call))
     files['gui/popups.gui']=popups
     return probed(game_dir,files)

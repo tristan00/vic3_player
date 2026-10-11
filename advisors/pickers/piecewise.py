@@ -4,7 +4,7 @@ import logging
 import numpy as np
 import psycopg
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from interface.timing import RECORDER, current
 from ..data.endgame import NAME
 from ..models.row.features import live
@@ -48,9 +48,9 @@ class CatBoostPiecewisePicker:
     def pick(self,candidates,snapshot):
         counts=np.array([len(candidate) for candidate in candidates])
         if not len(counts) or (counts==0).any():
-            raise ValueError('Candidate sequences must contain at least one action')
+            raise ValueError(evidence(counts=counts))
         if (counts!=counts[0]).any():
-            raise ValueError('Piecewise candidates must have equal lengths')
+            raise ValueError(evidence(counts=counts))
         actions=[]
         unique={}
         indices=[]

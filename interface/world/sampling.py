@@ -1,6 +1,6 @@
 import random
 
-from ..common import timed_often
+from ..common import evidence, timed_often
 
 
 SAMPLING={'random_ideology_share':(0,1),'copies':(1,1),'source_groups':(1,4),'primary_culture_share':(0,1),
@@ -18,7 +18,7 @@ def room(states,pool):
 @timed_often
 def jobs(settings):
     if set(settings['levels'])-set(SAMPLING):
-        raise ValueError(f'Unknown world levels: {sorted(set(settings["levels"])-set(SAMPLING))}')
+        raise ValueError(evidence(unknown=sorted(set(settings['levels'])-set(SAMPLING))))
     rng=random.Random(settings['seed'])
     found={}
     while len(found)<settings['count']:
@@ -30,6 +30,6 @@ def jobs(settings):
         if not (1<=job['countries']<=room(job['states'],settings['country_pool']) and 0<=job['sides']<=job['countries'] and 1<=job['source_groups']<=groups and
                 all(0<=low<=high<=1 for low,high in map(job.get,PER_COUNTRY)) and
                 all(type(job[name]) is int if name in WHOLE else 0<=job[name]<=1 for name in SAMPLING if name not in PER_COUNTRY)):
-            raise ValueError(f'Impossible world: {job}')
+            raise ValueError(evidence(job=job))
         found.setdefault(job['seed'],job)
     return list(found.values())

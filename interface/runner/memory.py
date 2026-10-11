@@ -9,7 +9,7 @@ import weakref
 import numpy as np
 import psutil
 
-from ..common import DEFAULT_GAME, GameCrashed, progress, timed, timed_often
+from ..common import DEFAULT_GAME, GameCrashed, evidence, progress, timed, timed_often
 from ..script import read, scalar
 from ..visibility import Visibility
 
@@ -54,7 +54,7 @@ class Process:
     @timed_often
     def check(self):
         if kernel.WaitForSingleObject(self.handle,0)==WAIT_OBJECT_0:
-            raise GameCrashed(f'The game process {self.pid} exited')
+            raise GameCrashed(evidence(pid=self.pid))
 
 @timed_often
 def outputs(name,spec):
@@ -93,7 +93,7 @@ class Reader:
         for table,vtable in LAYOUT['database_vtable'].items():
             database=self.word(self.base+self.tables[table]['rva'])
             if self.word(database)-self.base!=vtable:
-                raise RuntimeError(f'Unsupported game build: {table} database signature differs from layout {LAYOUT["version"]}')
+                raise RuntimeError(evidence(table=table,word=hex(self.word(database)-self.base),vtable=hex(vtable),layout=LAYOUT['version']))
         self.keys={}
         self.names=[]
         self.key_columns=set()
@@ -125,14 +125,14 @@ class Reader:
         data=ctypes.create_string_buffer(size);count=ctypes.c_size_t()
         if not kernel.ReadProcessMemory(self.handle,address,data,size,ctypes.byref(count)) or count.value!=size:
             self.check()
-            raise OSError(f'Cannot read {size} bytes at {address:#x}')
+            raise OSError(evidence(size=size,address=hex(address)))
         return data.raw
 
     def array(self,address,size):
         data=np.empty(size//8,dtype='<i8');count=ctypes.c_size_t()
         if not kernel.ReadProcessMemory(self.handle,address,data.ctypes.data,size,ctypes.byref(count)) or count.value!=size:
             self.check()
-            raise OSError(f'Cannot read {size} bytes at {address:#x}')
+            raise OSError(evidence(size=size,address=hex(address)))
         return data
 
     def is_object(self,address,vtable):
@@ -150,46 +150,46 @@ class Reader:
         for offset in (0x10,0x20):
             pointer=self.word(pointer+offset)
         if self.word(pointer)!=self.base+0x45ae328:
-            raise RuntimeError('Unsupported ingame interface handler')
+            raise RuntimeError(evidence(word=hex(self.word(pointer)),expected=hex(self.base+0x45ae328)))
         manager=self.word(pointer+0x1df0)
         array,capacity,count=struct.unpack('<QII',self.read(manager+0x10,16))
         if count>capacity or count>100000:
-            raise RuntimeError('Invalid pending-event window collection')
+            raise RuntimeError(evidence(count=count,capacity=capacity))
         _,ids,addresses=self.objects(self.tables['event']['rva'])
         live={int(ident):int(address) for ident,address in zip(ids,addresses)}
         result={}
         for (window,) in struct.iter_unpack('<Q',self.read(array,count*8) if count else b''):
             if self.word(window)!=self.base+0x45b9ad8:
-                raise RuntimeError('Unsupported pending-event window')
+                raise RuntimeError(evidence(word=hex(self.word(window)),expected=hex(self.base+0x45b9ad8)))
             reference=self.word(window+0x88)
             identity=struct.unpack('<I',self.read(reference+16,4))[0]
             slot=identity&0xffffff
             if slot not in live or struct.unpack('<I',self.read(live[slot]+8,4))[0]!=identity:
-                raise RuntimeError('Event window refers to an expired event instance')
+                raise RuntimeError(evidence(identity=identity,slot=slot))
             if slot in result:
-                raise RuntimeError('Duplicate event window instance')
+                raise RuntimeError(evidence(slot=slot))
             options,capacity,count=struct.unpack('<QII',self.read(window+0x110,16))
             if count>capacity or count>10000:
-                raise RuntimeError('Invalid event-option collection')
+                raise RuntimeError(evidence(count=count,capacity=capacity))
             rows=[]
             for index in range(count):
                 option=options+index*88
                 if self.word(option)!=window:
-                    raise RuntimeError('Event option belongs to a different window')
+                    raise RuntimeError(evidence(word=hex(self.word(option)),window=hex(window)))
                 ordinal=struct.unpack('<I',self.read(option+8,4))[0]
                 enabled,default=struct.unpack('<BB',self.read(option+81,2))
                 if enabled>1 or default>1:
-                    raise RuntimeError('Invalid native event-option flags')
+                    raise RuntimeError(evidence(enabled=enabled,default=default))
                 rows.append((ordinal,index,enabled,default,self.string(option+16),self.string(option+48)))
             if len({row[0] for row in rows})!=len(rows):
-                raise RuntimeError('Duplicate native event-option identity')
+                raise RuntimeError(evidence(ordinals=[row[0] for row in rows]))
             definition=self.word(live[slot]+24)
             capacity,total=struct.unpack('<II',self.read(definition+0x148,8))
             if total>capacity or total>10000:
-                raise RuntimeError('Invalid native event-option definition collection')
+                raise RuntimeError(evidence(total=total,capacity=capacity))
             shown={row[0]:row for row in rows}
             if not shown.keys()<=set(range(total)):
-                raise RuntimeError('Native event option has no matching definition')
+                raise RuntimeError(evidence(shown=sorted(shown),total=total))
             result[slot]=[shown.get(ordinal,(ordinal,-1,0,0,None,None)) for ordinal in range(total)]
         return result
 
@@ -202,12 +202,12 @@ class Reader:
         store=self.word(address+offset)
         pointer,capacity,count=struct.unpack('<QII',self.read(store+8,16))
         if count>capacity:
-            raise RuntimeError('Invalid variable store')
+            raise RuntimeError(evidence(count=count,capacity=capacity))
         values=self.read(pointer,count*32)
         codes=self.tokens(np.array([struct.unpack_from('<I',values,index*32+8)[0] for index in range(count)],dtype=np.int64))
         found={self.names[int(code)-1][1]:pointer+index*32 for index,code in enumerate(codes) if self.names[int(code)-1][1] in names}
         if len(found)!=len(names):
-            raise RuntimeError(f'The running control mod lacks variables {sorted(set(names)-set(found))}; restart the campaign with the current control mod')
+            raise RuntimeError(evidence(missing=sorted(set(names)-set(found))))
         return found
 
     def token(self,value):
@@ -245,14 +245,14 @@ class Reader:
             return {'variables':{},'lists':{},'maps':{},'days':{}}
         pointer,capacity,count=struct.unpack('<QII',self.read(store+8,16))
         if count>capacity:
-            raise RuntimeError('Invalid variable store')
+            raise RuntimeError(evidence(count=count,capacity=capacity))
         raw=self.read(pointer,count*32) if count else b''
         variables={name(code):self.item(kind,value) for code,kind,value in
                    (struct.unpack_from('<I4xI4xq',raw,index*32+8) for index in range(count))}
         container=self.word(address+spec['variable_lists']['pointer'])
         pointer,capacity,count=struct.unpack('<QII',self.read(container,16)) if container else (0,0,0)
         if count>capacity:
-            raise RuntimeError('Invalid variable list container')
+            raise RuntimeError(evidence(count=count,capacity=capacity))
         lists={}
         raw=self.read(pointer,count*64) if count else b''
         for index in range(count):
@@ -262,7 +262,7 @@ class Reader:
         container=self.word(address+spec['variable_maps']['pointer'])
         pointer,capacity,count=struct.unpack('<QII',self.read(container,16)) if container else (0,0,0)
         if count>capacity:
-            raise RuntimeError('Invalid variable map container')
+            raise RuntimeError(evidence(count=count,capacity=capacity))
         maps={}
         days={}
         raw=self.read(pointer,count*48) if count else b''
@@ -270,7 +270,7 @@ class Reader:
             code,=struct.unpack_from('<I',raw,index*48)
             table,size,mask,overflow=struct.unpack_from('<QIIB',raw,index*48+16)
             if mask&(mask+1) or overflow>64:
-                raise RuntimeError('Invalid variable map capacity')
+                raise RuntimeError(evidence(mask=mask,overflow=overflow))
             slots=self.read(table,(mask+1+overflow)*48)
             entries={}
             left={}
@@ -282,7 +282,7 @@ class Reader:
                     entries[entry]=self.item(value_kind,value,logged)
                     left[entry]=remaining
             if len(entries)!=size:
-                raise RuntimeError(f'Variable map {name(code)} holds {size} entries but {len(entries)} slots are occupied')
+                raise RuntimeError(evidence(map=name(code),size=size,entries=len(entries)))
             maps[name(code)]=entries
             if logged:
                 days[name(code)]=left
@@ -298,7 +298,7 @@ class Reader:
             process=psutil.Process(self.pid)
             process.suspend()
         except (psutil.AccessDenied,psutil.NoSuchProcess) as error:
-            raise GameCrashed(f'The game process {self.pid} cannot be suspended') from error
+            raise GameCrashed(evidence(pid=self.pid)) from error
         try:
             addresses=self.variables(tuple(dict.fromkeys(name for name,_,_ in writes)))
             self.write([(addresses[name]+offset,data) for name,offset,data in writes])
@@ -324,7 +324,7 @@ class Reader:
     def request_capture(self,nonce,timeout=30,save=False):
         events,_=self.table('event')
         if any(not key or not self.names[int(key)-1][1] for key in events['event_event']):
-            raise RuntimeError('Pending event has no loaded definition')
+            raise RuntimeError(evidence(keys=list(events['event_event'])))
         self.write_variables([(name,24,struct.pack('<q',value)) for name,value in
                     (('interface_capture_seq',nonce*SCALE),('interface_capture_done',0),('interface_capture',200000 if save else 100000))])
         self.captured(self.control_targets(),time.monotonic()+timeout)
@@ -334,7 +334,7 @@ class Reader:
         while self.word(targets['interface_capture_done'])!=200000 or self.word(targets['interface_capture'])!=0:
             progress('request_capture')
             if time.monotonic()>deadline:
-                raise TimeoutError('The game did not acknowledge the live capture request')
+                raise TimeoutError(evidence(done=self.word(targets['interface_capture_done']),capture=self.word(targets['interface_capture'])))
             time.sleep(.002)
             targets=self.control_targets()
 
@@ -374,7 +374,7 @@ class Reader:
         raw=self.read(address,32)
         size,capacity=struct.unpack_from('<QQ',raw,16)
         if size>1<<16 or capacity<size:
-            raise OSError(f'No string at {address:#x}')
+            raise OSError(evidence(address=hex(address),size=size,capacity=capacity))
         return (self.read(struct.unpack_from('<Q',raw)[0],size) if capacity>=16 else raw[:size]).decode('utf-8','replace')
 
     def codes(self,kind,pointers,inner=0x18):
@@ -434,7 +434,7 @@ class Reader:
             chosen=kinds==kind
             indexes=values[chosen]
             if np.any((indexes<0)|(indexes>=len(codes))):
-                raise RuntimeError(f'Invalid scope definition index for type {kind}')
+                raise RuntimeError(evidence(kind=kind))
             result[chosen]=codes[indexes]
         return result
 
@@ -470,7 +470,7 @@ class Reader:
                     raw=row.tobytes()
                     size,capacity=struct.unpack_from('<QQ',raw,16)
                     if size>1<<16 or capacity<size:
-                        raise OSError('Invalid column string')
+                        raise OSError(evidence(size=size,capacity=capacity))
                     value=(self.read(struct.unpack_from('<Q',raw)[0],size) if capacity>=16 else raw[:size]).decode('utf-8','replace')
                     key=('string',value)
                     if key not in self.keys:
@@ -496,7 +496,7 @@ class Reader:
         valid=(sizes>0)&(pointers>HEAP_LOW)&(pointers<HEAP_HIGH)&((sizes<=1<<24)&(buckets&(buckets-1)==0)&(other>0)&(other<=sizes)&(sizes>=buckets) if used is not None else sizes<=other)
         active=other>0 if used is not None else sizes>0
         if np.any(active&~valid):
-            raise RuntimeError(f'Invalid {child} container for objects {slots[active&~valid].tolist()}')
+            raise RuntimeError(evidence(child=child,objects=slots[active&~valid].tolist()))
         live=np.nonzero(valid)[0]
         width=int(sizes[live].max()) if len(live) else 0
         owner,position=np.nonzero(np.arange(width)[None,:]<sizes[live][:,None])
@@ -518,7 +518,7 @@ class Reader:
         if stride==4:
             for column,(kind,inner) in (members or {'value':['i',0]}).items():
                 if inner!=0:
-                    raise ValueError(f'Invalid {child}.{column} offset {inner} for four-byte elements')
+                    raise ValueError(evidence(child=child,column=column,inner=inner))
                 rows[column]=self.member(child,column,kind,elements[owner,position,0])
             return rows
         if used is not None:
@@ -594,7 +594,7 @@ class Reader:
             identity=halves[:,offset//4].copy()
             wrong=(identity&0xffffff)!=slots
             if np.any(wrong):
-                raise RuntimeError(f'{name} identity at +{offset} does not hold the slot for objects {slots[wrong][:5].tolist()}')
+                raise RuntimeError(evidence(name=name,offset=offset,objects=slots[wrong][:5].tolist()))
             result['ident']=identity
         for column,(kind,offset,*bit) in spec['fields'].items():
             if column in skip:
@@ -728,7 +728,7 @@ class Reader:
                                 {'type':['i',0],'value':['w',8],'flag':['optional_token',8,'type',[3]],'definition':['scope_definition',8,'type']})
             durations=self.vector('',index,np.stack([lists.pop('_durations'),lists.pop('_duration_counts')],1),0,12,4,{})
             if not np.array_equal(entries['id'],durations['id']) or not np.array_equal(entries['ord'],durations['ord']):
-                raise RuntimeError(f'Invalid {name} variable list durations')
+                raise RuntimeError(evidence(name=name))
             children[name+'_list']=lists
             owner=entries['id']
             children[name+'_list_item']={'id':lists['id'][owner],'list_ord':lists['ord'][owner],'ord':entries['ord'],
@@ -783,7 +783,7 @@ class Reader:
         offset,count_offset,*_=spec['vectors']['country_states']
         pointer,capacity,count=struct.unpack('<Qii',self.read(address+offset,count_offset+4-offset))
         if count<0 or count>capacity or count and not HEAP_LOW<pointer<HEAP_HIGH:
-            raise RuntimeError(f'Invalid country_states container for object {player}')
+            raise RuntimeError(evidence(player=player,pointer=hex(pointer),capacity=capacity,count=count))
         return count>0
 
     @timed_often

@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 
-from interface.common import timed
+from interface.common import evidence, timed
 from interface.timing import current
 from .random import HIGH, LOW, RandomAdvisor
 from ..data.weights import history, normalized
@@ -18,7 +18,7 @@ class RandomSvrWeightingAdvisor(RandomAdvisor):
         space=[name for name in actions if name not in self.excluded]
         X,y,runs=history(store.connection,space)
         if not len(y):
-            raise ValueError(f'{self.name} needs at least one scored run; launch with --warmup')
+            raise ValueError(evidence(name=self.name,scored=len(y)))
         target=normalized(y)
         rng=np.random.default_rng(self.random.randrange(2**32))
         rows=rng.integers(len(y),size=len(y))

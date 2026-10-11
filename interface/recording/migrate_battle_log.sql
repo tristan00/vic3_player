@@ -4,7 +4,7 @@ set local lock_timeout = '3s';
 do $$
 begin
   if (select encode(digest, 'hex') from schema_digest) <> 'a29a5ddcd264e0117235ec8bbf259dd47f0b90b31bf1b89f81f8e159db6c9dea' then
-    raise exception 'Unexpected source schema for battle log migration';
+    raise exception 'migrate_battle_log.sql digest=% expected=a29a5ddcd264e0117235ec8bbf259dd47f0b90b31bf1b89f81f8e159db6c9dea', (select encode(digest, 'hex') from schema_digest);
   end if;
 end $$;
 create table battle_start (

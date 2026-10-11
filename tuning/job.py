@@ -11,7 +11,7 @@ import traceback
 
 import psutil
 
-from interface.common import timed
+from interface.common import evidence, timed
 from . import ACTIVE, VERSION
 from . import weighting
 from .data import prepare, verify
@@ -42,7 +42,7 @@ def stop(process):
 @timed
 def execute(directory,request,seconds,memory_gb,heartbeat):
     if not 0<seconds<=SECONDS:
-        raise ValueError('Trial cutoff must not exceed 30 seconds')
+        raise ValueError(evidence(seconds=seconds,limit=SECONDS))
     request_path=directory/f"request_{request['trial']:05d}.json"
     output=directory/f"result_{request['trial']:05d}.json"
     request={**request,'output':str(output.resolve())}
@@ -111,14 +111,14 @@ def run_search(directory,data,manifest,model,settings,heartbeat):
             'source_digest':source_digest(),'metric':SPEC,'groups':space.groups,'parameters':space.parameters,'seconds_limit':SECONDS,**settings}
     config_path=directory/'search.json'
     if config_path.exists() and read(config_path)!=search:
-        raise ValueError('Cannot resume a search with changed data, source, parameters or settings')
+        raise ValueError(evidence(path=config_path))
     write(config_path,search)
     history=[read(path) for path in sorted(directory.glob('trial_*.json'))]
     if [trial['trial'] for trial in history]!=list(range(len(history))):
-        raise ValueError('Noncontiguous trial history')
+        raise ValueError(evidence(trials=[trial['trial'] for trial in history]))
     for trial in history:
         if space.canonical(trial['config'])!=trial['config'] or (trial['state']=='completed' and not math.isfinite(trial['metrics']['score'])):
-            raise ValueError('Invalid saved trial')
+            raise ValueError(evidence(trial=trial['trial'],state=trial['state']))
     while len(history)<settings['trials']:
         number=len(history)
         weights=weighting.current(directory)
@@ -144,7 +144,7 @@ def run_search(directory,data,manifest,model,settings,heartbeat):
 def finish(directory,history,manifest,model,settings,search,groups,weights):
     eligible=[trial for trial in history if trial['state']=='completed']
     if not eligible:
-        raise RuntimeError('No configuration completed within 30 seconds; no model was installed')
+        raise RuntimeError(evidence(trials=len(history),states=sorted({trial['state'] for trial in history})))
     chosen=min(eligible,key=lambda trial:loss(trial['metrics'],weights['weights']))
     winner={**chosen,'metrics':{**chosen['metrics'],'score':loss(chosen['metrics'],weights['weights'])},
             'baseline':{**chosen['baseline'],'score':loss(chosen['baseline'],weights['weights'])},'ranking_weighting':weights}
@@ -181,7 +181,7 @@ def run(directory):
         write(directory/'status.json',{'state':'completed','phase':'completed','updated':time.time(),'seconds':time.monotonic()-started})
     except Exception:
         error=traceback.format_exc()
-        LOG.exception('tuning failed')
+        LOG.exception(evidence())
         for model in settings['models']:
             path=directory/model/'status.json'
             if path.exists() and read(path)['state']=='running':

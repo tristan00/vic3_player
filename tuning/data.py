@@ -11,7 +11,7 @@ from advisors.data.histograms import entries, live_holdings
 from advisors.models.histogram import data as batch
 from advisors.models.row import data as action
 from advisors.models.row import features as row
-from interface.common import timed
+from interface.common import evidence, timed
 from interface.options.stored import Shared, Stored
 from interface.recording.store import DSN
 from . import VERSION
@@ -38,7 +38,7 @@ def blueprint(bounds,seed,points_per_run):
 @timed
 def prepare(directory,seed=19,points_per_run=12,progress=None):
     if points_per_run<1:
-        raise ValueError('Preparation needs at least one snapshot per validation run')
+        raise ValueError(evidence(points_per_run=points_per_run))
     directory.mkdir(parents=True,exist_ok=True)
     checkpoint=directory/'preparation.json'
     with psycopg.connect(DSN,connect_timeout=5) as connection:
@@ -46,10 +46,10 @@ def prepare(directory,seed=19,points_per_run=12,progress=None):
         if checkpoint.exists():
             manifest=read(checkpoint)
             if manifest['seed']!=seed or manifest['points_per_run']!=points_per_run or manifest['objective']!=OBJECTIVE or manifest['groups']!={model:taxonomy(model) for model in ('histogram','row')}:
-                raise ValueError('Preparation settings or schema changed')
+                raise ValueError(evidence(seed=manifest['seed'],given_seed=seed,points_per_run=manifest['points_per_run'],given_points_per_run=points_per_run,objective_match=manifest['objective']==OBJECTIVE,groups_match=manifest['groups']=={model:taxonomy(model) for model in ('histogram','row')}))
             for name,expected in manifest['files'].items():
                 if digest(directory/name)!=expected:
-                    raise ValueError(f'Prepared file changed: {name}')
+                    raise ValueError(evidence(name=name,digest=digest(directory/name),expected=expected))
         else:
             manifest=blueprint(connection.execute(HISTORY,scored_runs()).fetchall(),seed,points_per_run)
             write(checkpoint,manifest)
@@ -86,7 +86,7 @@ def prepare(directory,seed=19,points_per_run=12,progress=None):
                     draw_seed=int(np.random.SeedSequence([seed,run,seq]).generate_state(1)[0])
                     _,blocks=redraw(connection,run,seq,100,draw_seed,weights=manifest['weights'],snapshot=snapshot)
                     if len(blocks)!=100 or any(not block for block in blocks):
-                        raise ValueError(f'Candidate generator failed at {run}/{seq}')
+                        raise ValueError(evidence(run=run,seq=seq,blocks=len(blocks),empty=sum(not block for block in blocks)))
                     lookup=LiveLookup(snapshot)
                     context={**dict(zip(batch.STATE,lookup.numbers+lookup.prices+lookup.institutions+lookup.tariffs+lookup.taxes)),
                              **dict(zip(CATEGORIES,categories(lookup)))}
@@ -113,7 +113,7 @@ def prepare(directory,seed=19,points_per_run=12,progress=None):
 def partition(manifest):
     runs=np.random.default_rng(manifest['seed']).permutation([item['run'] for item in manifest['runs']]).tolist()
     if len(runs)<3:
-        raise ValueError('Need at least three eligible runs')
+        raise ValueError(evidence(runs=runs))
     count=max(1,int(round(len(runs)*.2)))
     manifest['validation'],manifest['train']=runs[:count],runs[count:]
 
@@ -123,9 +123,9 @@ def validate_manifest(manifest):
     runs={item['run'] for item in manifest['runs']}
     train,validation=set(manifest['train']),set(manifest['validation'])
     if manifest['version']!=VERSION or len(train)<2 or not validation or train&validation or train|validation!=runs:
-        raise ValueError('Training and validation runs must form a disjoint partition')
+        raise ValueError(evidence(version=manifest['version'],expected=VERSION,train=len(train),validation=len(validation),shared=sorted(train&validation),unassigned=sorted(runs^(train|validation))))
     if len(train)!=len(manifest['train']) or len(validation)!=len(manifest['validation']) or len(runs)!=len(manifest['runs']):
-        raise ValueError('Duplicate run assignments')
+        raise ValueError(evidence(train=len(train),listed_train=len(manifest['train']),validation=len(validation),listed_validation=len(manifest['validation']),runs=len(runs),listed_runs=len(manifest['runs'])))
 
 
 @timed
@@ -133,11 +133,11 @@ def verify(directory):
     manifest=read(directory/'dataset.json')
     validate_manifest(manifest)
     if manifest['objective']!=OBJECTIVE or manifest['groups']!={model:taxonomy(model) for model in ('histogram','row')}:
-        raise ValueError('Dataset objective or feature schema changed; prepare a fresh dataset')
+        raise ValueError(evidence(objective=manifest['objective'],current_objective=OBJECTIVE,groups_match=manifest['groups']=={model:taxonomy(model) for model in ('histogram','row')}))
     for run in manifest['validation']:
         name=f'candidates_{run}.pkl.gz'
         if digest(directory/name)!=manifest['files'][name]:
-            raise ValueError(f'Dataset checksum mismatch: {name}')
+            raise ValueError(evidence(name=name,digest=digest(directory/name),expected=manifest['files'][name]))
     return manifest
 
 
@@ -155,7 +155,7 @@ def training(connection,bounds,model,columns=None,snapshots=None,families=None):
         y=reward(meta.years.to_numpy(),{name:meta[f'reward_part.{name}'].to_numpy() for name in REWARD_COMPONENTS})
         keys=meta[['run','before_seq']].to_numpy()
     if not len(y) or not np.isfinite(y).all():
-        raise ValueError('Database training rows require finite reward targets')
+        raise ValueError(evidence(rows=len(y),finite=bool(np.isfinite(y).all())))
     starts,indices,counts=np.unique(keys,axis=0,return_inverse=True,return_counts=True)
     runs,run_indices,snapshots=np.unique(starts[:,0],return_inverse=True,return_counts=True)
     weights=len(y)/len(runs)/(counts[indices]*snapshots[run_indices[indices]])

@@ -3,7 +3,7 @@ from ctypes import wintypes
 
 from PIL import Image
 
-from ..common import timed, timed_often
+from ..common import evidence, timed, timed_often
 
 user32=ctypes.WinDLL('user32',use_last_error=True)
 gdi32=ctypes.WinDLL('gdi32')
@@ -28,7 +28,7 @@ def window():
 def shot(path):
     hwnd=window()
     if hwnd is None:
-        raise RuntimeError('No visible Victoria 3 window to capture')
+        raise RuntimeError(evidence(hwnd=hwnd))
     rect=wintypes.RECT()
     user32.GetClientRect(hwnd,ctypes.byref(rect))
     width,height=rect.right,rect.bottom

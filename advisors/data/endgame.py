@@ -1,7 +1,7 @@
 from collections import defaultdict
 import math
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from .construction import ConstructionActivity
 from .military import MilitaryStrength
 from .rewards import BUILDINGS, COSTS, ENDED, HOURS_PER_YEAR, OWNERS, PLAYED, PLAYERS, SNAPSHOTS, built, scored_runs, value_at
@@ -32,18 +32,18 @@ def reward(years,parts):
 def breakdown(start,end,baseline,points,active_fraction,military_mean_log):
     years=(end-start)/HOURS_PER_YEAR
     if years<=0 or not math.isfinite(years):
-        raise ValueError('Endgame reward requires positive duration')
+        raise ValueError(evidence(start=start,end=end,years=years))
     window=min(1.,years)
     beginning=max(start,end-HOURS_PER_YEAR)
     parts=[]
     for name in COMPONENTS:
         base=baseline[name]
         if base<=0 or not math.isfinite(base):
-            raise ValueError('Endgame reward requires positive finite baselines')
+            raise ValueError(evidence(name=name,base=base))
         last=value_at(points[name],end)/base
         previous=1. if beginning==start else value_at(points[name],beginning)/base
         if min(last,previous)<0 or not all(math.isfinite(v) for v in (last,previous)):
-            raise ValueError('Endgame reward requires nonnegative finite outcomes')
+            raise ValueError(evidence(name=name,last=last,previous=previous))
         change=(last-previous)/window
         part=change if name=='population' else (last+change)/2
         weight=OBJECTIVE['weights'][name]
@@ -52,13 +52,13 @@ def breakdown(start,end,baseline,points,active_fraction,military_mean_log):
         parts.append({'component':name,'start_value':base,'end_ratio':last,'recent_change':change,'part':part,
                       'weight':weight,'alpha':alpha,'duration_factor':factor,'contribution':weight*factor*part})
     if active_fraction is None or not math.isfinite(active_fraction) or not 0<=active_fraction<=1:
-        raise ValueError('Endgame reward requires a recorded construction active fraction between zero and one')
+        raise ValueError(evidence(active_fraction=active_fraction))
     weight=OBJECTIVE['weights']['construction']
     parts.append({'component':'construction','start_value':None,'end_ratio':None,'recent_change':None,
                   'active_fraction':active_fraction,'part':active_fraction-1,'weight':weight,'alpha':0.,
                   'duration_factor':1.,'contribution':weight*(active_fraction-1)})
     if military_mean_log is None or not math.isfinite(military_mean_log) or military_mean_log<0:
-        raise ValueError('Endgame reward requires a nonnegative finite mean log military strength')
+        raise ValueError(evidence(military_mean_log=military_mean_log))
     weight=OBJECTIVE['weights']['military']
     parts.append({'component':'military','start_value':None,'end_ratio':None,'recent_change':None,
                   'part':military_mean_log,'weight':weight,'alpha':0.,'duration_factor':1.,'contribution':weight*military_mean_log})

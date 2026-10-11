@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 import psycopg
 
-from ..common import progress, timed, timed_often
+from ..common import evidence, progress, timed, timed_often
 from ..timing import COLUMNS, INTERVAL_COLUMNS, RECORDER
 from .spec import CLOSED,ENTITIES,TABLES,VOCABULARIES
 
@@ -61,7 +61,7 @@ class Store:
         self.connection.execute('set synchronous_commit = off')
         stored=self.connection.execute('select digest from schema_digest').fetchone()
         if stored is None or bytes(stored[0])!=digest():
-            raise RuntimeError('The database schema differs from schema.sql; reinstall it before writing')
+            raise RuntimeError(evidence(database=stored and bytes(stored[0]).hex(),schema_sql=digest().hex()))
         self.layouts={table.name:Layout(table) for table in TABLES}
         self.vocabulary={name:dict(self.connection.execute(f'select name,{name} from {name}')) for name in VOCABULARIES}
         self.enums={name:{v for v, in self.connection.execute(f'select {name} from {name}')} for name in self.enum_names()}
@@ -114,7 +114,7 @@ class Store:
         fresh=sorted({name for name in names if name is not None and name not in self.vocabulary[vocabulary]})
         if fresh:
             if vocabulary in CLOSED:
-                raise RuntimeError(f'{vocabulary} has no entries {fresh[:5]}')
+                raise RuntimeError(evidence(vocabulary=vocabulary,fresh=fresh[:5]))
             self.vocabulary[vocabulary].update(self.connection.execute(
                 f'insert into {vocabulary} (name) select unnest(%s::text[]) on conflict (name) do update set name=excluded.name returning name,{vocabulary}',
                 (fresh,)).fetchall())
@@ -135,7 +135,7 @@ class Store:
             if folders:
                 names=[name for folder in folders for name in members[folder]]
                 if len(names)!=len(set(names)):
-                    raise RuntimeError(f'{vocabulary} repeats names across {folders}')
+                    raise RuntimeError(evidence(vocabulary=vocabulary,folders=folders))
                 self.members[vocabulary]=set(names)
                 fresh=sorted(set(names)-set(self.vocabulary[vocabulary]))
                 if fresh:
@@ -146,7 +146,7 @@ class Store:
             known=dict(self.connection.execute(f'select {enum},name from {enum}'))
             clash={value:(known[value],name) for value,name in labels.items() if known.get(value) not in (None,name)}
             if clash:
-                raise RuntimeError(f'{enum} codes renamed: {clash}')
+                raise RuntimeError(evidence(enum=enum,clash=clash))
             self.connection.execute(f'insert into {enum} ({enum},name) select * from unnest(%s::int2[],%s::text[]) on conflict ({enum}) do update set name=excluded.name',
                                     (list(labels),list(labels.values())))
             self.enums[enum].update(labels)
@@ -296,7 +296,7 @@ class Store:
             idents=[row[0] for row in rows.get(entity+'_history',())]
             slots={ident&SLOT:ident for ident in idents}
             if len(slots)!=len(idents):
-                raise RuntimeError(f'{entity} lists a slot twice')
+                raise RuntimeError(evidence(entity=entity,idents=len(idents),slots=len(slots)))
             live[entity]=slots
         return live
 
@@ -305,7 +305,7 @@ class Store:
         out=[]
         for row in rows:
             if len(row)!=layout.length:
-                raise RuntimeError(f'{layout.name} row has {len(row)} values, not {layout.length}')
+                raise RuntimeError(evidence(table=layout.name,values=len(row),length=layout.length))
             values=list(row)
             for index,column in layout.checked:
                 if column is None:
@@ -320,7 +320,7 @@ class Store:
                     else:
                         referenced[column.entity].add(value)
                 if column.vocabulary and value is not None and column.vocabulary in CLOSED and value not in self.members[column.vocabulary]:
-                    raise RuntimeError(f'{layout.name}.{column.name}: {value} is not a {column.vocabulary} of this ruleset')
+                    raise RuntimeError(evidence(table=layout.name,column=column.name,value=value,vocabulary=column.vocabulary))
                 values[index]=value
             out.append(tuple(values))
         return out
@@ -351,20 +351,20 @@ class Store:
         for row in rows:
             key=row[:width]
             if key in current:
-                raise RuntimeError(f'{layout.name} holds key {key} twice at snapshot {seq}')
+                raise RuntimeError(evidence(table=layout.name,key=key,seq=seq))
             current[key]=row[width:]
         previous=self.previous.get(layout.name,{})
         if layout.kind=='subject':
             orphans=[key for key in current if key[0] not in present[layout.owner]]
             if orphans:
-                raise RuntimeError(f'{layout.name} has rows for absent owners {orphans[:5]}')
+                raise RuntimeError(evidence(table=layout.name,orphans=orphans[:5]))
             vanished=[key for key in previous if key not in current and key[0] in present[layout.owner]]
             if vanished:
-                raise RuntimeError(f'{layout.name} lost rows of live owners {vanished[:5]}')
+                raise RuntimeError(evidence(table=layout.name,vanished=vanished[:5]))
             return [(*key,*data) for key,data in current.items() if previous.get(key)!=data],current
         if layout.kind=='singleton':
             if list(current)!=[()]:
-                raise RuntimeError(f'{layout.name} is a singleton but holds {len(current)} rows')
+                raise RuntimeError(evidence(table=layout.name,rows=len(current)))
             return [current[()]] if previous.get(())!=current[()] else [],current
         changed=[(*key,True,*data) for key,data in current.items() if previous.get(key)!=data]
         gone=[(*key,False,*[None]*len(layout.data)) for key in previous if key not in current]
@@ -382,7 +382,7 @@ class Store:
                 known[key]=value
                 fresh.append(row)
             elif seen[1:]!=value[1:]:
-                raise RuntimeError(f'{layout.name} sample {key} changed from {seen} to {value}')
+                raise RuntimeError(evidence(table=layout.name,key=key,seen=seen,value=value))
         return fresh
 
     @timed_often
@@ -395,7 +395,7 @@ class Store:
         for row in rows:
             values=tuple(row[i] for i in indexes)
             if known.setdefault(row[0],values)!=values:
-                raise RuntimeError(f'{layout.name} {row[0]} changed {columns} from {known[row[0]]} to {values}')
+                raise RuntimeError(evidence(table=layout.name,key=row[0],columns=columns,known=known[row[0]],values=values))
 
     @timed
     def write(self,built,phase,taken_at,read_ms):
@@ -404,7 +404,7 @@ class Store:
         present={entity:set(slots.values()) for entity,slots in live.items()}
         colors={identity(live,'province',province,'province','color'):color for province,color in built.colors.items()}
         if set(colors)!=present['province']:
-            raise RuntimeError('Province colours and captured provinces differ')
+            raise RuntimeError(evidence(colors=len(colors),provinces=len(present['province']),differing=sorted(set(colors)^present['province'])[:5]))
         resolved={}
         referenced=defaultdict(set)
         for name,rows in built.rows.items():
@@ -414,7 +414,7 @@ class Store:
             self.check_fixed(layout,resolved[name])
         missing=set(self.layouts)-set(resolved)
         if missing:
-            raise RuntimeError(f'The capture built no rows for {sorted(missing)}')
+            raise RuntimeError(evidence(missing=sorted(missing)))
         staged={}
         for name,rows in resolved.items():
             progress(f'stage {name}')
@@ -431,7 +431,7 @@ class Store:
             if opening:
                 self.open_run(cursor,built.constants)
             elif built.constants!=self.constants:
-                raise RuntimeError(f'Run constants changed from {self.constants} to {built.constants}')
+                raise RuntimeError(evidence(held=self.constants,built=built.constants))
             meta=built.meta
             cursor.execute('insert into snapshot (run_id,seq,phase,game_date,taken_at,read_ms,local_date_time,paused,speed,ui_panel_open,ui_interaction_open,'
                            'ui_map_list_open) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
@@ -505,7 +505,7 @@ class Store:
                 asked.append((label,self.connection.execute(sql,[list(column) for column in zip(*values)],prepare=True)))
         broken=[label for label,answer in asked if answer.fetchone()[0]]
         if broken:
-            raise RuntimeError(f'Snapshot {seq} breaks foreign keys: {broken[:5]}')
+            raise RuntimeError(evidence(seq=seq,broken=broken[:5]))
 
     @timed_often
     def parameters(self,cursor,vocabulary,code,label,params):
@@ -513,7 +513,7 @@ class Store:
         known=self.actions.setdefault((vocabulary,code),dict(cursor.execute(f'select name,value_kind from {vocabulary}_parameter where {vocabulary}=%s',(code,)).fetchall()))
         for name,kind in kinds.items():
             if known.get(name,kind)!=kind:
-                raise RuntimeError(f'{label}.{name} is {known[name]}, not {kind}')
+                raise RuntimeError(evidence(label=label,name=name,known=known[name],kind=kind))
             if name not in known:
                 cursor.execute(f'insert into {vocabulary}_parameter ({vocabulary},name,value_kind) values (%s,%s,%s)',(code,name,kind))
                 known[name]=kind
@@ -554,5 +554,5 @@ def enumerate_rows(run_id,values):
 
 def identity(live,entity,value,table,column):
     if live[entity].get(value&SLOT)!=value:
-        raise RuntimeError(f'{table}.{column} refers to {entity} {value} (slot {value&SLOT}, generation {value>>24}), which this snapshot did not capture')
+        raise RuntimeError(evidence(table=table,column=column,entity=entity,value=value,slot=value&SLOT,generation=value>>24))
     return value

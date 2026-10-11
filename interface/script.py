@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import re
 
-from .common import timed, timed_often
+from .common import evidence, timed, timed_often
 
 
 def blocks(text):
@@ -82,7 +82,7 @@ def production_methods(game,mods=()):
         entry=dict(fields(body(text)))
         for gate,values in entry.items():
             if gate.startswith(GATE_PREFIXES) and not all(value.replace('_','').isalnum() for value in values):
-                raise RuntimeError(f'{name}.{gate} is not a flat list of keys: {values}')
+                raise RuntimeError(evidence(name=name,gate=gate,values=values))
         yield name,entry
 
 
@@ -98,12 +98,12 @@ METHOD_REQUIREMENTS=('unlocking_technologies','unlocking_laws','disallowing_laws
 @timed_often
 def method_value(name,modifier,values):
     if len(values)!=1:
-        raise RuntimeError(f'{name}.{modifier} holds {values}, not one value')
+        raise RuntimeError(evidence(name=name,modifier=modifier,values=values))
     value=values[0]
     if value in ('yes','no'):
         return 1.0 if value=='yes' else 0.0
     if not re.fullmatch(r'-?\d+(\.\d+)?',value):
-        raise RuntimeError(f'{name}.{modifier} holds {value}, not a number')
+        raise RuntimeError(evidence(name=name,modifier=modifier,value=value))
     return float(value)
 
 
@@ -116,7 +116,7 @@ def method_effects(game,mods=()):
                 target=METHOD_TARGETS[field]
                 for scaling,inner in fields(' '.join(values)):
                     if scaling not in METHOD_SCALINGS:
-                        raise RuntimeError(f'{name}.{field} has an unknown scaling {scaling}')
+                        raise RuntimeError(evidence(name=name,field=field,scaling=scaling))
                     for modifier,found in fields(' '.join(inner)):
                         value=method_value(name,modifier,found)
                         flow=METHOD_GOODS.fullmatch(modifier) if target=='building' else None

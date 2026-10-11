@@ -4,7 +4,7 @@ import re
 import struct
 import time
 
-from ..common import progress, slot, timed, timed_often
+from ..common import evidence, progress, slot, timed, timed_often
 from ..timing import span
 from ..recording.capture import plain
 from ..runner.memory import SCALE
@@ -23,16 +23,16 @@ ABORT_LIMIT=1
 @timed_often
 def verification(text,done):
     if text.count(done)!=1:
-        raise RuntimeError(f'Expected one action acknowledgement for {done}')
+        raise RuntimeError(evidence(done=done,count=text.count(done)))
     payload=re.split(r'\n(?=\[\d\d:\d\d:\d\d\])',text.split(done,1)[1],maxsplit=1)[0]
     valid,separator,desc=payload.partition('|')
     if not separator or valid not in ('0','1'):
-        raise RuntimeError(f'Malformed action verification for {done}: {payload[:200]!r}')
+        raise RuntimeError(evidence(done=done,payload=payload[:200]))
     transport=re.findall(r'INTERFACE\|transport\|'+re.escape(done.split('|')[2])+r'\|([^\r\n]*)',text)
     if transport:
         outcome=transport[-1]
         if not any(outcome==prefix or outcome.startswith(prefix+' ') for prefix in ('started','refused','no fleet')):
-            raise RuntimeError(f'Malformed transport verification: {outcome!r}')
+            raise RuntimeError(evidence(outcome=outcome))
         valid='1' if outcome=='started' or outcome.startswith('started ') else '0'
         desc='transport '+outcome
     return valid=='1',plain(desc)
@@ -60,19 +60,19 @@ class Executor:
         database=reader.word(reader.base+reader.tables[TABLES.get(kind,kind)]['rva'])
         table,capacity=struct.unpack('<QI',reader.read(database+0x20,12))
         if not 0<=ident<capacity:
-            raise LookupError(f'{kind} {ident} is outside the game database')
+            raise LookupError(evidence(kind=kind,ident=ident,capacity=capacity))
         pointer=struct.unpack('<Q',reader.read(table+ident*16+8,8))[0]
         if not pointer:
-            raise LookupError(f'{kind} {ident} no longer exists')
+            raise LookupError(evidence(kind=kind,ident=ident))
         identity=struct.unpack('<I',reader.read(pointer+IDENTITY_OFFSETS.get(kind,8),4))[0]
         if identity&0xffffff!=ident:
-            raise LookupError(f'{kind} {ident} resolves to identity {identity:#x}')
+            raise LookupError(evidence(kind=kind,ident=ident,identity=hex(identity)))
         return identity
 
     @timed_often
     def encode(self,action,params):
         if set(params)!=({split(p)[0] for p in action.params}):
-            raise ValueError(f'{action.name} takes {action.params}, got {sorted(params)}')
+            raise ValueError(evidence(name=action.name,takes=action.params,got=sorted(params)))
         values={'interface_choice':0,'interface_key':0,'interface_n0':0,'interface_n1':0}
         slots=[]
         for param in action.params:
@@ -131,7 +131,7 @@ class Executor:
                 valid,desc=verification(text,done)
                 return {'action':name,'valid':valid,'desc':desc,'ms':round(dispatch.ms)}
         self.abort(reader,mark,done)
-        raise LookupError(f'{name}: no game object matched {params}')
+        raise LookupError(evidence(name=name,params=params))
 
     @timed_often
     def abort(self,reader,mark,done):

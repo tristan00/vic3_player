@@ -1,7 +1,7 @@
 import collections
 import re
 
-from ..common import timed, timed_often
+from ..common import evidence, timed, timed_often
 from ..script import blocks, body, fields, read, scalar
 
 
@@ -81,7 +81,7 @@ def select_groups(rng,data,count,pool):
         available[data['source_group_by_state'][state['key']]].append(state)
     if pool is not None:
         if len(set(pool))!=len(pool) or set(pool)-available.keys():
-            raise ValueError('Source group pool must contain distinct populated vanilla source groups')
+            raise ValueError(evidence(pool=pool))
         available={key:available[key] for key in pool}
     return {key:available[key] for key in rng.sample(sorted(available),count)}
 
@@ -92,7 +92,7 @@ def select_countries(data,pool):
     if pool is None:
         return available
     if not pool or len(set(pool))!=len(pool) or set(pool)-set(available):
-        raise ValueError('Country pool must contain distinct centralized vanilla country tags')
+        raise ValueError(evidence(pool=pool))
     return sorted(pool)
 
 
@@ -116,7 +116,7 @@ def assignments(rng,groups,sources):
             weights=[(4 if key==group['source_group'] else 1)/(1+d/scale)**2 for key,d in zip(keys,distances)]
             eligible=[key for key in keys if state['coastal'] or any(not s['coastal'] for s in sources[key])]
             if not eligible:
-                raise ValueError('These source groups have no inland state templates for this map')
+                raise ValueError(evidence(keys=keys,coastal=state['coastal']))
             origin=group['source_group'] if state is group['states'][0] and group['source_group'] in eligible else rng.choices(eligible,[weights[keys.index(k)] for k in eligible])[0]
             destinations[origin].append(state)
     for origin,states in destinations.items():

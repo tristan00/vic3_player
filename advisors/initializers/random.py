@@ -3,14 +3,14 @@ import random
 from pathlib import Path
 from statistics import NormalDist
 
-from interface.common import timed_often
+from interface.common import evidence, timed_often
 from ..catalogue import NAMES
 
 LOW,HIGH=-2.,2.
 DRAW=json.loads((Path(__file__).parent/'centres.json').read_text(encoding='utf-8'))
 CENTRE,SPREAD,CENTRES=DRAW['default'],DRAW['spread'],DRAW['centres']
 if set(CENTRES)-set(NAMES) or not all(LOW<=centre<=HIGH for centre in (CENTRE,*CENTRES.values())) or SPREAD<=0:
-    raise ValueError('centres.json names an unknown lever, a centre outside the weight range, or a spread that is not above zero')
+    raise ValueError(evidence(unknown=sorted(set(CENTRES)-set(NAMES)),centre=CENTRE,centres=CENTRES,spread=SPREAD,low=LOW,high=HIGH))
 
 
 class RandomAdvisor:

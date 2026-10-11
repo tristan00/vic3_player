@@ -16,14 +16,14 @@ export async function request<T = any>(path: string, init?: RequestInit): Promis
   let response: Response
   try {
     response = await fetch(path, init)
-  } catch {
+  } catch (error) {
     reached(false)
-    throw new Error('The dashboard server is not answering')
+    throw new Error(`api.ts request path=${path} error=${error}`)
   }
   reached(true)
   if (!response.ok) {
     const body = await response.json().catch(() => null)
-    throw new Error(body?.detail ? String(body.detail) : `${response.status} ${response.statusText}`)
+    throw new Error(body?.detail ? String(body.detail) : `api.ts request path=${path} status=${response.status} statusText=${response.statusText}`)
   }
   return response.json()
 }

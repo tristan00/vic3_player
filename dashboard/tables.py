@@ -1,3 +1,4 @@
+from interface.common import evidence
 from interface.recording.spec import ENTITIES, ENUMS, TABLE, VOCABULARIES
 
 from . import db, names
@@ -95,7 +96,7 @@ def condition(run,table,column,text,index,params):
         params[f'f{index}']=float(text)
     elif kind=='boolean':
         if text not in ('true','false'):
-            raise ValueError(f'{column} is true or false')
+            raise ValueError(evidence(column=column,text=text))
         params[f'f{index}']=text=='true'
     else:
         params[f'f{index}']=text
@@ -127,13 +128,13 @@ def page(table,run,seq,at,filters,sort,desc,offset,limit):
     known=names.catalog()
     per_run='run_id' in columns
     if per_run and run is None:
-        raise ValueError(f'{table} is recorded per run')
+        raise ValueError(evidence(table=table,run=run))
     function=reader(table)
     params={'run':run,'seq':seq,'limit':limit,'offset':offset}
     conditions=[]
     at=bool(per_run and at and function)
     if at and db.one('select 1 from snapshot where run_id=%s and seq=%s',(run,seq)) is None:
-        raise ValueError(f'run {run} has no snapshot {seq}')
+        raise ValueError(evidence(run=run,seq=seq))
     if at:
         source=f'{function}(%(run)s,%(seq)s) t'
     else:
@@ -146,13 +147,13 @@ def page(table,run,seq,at,filters,sort,desc,offset,limit):
     echoed=[]
     for index,(column,text) in enumerate(filters):
         if column not in result:
-            raise ValueError(f'{table} has no column {column}')
+            raise ValueError(evidence(table=table,column=column))
         clause,echo=condition(run if per_run else None,table,column,text,index,params)
         conditions.append(clause)
         echoed.append(echo)
     where=' where '+' and '.join(conditions) if conditions else ''
     if sort is not None and sort not in result:
-        raise ValueError(f'{table} has no column {sort}')
+        raise ValueError(evidence(table=table,sort=sort))
     keys=[column for column in known['keys'].get(table,[]) if column in result and column!='run_id']
     ties=[column for column in keys or result if column!=sort]
     order=','.join(([f't."{sort}" {"desc" if desc else "asc"} nulls last'] if sort else [])+[f't."{column}"' for column in ties])
@@ -174,12 +175,12 @@ def series(run,table,filters):
         return None
     columns=chartable(table)
     if not columns:
-        raise ValueError(f'{table} has no numeric values over time')
+        raise ValueError(evidence(table=table))
     known=names.catalog()
     keys=[column for column in known['keys'][table] if column not in ('run_id','seq','n')]
     given=dict(filters)
     if set(keys)-set(given):
-        raise ValueError(f'{table} needs '+', '.join(sorted(set(keys)-set(given))))
+        raise ValueError(evidence(table=table,missing=sorted(set(keys)-set(given))))
     params={'run':run}
     conditions=['t.run_id=%(run)s']+[condition(run,table,column,given[column],index,params)[0] for index,column in enumerate(keys)]
     sampled='n' in known['keys'][table]
@@ -209,7 +210,7 @@ def entity(run,kind,ident,seq):
     columns,found=db.query(f'select * from {history} where run_id=%s and "{kind}"=%s order by seq',(run,ident))
     dates=dict(db.rows('select seq,game_date from snapshot where run_id=%s',(run,)))
     if seq not in dates:
-        raise ValueError(f'run {run} has no snapshot {seq}')
+        raise ValueError(evidence(run=run,seq=seq))
     described,versions=shown(run,history,columns,found,seq)
     for version in versions:
         version['date']=db.day(dates[version['seq']])

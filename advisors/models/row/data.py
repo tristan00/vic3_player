@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from ...data.endgame import COMPONENTS, HISTORY, NAME, OBJECTIVE, REWARD_COMPONENTS, Trajectories, reward, scored_runs
 from .features import CATEGORICAL, NUMERIC, PLAYER_FIELDS, SITE, STATE_REPORTS, Historical, Selection, action_features, context, frame
 from .batch import characters, parameters, sites
@@ -138,7 +138,7 @@ def load(connection,runs=None,cache=None):
         bounds={run:bounds[run] for run in runs}
     data=training_rows(connection,bounds) if cache is None else cache.load(connection,bounds)
     if data.meta.empty:
-        raise ValueError('No action rows have the required starting state and future outcomes')
+        raise ValueError(evidence(rows=len(data.meta),runs=len(bounds)))
     meta=data.meta.copy()
     y=reward(meta.years.to_numpy(),{name:meta[f'reward_part.{name}'].to_numpy() for name in REWARD_COMPONENTS})
     meta.insert(5,'target',y)
@@ -154,7 +154,7 @@ def load(connection,runs=None,cache=None):
 def split(runs,seed=19,fraction=.2):
     unique=np.unique(runs)
     if len(unique)<2:
-        raise ValueError('Training and validation need at least two complete runs')
+        raise ValueError(evidence(runs=unique))
     chosen=np.random.default_rng(seed).permutation(unique)[:max(1,round(len(unique)*fraction))]
     test=np.isin(runs,chosen)
     return np.flatnonzero(~test),np.flatnonzero(test)

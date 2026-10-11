@@ -8,7 +8,7 @@ import re
 import threading
 import time
 
-from ..common import timed, timed_often
+from ..common import evidence, timed, timed_often
 
 kernel=ctypes.WinDLL('kernel32',use_last_error=True)
 kernel.CreateFileW.restype=wintypes.HANDLE
@@ -27,7 +27,7 @@ INVALID=wintypes.HANDLE(-1).value
 def shared_read(path,offset):
     handle=kernel.CreateFileW(str(path),0x80000000,7,None,3,0x80,None)
     if handle==INVALID:
-        raise FileNotFoundError(path)
+        raise FileNotFoundError(evidence(path=path))
     with os.fdopen(msvcrt.open_osfhandle(handle,os.O_RDONLY|os.O_BINARY),'rb') as stream:
         stream.seek(offset)
         return stream.read()
@@ -112,7 +112,7 @@ class LogTail:
                         return
                     else:
                         self.lost+=1
-                        logging.getLogger('interface').warning('debug log rotated past the tail %d times',self.lost)
+                        logging.getLogger('interface').warning(evidence(lost=self.lost))
                     self.unsettled=None
                     self.known=self.rotated(files)
                     self.offset=0
@@ -186,7 +186,7 @@ class LogTail:
         if self.thread is None:
             self.start()
         if self.died:
-            raise RuntimeError('The debug log tail thread stopped') from self.died
+            raise RuntimeError(evidence(died=self.died)) from self.died
         self.poll()
         with self.lock:
             data=bytes(self.buffer[max(0,len(self.buffer)-(self.total-mark)):])

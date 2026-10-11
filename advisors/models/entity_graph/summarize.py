@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from .metrics import accuracy
 from .removals import ATTEMPTS, DESCRIPTIONS
 from .schema import COMPONENTS, GRAPH_VERSION, HORIZONS
@@ -21,7 +21,7 @@ def number(value):
 @timed
 def paired(reference,other,scale):
     if not np.array_equal(reference['run'],other['run']) or not np.array_equal(reference['seq'],other['seq']):
-        raise ValueError('Paired comparison decisions differ')
+        raise ValueError(evidence(reference=len(reference['run']),other=len(other['run'])))
     ids=np.unique(reference['run'])
     mask=reference['mask']
     a=(((reference['prediction']-reference['target'])/scale)**2*mask).sum(axis=(1,2))

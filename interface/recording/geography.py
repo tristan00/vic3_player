@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from ..common import progress, timed, timed_often
+from ..common import evidence, progress, timed, timed_often
 from ..script import read
 
 
@@ -56,7 +56,7 @@ def vanilla_world(game):
     for key,value in read(Path(game),'map_data/state_regions'):
         for color in re.findall(r'x[0-9A-Fa-f]{6}',value.split('provinces',1)[1].split('}',1)[0]):
             if regions.setdefault(normal(color),key)!=key:
-                raise RuntimeError(f'Province {color} belongs to state regions {regions[normal(color)]} and {key}')
+                raise RuntimeError(evidence(color=color,held=regions[normal(color)],key=key))
     return identity(files),files,regions,files
 
 

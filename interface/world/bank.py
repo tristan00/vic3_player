@@ -3,7 +3,7 @@ import msvcrt
 from pathlib import Path
 from uuid import uuid4
 
-from ..common import DEFAULT_GAME, timed, timed_often
+from ..common import DEFAULT_GAME, evidence, timed, timed_often
 from .cache import checked, configure, launch, publish, status, worlds
 
 
@@ -48,7 +48,7 @@ class Bank:
 def take(directories,rng):
     available=sorted({path for directory in directories for path in Bank(directory).available()})
     if not available:
-        raise ValueError('World banks have no completed worlds')
+        raise ValueError(evidence(directories=directories))
     path=rng.choice(available)
     checked(path)
     return path

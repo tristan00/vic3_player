@@ -9,6 +9,7 @@ from psycopg_pool import ConnectionPool
 from starlette.responses import Response
 
 from advisors.data.rewards import HOURS_PER_YEAR
+from interface.common import evidence
 from interface.options.stored import YEAR_OFFSET, date_text
 from interface.recording.store import DSN
 from interface.timing import timer
@@ -89,7 +90,7 @@ def plain(value):
         return f'{memoryview(value).nbytes} bytes'
     if isinstance(value,timedelta):
         return str(value)
-    raise TypeError(f'{type(value).__name__} has no JSON form')
+    raise TypeError(evidence(kind=type(value).__name__))
 
 
 @often

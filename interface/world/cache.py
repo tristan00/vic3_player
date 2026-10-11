@@ -11,7 +11,7 @@ import traceback
 import numpy as np
 import psutil
 
-from ..common import timed, timed_often
+from ..common import evidence, timed, timed_often
 from ..runner.session import _spawn, process as owner
 from .generate import generate
 from .sampling import jobs
@@ -33,11 +33,11 @@ def publish(path,value):
 def checked(path):
     manifest=json.loads(path.read_text(encoding='utf-8'))
     if Path(manifest['mod']).resolve()!=path.parent/'mod' or not (path.parent/'mod/map_data/provinces.png').is_file():
-        raise ValueError(f'Cached world is missing its map or has moved: {path}')
+        raise ValueError(evidence(path=path))
     audit=json.loads((path.parent/'audit.json').read_text(encoding='utf-8'))
     if (not all(audit[name] for name in ('population_structure_preserved','culture_projection_matches','production_methods_match_projection')) or
             any(audit[name] for name in ('company_errors','ownership_errors','duplicate_buildings','coastal_templates_inland'))):
-        raise ValueError(f'Cached world failed its generation audit: {path}')
+        raise ValueError(evidence(path=path))
 
 
 @timed

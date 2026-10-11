@@ -2,6 +2,7 @@ import json
 import re
 from pathlib import Path
 
+from ..common import evidence
 from .capture import GROUPS
 
 F,I2,I4,I8,B,T,H='float8','int2','int4','int8','bool','text','game_hours'
@@ -534,8 +535,7 @@ def attach_metrics():
                                          (STATE_TOPICS,DROPPED_STATE_METRICS,set(GROUPS['state']),'state')):
         kept=[name for names in topics.values() for name in names]
         if len(kept)!=len(set(kept)) or set(kept)&set(dropped) or set(kept)|set(dropped)!=captured:
-            raise SystemExit(f'{kind} metrics: missing {sorted(captured-set(kept)-set(dropped))} extra {sorted((set(kept)|set(dropped))-captured)} '
-                             f'both {sorted(set(kept)&set(dropped))}')
+            raise SystemExit(evidence(kind=kind,missing=sorted(captured-set(kept)-set(dropped)),extra=sorted((set(kept)|set(dropped))-captured),both=sorted(set(kept)&set(dropped))))
         for topic,names in topics.items():
             for name in names:
                 table=target(f'player_{topic}',None) if name in PLAYER else target(f'{kind}_{topic}',kind)
@@ -545,9 +545,9 @@ def attach_metrics():
     for dropped in (DROPPED_COUNTRY_METRICS,DROPPED_STATE_METRICS):
         for name,(table,_) in dropped.items():
             if table not in scopes:
-                raise SystemExit(f'{name} is replaced from unknown table {table}')
+                raise SystemExit(evidence(name=name,table=table))
             if name not in PLAYER and scopes[table]!='public':
-                raise SystemExit(f'{name} is captured for every owner but its replacement {table} is player-only')
+                raise SystemExit(evidence(name=name,table=table,scope=scopes[table]))
 
 
 

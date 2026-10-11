@@ -2,13 +2,17 @@ import json
 import logging
 from pathlib import Path
 
-from .timing import timer
+from .timing import evidence, timer
 
 DEFAULT_GAME=Path('D:/SteamLibrary/steamapps/common/Victoria 3')
 DEFAULT_DATA=Path('D:/vic3_data/interface')
 
 
 class GameCrashed(Exception):
+    pass
+
+
+class Defeated(RuntimeError):
     pass
 
 

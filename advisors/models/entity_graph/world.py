@@ -9,7 +9,7 @@ import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from interface.options.stored import read_table
 from interface.recording.spec import ENTITIES, TABLE
 from interface.recording.store import DSN
@@ -91,7 +91,7 @@ class WorldReader:
     @timed
     def read(self,seq):
         if seq not in self.dates:
-            raise ValueError('The requested snapshot does not exist')
+            raise ValueError(evidence(seq=seq))
         return {'run':self.run,'seq':seq,'player':self.player,'history':[seq],
                 'dates':{seq:self.dates[seq]},'states':{seq:self.snapshot(seq)},
                 'geography':self.geography,'vocabulary':self.vocabulary,'enums':self.enums,'tables':WORLD_TABLES,
@@ -280,9 +280,9 @@ class WorldBuilder(Builder):
 @timed
 def build_world(data,actions=None):
     if tuple(data.get('tables',()))!=WORLD_TABLES:
-        raise ValueError('Full world requires the complete recording schema')
+        raise ValueError(evidence(tables=len(data.get('tables',())),expected=len(WORLD_TABLES),differing=sorted(set(data.get('tables',()))^set(WORLD_TABLES))))
     if 'map' not in data['geography']:
-        raise ValueError('Full world requires recorded map raster and coordinate geometry; reload the source snapshot')
+        raise ValueError(evidence(geography=sorted(data['geography'])))
     seq=data['seq']
     data={**data,'history':[seq],'action_history':{}}
     builder=WorldBuilder(data)
@@ -297,9 +297,9 @@ def build_world(data,actions=None):
     expected=Counter(kind for kind in ENTITIES for _ in data['states'][seq].get(kind+'_history',[]))
     observed=Counter(n['kind'] for n in graph.nodes if n['kind'] in ENTITIES)
     if expected!=observed or any(c['source_rows']!=c['represented_rows'] for c in builder.coverage):
-        raise ValueError('Full world graph lost recorded entities or fact rows')
+        raise ValueError(evidence(expected=expected,observed=observed,coverage=[c for c in builder.coverage if c['source_rows']!=c['represented_rows']]))
     if any(n['sources'][name]['observed_seq']>seq for n in graph.nodes for name in n.get('sources',{})):
-        raise ValueError('Full world graph contains future facts')
+        raise ValueError(evidence(seq=seq,latest=max(n['sources'][name]['observed_seq'] for n in graph.nodes for name in n.get('sources',{}))))
     summary.update(run=data['run'],seq=seq,history=[seq],coverage=builder.coverage,
                    missing_entity_records=builder.missing,opaque_scope_targets=builder.scope_targets,
                    excluded_tables=EXCLUDED,excluded_fields=sorted(FIELD_EXCLUSIONS),components=components(graph),

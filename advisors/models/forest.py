@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import norm
 from sklearn.ensemble import RandomForestRegressor
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 
 TREES=50
 LEAF=2
@@ -46,7 +46,7 @@ def local_search(forest,starts,best,low,high,rng):
 @timed
 def propose(X,y,low,high,rng,names=None,random_points=None):
     if not len(y):
-        raise ValueError('The forest needs at least one observation')
+        raise ValueError(evidence(observations=len(y)))
     names=names or [str(i) for i in range(len(low))]
     forest=RandomForestRegressor(n_estimators=TREES,min_samples_leaf=LEAF,max_features=FEATURES,random_state=int(rng.integers(2**31))).fit(X,y)
     if random_points is None:

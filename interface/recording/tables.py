@@ -3,7 +3,7 @@ from operator import itemgetter
 import logging
 from dataclasses import dataclass
 
-from ..common import progress, slot, timed, timed_often
+from ..common import evidence, progress, slot, timed, timed_often
 from .capture import LOG_MAPS,SHIP_MAPS,UNIT_MAPS
 from .spec import DROPPED_COUNTRY_METRICS,DROPPED_STATE_METRICS,EPOCH_DATE,METRIC_COLUMNS,METRICS_KINDS,TABLE,TABLES
 
@@ -75,7 +75,7 @@ class Context:
             items.sort(key=lambda item:item[0])
             ords=[item[0] for item in items]
             if len(set(ords))!=len(ords) or (not sparse and ords!=list(range(len(ords)))):
-                raise RuntimeError(f'{table} ords of {key} are {"duplicated" if sparse else "not dense"}: {ords[:10]}')
+                raise RuntimeError(evidence(table=table,key=key,sparse=sparse,ords=ords[:10]))
             result[key]=items if sparse else [item[1:] for item in items]
         return result
 
@@ -93,14 +93,14 @@ class Context:
             found=self.table(entity)
             self.identities[entity]=dict(zip(found['id'],found['ident'])) if found else {}
         if value&SLOT not in self.identities[entity]:
-            raise RuntimeError(f'The script names {entity} {value} but the memory capture holds no such object')
+            raise RuntimeError(evidence(entity=entity,value=value))
         return self.identities[entity][value&SLOT]
 
     @timed_often
     def player_rows(self,table,*columns,sparse=False):
         items=self.children(table,'id',*columns,sparse=sparse)
         if set(items)-{self.player}:
-            raise RuntimeError(f'{table} holds rows of countries other than the player: {sorted(set(items)-{self.player})[:5]}')
+            raise RuntimeError(evidence(table=table,player=self.player,others=sorted(set(items)-{self.player})[:5]))
         return items.get(self.player,[])
 
 
@@ -119,7 +119,7 @@ def ownership_owner(ident,building,owner_type,owner,types,headquarters,owning):
     if owner_type==OWNER_COUNTRY:
         return {'owner_kind':'country','owner_country':owner,'owner_building':None,'owner_company':None}
     if owner_type!=OWNER_BUILDING:
-        raise RuntimeError(f'Ownership {ident} has owner type {owner_type}, neither a country nor a building')
+        raise RuntimeError(evidence(ownership=ident,owner_type=owner_type))
     if owner==building:
         kind='self'
     elif owner not in types:
@@ -127,9 +127,9 @@ def ownership_owner(ident,building,owner_type,owner,types,headquarters,owning):
     elif types[owner] in owning:
         kind=owning[types[owner]]
     else:
-        raise RuntimeError(f'Ownership {ident} is owned by building {owner} of type {types[owner]}, which is no ownership building')
+        raise RuntimeError(evidence(ownership=ident,owner=owner,owner_building_type=types[owner]))
     if kind=='company' and owner not in headquarters:
-        raise RuntimeError(f'Ownership {ident} is owned by company headquarters {owner}, which no captured company names as its headquarters')
+        raise RuntimeError(evidence(ownership=ident,owner=owner))
     return {'owner_kind':kind,'owner_country':None,'owner_building':owner,'owner_company':headquarters[owner] if kind=='company' else None}
 
 
@@ -144,7 +144,7 @@ def movement_modifiers(children,ids,label):
 
 def flag(value):
     if value not in (0,1):
-        raise RuntimeError(f'Expected a 0/1 flag, found {value}')
+        raise RuntimeError(evidence(value=value))
     return bool(value)
 
 
@@ -177,7 +177,7 @@ def countries(c):
         c.add('country_diplomacy',country=ids[i],infamy=t['infamy'][index])
     stray=(set(ranks)|set(kinds)|leaders)-set(ids)
     if stray:
-        raise RuntimeError(f'Country captures for countries absent from the country table: {sorted(stray)[:5]}')
+        raise RuntimeError(evidence(stray=sorted(stray)[:5]))
     for name,table,column in (('country_culture','country_cultures','culture'),('country_dividend_building','country_dividend_buildings','building')):
         for i,items in c.children(table,'id','value').items():
             for value, in items:
@@ -217,16 +217,16 @@ def samples(c,owner,trend,ids):
     heads={}
     for i,ord_,channel,date,n in c.rows(f'{owner}_{trend}_channel','id','ord','channel','date','index'):
         if ord_!=5 or channel!=0:
-            raise RuntimeError(f'{owner}_{trend} channel ({ord_}, {channel}) is not the single channel (5, 0)')
+            raise RuntimeError(evidence(owner=owner,trend=trend,ord=ord_,channel=channel))
         heads[i]=(n,date)
     result={}
     for i,items in c.children(f'{owner}_{trend}','id','channel','value').items():
         if {channel for channel,_ in items}!={0}:
-            raise RuntimeError(f'{owner}_{trend} of {i} has channels other than 0')
+            raise RuntimeError(evidence(owner=owner,trend=trend,id=i,channels=sorted({channel for channel,_ in items})))
         n,date=heads[i]
         size=len(items)
         if size>n:
-            raise RuntimeError(f'{owner}_{trend} of {i} holds {size} values for {n} samples')
+            raise RuntimeError(evidence(owner=owner,trend=trend,id=i,size=size,n=n))
         for position,(_,value) in enumerate(items):
             sample=n-((n-1-position)%size)
             result[(ids[i] if ids else i),sample]=(date if sample==n else None,value)
@@ -246,7 +246,7 @@ def player(c):
     private=c.table('country_private')
     if private:
         if private['id']!=[c.player]:
-            raise RuntimeError(f'country_private holds {private["id"]}, not the player {c.player}')
+            raise RuntimeError(evidence(ids=private['id'],player=c.player))
         p={column:private[column][0] for column in PRIVATE_COUNTRY}
         c.add('player_policy',heir=p['heir'],tax_level=p['tax_level'],government_wage_level=p['government_wage_level'],
               military_wage_level=p['military_wage_level'],supply_ship_construction_level=p['supply_ship_construction_level'],
@@ -280,7 +280,7 @@ def player(c):
         c.add('player_production_method_available',production_method=method)
     consumed=sorted(set(c.rows('market_goods_consumed_by','goods','consumer')))
     if {consumer for _,consumer in consumed}-{'government','military'}:
-        raise RuntimeError(f'Unknown goods consumers {sorted({consumer for _,consumer in consumed})}')
+        raise RuntimeError(evidence(consumers=sorted({consumer for _,consumer in consumed})))
     for goods,consumer in consumed:
         c.add('player_consumed_goods',consumer=consumer,goods=goods)
     for objective in sorted({k for k, in c.rows('objective','objective')}):
@@ -328,7 +328,7 @@ def player(c):
     shown=set(c.rows('diplomatic_action_shown','country','action'))
     possible=set(c.rows('diplomatic_action_possible','country','action'))
     if possible-shown:
-        raise RuntimeError(f'Diplomatic actions possible but not shown: {sorted(possible-shown)[:5]}')
+        raise RuntimeError(evidence(unshown=sorted(possible-shown)[:5]))
     for country,action in sorted(shown):
         c.add('player_diplomatic_option',target_country=c.ident('country',country),action_type=action,possible=(country,action) in possible)
     for country,action,side,state in sorted(set(c.rows('diplomatic_action_state_pick','country','action','side','state'))):
@@ -337,7 +337,7 @@ def player(c):
     shown=set(c.rows('interaction_shown','character','interaction'))
     possible=set(c.rows('interaction_possible','character','interaction'))
     if possible-shown:
-        raise RuntimeError(f'Character interactions possible but not shown: {sorted(possible-shown)[:5]}')
+        raise RuntimeError(evidence(unshown=sorted(possible-shown)[:5]))
     for character,interaction in sorted(shown):
         c.add('player_character_interaction',character=c.ident('character',character),character_interaction=interaction,possible=(character,interaction) in possible)
     for state,paused in c.rows('state_setting','state','colonization_paused'):
@@ -353,7 +353,7 @@ def player(c):
                                        ('player_radicals_sample','trend_radicals','radicals',int),('player_loyalists_sample','trend_loyalists','loyalists',int)):
         for (owner,n),(date,value) in samples(c,'country',trend,ids).items():
             if owner&SLOT!=c.player:
-                raise RuntimeError(f'Player trend samples belong to {owner}')
+                raise RuntimeError(evidence(owner=owner,player=c.player))
             c.add(table,n=n,date=date,**{column:convert(value)})
 
 
@@ -366,7 +366,7 @@ def straits(c):
 def mandates(c):
     values=[m for m, in c.rows('bloc_mandates','mandates')]
     if len(values)>1:
-        raise RuntimeError(f'{len(values)} bloc mandate rows in one snapshot')
+        raise RuntimeError(evidence(rows=len(values)))
     return bool(values and values[0])
 
 
@@ -378,7 +378,7 @@ def metrics(c):
     values=defaultdict(dict)
     for tag,name,value,country in c.rows('country_metric','tag','name','value','country'):
         if tags.get(country)!=tag:
-            raise RuntimeError(f'country_metric tag {tag} does not name country {country}')
+            raise RuntimeError(evidence(tag=tag,country=country,known=tags.get(country)))
         values[country][name]=value
     kinds=METRICS_KINDS
     rows={}
@@ -389,7 +389,7 @@ def metrics(c):
                 table,column=METRIC_COLUMNS['country',name]
                 key=None if table.startswith('player_') else ids[country]
                 if key is None and country!=c.player:
-                    raise RuntimeError(f'Player metric {name} captured for {country}')
+                    raise RuntimeError(evidence(name=name,country=country,player=c.player))
                 rows.setdefault(table,{}).setdefault(key,{})[column]=converted
     state=c.table('state')
     sids=idents(state) if state else {}
@@ -431,18 +431,18 @@ def check_dropped(c,values,sids,state_rows):
                 direction,line=expression.split()
                 amounts=[row['amount'] for row in c.out[table] if row['direction']==direction and row['line']==int(line)]
                 if amounts!=[value]:
-                    raise RuntimeError(f'Country metric {name} is {value}, not budget {expression} {amounts}')
+                    raise RuntimeError(evidence(name=name,value=value,expression=expression,amounts=amounts))
                 continue
             key=None if table.startswith('player_') else ids[country]
             row=found.get((table,key))
             if row is not None and expression in row and not same(row[expression],value):
-                raise RuntimeError(f'Country metric {name} of {country} is {value}, not {table}.{expression} {row[expression]}')
+                raise RuntimeError(evidence(name=name,country=country,value=value,table=table,expression=expression,stored=row[expression]))
     for state_,name,value in state_rows:
         if name in DROPPED_STATE_METRICS:
             table,expression=DROPPED_STATE_METRICS[name]
             row=found.get((table,sids[state_]))
             if row is not None and expression in row and not same(row[expression],value):
-                raise RuntimeError(f'State metric {name} of {state_} is {value}, not {table}.{expression} {row[expression]}')
+                raise RuntimeError(evidence(name=name,state=state_,value=value,table=table,expression=expression,stored=row[expression]))
 
 
 def same(stored,metric):
@@ -454,7 +454,7 @@ def metric_value(kind,value):
         return flag(value)
     if kind in ('int32','int64'):
         if value!=int(value):
-            raise RuntimeError(f'Integer metric holds {value}')
+            raise RuntimeError(evidence(value=value))
         return int(value)
     return value
 
@@ -473,7 +473,7 @@ def diplomacy(c):
             elif second&SLOT==c.player:
                 other,own,theirs=first,second_truce,first_truce
             else:
-                raise RuntimeError(f'Private relation {i} is not between the player and another country')
+                raise RuntimeError(evidence(relation=i,first=first,second=second,player=c.player))
             if other in living:
                 c.add('player_relation',country=other,relations=relations,improve_relations=improve,tension=tension,player_truce=own,country_truce=theirs)
     t=c.table('pact')
@@ -503,7 +503,7 @@ def diplomacy(c):
                   initiator_maneuvers=t['initiator_maneuvers'][index],target_maneuvers=t['target_maneuvers'][index],end_date=t['end_date'][index],
                   escalation=t['escalation'][index],war=t['war'][index])
         if any(identity!=ident for identity,ident in zip(t['identity'],t['ident'])):
-            raise RuntimeError('diplomatic_play.identity differs from the play identity')
+            raise RuntimeError(evidence(differing=[(identity,ident) for identity,ident in zip(t['identity'],t['ident']) if identity!=ident][:5]))
         for role,table in (('initiator','initiators'),('target','targets'),('interested','involved'),('initiator_ally','lean_initiator'),('target_ally','lean_target')):
             for i,items in c.children('diplomatic_play_'+table,'id','value').items():
                 for country, in items:
@@ -543,10 +543,10 @@ def states(c):
     ids=idents(t)
     potential={state for state, in c.rows('treaty_port_potential','state')}
     if potential-set(ids):
-        raise RuntimeError('Treaty-port potential for states absent from the state table')
+        raise RuntimeError(evidence(states=sorted(potential-set(ids))[:5]))
     names={c.label(code) for code in set(t['custom_name'])}-{None}
     if names:
-        raise RuntimeError(f'state.custom_name holds {sorted(names)[:3]}')
+        raise RuntimeError(evidence(names=sorted(names)[:3]))
     columns={'lower_strata':'pop_statistics_population_lower_strata','middle_strata':'pop_statistics_population_middle_strata',
              'upper_strata':'pop_statistics_population_upper_strata','radicals':'pop_statistics_population_radicals','loyalists':'pop_statistics_population_loyalists',
              'subsisting_workforce':'pop_statistics_population_subsisting_workforce','unemployed_workforce':'pop_statistics_population_unemployed_workforce',
@@ -586,7 +586,7 @@ def states(c):
         for i,code,value in c.rows(table,'id','goods','value'):
             key=ids[i],c.label(code)
             if key not in goods:
-                raise RuntimeError(f'{table} has goods {key[1]} without a local price in state {i}')
+                raise RuntimeError(evidence(table=table,goods=key[1],state=i))
             goods[key][column]=value
     for (state,name),values in goods.items():
         c.add('state_goods',state=state,goods=name,**values)
@@ -625,7 +625,7 @@ def states(c):
 def region_names(c):
     t=c.tables.get('state_region')
     if not t or not t['id']:
-        raise RuntimeError('The capture holds no state regions')
+        raise RuntimeError(evidence(table=t))
     return {i:c.label(code) for i,code in zip(t['id'],t['state_region_template'])}
 
 
@@ -655,7 +655,7 @@ def pops(c):
     for row in c.out['pop_movement_support']:
         supported[row['pop']&SLOT].add(row['political_movement']&SLOT)
     if dict(listed)!=dict(supported):
-        raise RuntimeError('Movement pop lists differ from the inverse of pop movement support')
+        raise RuntimeError(evidence(listed=len(dict(listed)),supported=len(dict(supported))))
 
 
 @timed_often
@@ -685,7 +685,7 @@ def provinces(c,colors):
     for province,state,controller in c.rows('province_state','province','state','controller_country'):
         c.add('province_history',province=province,state=state,controller=controller)
         if province not in colors:
-            raise RuntimeError(f'Province {province} has no captured colour')
+            raise RuntimeError(evidence(province=province))
 
 
 BUILDING_FLOW=('balance_subsidies','trade_revenue','input_goods_shortage','tariffs','tolls','subventions','supply_ship_construction','military_ship_construction',
@@ -707,7 +707,7 @@ def buildings(c):
         mine={int(i) for i,owner in zip(states['id'],states['country']) if slot(owner)==c.player}
         live={i for i,state,dead in zip(t['id'],t['state'],t['dead']) if not flag(dead) and slot(state) in mine}
         if set(settings)!=live:
-            raise RuntimeError(f'Building GUI captures cover {sorted(set(settings)-live)[:5]} beyond the live player buildings and miss {sorted(live-set(settings))[:5]}')
+            raise RuntimeError(evidence(beyond=sorted(set(settings)-live)[:5],missed=sorted(live-set(settings))[:5]))
         for building,values in settings.items():
             c.add('building_private',building=c.ident('building',building),**dict(zip(('auto_expand','output_paused','monopoly','privatizable'),map(flag,values))))
         for i,items in c.children('building_pm','id','production_method').items():
@@ -739,16 +739,16 @@ def buildings(c):
             listed=owners.pop(i,None)
             if building not in captured:
                 if listed is not None:
-                    raise RuntimeError(f'Ownership {ident} of vanished building {building} is still listed among the owners of building {listed[0]}')
+                    raise RuntimeError(evidence(ownership=ident,building=building,listed=listed[0]))
             elif listed is None or listed[0]!=building&SLOT or listed[1]!=ident:
-                raise RuntimeError(f'Ownership {ident} is not listed among the owners of building {building}')
+                raise RuntimeError(evidence(ownership=ident,building=building,listed=listed))
             asset=assets.pop(i,None)
             if asset is not None and (asset[0]!=owner&SLOT or asset[1]!=ident or owner not in captured):
-                raise RuntimeError(f'Ownership {ident} is listed among the assets of {asset[0]}, not of its owner {owner}')
+                raise RuntimeError(evidence(ownership=ident,asset_owner=asset[0],owner=owner))
             c.add('building_ownership_history',building_ownership=ident,building=building,**ownership_owner(ident,building,owner_type,owner,types,headquarters,owning),
                   levels=levels,privatization=flag(privatization),in_owner_assets=asset is not None)
         if owners or assets:
-            raise RuntimeError(f'Owner or asset entries without an ownership: {sorted(owners)[:3]} {sorted(assets)[:3]}')
+            raise RuntimeError(evidence(owners=sorted(owners)[:3],assets=sorted(assets)[:3]))
 
 
 @timed_often
@@ -771,22 +771,22 @@ def markets(c):
                 c.add('market_area_state',market_area=ids[i],state=state,port=(i,state&SLOT) in ports)
                 ports.discard((i,state&SLOT))
         if ports:
-            raise RuntimeError(f'Market area ports outside their market area: {sorted(ports)[:3]}')
+            raise RuntimeError(evidence(ports=sorted(ports)[:3]))
     hubs=c.children('world_market_hub','id','state')
     if set(hubs)-{0}:
-        raise RuntimeError(f'World market hubs of owners {sorted(hubs)}')
+        raise RuntimeError(evidence(owners=sorted(hubs)))
     centers=defaultdict(int)
     for owner,state,_ in c.rows('world_market_hub_trade_center','id','state','ord'):
         if owner!=0:
-            raise RuntimeError('World market trade centers of an owner other than 0')
+            raise RuntimeError(evidence(owner=owner,state=state))
         centers[state&SLOT]+=1
     for state, in hubs.get(0,[]):
         c.add('world_market_hub',state=state,trade_centers=centers.pop(state&SLOT,0))
     if centers:
-        raise RuntimeError(f'Trade centers of states that are not hubs: {sorted(centers)[:3]}')
+        raise RuntimeError(evidence(centers=sorted(centers)[:3]))
     channels=c.rows('world_market_price_trend_channel','id','ord','channel','date','index')
     if {owner for owner,*_ in channels}-{0} or len({(date,n) for *_,date,n in channels})>1:
-        raise RuntimeError('World market price channels do not share one clock')
+        raise RuntimeError(evidence(owners=sorted({owner for owner,*_ in channels}),clocks=sorted({(date,n) for *_,date,n in channels})[:5]))
     goods=c.order('common/goods')
     for _,bucket,channel,_,_ in channels:
         c.add('world_market_price_channel',goods=goods[channel],bucket=bucket)
@@ -798,7 +798,7 @@ def markets(c):
         for channel,values in buffers.items():
             size=len(values)
             if size>n or sorted(values)!=list(range(size)):
-                raise RuntimeError(f'World market price buffer of channel {channel} holds {size} values for {n} samples')
+                raise RuntimeError(evidence(channel=channel,size=size,n=n))
             for position,value in values.items():
                 sample=n-((n-1-position)%size)
                 c.add('world_market_price_sample',goods=goods[channel],n=sample,date=date if sample==n else None,price=value)
@@ -814,7 +814,7 @@ def companies(c):
         for i,country,kind in zip(t['id'],t['country'],t['company_type']):
             if country&SLOT==c.player:
                 if c.label(kind) in by_type:
-                    raise RuntimeError(f'The player holds two companies of type {c.label(kind)}')
+                    raise RuntimeError(evidence(company_type=c.label(kind)))
                 by_type[c.label(kind)]=i
         for kind,investment,trade,established in c.rows('company_charter','company_type','investment','trade','established'):
             charters[by_type[kind]]=(flag(investment),flag(trade),established)
@@ -826,7 +826,7 @@ def companies(c):
         by_owner={}
         for i,country,kind in zip(t['id'],t['country'],t['company_type']):
             if (c.label(kind),country&SLOT) in by_owner:
-                raise RuntimeError(f'Country {country} holds two companies of type {c.label(kind)}')
+                raise RuntimeError(evidence(country=country,company_type=c.label(kind)))
             by_owner[c.label(kind),country&SLOT]=i
         for kind,country,owned in sorted(set(c.rows('company_owns_country','company_type','country','owned_country'))):
             c.add('company_owned_country',company=ids[by_owner[kind,country]],country=c.ident('country',owned))
@@ -890,7 +890,7 @@ def politics(c):
                      c.rows('interest_group_negotiation','interest_group','amenability','negotiated')}
         private=c.rows('interest_group_private','id','party_to_join','wants_to_leave_party','civil_war')
         if {i for i,*_ in private}!=set(negotiation):
-            raise RuntimeError('Interest group private data and negotiation captures cover different groups')
+            raise RuntimeError(evidence(private=sorted({i for i,*_ in private}),negotiation=sorted(negotiation)))
         for i,joining,leaving,side in private:
             amenability,negotiated=negotiation[i]
             c.add('interest_group_private',interest_group=ids[i],civil_war_side=side,party_to_join=joining,wants_to_leave_party=flag(leaving),
@@ -905,7 +905,7 @@ def politics(c):
                 c.add('interest_group_held_trait',interest_group=ids[i],interest_group_trait=c.label(trait),enabled=(i,trait) in enabled)
                 enabled.discard((i,trait))
         if enabled:
-            raise RuntimeError(f'Enabled interest group traits the groups do not hold: {sorted(enabled)[:3]}')
+            raise RuntimeError(evidence(enabled=sorted(enabled)[:3]))
         for i,items in c.children('interest_group_influencing_movements','id','value').items():
             for movement, in items:
                 c.add('interest_group_influencing_movement',interest_group=ids[i],political_movement=movement)
@@ -943,7 +943,7 @@ def politics(c):
         reports=c.rows('law_chance','law',*fields)
         chances={law:dict(zip(fields,values)) for law,*values in reports}
         if len(chances)!=len(reports):
-            raise RuntimeError('Law reports contain duplicate law types')
+            raise RuntimeError(evidence(chances=len(chances),reports=len(reports)))
         held={}
         for index,i in enumerate(t['id']):
             c.add('law_history',law=ids[i],country=t['country'][index],law_type=c.label(t['law'][index]),progress=t['progress'][index],phase=t['phase'][index],
@@ -951,10 +951,10 @@ def politics(c):
             if t['country'][index]&SLOT==c.player and c.label(t['law'][index]) in chances:
                 held[i]=chances[c.label(t['law'][index])]
         if len(held)!=len(chances):
-            raise RuntimeError('Law chances do not each match one player law')
+            raise RuntimeError(evidence(held=len(held),chances=len(chances)))
         private=c.rows('law_private','id','enactment_last_checkpoint_result','replace','enactment_start_date')
         if set(held)!={i for i,*_ in private}:
-            raise RuntimeError('Law reports do not each match one player law with private data')
+            raise RuntimeError(evidence(held=sorted(held),private=sorted({i for i,*_ in private})))
         for i,result,replacing,start in private:
             c.add('law_private',law=ids[i],checkpoint_result=result,replacing_law_type=c.label(replacing),enactment_start_date=start,**held[i])
         for i,items in c.children('law_amendments','id','value').items():
@@ -1014,7 +1014,7 @@ def politics(c):
         for i,items in c.children('civil_war_seceded_state','id','state_region','incorporated').items():
             empty=[incorporated for region,incorporated in items if not region]
             if empty:
-                LOG.warning('Civil war %s lists %d seceded entries without a state region',ids[i],len(empty))
+                LOG.warning(evidence(civil_war=ids[i],seceded_without_region=len(empty)))
             for region,incorporated in items:
                 if region:
                     c.add('civil_war_seceded_state',civil_war=ids[i],state_region=c.label(region),incorporated=flag(incorporated))
@@ -1040,7 +1040,7 @@ def characters(c):
     has_formation=dict(c.rows('character_formation','character','has_formation'))
     private=c.rows('character_private','id','loyalty','recruitable')
     if set(popularity)!=set(has_formation):
-        raise RuntimeError(f'Character popularity covers {sorted(popularity)[:8]} ({len(popularity)}), formation {sorted(has_formation)[:8]} ({len(has_formation)})')
+        raise RuntimeError(evidence(popularity=sorted(popularity)[:8],popularity_count=len(popularity),has_formation=sorted(has_formation)[:8],has_formation_count=len(has_formation)))
     for i,loyalty,recruitable in private:
         c.add('character_private',character=ids[i],loyalty=loyalty,recruitable=flag(recruitable))
     for i,value in popularity.items():
@@ -1081,12 +1081,12 @@ def military(c):
         ids=idents(t)
         names={c.label(code) for code in set(t['name'])}-{None}
         if names:
-            raise RuntimeError(f'formation.name holds {sorted(names)[:3]}')
+            raise RuntimeError(evidence(names=sorted(names)[:3]))
         position=c.children('formation_position','id','value')
         for index,i in enumerate(t['id']):
             xy=[value for value, in position.get(i,[])]
             if len(xy)!=2:
-                raise RuntimeError(f'Formation {i} has {len(xy)} position values')
+                raise RuntimeError(evidence(formation=i,values=len(xy)))
             c.add('formation_history',formation=ids[i],country=t['country'][index],formation_type=t['type'][index],name_key=c.label(t['localizable_name'][index]),
                   flag=t['flag'][index],color_red=t['color_red'][index],color_green=t['color_green'][index],color_blue=t['color_blue'][index],
                   supply_hub=t['supply_hub'][index],supply_priority=t['supply_priority'][index],attached_to_fleet=t['attached_to_fleet'][index],
@@ -1104,10 +1104,9 @@ def military(c):
         dead=dict(zip(t['id'],t['dead']))
         live={i for i in private if not flag(dead[i])}
         if set(settings)!=set(display) or deployable-set(settings):
-            raise RuntimeError(f'Formation GUI captures cover different formations: settings {sorted(settings)[:5]}, names {sorted(display)[:5]}, '
-                               f'deployable {sorted(deployable)[:5]}')
+            raise RuntimeError(evidence(settings=sorted(settings)[:5],display=sorted(display)[:5],deployable=sorted(deployable)[:5]))
         if set(settings)!=live:
-            raise RuntimeError(f'Formation GUI captures cover {sorted(set(settings)-live)[:5]} beyond the live player formations and miss {sorted(live-set(settings))[:5]}')
+            raise RuntimeError(evidence(beyond=sorted(set(settings)-live)[:5],missed=sorted(live-set(settings))[:5]))
         for i,(home,objective,distance) in private.items():
             c.add('formation_private',formation=ids[i],home_hq=home,strategic_objective=objective,travel_distance=distance)
         for i,values in settings.items():
@@ -1228,7 +1227,7 @@ def wars(c):
         for i,_ in c.rows('battle_attacker_still_fighting_trend','id','channel'):
             counts[i]+=1
         if any(counts.get(i,0)!=n for i,(n,_) in fighting.items()) or set(counts)-set(fighting):
-            raise RuntimeError('Still-fighting sample counts differ from their channel index')
+            raise RuntimeError(evidence(counts=dict(counts),fighting={i:n for i,(n,_) in fighting.items()}))
         for index,i in enumerate(t['id']):
             n,date=fighting.get(i,(None,None))
             c.add('battle_history',battle=ids[i],war=t['war'][index],front=t['front'][index],province=t['province'][index],battle_type=t['type'][index],
@@ -1256,7 +1255,7 @@ def ai(c):
         return
     ids=idents(t)
     if any(a!=b for a,b in zip(t['country'],t['spending_country'])):
-        raise RuntimeError('ai.spending_country differs from ai.country')
+        raise RuntimeError(evidence(differing=[(a,b) for a,b in zip(t['country'],t['spending_country']) if a!=b][:5]))
     countries=dict(zip(t['id'],t['country']))
     for index,i in enumerate(t['id']):
         c.add('country_ai_history',country_ai=ids[i],country=t['country'][index])
@@ -1269,17 +1268,17 @@ def ai(c):
     for i,_,country,target,neighbour,relevance,attitude in c.rows('ai_country_goal','id','ord','country','target_country','neighbour','diplomatic_relevance',
                                                                   'attitude'):
         if country!=countries[i]:
-            raise RuntimeError('ai_country_goal.country differs from its AI country')
+            raise RuntimeError(evidence(id=i,country=country,ai_country=countries[i]))
         c.add('country_ai_goal',country_ai=ids[i],target_country=target,neighbour=flag(neighbour),diplomatic_relevance=flag(relevance),attitude=attitude)
     reasons=defaultdict(list)
     for i,target,position,reason,attitude,country,score in c.rows('ai_country_goal_antagonize_reason','id','target','ord','reason','attitude','country','score'):
         if attitude!=1 or country!=-1:
-            raise RuntimeError(f'Antagonize reason with attitude {attitude} and country {country}')
+            raise RuntimeError(evidence(attitude=attitude,country=country))
         reasons[i,target].append((position,reason,score))
     for (i,target),items in reasons.items():
         items.sort()
         if [p for p,_,_ in items]!=list(range(len(items))):
-            raise RuntimeError(f'Antagonize reasons of ({i}, {target}) are not dense')
+            raise RuntimeError(evidence(id=i,target=target,positions=[p for p,_,_ in items]))
         for position,reason,score in items:
             c.add('country_ai_antagonize_reason',country_ai=ids[i],target_country=target,position=position,reason=c.label(reason),score=score)
 
@@ -1290,10 +1289,10 @@ def journal(c):
     if t:
         ids=idents(t)
         if set(t['scope_root_definition'])-{0}:
-            raise RuntimeError('journal_entry.scope_root_definition is not always 0')
+            raise RuntimeError(evidence(values=sorted(set(t['scope_root_definition']))))
         progress={entry:(p,g,pc) for entry,p,g,pc in c.rows('journal_progress','journal','progress','goal','percent')}
         if set(progress)-set(t['id']):
-            raise RuntimeError(f'Journal progress names entries memory does not hold: {sorted(set(progress)-set(t["id"]))[:5]}')
+            raise RuntimeError(evidence(entries=sorted(set(progress)-set(t['id']))[:5]))
         for index,i in enumerate(t['id']):
             p,g,pc=progress.get(i,(None,None,None))
             c.add('journal_entry_history',journal_entry=ids[i],country=t['country'][index],journal_entry_type=c.label(t['journal_entry_type'][index]),
@@ -1301,7 +1300,7 @@ def journal(c):
         for i,items in c.children('journal_entry_target','id','name','scope_type','identity','definition').items():
             for name,scope,target,definition in items:
                 if definition!=0:
-                    raise RuntimeError('journal_entry_target.definition is not always 0')
+                    raise RuntimeError(evidence(name=name,definition=definition))
                 c.add('journal_entry_target',journal_entry=ids[i],name_key=c.label(name),scope_type=scope,scope_target=target)
         for i,items in c.children('journal_entry_progress_bar','id','progress_bar','value').items():
             for bar,value in items:
@@ -1316,27 +1315,27 @@ def journal(c):
     if t:
         ids=idents(t)
         if set(t['scope_root_definition'])-{0}:
-            raise RuntimeError('event.scope_root_definition is not always 0')
+            raise RuntimeError(evidence(values=sorted(set(t['scope_root_definition']))))
         labels=dict(zip(t['id'],t['event_event']))
         for ident,kind,origin in zip(t['ident'],t['event_event'],t['origin_country']):
             c.add('event_history',event=ident,event_type=c.label(kind),origin_country=origin)
         for i,items in c.children('event_target','id','name','scope_type','identity','definition').items():
             for name,scope,target,definition in items:
                 if definition!=0:
-                    raise RuntimeError('event_target.definition is not always 0')
+                    raise RuntimeError(evidence(name=name,definition=definition))
                 c.add('event_target',event=ids[i],name_key=c.label(name),scope_type=scope,scope_target=target)
         options=defaultdict(list)
         for i,position,enabled,visible,default,visible_position,text,description,name in c.rows(
                 'event_option_state','id','ord','enabled','visible','default_option','visible_ord','text','description','event'):
             if visible!=int(visible_position>=0):
-                raise RuntimeError(f'event_option_state.visible disagrees with visible_ord for event {i}')
+                raise RuntimeError(evidence(event=i,visible=visible,visible_position=visible_position))
             if name!=c.label(labels[i]):
-                raise RuntimeError(f'Event options of {i} name another event')
+                raise RuntimeError(evidence(event=i,name=name,label=c.label(labels[i])))
             options[i].append((position,enabled,default,visible_position,text,description))
         for i,items in options.items():
             items.sort()
             if [p for p,*_ in items]!=list(range(len(items))):
-                raise RuntimeError(f'Event options of {i} are not dense')
+                raise RuntimeError(evidence(event=i,positions=[p for p,*_ in items]))
             for position,enabled,default,visible_position,text,description in items:
                 c.add('event_option',event=ids[i],option=position,enabled=flag(enabled),default_option=flag(default),visible_position=visible_position,
                       text=text,description=description)
@@ -1356,7 +1355,7 @@ def conflict_rows(c,table,maps,events):
     rows=[]
     for n,event,*values in c.rows(table,'n',*(name[len('log_'):] for name in maps)):
         if int(event) not in events or events[int(event)][0] not in STAGES:
-            raise RuntimeError(f'{table} row {n} belongs to event {event}, which is no battle event of this capture')
+            raise RuntimeError(evidence(table=table,n=n,event=event))
         rows.append((n,*events[int(event)],*values))
     return rows
 
@@ -1400,7 +1399,7 @@ def ordered(table,rows):
         if pick is None:
             unknown=set(shape)-known
             if unknown:
-                raise RuntimeError(f'{table.name} rows carry unknown columns {sorted(unknown)}')
+                raise RuntimeError(evidence(table=table.name,unknown=sorted(unknown)))
             pick=picks[shape]=picker(names,shape)
         out.append(pick(row))
     return out
@@ -1428,10 +1427,10 @@ def build(capture,orders,colors):
     fields_match(context)
     unread=sorted(name for name,columns in capture.tables.items() if name not in context.tables.read and any(columns.values()))
     if unread:
-        raise RuntimeError(f'Captured tables with rows that no table stores: {unread}')
+        raise RuntimeError(evidence(unread=unread))
     unknown=set(context.out)-set(TABLE)
     if unknown:
-        raise RuntimeError(f'Builders produced rows for unknown tables {sorted(unknown)}')
+        raise RuntimeError(evidence(unknown=sorted(unknown)))
     return {table.name:ordered(table,context.out.get(table.name,[])) for table in TABLES}
 
 
@@ -1439,6 +1438,6 @@ def build(capture,orders,colors):
 def fields_match(c):
     construction=[row for row in c.out['country_construction_report'] if row['country']&SLOT==c.player]
     if c.construction_paused is not None and construction and flag(c.construction_paused)!=construction[0]['is_construction_paused']:
-        raise RuntimeError('country.construction_paused differs from IsConstructionPaused for the player')
+        raise RuntimeError(evidence(construction_paused=c.construction_paused,is_construction_paused=construction[0]['is_construction_paused']))
     if c.player in c.ship_queue_paused and construction and c.ship_queue_paused[c.player]!=construction[0]['is_ship_construction_paused']:
-        raise RuntimeError('ship_queue.paused differs from IsShipConstructionPaused for the player')
+        raise RuntimeError(evidence(paused=c.ship_queue_paused[c.player],is_ship_construction_paused=construction[0]['is_ship_construction_paused']))

@@ -3,7 +3,7 @@ from functools import cache, cached_property
 import numpy as np
 import pandas as pd
 
-from interface.common import DEFAULT_GAME, timed, timed_often
+from interface.common import DEFAULT_GAME, evidence, timed, timed_often
 from interface.recording.spec import TABLE
 from interface.script import read
 from ...catalogue import ENTITIES, RECORDED_PARAMS, SITED
@@ -228,7 +228,7 @@ def context(point,selection=ALL):
         if selection.names.intersection(names):
             values=getattr(state,attribute)
             if values is None:
-                raise ValueError('The starting snapshot lacks required player state')
+                raise ValueError(evidence(attribute=attribute))
             found.update((name,value) for name,value in zip(names,values) if name in selection.names)
     if 'player.country_rank' in selection.names:
         rank=state.country(state.player)
@@ -243,7 +243,7 @@ def action_features(name,params,point,selection=ALL):
     found={'action':name} if 'action' in selection.names else {}
     expected=dict(PARAMETERS[name])
     if set(params)!=set(expected):
-        raise ValueError(f'{name} parameters differ from the catalogue: {set(params)^set(expected)}')
+        raise ValueError(evidence(name=name,differing=set(params)^set(expected)))
     for param,kind in expected.items():
         value=params[param]
         prefix=f'parameter.{param}.{kind}'

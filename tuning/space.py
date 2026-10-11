@@ -3,7 +3,7 @@ import json
 
 import numpy as np
 
-from interface.common import timed_often
+from interface.common import evidence, timed_often
 
 MODEL={
     'iterations':{'kind':'integer','low':10,'high':1000,'log':True},
@@ -40,22 +40,22 @@ class Space:
     def canonical(self,config):
         unknown=set(config)-set(self.parameters)
         if unknown:
-            raise ValueError(f'Unknown tuning parameters: {unknown}')
+            raise ValueError(evidence(unknown=unknown))
         result={}
         for name,spec in self.parameters.items():
             if any(config[parent] not in values for parent,values in spec.get('when',{}).items()):
                 continue
             if name not in config:
-                raise ValueError(f'Missing tuning parameter: {name}')
+                raise ValueError(evidence(name=name))
             value=config[name]
             if spec['kind']=='choice':
                 if value not in spec['values']:
-                    raise ValueError(f'Invalid value for {name}: {value}')
+                    raise ValueError(evidence(name=name,value=value,values=spec['values']))
             elif not np.isfinite(value) or not spec['low']<=value<=spec['high'] or (spec['kind']=='integer' and int(value)!=value):
-                raise ValueError(f'Invalid value for {name}: {value}')
+                raise ValueError(evidence(name=name,value=value,spec=spec))
             result[name]=value
         if not any(result['feature.'+name]!='off' for name,group in self.groups.items() if group['role']=='option'):
-            raise ValueError('At least one option feature family must be enabled')
+            raise ValueError(evidence(features={name:result['feature.'+name] for name,group in self.groups.items() if group['role']=='option'}))
         return result
 
     @timed_often

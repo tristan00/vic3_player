@@ -3,7 +3,7 @@ import re
 
 from ..recording.spec import DROPPED_COUNTRY_METRICS, METRIC_COLUMNS
 from .stored import script_hours
-from ..common import timed_often
+from ..common import evidence, timed_often
 
 TOKEN=re.compile(r'\?=|>=|<=|!=|[{}=<>]|[^\s{}=<>?!]+')
 COMPARE={'>=':lambda a,b:a>=b,'<=':lambda a,b:a<=b,'>':lambda a,b:a>b,'<':lambda a,b:a<b,'=':lambda a,b:a==b,'!=':lambda a,b:a!=b}
@@ -156,7 +156,7 @@ def amount(s,value):
     else:
         named=s.definitions('common/script_values').get(value,{}).get('value')
     if not named or number(named[0]) is None:
-        raise Unknown(value)
+        raise Unknown(evidence(value=value))
     return number(named[0])
 
 
@@ -167,7 +167,7 @@ class Unknown(Exception):
 @timed_often
 def known(value,what):
     if value is None:
-        raise Unknown(f'{what} is not captured')
+        raise Unknown(evidence(what=what))
     return value
 
 
@@ -205,7 +205,7 @@ def dlc_feature(s,feature):
     prefix=feature.split('_')[0]
     token=DLC_FEATURES.get(feature,prefix if re.fullmatch(r'(ep|ip|mp|rp|ap)\d',prefix) else None)
     if token is None:
-        raise ValueError(f'No DLC is known to provide the feature {feature}')
+        raise ValueError(evidence(feature=feature))
     return token in set(s.dlc)
 
 
@@ -658,7 +658,7 @@ def state_metric(scope,name):
     table,column=METRIC_COLUMNS['state',name]
     value=scope.s.map(table,'state,'+column).get(scope.ident)
     if value is None:
-        raise Unknown(f'{name} of state {scope.ident} is not captured')
+        raise Unknown(evidence(name=name,state=scope.ident))
     return value
 
 
@@ -666,7 +666,7 @@ def state_metric(scope,name):
 def devastation_level(scope):
     value=scope.s.map('state_status','state,devastation').get(scope.ident)
     if value is None:
-        raise Unknown(f'devastation of state {scope.ident} is not captured')
+        raise Unknown(evidence(state=scope.ident))
     return int(value*1000)/100000
 
 
@@ -682,7 +682,7 @@ def group_row(scope):
     government=s.map('interest_group','interest_group,in_government').get(scope.ident)
     clout=s.map('interest_group_stats','interest_group,clout').get(scope.ident)
     if government is None or clout is None:
-        raise Unknown(f'interest group {scope.ident} is not captured')
+        raise Unknown(evidence(interest_group=scope.ident))
     return government,clout
 
 
@@ -816,14 +816,14 @@ HANDLERS={
 def metric(s,country,name):
     table,column=METRIC_COLUMNS.get(('country',name)) or DROPPED_COUNTRY_METRICS[name]
     if not column.isidentifier():
-        raise RuntimeError(f'{name} is derived as {column} in {table}, not stored')
+        raise RuntimeError(evidence(name=name,column=column,table=table))
     if table.startswith('player_'):
         found=s.rows(table,column)
         value=found[0][0] if country==s.player and found else None
     else:
         value=s.map(table,'country,'+column).get(country)
     if value is None:
-        raise Unknown(f'{name} of {country} is not captured')
+        raise Unknown(evidence(name=name,country=country))
     return value
 
 
@@ -832,7 +832,7 @@ def relation_between(s,first,second):
     other=second if first==s.player else first if second==s.player else None
     value=s.map('player_relation','country,relations').get(other)
     if value is None:
-        raise Unknown(f'relations between {first} and {second} are not captured')
+        raise Unknown(evidence(first=first,second=second))
     return value
 
 
@@ -881,7 +881,7 @@ def charges_strait_toll(s,country):
         if first and controllers.get(a)==country or second and controllers.get(b)==country:
             return True
     if charged-endpoints.keys():
-        raise Unknown('toll-charging strait endpoints are not captured')
+        raise Unknown(evidence(missing=sorted(charged-endpoints.keys())))
     return False
 
 
@@ -914,7 +914,7 @@ def country_test(key,operator,value,scope):
         if value.endswith('.country_rank'):
             other=target(scope,value[:-len('.country_rank')])
             if other is None:
-                raise Unknown(f'country rank scope {value} is not captured')
+                raise Unknown(evidence(value=value))
             return COMPARE[operator](rank_of(s,country),rank_of(s,other.country()))
         return COMPARE[operator](rank_of(s,country),float(next(iter(s.definitions('common/country_ranks').get(value.split(':',1)[-1],{}).get('rank_value',[])),-1)))
     if key in ('is_revolutionary','is_insurrectionary'):
@@ -965,9 +965,9 @@ def country_test(key,operator,value,scope):
         held=country in {owners.get(state) for _,first,second in listed for state in (first,second)}
         ours=country==s.player and not any(controller==s.player for _,controller in s.rows('occupation','state,controller'))
         if not held and not ours and {ident for ident, in s.rows('strait','strait')}-{strait for strait,_,_ in listed}:
-            raise Unknown(f'{key}: a strait has no recorded endpoints')
+            raise Unknown(evidence(key=key))
         if held and key=='has_any_strait_control':
-            raise Unknown(f'{key} of a country that borders a strait')
+            raise Unknown(evidence(key=key))
         return held
     if key=='is_in_same_power_bloc':
         other=target(scope,value)
@@ -1057,7 +1057,7 @@ def modifiers(s,kind,ident):
         return {modifier for modifier, in s.rows('country_timed_modifier','modifier',country=ident)}
     if kind in ('state','character'):
         return {modifier for modifier, in s.rows(kind+'_timed_modifier','modifier',**{kind:ident})}
-    raise Unknown(f'{kind} timed modifiers are not captured')
+    raise Unknown(evidence(kind=kind))
 
 
 HANDLED={'AND','OR','NOT','NOR','NAND','any_scope_war','calc_true_if','amount','custom_tooltip','hidden_trigger','custom_description','has_dlc_feature','always','has_variable','save_temporary_scope_as',

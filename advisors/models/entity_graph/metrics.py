@@ -1,6 +1,6 @@
 import numpy as np
 
-from interface.common import timed_often
+from interface.common import evidence, timed_often
 from advisors.models.validation import entropy
 from .schema import HORIZONS
 
@@ -9,7 +9,7 @@ from .schema import HORIZONS
 def scale_targets(y,mask):
     count=mask.sum(0)
     if np.any(count<2):
-        raise ValueError('Each forecast cell requires two training observations')
+        raise ValueError(evidence(count=count))
     mean=(y*mask).sum(0)/count
     scale=np.sqrt((((y-mean)*mask)**2).sum(0)/count)
     return mean,np.maximum(scale,.01)
@@ -26,7 +26,7 @@ def utility(y):
 @timed_often
 def accuracy(prediction,y,mask,scale,reward_scale):
     if prediction.shape!=y.shape or not np.isfinite(prediction).all():
-        raise ValueError('Nonfinite or misshaped forecast')
+        raise ValueError(evidence(prediction=prediction.shape,y=y.shape,finite=bool(np.isfinite(prediction).all())))
     errors=prediction-y
     count=mask.sum(0)
     mse=((errors*mask)**2).sum(0)/np.maximum(count,1)

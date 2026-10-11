@@ -2,7 +2,7 @@ import logging
 import time
 
 from advisors.data.endgame import HISTORY, OBJECTIVE, scored_runs
-from interface.common import timed
+from interface.common import evidence, timed
 from . import ACTIVE, VERSION
 from .data import training
 from .features import selected_columns, selected_families, taxonomy
@@ -19,7 +19,7 @@ def train(connection,model):
     design=read(ACTIVE/f'{model}.json')
     groups=taxonomy(model)
     if design['version']!=VERSION or design['groups']!=groups or design['objective']!=OBJECTIVE:
-        raise ValueError('Installed picker feature schema changed; retune before collecting')
+        raise ValueError(evidence(model=model,version=design['version'],current_version=VERSION,objective=design['objective'],current_objective=OBJECTIVE,differing_groups=sorted(name for name in set(design['groups'])|set(groups) if design['groups'].get(name)!=groups.get(name))))
     config=Space(groups).canonical(design['config'])
     bounds={run:(first,last,reason) for run,first,last,reason in connection.execute(HISTORY,scored_runs()).fetchall()}
     columns=selected_columns(groups,config)

@@ -2,7 +2,7 @@ import bisect
 from itertools import groupby
 import math
 
-from interface.common import DEFAULT_GAME, timed, timed_often
+from interface.common import DEFAULT_GAME, evidence, timed, timed_often
 from interface.script import construction_costs
 
 MIN_RATIO=1e-12
@@ -99,18 +99,18 @@ def mean_log(points,start,end,base=None):
     initial=value_at(points,start)
     base=initial if base is None else base
     if base<=0 or end<=start:
-        raise ValueError('Log growth requires a positive starting value and duration')
+        raise ValueError(evidence(base=base,start=start,end=end))
     path=[(start,initial)]+[(date,value) for date,value in points if start<date<end]
     stops=[date for date,_ in path[1:]]+[end]
     if any(value<0 for (date,value),stop in zip(path,stops) if stop>date):
-        raise ValueError('Log growth cannot score negative values')
+        raise ValueError(evidence(path=path,end=end))
     return sum((stop-date)*math.log(max(value/base,MIN_RATIO)) for (date,value),stop in zip(path,stops) if stop>date)/(end-start)
 
 
 @timed_often
 def growth(first,last,points):
     if points[0][0]!=first:
-        raise RuntimeError(f'the value was not recorded at the first snapshot (hour {first})')
+        raise RuntimeError(evidence(first=first,recorded=points[0][0]))
     return mean_log(points,first,last,base=points[0][1])
 
 

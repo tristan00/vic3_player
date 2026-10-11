@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException as Refused
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import FileResponse, Response
 
+from interface.common import evidence
 from . import actions, db, names, runs, tables, tuning, worlds
 
 LOG=logging.getLogger('dashboard')
@@ -70,7 +71,7 @@ def watch(stop):
         try:
             runs.refresh()
         except Exception:
-            LOG.exception('The collection state could not be read; the last copy stays')
+            LOG.exception(evidence())
 
 
 @asynccontextmanager
@@ -118,7 +119,7 @@ def rejected(request,error):
 @db.often
 def found(value,what):
     if value is None:
-        raise HTTPException(404,f'no {what}')
+        raise HTTPException(404,evidence(what=what))
     return db.reply(value)
 
 
@@ -130,7 +131,7 @@ def filters(request):
 @db.often
 def known(run:ID):
     if not runs.exists(run):
-        raise HTTPException(404,f'no run {run}')
+        raise HTTPException(404,evidence(run=run))
     return run
 
 
@@ -252,7 +253,7 @@ def world_detail(world:ID):
 def world_image(world:ID,name:str):
     image=worlds.image(world,name)
     if image is None:
-        raise HTTPException(404,f'no image {name} in world {world}')
+        raise HTTPException(404,evidence(name=name,world=world))
     return Response(image,media_type='image/png')
 
 
@@ -302,7 +303,7 @@ def table_page(request:Request,table:str,sort:str|None=None,desc:bool=False,offs
 @app.api_route('/api/{rest:path}',methods=['GET','POST','PUT','PATCH','DELETE'])
 @db.often
 def unknown(rest:str):
-    raise HTTPException(404,f'no route /api/{rest}')
+    raise HTTPException(404,evidence(rest=rest))
 
 
 app.mount('/assets',StaticFiles(directory=DIST/'assets',check_dir=False))
@@ -312,5 +313,5 @@ app.mount('/assets',StaticFiles(directory=DIST/'assets',check_dir=False))
 @db.often
 def page(rest:str):
     if not INDEX.is_file():
-        raise HTTPException(404,f'the interface is not built: {INDEX} is missing')
+        raise HTTPException(404,evidence(index=INDEX))
     return FileResponse(INDEX,headers={'Cache-Control':'no-store'})

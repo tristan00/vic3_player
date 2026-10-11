@@ -3,7 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .common import timed, timed_often
+from .common import evidence, timed, timed_often
 
 SLOT = 0xffffff
 
@@ -19,7 +19,7 @@ class Visibility:
     def _verdict(self, name, scope):
         key = scope + '|' + name
         if key not in self.verdicts:
-            raise RuntimeError('no visibility verdict for metric ' + key)
+            raise RuntimeError(evidence(key=key))
         return self.verdicts[key]
 
     @timed_often
@@ -35,7 +35,7 @@ class Visibility:
         if name in cache:
             return cache[name]
         if name in pending:
-            raise RuntimeError('cyclic owner chain: ' + ' -> '.join((*pending, name)))
+            raise RuntimeError(evidence(chain=(*pending,name)))
         spec = self.tables[name]
         kind, *rest = spec['owner']
         rows = snapshot[name]
@@ -53,7 +53,7 @@ class Visibility:
         elif kind == 'via':
             parent = rest[0]
             if parent not in snapshot:
-                raise RuntimeError(f'{name} is owned via {parent}, which the snapshot does not contain')
+                raise RuntimeError(evidence(name=name,parent=parent))
             source = self._owner(parent, snapshot, player, cache, (*pending, name))
             if source is None:
                 owner = None
@@ -82,14 +82,14 @@ class Visibility:
             return ((rows[first].astype(np.int64) & SLOT) == player) | ((rows[second].astype(np.int64) & SLOT) == player)
         owner = self._owner(name, snapshot, player, cache)
         if owner is None:
-            raise RuntimeError(f'{name} has no resolvable owner')
+            raise RuntimeError(evidence(name=name))
         return np.full(len(owner), True) if spec['owner'][0] == 'all' else owner == player
 
     @timed
     def apply(self, snapshot, player):
         unknown = sorted(set(snapshot) - set(self.tables))
         if unknown:
-            raise RuntimeError('no visibility verdict for ' + ', '.join(unknown))
+            raise RuntimeError(evidence(unknown=unknown))
         cache = {}
         result = {}
         for name, rows in snapshot.items():

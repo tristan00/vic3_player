@@ -3,7 +3,7 @@ import time
 
 import numpy as np
 
-from interface.common import timed
+from interface.common import evidence, timed
 from .data import training, validate_manifest
 from .features import selected_columns, selected_families
 from .metrics import differentiation, summarize
@@ -61,7 +61,7 @@ def evaluate(connection,directory,manifest,model,config,threads,seed,progress_pa
             seq=candidate['seq']
             mask=sequences==seq
             if not mask.any():
-                raise ValueError(f'Differentiation snapshot {run}/{seq} lacks reward validation rows')
+                raise ValueError(evidence(run=run,seq=seq))
             mse=float(np.mean((run_predictions[mask]-run_targets[mask])**2))
             constant_mse=float(np.mean((fitted.mean-run_targets[mask])**2))
             points.append({'run':run,'seq':seq,'mse':mse,'normalized_mse':mse/fitted.scale**2,**differentiation(options[index],fitted.scale)})
@@ -72,7 +72,7 @@ def evaluate(connection,directory,manifest,model,config,threads,seed,progress_pa
     save(output.with_suffix('.model.pkl.gz'),fitted)
     restored=load(output.with_suffix('.model.pkl.gz'))
     if not np.array_equal(before,restored.predict(check)):
-        raise ValueError('Saved model predictions changed')
+        raise ValueError(evidence(output=output))
     save(output.with_suffix('.points.pkl.gz'),points)
     progress('completed')
     return {'metrics':summarize(points,loss_weights),'baseline':summarize(baseline,loss_weights),'training_rows':rows,'features':fitted.feature_count,

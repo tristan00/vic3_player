@@ -2,7 +2,7 @@ begin;
 do $$
 begin
   if (select encode(digest, 'hex') from schema_digest) <> 'f800b9df12d8632f3a0d8972288e7e761583e1663a06c2a86234d21ea89ebce9' then
-    raise exception 'Unexpected source schema for politics and culture migration';
+    raise exception 'migrate_politics_culture.sql digest=% expected=f800b9df12d8632f3a0d8972288e7e761583e1663a06c2a86234d21ea89ebce9', (select encode(digest, 'hex') from schema_digest);
   end if;
 end $$;
 alter table run add column ideology_uniformity float8 check (ideology_uniformity between 0 and 1);

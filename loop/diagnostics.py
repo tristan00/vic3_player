@@ -3,7 +3,7 @@ import json
 import logging
 from zipfile import ZipFile, ZIP_STORED
 
-from interface.common import progress, timed
+from interface.common import evidence, progress, timed
 
 LOG=logging.getLogger('loop')
 TAIL_BYTES=1<<20
@@ -35,5 +35,5 @@ def clock_failure(game,run_id,error):
             files.append({'name':name,'size':size,'offset':offset,'saved':len(content)})
         archive.writestr('incident.json',json.dumps({'run':run_id,'captured_at':captured.isoformat(),
                                                    'error':str(error),'files':files},indent=2))
-    LOG.error('Clock-stall evidence saved to %s',output)
+    LOG.error(evidence(output=str(output)))
     return output

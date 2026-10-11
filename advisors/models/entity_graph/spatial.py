@@ -8,7 +8,7 @@ import numpy as np
 from PIL import Image
 from scipy.spatial import cKDTree
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 
 
 @timed
@@ -16,7 +16,7 @@ def map_geometry(files,identities):
     settings=bytes(files['default.map']).decode('utf-8-sig')
     wrap=re.search(r'(?m)^\s*wrap_x\s*=\s*(yes|no)\b',settings)
     if wrap is None:
-        raise ValueError('Recorded map must specify horizontal wrapping')
+        raise ValueError(evidence(wrap=wrap))
     with Image.open(io.BytesIO(files['provinces.png'])) as image:
         rgb=np.asarray(image.convert('RGB'),dtype=np.int32)
     colors=(rgb[:,:,0]<<16)|(rgb[:,:,1]<<8)|rgb[:,:,2]
@@ -37,10 +37,10 @@ def map_geometry(files,identities):
             else:
                 key=int(color[1:],16) if color.lower().startswith('x') else int(color)
                 if key not in identities:
-                    raise ValueError(f'Crossing references unrecorded province color {color}')
+                    raise ValueError(evidence(color=color,key=key))
                 endpoints.append(identities[key])
         if endpoints[0] is None or endpoints[1] is None:
-            raise ValueError('Geographic crossing lacks an endpoint')
+            raise ValueError(evidence(endpoints=endpoints))
         crossings.append({'first':endpoints[0],'second':endpoints[1],'through':endpoints[2],
                           'type':row[2].strip(),'positions':[float(v) for v in row[4:8]]})
     height,width=raster.shape
@@ -77,7 +77,7 @@ def point(x,y,geometry):
     if x is None or y is None:
         return None
     if not math.isfinite(x) or not math.isfinite(y):
-        raise ValueError('Nonfinite spatial coordinate')
+        raise ValueError(evidence(x=x,y=y))
     width,height=geometry['width'],geometry['height']
     if geometry['wrap_x']:
         x=x%width
@@ -163,7 +163,7 @@ def add_spatial(builder,raw,seq,hour,geography):
     geometry=geography['map']
     width,height=geometry['width'],geometry['height']
     if geometry['coordinate_frame']!='game_xy_bottom_left' or geometry['raster'].shape!=(height,width):
-        raise ValueError('Invalid world coordinate geometry')
+        raise ValueError(evidence(coordinate_frame=geometry['coordinate_frame'],raster=geometry['raster'].shape,height=height,width=width))
     positions={}
     regions={}
     members_by_state={}

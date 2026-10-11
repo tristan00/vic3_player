@@ -1,7 +1,7 @@
 import random
 import re
 
-from ..common import timed, timed_often
+from ..common import evidence, timed, timed_often
 from ..script import blocks, body, scalar
 from .nations import _rgb, _tags, _techs, word
 from .source import select_countries
@@ -116,7 +116,7 @@ def politics(text,data,techs,capacity):
         eligible=[law for law in choices if data['law_groups'][law]==group and data['law_rules'][law][2]<=techs
                   and (group!='lawgroup_army_model' or data['barracks_cap'][law]>=capacity)]
         if not eligible:
-            raise ValueError(f'No researched law supports {group} with {capacity} barracks in one state')
+            raise ValueError(evidence(group=group,capacity=capacity))
         laws[group]=min(eligible,key=lambda law:(abs(data['law_progress'][law]-data['law_progress'][wanted]),law!=wanted,law))
     setup.extend(f'activate_law = law_type:{law}' for law in laws.values())
     return '\n'.join(setup+remaining)

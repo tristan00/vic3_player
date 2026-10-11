@@ -5,7 +5,7 @@ import queue
 import psycopg
 
 from ..actions.catalogue import action_folders
-from ..common import timed, timed_often
+from ..common import evidence, timed, timed_often
 from ..recording.spec import VOCABULARIES
 from ..runner.memory import MONTH_STARTS
 from ..timing import Span, span_name
@@ -78,7 +78,7 @@ class Vocabulary(dict):
     def __missing__(self,code):
         self.read()
         if code not in self:
-            raise KeyError(code)
+            raise KeyError(evidence(code=code))
         return self[code]
 
 

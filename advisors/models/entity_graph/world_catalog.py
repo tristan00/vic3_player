@@ -4,7 +4,7 @@ import gzip
 import json
 from pathlib import Path
 
-from interface.common import timed
+from interface.common import evidence, timed
 from interface.recording.spec import ENTITIES
 from .graph import audit
 from .removals import ATTEMPTS, DESCRIPTIONS, derive
@@ -27,7 +27,7 @@ def catalog(root,data,actions,names=('full_world',)):
         graph=derive(base,data,name)
         counts=Counter(n['kind'] for n in graph.nodes if n['kind'] in ENTITIES)
         if counts!=original:
-            raise ValueError('A variant removed core entities')
+            raise ValueError(evidence(counts=counts,original=original))
         summary=full_audit if name=='full_world' else audit(graph,data['dates'][data['seq']])
         summary={**summary,'nodes':len(graph.nodes),'edges':len(graph.edges),'removed_nodes':len(base.nodes)-len(graph.nodes),
                  'removed_edges':len(base.edges)-len(graph.edges),

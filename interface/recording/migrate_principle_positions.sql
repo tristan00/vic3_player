@@ -4,7 +4,7 @@ set local lock_timeout = '3s';
 do $$
 begin
   if (select encode(digest, 'hex') from schema_digest) is distinct from 'a3adb8870a20e37007b8d5b0f97295ec1974a7f5019641298963e341b8e69282' then
-    raise exception 'Unexpected source schema for principle positions migration';
+    raise exception 'migrate_principle_positions.sql digest=% expected=a3adb8870a20e37007b8d5b0f97295ec1974a7f5019641298963e341b8e69282', (select encode(digest, 'hex') from schema_digest);
   end if;
 end $$;
 alter table power_bloc_adopted_principle add column position int2;

@@ -3,7 +3,7 @@ from functools import cached_property
 
 from advisors import catalogue as C
 from interface.actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, LEVELS, TOLL_LEVELS
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from interface.options.available import PROMOTED, SUPPRESSED, TARIFF_CODES, changing, enacting_laws, monopolies, player_value, privatization_requested, strait_sides, strait_value, trade_level
 
 Choice=namedtuple('Choice','params commands')
@@ -445,7 +445,7 @@ def undealt(options):
 @timed
 def offer(snapshot,options):
     if undealt(options):
-        raise RuntimeError(f'No act carries the diplomatic actions {undealt(options)}')
+        raise RuntimeError(evidence(undealt=undealt(options)))
     context=Context(snapshot,options)
     offered={}
     for name,rule in RULES.items():
@@ -454,7 +454,7 @@ def offer(snapshot,options):
             declared={param for param,_ in C.PARAMS[name]}
             for choice in found:
                 if set(choice.params)!=declared:
-                    raise RuntimeError(f'{name} carries {sorted(choice.params)}, not {sorted(declared)}')
+                    raise RuntimeError(evidence(name=name,params=sorted(choice.params),declared=sorted(declared)))
             offered[name]=found
     declined(offered,options)
     return offered

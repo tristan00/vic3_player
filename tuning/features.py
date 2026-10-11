@@ -8,7 +8,7 @@ from advisors.catalogue import RECORDED_PARAMS
 from advisors.data import features as state
 from advisors.data import histograms as hist
 from advisors.models.row import features as row
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 
 
 @timed_often
@@ -37,7 +37,7 @@ def taxonomy(model):
                     groups[f'option.{prefix}.{dtype}']={'kind':'columns','role':'option','columns':selected}
         found=[column for group in groups.values() for column in group['columns']]
         if len(found)!=len(set(found)) or set(found)!=set(row.NUMERIC+row.CATEGORICAL):
-            raise ValueError(f'Feature taxonomy does not partition the row schema: {set(found)^set(row.NUMERIC+row.CATEGORICAL)}')
+            raise ValueError(evidence(found=len(found),distinct=len(set(found)),differing=set(found)^set(row.NUMERIC+row.CATEGORICAL)))
     elif model=='histogram':
         groups['option.batch_size']={'kind':'columns','role':'option','columns':['batch_size']}
         actions={hist.ACTION,*hist.ANSWER,*hist.QUEUE,*hist.PLAY,*hist.PLAY_CONTEXT,*hist.PLAY_PACTS,*hist.LEADERS,*state.SITE}
@@ -47,7 +47,7 @@ def taxonomy(model):
         for name in [hist.BUILDINGS,hist.METHODS,*hist.COUNTRY]:
             groups['holdings.'+name]={'kind':'histogram','role':'context','source':'held','family':name}
     else:
-        raise ValueError(model)
+        raise ValueError(evidence(model=model))
     return groups
 
 

@@ -12,7 +12,7 @@ import time
 import numpy as np
 
 from ..actions.catalogue import action_folders
-from ..common import DEFAULT_DATA, slot, timed, timed_often
+from ..common import DEFAULT_DATA, Defeated, evidence, slot, timed, timed_often
 from ..runner.memory import LAYOUT, MONTH_STARTS
 from ..timing import span
 from ..script import alerts, blocks, body, building_methods, decisions, definitions, event_effects, event_options, keys, method_effects, production_methods, read, scalar
@@ -64,7 +64,7 @@ def record(game,store,phase):
     world=next((path for path in manifests if path.is_file()),None)
     if store.session!=identity:
         if store.run_id is not None:
-            raise RuntimeError('The game session changed within a run')
+            raise RuntimeError(evidence(session=store.session,identity=identity,run_id=store.run_id))
         prepare(game,store,world)
     reader=game.reader()
     with span('interface.recording.record.read','interface') as reading:
@@ -79,7 +79,7 @@ def record(game,store,phase):
         tags={ident:label(code) for ident,code in zip(snapshot['country']['id'].tolist(),snapshot['country']['country_definition'].tolist())}
         living={slot(c) for c in snapshot['state']['country'].tolist()}-{-1}
         if player not in living:
-            raise RuntimeError(f'The played country {tags.get(player)} no longer owns any state')
+            raise Defeated(evidence(player=player,tag=tags.get(player)))
         windows=_event_options(reader)
         for table in ('event','event_target'):
             answered=~np.isin(snapshot[table]['id'].astype(np.int64)&0xffffff,list(windows))
@@ -98,7 +98,7 @@ def record(game,store,phase):
         path.parent.mkdir(parents=True,exist_ok=True)
         with open(path,'wb') as handle:
             pickle.dump({'error':str(error),'phase':phase,'player':player,'tables':tables,'held':own,'picks':held.picks,'windows':windows},handle)
-        LOG.error('CAPTURE REFUSED: %s; the capture is dumped to %s',error,path)
+        LOG.error(evidence(error=str(error),dump=str(path)))
         raise
     return store.run_id,seq
 
@@ -112,10 +112,10 @@ def snapshot_meta(tables,label):
     player=tables.pop('player')
     rules=tables.pop('game_rule_setting')
     if state['id']!=[0] or player['id']!=[0] or len(ui['panel'])!=1 or len(control['paused'])>1 or set(rules['id'])-{0}:
-        raise RuntimeError('The game state, player, UI or time control capture is not a single row')
+        raise RuntimeError(evidence(state=state['id'],player=player['id'],panel=len(ui['panel']),paused=len(control['paused']),rules=sorted(set(rules['id']))))
     ordered=sorted(zip(rules['ord'],rules['setting']))
     if [o for o,_ in ordered]!=list(range(len(ordered))):
-        raise RuntimeError('Game rule ords are not dense')
+        raise RuntimeError(evidence(ords=[o for o,_ in ordered]))
     constants={'player_country':player['country'][0],'game_speed':state['speed'][0],'first_start':bool(state['first_start'][0]),
                'custom_rng_seed':label(state['custom_rng_seed'][0]),'game_rules':[label(setting) for _,setting in ordered]}
     meta={'game_date':state['date'][0],'local_date_time':state['local_date_time'][0],
@@ -206,7 +206,7 @@ class Held:
         self.variables,self.lists,self.maps,self.days=held['variables'],held['lists'],held['maps'],held['days']
         self.picks=picks
         if self.variables.get('cap_seq')!=('value',nonce):
-            raise RuntimeError(f'The capture holder carries request {self.variables.get("cap_seq")}, not {nonce}')
+            raise RuntimeError(evidence(cap_seq=self.variables.get('cap_seq'),nonce=nonce))
 
     @timed_often
     def listed(self,name):
@@ -234,7 +234,7 @@ class Held:
             return self.maps[name]
         parts=[self.maps[f'{name}__p{index}'] for index in range(3) if f'{name}__p{index}' in self.maps]
         if any(set(part)!=set(parts[0]) for part in parts):
-            raise RuntimeError(f'The integer parts of {name} cover different objects')
+            raise RuntimeError(evidence(name=name,sizes=[len(part) for part in parts]))
         return {key:('value',float(sum(int(text(part[key]))*PART**index for index,part in enumerate(parts)))) for key in (parts[0] if parts else {})}
 
     @timed_often
@@ -244,14 +244,14 @@ class Held:
         for item in objects:
             missing=[field for field,found in values.items() if item not in found]
             if missing:
-                raise RuntimeError(f'Capture group {name} lacks {missing} for object {item}')
+                raise RuntimeError(evidence(name=name,missing=missing,item=item))
             rows.append((ident(item),*(values[field][item] for field in fields)))
         return rows
 
 
 def number(item):
     if item[0]!='value':
-        raise RuntimeError(f'Expected a number, found {item}')
+        raise RuntimeError(evidence(item=item))
     return item[1]
 
 
@@ -261,13 +261,13 @@ def flag(item):
 
 def text(item):
     if item[0]!='flag':
-        raise RuntimeError(f'Expected text, found {item}')
+        raise RuntimeError(evidence(item=item))
     return item[1]
 
 
 def ident(item):
     if item[0] in ('flag','value'):
-        raise RuntimeError(f'Expected an object, found {item}')
+        raise RuntimeError(evidence(item=item))
     return item[1]
 
 
@@ -282,7 +282,7 @@ def _logged(held,maps,required,prefix):
     columns=[held.mapped(name) for name in maps]
     for position,(name,column) in enumerate(zip(maps,columns)):
         if not set(column)<=set(keys) or (position<required and len(column)!=len(keys)):
-            raise RuntimeError(f'{name} holds {len(column)} entries for the {len(keys)} logged from {first+1} to {last}')
+            raise RuntimeError(evidence(name=name,entries=len(column),keys=len(keys),first=first+1,last=last))
     reads=[text if name in LOG_TEXT else number if name.rsplit('_',1)[1] in LOG_NUMBERS else ident for name in maps]
     return keys,[(index,*(read(column[key]) if key in column else None for read,column in zip(reads,columns))) for index,key in enumerate(keys,first+1)]
 
@@ -313,11 +313,10 @@ def _metrics(held,kind,groups,owners):
             if METRICS[kind][name]=='float':
                 outside=[key for bound in ('above','below') for key,value in held.column(metric_map(kind,name+'__'+bound)).items() if number(value)]
                 if outside:
-                    raise RuntimeError(f'{kind} metric {name} left its captured range for {outside[:5]}')
+                    raise RuntimeError(evidence(kind=kind,name=name,outside=outside[:5]))
             keys={ident(key) for key in found}
             if not owners[group]<=keys or keys-owners['allowed_'+group]:
-                raise RuntimeError(f'Incomplete {group} metric {name}: missing {sorted(owners[group]-keys)[:5]}, '
-                                   f'unexpected {sorted(keys-owners["allowed_"+group])[:5]}')
+                raise RuntimeError(evidence(group=group,name=name,missing=sorted(owners[group]-keys)[:5],unexpected=sorted(keys-owners["allowed_"+group])[:5]))
             rows+=[(ident(key),name,number(value)) for key,value in found.items()]
     return rows
 
@@ -335,7 +334,7 @@ def _scripted(tables,snapshot,held,tags,label,player,living,world,maps):
     provinces=held.listed('cap_province')
     painted={ident(province):text(color) for province,color in held.mapped('cap_province_color').items()}
     if len(provinces)!=len(expected) or set(painted.values())!=expected or {ident(p) for p in provinces}!=set(painted):
-        raise RuntimeError(f'Incomplete provinces: expected {len(expected)} colours, captured {len(provinces)} provinces and {len(painted)} colours')
+        raise RuntimeError(evidence(expected=len(expected),provinces=len(provinces),painted=len(painted)))
     located,controlled=held.mapped('cap_province_state'),held.mapped('cap_province_controller')
     put(tables,'province_state',[('province','int4'),('state','int4'),('controller_country','int4')],
         [(ident(province),ident(located[province]) if province in located else -1,ident(controlled[province]) if province in controlled else -1)
@@ -427,7 +426,7 @@ def _scripted(tables,snapshot,held,tags,label,player,living,world,maps):
     known={slot(front) for front in snapshot['front']['id'].tolist()} if 'front' in snapshot else set()
     fronts=[(front,number(advantage)) for front,advantage,shown in held.fields('front',held.listed('cap_obj_front'),('advantage','shown')) if flag(shown)]
     if {front for front,_ in fronts}-known:
-        raise RuntimeError(f'Front advantage captured for fronts absent from the snapshot: {sorted({front for front,_ in fronts}-known)}')
+        raise RuntimeError(evidence(fronts=sorted({front for front,_ in fronts}-known)))
     put(tables,'front_advantage',[('front','int4'),('advantage','float8')],sorted(fronts))
     put(tables,'time_control',[('paused','int4'),('speed','int4')],
                [(flag(held.variables['cap_time_paused']),int(text(held.variables['cap_time_speed__p0']))+PART*int(text(held.variables['cap_time_speed__p1'])))])
@@ -442,17 +441,17 @@ def _scripted(tables,snapshot,held,tags,label,player,living,world,maps):
                sorted({(ident(actor),text(kind)) for actor,kind in _counted(held,PROPOSAL_MAPS,'cap_proposal_count')}))
     names,ignored,formable=(held.mapped(name) for name in FORMABLE_MAPS)
     if set(names)!=set(ignored) or set(names)!=set(formable):
-        raise RuntimeError('The formable-country maps cover different entries')
+        raise RuntimeError(evidence(names=len(names),ignored=len(ignored),formable=len(formable)))
     put(tables,'formable_country',[('ord','int4'),('name','text'),('ignored','int4'),('formable','int4')],
                sorted((int(text(key)),plain(text(name)),flag(ignored[key]),flag(formable[key])) for key,name in names.items()))
     borrow_names,borrow_selected=(held.mapped(name) for name in BORROW_MAPS)
     if set(borrow_names)!=set(borrow_selected):
-        raise RuntimeError('The borrow-setting maps cover different entries')
+        raise RuntimeError(evidence(names=len(borrow_names),selected=len(borrow_selected)))
     put(tables,'formation_borrow_setting',[('formation','int4'),('ord','int4'),('name','text'),('selected','int4')],
                sorted((slot(int(text(key).split('|')[0])),int(text(key).split('|')[1]),plain(text(name)),flag(borrow_selected[key])) for key,name in borrow_names.items()))
     release_names,release_possible=(held.mapped(name) for name in RELEASE_MAPS)
     if set(release_names)!=set(release_possible):
-        raise RuntimeError('The releasable-country maps cover different entries')
+        raise RuntimeError(evidence(names=len(release_names),possible=len(release_possible)))
     put(tables,'releasable_country',[('ord','int4'),('name','text'),('possible','int4')],
                sorted((int(text(key)),plain(text(name)),flag(release_possible[key])) for key,name in release_names.items()))
     put(tables,'message_feed',[('ord','int4'),('date','text'),('type','text'),('name','text'),('description','text')],_messages(held))
@@ -469,7 +468,7 @@ def _counted(held,maps,counter):
     columns=[held.mapped(name) for name in maps]
     for name,column in zip(maps,columns):
         if set(column)!=set(keys):
-            raise RuntimeError(f'{name} holds {len(column)} entries but {count} were counted')
+            raise RuntimeError(evidence(name=name,entries=len(column),count=count))
     return [tuple(column[key] for column in columns) for key in keys]
 
 
@@ -496,7 +495,7 @@ def _event_options(reader,timeout=1):
 def _options(tables,snapshot,captured,label):
     events={int(ident):label(int(key)) for ident,key in zip(snapshot['event']['id'],snapshot['event']['event_event'])}
     if not set(captured)<=set(events):
-        raise RuntimeError(f'Pending-event windows for unknown events: {sorted(set(captured)-set(events))}')
+        raise RuntimeError(evidence(windows=sorted(set(captured)-set(events))))
     put(tables,'event_option_state',[('event','text'),('ord','int4'),('enabled','int4'),('id','int4'),
                ('visible','int4'),('default_option','int4'),('visible_ord','int4'),('text','text'),('description','text')],
                [(events[ident],ordinal,enabled,ident,int(visible>=0),default,visible,text and text.replace(chr(0),''),description and description.replace(chr(0),''))

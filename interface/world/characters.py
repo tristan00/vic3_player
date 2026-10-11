@@ -1,6 +1,6 @@
 import re
 
-from ..common import timed
+from ..common import evidence, timed
 from ..script import blocks,body,clean,scalar,script_files
 
 
@@ -36,7 +36,7 @@ def scripts(game,files):
     text=files.get(path) or clean(game/path)
     anchor='datacontext = "[Character.GetCountry]"'
     if text.count(anchor)!=1:
-        raise ValueError('Character offer layout changed')
+        raise ValueError(evidence(anchor=anchor,count=text.count(anchor)))
     widget=('widget = { size = { 0 0 } state = { name = interface_uniform_offer trigger_on_create = yes duration = 0.01 '
             'on_finish = "[GetScriptedGui(\'interface_uniform_character\').Execute(GuiScope.SetRoot(Character.MakeScope).End)]" } }')
     files[path]=text.replace(anchor,anchor+'\n'+widget,1)
@@ -44,7 +44,7 @@ def scripts(game,files):
     text=files.get(path) or clean(game/path)
     anchor='name = "ingame_hud"'
     if text.count(anchor)!=1:
-        raise ValueError('In-game HUD layout changed')
+        raise ValueError(evidence(anchor=anchor,count=text.count(anchor)))
     offers='\n'.join(f'flowcontainer = {{ datamodel = "[AccessPlayer.Access{kind}Offer]" item = {{ {widget} }} }}'
                      for kind in ('Generals','Admirals'))
     files[path]=text.replace(anchor,anchor+'\n'+offers,1)

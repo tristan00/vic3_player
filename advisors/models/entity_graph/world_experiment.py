@@ -8,7 +8,7 @@ import time
 import numpy as np
 import torch
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from .experiment import restore
 from .job import record as save_json
 from .metrics import accuracy, combined, differentiation, scale_targets, utility
@@ -41,14 +41,14 @@ def sequences(manifest,rows):
     runs={row['run'] for row in rows}
     frames=[row for row in manifest['frames'] if row['run'] in runs]
     if {(row['run'],row['seq']) for row in frames if row['decision']}!=wanted:
-        raise ValueError('Recurrent processing requires every decision in each selected run')
+        raise ValueError(evidence(wanted=len(wanted),framed=len({(row['run'],row['seq']) for row in frames if row['decision']})))
     return [[row for row in sorted(frames,key=lambda row:row['seq']) if row['run']==run] for run in sorted(runs)]
 
 
 @timed
 def forecasts(model,packed,rows,name,mean,scale,progress=None,with_alternatives=False):
     if name!='full_world':
-        raise ValueError('Recurrent fitting uses the complete world')
+        raise ValueError(evidence(name=name))
     manifest=json.loads((packed/'dataset.json').read_text())
     predictions=[]
     records=[]
@@ -70,7 +70,7 @@ def forecasts(model,packed,rows,name,mean,scale,progress=None,with_alternatives=
                 records.append(record)
                 if with_alternatives:
                     if not frame['deltas']:
-                        raise ValueError('Every held-out decision requires candidate alternatives')
+                        raise ValueError(evidence(deltas=frame['deltas']))
                     candidates.append(np.stack([model.propose(observation,delta).prediction.cpu().numpy()[0]*scale+mean for delta in frame['deltas']]))
                     identifiers.append([record['run'],record['seq']])
                 memory=model.commit(observation,proposed)
@@ -102,7 +102,7 @@ def train_epoch(model,optimizer,packed,groups,mean,scale,progress):
                 visible=torch.as_tensor(record['mask'],dtype=torch.float32,device=device)
                 loss=((proposed.prediction[0]-target).square()*visible).sum()
                 if not torch.isfinite(loss):
-                    raise ValueError('Nonfinite recurrent training loss')
+                    raise ValueError(evidence(loss=loss))
                 losses.append(loss)
                 observed+=int(record['mask'].sum())
                 loss_sum+=float(loss.detach())
@@ -159,7 +159,7 @@ def fit(packed,output,name,configuration,manifest):
 def fit_model(packed,output,name,configuration,manifest,progress):
     validate_dataset(manifest)
     if name!='full_world':
-        raise ValueError('Recurrent fitting uses the complete world')
+        raise ValueError(evidence(name=name))
     output.mkdir(parents=True,exist_ok=True)
     started=time.monotonic()
     train=[r for r in manifest['rows'] if r['split']=='train']
@@ -169,7 +169,7 @@ def fit_model(packed,output,name,configuration,manifest,progress):
     mean,scale=scale_targets(y,mask)
     reward_scale=float(np.std(utility(y[mask.all(axis=(1,2))])))
     if not np.isfinite(reward_scale) or reward_scale<=0:
-        raise ValueError('Training reward variation is required')
+        raise ValueError(evidence(reward_scale=reward_scale))
     random.seed(configuration.seed)
     np.random.seed(configuration.seed)
     torch.manual_seed(configuration.seed)
@@ -226,7 +226,7 @@ def run(packed,output,epochs,workers=1,attempts=('full_world',),wait_for=None):
             tracker.update(phase='waiting_for_data')
             while not (packed/'complete.json').exists():
                 if json.loads(wait_for.read_text())['state']=='failed':
-                    raise RuntimeError('World preparation failed')
+                    raise RuntimeError(evidence(wait_for=wait_for))
                 time.sleep(5)
         experiment(packed,output,epochs,workers,attempts,tracker)
         tracker.update(state='complete',phase='complete')
@@ -238,19 +238,19 @@ def run(packed,output,epochs,workers=1,attempts=('full_world',),wait_for=None):
 @timed
 def experiment(packed,output,epochs,workers,attempts,tracker):
     if tuple(attempts)!=('full_world',):
-        raise ValueError('Recurrent experiments use the complete world; tune its network with world_tune')
+        raise ValueError(evidence(attempts=tuple(attempts)))
     if not (packed/'complete.json').exists():
-        raise ValueError('World preparation is incomplete')
+        raise ValueError(evidence(path=packed/'complete.json'))
     torch.set_num_threads(4)
     torch.backends.cuda.matmul.allow_tf32=False
     output.mkdir(parents=True,exist_ok=True)
     manifest=json.loads((packed/'dataset.json').read_text())
     if manifest.get('graph_version')!=GRAPH_VERSION:
-        raise ValueError('Dataset is obsolete; rebuild recurrent frames before fitting')
+        raise ValueError(evidence(found=manifest.get('graph_version'),expected=GRAPH_VERSION))
     validate_dataset(manifest)
     for path in output.glob('*/result.json'):
         if json.loads(path.read_text()).get('graph_version')!=GRAPH_VERSION:
-            raise ValueError('Saved fit is obsolete; use a new output directory')
+            raise ValueError(evidence(path=path,expected=GRAPH_VERSION))
     configuration=Configuration(epochs=epochs)
     tracker.update(phase='fitting')
     results=[]

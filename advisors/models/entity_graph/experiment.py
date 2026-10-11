@@ -1,6 +1,6 @@
 import torch
 
-from interface.common import timed
+from interface.common import evidence, timed
 from .model import Configuration, Network
 from .schema import GRAPH_VERSION
 
@@ -9,7 +9,7 @@ from .schema import GRAPH_VERSION
 def restore(path,device='cuda'):
     checkpoint=torch.load(path,map_location=device,weights_only=True)
     if checkpoint.get('graph_version')!=GRAPH_VERSION:
-        raise ValueError('Checkpoint is obsolete; fit the recurrent model')
+        raise ValueError(evidence(path=path,found=checkpoint.get('graph_version'),expected=GRAPH_VERSION))
     configuration=Configuration(**checkpoint['configuration'])
     model=Network(checkpoint['tokens'],checkpoint['kinds'],checkpoint['relations'],configuration).to(device)
     model.load_state_dict(checkpoint['state'])

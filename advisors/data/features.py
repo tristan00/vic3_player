@@ -3,7 +3,7 @@ import logging
 import time
 from functools import cached_property
 
-from interface.common import DEFAULT_GAME, timed, timed_often
+from interface.common import DEFAULT_GAME, evidence, timed, timed_often
 from interface.recording.spec import NULL_DATE, TABLE
 from interface.script import read
 from ..catalogue import DUTIES, INSTITUTIONS as INSTITUTION_TYPES, LAW_ACTIONS, LAW_GROUP, LAW_GROUPS, NAVAL, RECORDED_PARAMS, PARTY_ACTIONS
@@ -136,7 +136,7 @@ def laws(active):
 def enactment(rows):
     active=[values for started,*values in rows if started not in (None,NULL_DATE)]
     if len(active)>1:
-        raise ValueError('More than one player law is being enacted')
+        raise ValueError(evidence(active=active))
     if not active:
         return [0.]+[float('nan')]*len(ENACTMENT_FIELDS)
     values=[float('nan') if value is None else float(value) for value in active[0]]

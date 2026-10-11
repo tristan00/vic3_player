@@ -5,7 +5,7 @@ set local lock_timeout = '3s';
 do $$
 begin
   if (select encode(digest, 'hex') from schema_digest) is distinct from 'ff76d96788a07bb19ce33945bc22d43ddef2fb192baddf54c1ebd558acfd2a3d' then
-    raise exception 'Unexpected source schema for random ideology share migration';
+    raise exception 'migrate_random_ideology_share.sql digest=% expected=ff76d96788a07bb19ce33945bc22d43ddef2fb192baddf54c1ebd558acfd2a3d', (select encode(digest, 'hex') from schema_digest);
   end if;
 end $$;
 

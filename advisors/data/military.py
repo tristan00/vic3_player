@@ -2,7 +2,7 @@ from bisect import bisect_right
 from collections import defaultdict
 import math
 
-from interface.common import timed, timed_often
+from interface.common import evidence, timed, timed_often
 from .rewards import PLAYERS, SNAPSHOTS
 
 MANPOWER_PER_UNIT=1000
@@ -22,7 +22,7 @@ class MilitaryStrength:
         for run,seq,unit,present,country,manpower in connection.execute(UNITS,(runs,)).fetchall():
             value=manpower if present and country==players[run] else 0
             if value is None or value<0:
-                raise ValueError('Military strength requires nonnegative recorded manpower')
+                raise ValueError(evidence(value=value))
             events[run,seq].append((unit,value))
         snapshots=defaultdict(list)
         for run,seq,hour in connection.execute(SNAPSHOTS,(runs,)).fetchall():

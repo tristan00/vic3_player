@@ -6648,9 +6648,13 @@ create index state_history_country on state_history (run_id, country, seq);
 create index character_history_country on character_history (run_id, country, seq);
 
 create function run_numbering() returns trigger language plpgsql as $$
+declare
+  runs int8;
+  last int4;
 begin
-  if exists (select 1 from run having count(*) <> max(run_id)) then
-    raise exception 'run ids must run from 1 without a gap';
+  select count(*), max(run_id) into runs, last from run;
+  if runs <> last then
+    raise exception 'run_numbering runs=% last=%', runs, last;
   end if;
   return null;
 end $$;

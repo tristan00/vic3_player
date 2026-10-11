@@ -4,7 +4,7 @@ set local lock_timeout = '3s';
 do $$
 begin
   if (select encode(digest, 'hex') from schema_digest) <> '110ed906ba89d75b5c0b2a89996855a085bfaa6af903cc876d61923218a003a7' then
-    raise exception 'Unexpected source schema for pact terms migration';
+    raise exception 'migrate_pact_terms.sql digest=% expected=110ed906ba89d75b5c0b2a89996855a085bfaa6af903cc876d61923218a003a7', (select encode(digest, 'hex') from schema_digest);
   end if;
 end $$;
 create table pact_private (
