@@ -7,7 +7,7 @@ const RIGHT = 14
 const TOP = 8
 const BOTTOM = 22
 
-export function useWidth(): [React.RefObject<HTMLDivElement | null>, number] {
+function useWidth(): [React.RefObject<HTMLDivElement | null>, number] {
   const ref = useRef<HTMLDivElement | null>(null)
   const [width, setWidth] = useState(0)
   useLayoutEffect(() => {
