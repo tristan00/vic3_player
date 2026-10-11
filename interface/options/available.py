@@ -142,11 +142,6 @@ def passes(s,folder,name,fields,scope):
 
 
 @timed_often
-def decidable(s,name):
-    return passes(s,'common/decisions',name,('possible',),country_scope(s))
-
-
-@timed_often
 def state_regions(s):
     def compute():
         regions={state:region for region,fields in s.definitions('common/strategic_regions').items() for state in fields.get('states',())}
@@ -3003,7 +2998,7 @@ RULES={
     'pause':lambda s:[{}],
     'unpause':lambda s:[{}],
     'set_speed':lambda s:product(speed=() if s.meta['speed']==int(FASTEST_SPEED) else (FASTEST_SPEED,)),
-    'take_decision':lambda s:product(decision=[name for name, in s.rows('player_decision','decision') if decidable(s,name)]),
+    'take_decision':lambda s:product(decision=[name for name,takeable in s.rows('player_decision','decision,takeable') if takeable]),
     'toggle_ignore_decision':lambda s:product(decision=[name for name, in s.rows('player_decision','decision')]),
 }
 
