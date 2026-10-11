@@ -1214,8 +1214,10 @@
       "role": "option",
       "columns": [
         "parameter.building.building.levels",
+        "parameter.building.building.slave_basket",
         "parameter.building.building.active",
         "parameter.building.building.subsidized",
+        "parameter.building.building.privatization_requested",
         "parameter.building.building.dead"
       ]
     },
@@ -1224,9 +1226,7 @@
       "role": "option",
       "columns": [
         "parameter.building.building.building_type",
-        "parameter.building.building.state.state_region",
-        "parameter.building.building.slave_basket",
-        "parameter.building.building.privatization_requested"
+        "parameter.building.building.state.state_region"
       ]
     },
     "option.parameter.building_type.building_type.categorical": {
@@ -1309,8 +1309,6 @@
         "parameter.combat_unit.combat_unit.formation.flag",
         "parameter.combat_unit.combat_unit.formation.supply_priority",
         "parameter.combat_unit.combat_unit.building.building_type",
-        "parameter.combat_unit.combat_unit.building.slave_basket",
-        "parameter.combat_unit.combat_unit.building.privatization_requested",
         "parameter.combat_unit.combat_unit.battle.battle_type",
         "parameter.combat_unit.combat_unit.battle.status",
         "parameter.combat_unit.combat_unit.combat_unit_type",
@@ -1378,8 +1376,6 @@
         "parameter.company.company.country.country_rank",
         "parameter.company.company.country.country_type",
         "parameter.company.company.building.building_type",
-        "parameter.company.company.building.slave_basket",
-        "parameter.company.company.building.privatization_requested",
         "parameter.company.company.ceo.religion",
         "parameter.company.company.ceo.ideology",
         "parameter.company.company.ceo.order_type",
@@ -2126,8 +2122,7 @@
         "parameter.treaty.treaty.second_country.government",
         "parameter.treaty.treaty.second_country.religion",
         "parameter.treaty.treaty.second_country.country_rank",
-        "parameter.treaty.treaty.second_country.country_type",
-        "parameter.treaty.treaty.withdrawn_by"
+        "parameter.treaty.treaty.second_country.country_type"
       ]
     },
     "option.parameter.treaty_article.treaty_article.categorical": {
