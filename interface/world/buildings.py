@@ -12,11 +12,11 @@ def levels(record):
 
 
 @timed_often
-def expected(records,factor,scales):
+def expected(records,scales):
     counts=collections.Counter()
     for record in records:
         kind=scalar(record,'building')
-        scale=scales.get(kind,factor)
+        scale=scales.get(kind,1)
         counts[kind]+=int(scalar(record,'level') or 0)
         for key,ownership in blocks(body(record)):
             if key=='add_ownership':
@@ -25,7 +25,7 @@ def expected(records,factor,scales):
 
 
 @timed_often
-def project(records,tag,state,tags,states,owners,factor,scales,companies):
+def project(records,tag,state,tags,states,owners,scales,companies):
     from .project import commands
 
     groups=collections.defaultdict(list)
@@ -34,7 +34,7 @@ def project(records,tag,state,tags,states,owners,factor,scales,companies):
     output=[]
     for kind,group in groups.items():
         ownership=collections.Counter()
-        scale=scales.get(kind,factor)
+        scale=scales.get(kind,1)
         direct=sum(int(scalar(record,'level') or 0) for record in group)
         representative=max(group,key=levels)
         fields=[f'{key} {op} {value}' for key,op,value in commands(body(representative)) if key not in ('add_ownership','level')]
@@ -77,7 +77,7 @@ def compare(manifest,actual):
         found[tag,state,kind]+=int(count)
     differences=[{'country':tag,'state':state,'building':kind,'expected':count,'actual':found[tag,state,kind]}
                  for (tag,state,kind),count in wanted.items() if found[tag,state,kind]!=count]
-    return {'excluded_levels':sum(v['levels'] for s in manifest['states'] for v in s.get('excluded_buildings',{}).values()),
+    return {'excluded_levels':sum(v['levels'] for s in manifest['states'] for v in s['excluded_buildings'].values()),
             'expected_levels':sum(wanted.values()),'actual_levels':sum(found[key] for key in wanted),
             'expected_buildings':len(wanted),'differences':differences}
 

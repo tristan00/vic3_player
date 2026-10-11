@@ -15,7 +15,6 @@ def population(rng,data,states,primary,share):
             for (state,_),culture in zip(records,cultures)]
     total=sum(sizes)
     original=sum(size for size,own in zip(sizes,native) if own)
-    share=original/total if share is None else share
     target=round(share*total)
     if target>=original:
         counts=integer_counts([size if own else size*(target-original)/(total-original) if total!=original else 0

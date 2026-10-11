@@ -27,13 +27,13 @@ def loaded(reader,manifest):
         if home not in locations.values() or (slot(building)!=-1 and locations.get(building_states.get(slot(building)))!=home):
             errors.append(f'Company {slot(ident)}: headquarters disagrees with country or state')
     hqs=tables['hq']
-    headquarters={slot(ident):(slot(country),label(region)) for ident,country,region in zip(hqs['id'],hqs['country'],hqs['hq_region'])}
-    region_states={r['key']:set(r['states']) for r in manifest['strategic_regions']}
+    headquarters={slot(ident):(slot(country),label(group)) for ident,country,group in zip(hqs['id'],hqs['country'],hqs['hq_region'])}
+    group_states={r['key']:set(r['states']) for r in manifest['groups']}
     formations=tables['formation']
     formation_countries={slot(ident):slot(country) for ident,country in zip(formations['id'],formations['country'])}
     for ident,country,hq in zip(formations['id'],formations['country'],formations['home_hq']):
-        owner,region=headquarters.get(slot(hq),(None,None))
-        if owner!=slot(country) or not any(c==owner and state in region_states.get(region,set()) for c,state in locations.values()):
+        owner,group=headquarters.get(slot(hq),(None,None))
+        if owner!=slot(country) or not any(c==owner and state in group_states.get(group,set()) for c,state in locations.values()):
             errors.append(f'Formation {slot(ident)}: missing or foreign headquarters')
     units=tables['combat_unit']
     counts=collections.Counter()

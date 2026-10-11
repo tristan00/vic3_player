@@ -1,9 +1,6 @@
-import argparse
 from concurrent.futures import ProcessPoolExecutor, as_completed
-import hashlib
 import json
 import logging
-import msvcrt
 from pathlib import Path
 import pickle
 import random
@@ -14,28 +11,15 @@ import traceback
 import numpy as np
 import psutil
 
-from ..common import DEFAULT_DATA, DEFAULT_GAME, timed, timed_often
-from ..runner.session import _spawn
+from ..common import timed, timed_often
+from ..runner.session import _spawn, process as owner
 from .generate import generate
-from .sampling import SLIDERS, world_size
+from .sampling import jobs
 from .vanilla import boxes, rasters, vanilla
 
 
 ROOT=Path(__file__).resolve().parents[2]
-DEFAULT_CACHE=DEFAULT_DATA/'world_cache'
 SOURCES=None
-
-
-@timed
-def fingerprint(game):
-    digest=hashlib.sha256()
-    for path in sorted(path for path in (ROOT/'interface/world').glob('*.py') if path.name not in ('cache.py','__main__.py','__init__.py'))+[ROOT/'interface/script.py']:
-        digest.update(path.name.encode())
-        digest.update(path.read_bytes())
-    binary=Path(game)/'binaries/victoria3.exe'
-    stat=binary.stat()
-    digest.update(str((str(Path(game).resolve()),stat.st_size,stat.st_mtime_ns)).encode())
-    return digest.hexdigest()
 
 
 @timed_often
@@ -45,52 +29,41 @@ def publish(path,value):
     temporary.replace(path)
 
 
-@timed_often
-def jobs(seed,count):
-    rng=random.Random(seed)
-    seen=set()
-    result=[]
-    while len(result)<count:
-        size=world_size(rng,[None]*len(SLIDERS))
-        if size[0] not in seen:
-            seen.add(size[0])
-            result.append(size)
-    return result
-
-
-@timed_often
-def manifest_path(root,size):
-    return root/'worlds'/f'seed_{size[0]}_{size[1]}_{size[2]}'/'manifest.json'
-
-
 @timed
 def checked(path):
     manifest=json.loads(path.read_text(encoding='utf-8'))
     if Path(manifest['mod']).resolve()!=path.parent/'mod' or not (path.parent/'mod/map_data/provinces.png').is_file():
         raise ValueError(f'Cached world is missing its map or has moved: {path}')
-    if not any(c['country_type']!='decentralized' for c in manifest['countries']):
-        raise ValueError(f'Cached world has no playable country: {path}')
     audit=json.loads((path.parent/'audit.json').read_text(encoding='utf-8'))
-    if (not audit['population_structure_preserved'] or not audit['culture_projection_matches'] or not audit['production_methods_match_projection'] or
+    if (not all(audit[name] for name in ('population_structure_preserved','culture_projection_matches','production_methods_match_projection')) or
             any(audit[name] for name in ('company_errors','ownership_errors','duplicate_buildings','coastal_templates_inland'))):
         raise ValueError(f'Cached world failed its generation audit: {path}')
-    return manifest['seed']
+
+
+@timed
+def worlds(root):
+    return sorted(root/name for name in json.loads((root/'index.json').read_text(encoding='utf-8'))['worlds'])
+
+
+@timed
+def configure(root,**settings):
+    settings.update(seed=random.SystemRandom().randrange(10**12) if settings['seed'] is None else settings['seed'],game=str(Path(settings['game']).resolve()))
+    jobs(settings)
+    root.mkdir(parents=True)
+    publish(root/'config.json',settings)
+    publish(root/'index.json',{'worlds':[]})
+    publish(root/'status.json',{'phase':'starting','target':settings['count'],'updated':time.time()})
 
 
 @timed
 def prepare_sources(root,game):
     folder=root/'sources'
-    folder.mkdir(exist_ok=True)
-    if (folder/'ready').is_file():
-        return
-    source=Path(game)/'game'
-    for name,array in rasters(source).items():
+    folder.mkdir()
+    arrays=rasters(game)
+    for name,array in arrays.items():
         np.save(folder/(name+'.npy'),array,allow_pickle=False)
     with open(folder/'definitions.pkl','wb') as handle:
-        pickle.dump((vanilla(source),boxes(source)),handle,pickle.HIGHEST_PROTOCOL)
-    (folder/'ready').touch()
-    rasters.cache_clear()
-    boxes.cache_clear()
+        pickle.dump((vanilla(game),boxes(arrays['provinces'])),handle,pickle.HIGHEST_PROTOCOL)
 
 
 @timed
@@ -104,126 +77,67 @@ def worker(root):
 
 
 @timed
-def build_one(root,game,size):
+def build_one(root,settings,job):
     started=time.monotonic()
-    path=generate(*size,game_dir=game,data_dir=root,source_data=SOURCES)
+    path=generate(root,settings['game'],SOURCES,settings['source_group_pool'],settings['country_pool'],**job)
     checked(path)
-    return str(path),time.monotonic()-started
+    return str(path.relative_to(root)),time.monotonic()-started
 
 
 @timed
-def build(root,game,count,workers,seed):
-    root=Path(root).resolve()
-    root.mkdir(parents=True,exist_ok=True)
-    with open(root/'build.lock','a+b') as lock:
-        lock.seek(0)
-        msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
-        identity=fingerprint(game)
-        config=root/'config.json'
-        if config.is_file():
-            settings=json.loads(config.read_text(encoding='utf-8'))
-            if settings['fingerprint']!=identity or (seed is not None and seed!=settings['seed']):
-                raise ValueError('Cache sources or seed changed; use a new cache directory')
-        else:
-            settings={'fingerprint':identity,'seed':seed if seed is not None else random.SystemRandom().randrange(10**12),'game':str(Path(game).resolve())}
-            publish(config,settings)
-        sizes=jobs(settings['seed'],count)
-        complete=[]
-        pending=[]
-        for size in sizes:
-            path=manifest_path(root,size)
-            if path.exists():
-                if checked(path)!=size[0]:
-                    raise ValueError(f'Wrong cached world seed: {path}')
-                complete.append(str(path.relative_to(root)))
-            else:
-                pending.append(size)
-        state={'pid':psutil.Process().pid,'created':psutil.Process().create_time(),'target':count,'completed':len(complete),
-               'workers':workers,'started':time.time(),'updated':time.time(),'phase':'preparing sources','world_seconds':0}
-        publish(root/'index.json',{'fingerprint':identity,'worlds':complete})
+def build(root,workers):
+    process=psutil.Process()
+    settings=json.loads((root/'config.json').read_text(encoding='utf-8'))
+    state={'pid':process.pid,'created':process.create_time(),'workers':workers,'started':time.time(),'updated':time.time(),
+           'phase':'preparing sources','target':settings['count'],'completed':0,'world_seconds':0}
+    publish(root/'status.json',state)
+    try:
+        prepare_sources(root,Path(settings['game'])/'game')
+        state['phase']='building'
         publish(root/'status.json',state)
-        try:
-            if pending:
-                prepare_sources(root,game)
-                state['phase']='building'
-                publish(root/'status.json',state)
-                with ProcessPoolExecutor(workers,initializer=worker,initargs=(str(root),)) as pool:
-                    futures={pool.submit(build_one,root,game,size):size for size in pending}
-                    try:
-                        for future in as_completed(futures):
-                            path,seconds=future.result()
-                            complete.append(str(Path(path).relative_to(root)))
-                            publish(root/'index.json',{'fingerprint':identity,'worlds':sorted(complete)})
-                            state.update(completed=len(complete),updated=time.time(),world_seconds=state['world_seconds']+seconds)
-                            publish(root/'status.json',state)
-                            print(f'{len(complete)}/{count} {Path(path).parent.name} {seconds:.2f}s',flush=True)
-                    except BaseException as error:
-                        state.update(phase='failed',error=f'{type(error).__name__}: {error}',traceback=traceback.format_exc(),updated=time.time())
-                        publish(root/'status.json',state)
-                        for future in futures:
-                            future.cancel()
-                        raise
-            state.update(phase='complete',updated=time.time())
-            publish(root/'status.json',state)
-        except BaseException as error:
-            state.update(phase='failed',error=f'{type(error).__name__}: {error}',traceback=traceback.format_exc(),updated=time.time())
-            publish(root/'status.json',state)
-            raise
-
-
-class Cached:
-    @timed
-    def __init__(self,root,rng,game=DEFAULT_GAME):
-        self.root=Path(root).resolve()
-        index=json.loads((self.root/'index.json').read_text(encoding='utf-8'))
-        if index['fingerprint']!=fingerprint(game):
-            raise ValueError('Cached worlds were generated from different sources; rebuild in a new directory')
-        self.worlds=sorted({(self.root/path).resolve() for path in index['worlds']})
-        if any(not path.is_relative_to(self.root/'worlds') or not path.is_file() for path in self.worlds):
-            raise ValueError('World cache contains missing or misplaced manifests')
-        self.rng=rng
-
-    @timed
-    def take(self):
-        world=self.rng.choice(self.worlds)
-        checked(world)
-        return world
+        complete=[]
+        with ProcessPoolExecutor(workers,initializer=worker,initargs=(str(root),)) as pool:
+            futures=[pool.submit(build_one,root,settings,job) for job in jobs(settings)]
+            try:
+                for future in as_completed(futures):
+                    path,seconds=future.result()
+                    complete.append(path)
+                    publish(root/'index.json',{'worlds':sorted(complete)})
+                    state.update(completed=len(complete),updated=time.time(),world_seconds=state['world_seconds']+seconds)
+                    publish(root/'status.json',state)
+                    print(f'{len(complete)}/{settings["count"]} {Path(path).parent.name} {seconds:.2f}s',flush=True)
+            except BaseException:
+                for future in futures:
+                    future.cancel()
+                pool.terminate_workers()
+                raise
+        state.update(phase='complete',updated=time.time())
+    except BaseException as error:
+        state.update(phase='failed',error=f'{type(error).__name__}: {error}',traceback=traceback.format_exc(),updated=time.time())
+        raise
+    finally:
+        publish(root/'status.json',state)
 
 
 @timed
-def main(argv=None):
-    parser=argparse.ArgumentParser(allow_abbrev=False)
-    parser.add_argument('command',choices=('build','status'))
-    parser.add_argument('--directory',type=Path,default=DEFAULT_CACHE)
-    parser.add_argument('--game-dir',type=Path,default=DEFAULT_GAME)
-    parser.add_argument('--count',type=int,default=1000)
-    parser.add_argument('--workers',type=int,default=20)
-    parser.add_argument('--seed',type=int)
-    parser.add_argument('--foreground',action='store_true',help=argparse.SUPPRESS)
-    args=parser.parse_args(argv)
-    if args.command=='status':
-        state=json.loads((args.directory/'status.json').read_text(encoding='utf-8'))
-        state['running']=psutil.pid_exists(state['pid']) and psutil.Process(state['pid']).create_time()==state['created']
-        print(json.dumps(state,indent=2))
-        return
-    if not args.foreground:
-        args.directory.mkdir(parents=True,exist_ok=True)
-        command=[sys.executable,'-m','interface.world.cache','build','--foreground','--directory',str(args.directory.resolve()),
-                 '--game-dir',str(args.game_dir.resolve()),'--count',str(args.count),'--workers',str(args.workers)]
-        if args.seed is not None:
-            command+=['--seed',str(args.seed)]
-        process=_spawn(command,str(ROOT))
-        print(f'WORLD CACHE LAUNCHED pid {process.pid}; log {args.directory / "build.log"}',flush=True)
-        return
-    with open(args.directory/'build.log','a',encoding='utf-8',buffering=1) as log:
-        sys.stdout=sys.stderr=log
-        logging.basicConfig(stream=log,level=logging.WARNING,format='%(asctime)s %(message)s')
-        psutil.Process().nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
-        try:
-            build(args.directory,args.game_dir,args.count,args.workers,args.seed)
-        except BaseException:
-            traceback.print_exc()
-            raise
+def status(root):
+    state=json.loads((root/'status.json').read_text(encoding='utf-8'))
+    return dict(state,running=owner(state) is not None)
+
+
+@timed
+def launch(root,workers):
+    process=_spawn([sys.executable,'-m','interface.world.cache',str(root),str(workers)],str(ROOT))
+    return {'output':str(root),'pid':process.pid,'workers':workers,'log':str(root/'build.log')}
+
+
+@timed
+def main():
+    root,workers=Path(sys.argv[1]),int(sys.argv[2])
+    sys.stdout=sys.stderr=open(root/'build.log','a',encoding='utf-8',buffering=1)
+    logging.basicConfig(stream=sys.stderr,level=logging.WARNING,format='%(asctime)s %(message)s')
+    psutil.Process().nice(psutil.BELOW_NORMAL_PRIORITY_CLASS)
+    build(root,workers)
 
 
 if __name__=='__main__':

@@ -39,7 +39,7 @@ def reference(game,templates,rules):
                     cultures.append(value[0].removeprefix('cu:'))
                 elif kind=='remove_primary_culture':
                     cultures=[culture for culture in cultures if culture!=value[0].removeprefix('cu:')]
-        countries[tag]={'tag':tag,'definition':definitions[tag],'techs':techs,
+        countries[tag]={'definition':definitions[tag],'techs':techs,
                         'type':scalar(definitions[tag],'country_type'),
                         'cultures':cultures}
     from .military import units
@@ -75,36 +75,25 @@ def reference(game,templates,rules):
 
 
 @timed_often
-def select_regions(rng,data,count,requested=None):
+def select_groups(rng,data,count,pool):
     available=collections.defaultdict(list)
     for state in data['templates']:
-        available[data['regions'][state['key']]].append(state)
-    selected=list(requested) if requested is not None else rng.sample(sorted(available),count)
-    if len(selected)!=count or len(set(selected))!=count or set(selected)-available.keys():
-        raise ValueError('Source regions must be distinct populated vanilla strategic regions')
-    return {key:available[key] for key in selected}
+        available[data['source_group_by_state'][state['key']]].append(state)
+    if pool is not None:
+        if len(set(pool))!=len(pool) or set(pool)-available.keys():
+            raise ValueError('Source group pool must contain distinct populated vanilla source groups')
+        available={key:available[key] for key in pool}
+    return {key:available[key] for key in rng.sample(sorted(available),count)}
 
 
 @timed_often
-def moments(values):
-    mean=sum(values)/len(values)
-    return mean,(sum((v-mean)**2 for v in values)/len(values))**.5
-
-
-@timed_often
-def spread(values,amount,center=None,lower=0,upper=None):
-    mean,_=moments(values)
-    center=mean if center is None else center
-    shifted=[center+amount*(value-mean) for value in values]
-    negative=min(shifted)
-    positive=max(shifted)
-    scale=1.0
-    if negative<lower:
-        scale=min(scale,(center-lower)/(center-negative))
-    if upper is not None and positive>upper:
-        scale=min(scale,(upper-center)/(positive-center))
-    result=[max(lower,center+(value-center)*scale) for value in shifted]
-    return result if upper is None else [min(upper,value) for value in result]
+def select_countries(data,pool):
+    available=sorted(tag for tag,source in data['source_countries'].items() if source['type']!='decentralized')
+    if pool is None:
+        return available
+    if not pool or len(set(pool))!=len(pool) or set(pool)-set(available):
+        raise ValueError('Country pool must contain distinct centralized vanilla country tags')
+    return sorted(pool)
 
 
 @timed_often
@@ -116,22 +105,22 @@ def integer_counts(values):
 
 
 @timed_often
-def assignments(rng,regions,sources):
+def assignments(rng,groups,sources):
     keys=list(sources)
     destinations={key:[] for key in keys}
-    centers=[r['states'][0]['center'] for r in regions]
-    for region in regions:
-        for state in region['states']:
+    centers=[r['states'][0]['center'] for r in groups]
+    for group in groups:
+        for state in group['states']:
             distances=[float(sum((state['center']-center)**2))**.5 for center in centers]
             scale=max(1,sum(distances)/len(distances))
-            weights=[(4 if key==region['source_region'] else 1)/(1+d/scale)**2 for key,d in zip(keys,distances)]
-            eligible=[key for key in keys if state.get('coastal',True) or any(not s['coastal'] for s in sources[key])]
+            weights=[(4 if key==group['source_group'] else 1)/(1+d/scale)**2 for key,d in zip(keys,distances)]
+            eligible=[key for key in keys if state['coastal'] or any(not s['coastal'] for s in sources[key])]
             if not eligible:
-                raise ValueError('These source regions have no inland state templates for this map')
-            origin=region['source_region'] if state is region['states'][0] and region['source_region'] in eligible else rng.choices(eligible,[weights[keys.index(k)] for k in eligible])[0]
+                raise ValueError('These source groups have no inland state templates for this map')
+            origin=group['source_group'] if state is group['states'][0] and group['source_group'] in eligible else rng.choices(eligible,[weights[keys.index(k)] for k in eligible])[0]
             destinations[origin].append(state)
     for origin,states in destinations.items():
-        capacity=sum(s.get('coastal',True) for s in states)
+        capacity=sum(s['coastal'] for s in states)
         remaining=[]
         chosen=[]
         for _ in states:
@@ -144,27 +133,8 @@ def assignments(rng,regions,sources):
             chosen.append(source)
             capacity-=source['coastal']
         rng.shuffle(states)
-        states.sort(key=lambda s:s.get('coastal',True),reverse=True)
+        states.sort(key=lambda s:s['coastal'],reverse=True)
         chosen.sort(key=lambda s:s['coastal'],reverse=True)
         for state,source in zip(states,chosen):
             state['source']=source
-            state['source_region']=origin
-
-
-@timed
-def development(rng,states,groups,country_economy,local_economy):
-    by_id={s['id']:s for s in states}
-    drawn=lambda value:rng.uniform(*value) if isinstance(value,(tuple,list)) else value
-    countries=[]
-    for group in groups:
-        countries.append(drawn(country_economy))
-        for index in group:
-            state=by_id[index]
-            source=state['source']
-            limits=[cap/source['buildings'][kind] for kind,cap in source['capped'].items() if source['buildings'].get(kind)]
-            farms=sum(source['buildings'].get(kind,0) for kind in source['arable_resources'])
-            if farms:
-                limits.append(source['arable_land']/farms)
-            state['local_economy']=drawn(local_economy)
-            state['economic_scale']=min([countries[-1]*state['local_economy'],*limits])
-    return countries
+            state['source_group']=origin

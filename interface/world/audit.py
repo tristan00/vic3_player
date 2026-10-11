@@ -44,7 +44,6 @@ def audit(states,files):
         source=state['source']
         expected_pops=' '.join(source['pop_records'])
         actual_pops=pops[state['key']]
-        expected_buildings=' '.join(source['building_records'])
         actual_buildings=buildings[state['key']]
         representatives={}
         for record in state['eligible_records']:
@@ -68,8 +67,8 @@ def audit(states,files):
              'levels':numbers(actual_buildings,'levels')+numbers(actual_buildings,'level'),'population_structure_preserved':types(expected_pops)==types(inner),
              'culture_projection_matches':collections.Counter(' '.join(r.split()) for _,r in blocks(inner))==collections.Counter(' '.join(r.split()) for r in state['pop_records']),
              'production_methods_match_projection':methods(projected_methods)==methods(actual_buildings),
-             'source_arable':source['arable_land'],'arable':state.get('arable_land',source['arable_land']),
-             'source_coastal':source['coastal'],'coastal':state.get('coastal',source['coastal'])}
+             'source_arable':source['arable_land'],'arable':state['arable_land'],
+             'source_coastal':source['coastal'],'coastal':state['coastal']}
         totals.update({key:row[key] for key in ('source_population','population','source_levels','levels','excluded_levels','source_arable','arable')})
         rows.append(row)
     return {'totals':dict(totals),'states':rows,
@@ -79,5 +78,4 @@ def audit(states,files):
             'coast_mismatches':sum(r['source_coastal']!=r['coastal'] for r in rows),
             'coastal_templates_inland':sum(r['source_coastal'] and not r['coastal'] for r in rows),
             'companies':len(re.findall(r'\badd_company\s*=',files['common/history/countries/interface.txt'])),
-            'company_errors':company_errors,'ownership_errors':ownership_errors,'duplicate_buildings':duplicate_buildings,
-            'game_advanced':False}
+            'company_errors':company_errors,'ownership_errors':ownership_errors,'duplicate_buildings':duplicate_buildings}

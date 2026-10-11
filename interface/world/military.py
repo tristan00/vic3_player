@@ -31,11 +31,11 @@ def fleet(value,scale):
 
 
 @timed_often
-def military(data,donor,tag,states,regions,scale):
+def military(data,donor,states,groups,scale):
     from .project import commands
 
     output=[]
-    coast=[s for s in states if s.get('coastal',s['source']['coastal'])]
+    coast=[s for s in states if s['coastal']]
     text=' '.join(data['history']['military_formations'].get('c:'+donor,[]))
     removed=set()
     extra=[]
@@ -48,7 +48,7 @@ def military(data,donor,tag,states,regions,scale):
             if scope:
                 removed.add(scope)
         elif coast and (value:=fleet(value,scale)):
-            value=re.sub(r'\bhq_region\s*=\s*sr:\w+',f'hq_region = sr:{regions[coast[0]["id"]]}',value)
+            value=re.sub(r'\bhq_region\s*=\s*sr:\w+',f'hq_region = sr:{groups[coast[0]["id"]]}',value)
             value=re.sub(r'\bSTATE_\w+',coast[0]['key'],value)
             output.append(f'{key} {op} {value}')
         elif scope:

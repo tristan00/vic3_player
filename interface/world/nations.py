@@ -1,32 +1,22 @@
 import itertools
 
-
 from ..common import timed_often
 
-
 ONSETS=['b','c','d','f','g','h','j','k','l','m','n','p','r','s','t','v','w','z','br','dr','gr','kr','tr','st','sh','th','ch','vl','sk','pr']
-
-
 VOWELS=['a','e','i','o','u','ai','ei','ou','ia','y','ae','io']
-
-
 CODAS=['','','','n','r','l','s','m','th','rd','nd','sk','x','k','t']
-
-
 ENDINGS=['ia','an','or','ar','en','is','ad','um','ea','ost']
 
 
-GENERIC={'onsets':ONSETS,'vowels':VOWELS,'codas':CODAS,'endings':ENDINGS}
-
-
 @timed_often
-def word(rng,used=None,phonology=GENERIC,syllables=(2,3),ending=True):
+def word(rng,used=None):
     while True:
-        text=''.join(rng.choice(phonology['onsets'])+rng.choice(phonology['vowels'])+rng.choice(phonology['codas']) for _ in range(rng.randint(*syllables)))
-        text=(text+rng.choice(phonology['endings']) if ending else text).capitalize()
-        if used is None or text not in used:
-            if used is not None:
-                used.add(text)
+        text=''.join(rng.choice(ONSETS)+rng.choice(VOWELS)+rng.choice(CODAS) for _ in range(rng.randint(2,3)))
+        text=(text+rng.choice(ENDINGS)).capitalize()
+        if used is None:
+            return text
+        if text not in used:
+            used.add(text)
             return text
 
 
@@ -42,11 +32,6 @@ def _tags(count,taken):
     if count>len(tags):
         raise ValueError(f'At most {len(tags)} countries are supported')
     return tags[:count]
-
-
-@timed_often
-def level(value,low,mean,top):
-    return low+2*value*(mean-low) if value<=.5 else mean+(value-.5)*2*(top-mean)
 
 
 @timed_often

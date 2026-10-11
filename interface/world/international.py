@@ -1,3 +1,4 @@
+import itertools
 import math
 
 from ..common import timed_often
@@ -6,6 +7,25 @@ from .nations import _rgb, word
 
 IDENTITIES={'identity_trade_league':'League','identity_ideological_union':'Union','identity_military_treaty_organization':'Pact','identity_sovereign_empire':'Empire'}
 RELATIONS=50
+
+
+@timed_often
+def conquests(rng,level,tags):
+    targets={}
+    if len(tags)<2:
+        return targets
+    for tag in tags:
+        target=rng.choice([other for other in tags if other!=tag])
+        if rng.random()<level:
+            targets[tag]=target
+    return targets
+
+
+@timed_often
+def opening_war(rng,level,free):
+    if len(free)<2 or rng.random()>=level:
+        return None
+    return rng.sample(free,2)
 
 
 @timed_often
@@ -45,6 +65,23 @@ def connect(rng,level,strength,types,centers,rules):
             else:
                 independent.append(i)
         blocs.append({'leader':leader,'members':members,'independent':independent})
+    return overlords,blocs
+
+
+@timed_often
+def split(rng,sides,strength,types,rules):
+    def equality(chosen):
+        totals=[[sum(values[k] for values,side in zip(strength,chosen) if side==s) for k in range(len(strength[0]))] for s in range(sides)]
+        return min(min(metric)/max(metric) if max(metric) else 1 for metric in zip(*totals))
+    sizes=lambda chosen:[chosen.count(side) for side in range(sides)]
+    chosen=max((c for c in itertools.product(range(sides),repeat=len(strength)) if max(sizes(c))-min(sizes(c))<2),key=equality)
+    overlords={}
+    blocs=[]
+    for side in range(sides):
+        members=sorted((i for i,found in enumerate(chosen) if found==side),key=lambda i:(-strength[i][0],i))
+        for i in members[1:]:
+            overlords[i]=(members[0],rng.choice(sorted(kind for kind,(over,under) in rules.items() if types[members[0]] in over and types[i] in under)))
+        blocs.append({'leader':members[0],'members':members,'independent':[]})
     return overlords,blocs
 
 

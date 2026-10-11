@@ -1,14 +1,13 @@
-import collections
 import random
 import re
 
 from ..common import timed, timed_often
 from ..script import blocks, body, scalar
-from .nations import _rgb, _tags, _techs, level, word
-from .source import development, integer_counts, moments, spread
+from .nations import _rgb, _tags, _techs, word
+from .source import select_countries
 from .buildings import expected, project
 from .military import military as formations
-from .international import connect, found, members, pacts
+from .international import connect, conquests, found, members, opening_war, pacts, split
 from .cultures import population
 
 
@@ -38,14 +37,14 @@ def commands(text):
 
 
 @timed_often
-def remap(text,tags,states,regions):
+def remap(text,tags,states,group_map):
     text=re.sub(r'\b(c|region_state):([A-Z0-9]{3})\b',lambda m:m[1]+':'+tags.get(m[2],m[2]),text)
     text=re.sub(r'\bSTATE_\w+',lambda m:states.get(m[0],m[0]),text)
-    return re.sub(r'\bsr:(\w+)',lambda m:'sr:'+regions.get(m[1],m[1]),text)
+    return re.sub(r'\bsr:(\w+)',lambda m:'sr:'+group_map.get(m[1],m[1]),text)
 
 
 @timed_often
-def history_text(text,tags,states,regions):
+def history_text(text,tags,states,group_map):
     text=re.sub(r'\bhome_region\s*=\s*(?:s:)?STATE_\w+','home_region = random',text)
     output=[]
     dropped_branch=False
@@ -53,9 +52,9 @@ def history_text(text,tags,states,regions):
         heading=key+' '+value
         refs=set(re.findall(r'\b(?:c|region_state):([A-Z0-9]{3})\b',heading))-tags.keys()
         missing=set(re.findall(r'\bSTATE_\w+',heading))-states.keys()
-        absent_regions=set(re.findall(r'\bsr:(\w+)',heading))-regions.keys()
+        absent_groups=set(re.findall(r'\bsr:(\w+)',heading))-group_map.keys()
         provinces=re.findall(r'\bp:x[0-9A-Fa-f]+',heading)
-        invalid=bool(refs or missing or absent_regions or provinces)
+        invalid=bool(refs or missing or absent_groups or provinces)
         if key=='limit' and invalid:
             return ''
         if key not in ('else','else_if'):
@@ -67,36 +66,14 @@ def history_text(text,tags,states,regions):
             continue
         wrapper=key in ('if','else_if','else') or key.startswith(('c:','s:','cu:','company:','every_','random_'))
         if wrapper:
-            inner=history_text(body(value),tags,states,regions)
+            inner=history_text(body(value),tags,states,group_map)
             if not inner:
                 dropped_branch=key in ('if','else_if')
                 continue
-            output.append(f'{remap(key,tags,states,regions)} {operator} {{ {inner} }}')
+            output.append(f'{remap(key,tags,states,group_map)} {operator} {{ {inner} }}')
         elif not invalid:
-            output.append(remap(f'{key} {operator} {value}',tags,states,regions))
+            output.append(remap(f'{key} {operator} {value}',tags,states,group_map))
     return '\n'.join(output)
-
-
-@timed_often
-def tech_counts(data,sources,donors,tech,variation):
-    members={s['owner'] for pool in sources.values() for s in pool}
-    counts={tag:len(data['source_countries'][tag]['techs']) for tag in members}
-    low,_,high=data['tech_range']
-    mean=moments(list(counts.values()))[0]
-    target=level(tech,low,mean,high)
-    homes={tag:max(sources,key=lambda region:sum(s['owner']==tag for s in sources[region])) for tag in members}
-    regional={region:moments([counts[t] for t in members if homes[t]==region])[0] for region in sources if region in homes.values()}
-    residuals={tag:counts[tag]-regional[homes[tag]] for tag in members}
-    sigma=moments(list(residuals.values()))[1]
-    reference=[residuals[tag] if tag in residuals else len(data['source_countries'][tag]['techs'])-mean for tag in donors]
-    if not moments(reference)[1] and sigma and len(donors)>1:
-        ranked=sorted(residuals.values())
-        reference=[ranked[round(i*(len(ranked)-1)/(len(donors)-1))] for i in range(len(donors))]
-    sampled=moments(reference)[1]
-    values=spread(reference,variation*sigma/sampled if sampled else 0,center=target,lower=min(low,target),upper=max(high,target))
-    return integer_counts(values),{'mean':target,'reference_mean':mean,'reference_sd':sigma,
-                                   'requested_sd':variation*sigma,'realized_mean':moments(integer_counts(values))[0],
-                                   'realized_sd':moments(integer_counts(values))[1]}
 
 
 @timed_often
@@ -146,19 +123,16 @@ def politics(text,data,techs,capacity):
 
 
 @timed
-def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_uniformity=0,copies=0,
-            tech_variation=1,country_economy=1,local_economy=1,primary_culture_share=None,military=1,interconnectedness=0):
+def nations(rng,data,states,groups,capitals,strategic,country_pool,ideology_uniformity,copies,primary_culture_share,military,interconnectedness,antagonism,war,sides):
     by_id={s['id']:s for s in states}
-    region_of={s['id']:r['key'] for r in strategic for s in r['states']}
+    group_of={s['id']:r['key'] for r in strategic for s in r['states']}
     identity_rng=random.Random(rng.getrandbits(64))
     control_rng=random.Random(rng.getrandbits(64))
     culture_rng=random.Random(rng.getrandbits(64))
     relation_rng=random.Random(rng.getrandbits(64))
-    economy_rng=random.Random(rng.getrandbits(64))
-    eligible=sorted(tag for tag,source in data['source_countries'].items() if source['type']!='decentralized')
-    if len(groups)>len(eligible):
-        raise ValueError(f'Need at most {len(eligible)} countries')
-    donors=rng.sample(eligible,len(groups))
+    conquest_rng=random.Random(rng.getrandbits(64))
+    war_rng=random.Random(rng.getrandbits(64))
+    donors=rng.sample(select_countries(data,country_pool),len(groups))
     types=[kind if kind in TYPES else identity_rng.choices(list(TYPES),list(TYPES.values()))[0] for kind in (data['source_countries'][donor]['type'] for donor in donors)]
     tags=_tags(len(groups),data['tags'])
     count=round(len(groups)*copies)
@@ -166,12 +140,12 @@ def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_u
     for index in selected:
         tags[index]=donors[index]
     tag_map=dict(zip(donors,tags))
+    conquest_targets=conquests(conquest_rng,antagonism,tags)
     state_map={}
     for state in states:
         state_map.setdefault(state['source']['key'],state['key'])
-    region_map={r['source_region']:r['key'] for r in strategic}
-    economies=development(economy_rng,states,groups,country_economy,local_economy)
-    counts,tech_reference=tech_counts(data,sources,donors,tech,tech_variation)
+    group_map={r['source_group']:r['key'] for r in strategic}
+    counts=[len(data['source_countries'][donor]['techs']) for donor in donors]
     histories={folder:[] for folder in data['history']}
     files={}
     definitions=[]
@@ -198,12 +172,35 @@ def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_u
     scales={kind:military if kind in data['military_buildings'] else 1
             for kind in data['military_buildings']|{'building_government_administration','building_construction_sector','building_trade_center'}}
     for state in states:
-        state['buildings']=expected(state['source']['building_records'],state['economic_scale'],scales)
-    overlords,blocs=connect(relation_rng,interconnectedness,[sum(sum(by_id[i]['buildings'].values()) for i in group) for group in groups],
-                            types,[by_id[i]['center'] for i in capitals],data['subject_rules'])
+        state['buildings']=expected(state['source']['building_records'],scales)
+    known=[]
+    for donor,group,count in zip(donors,groups,counts):
+        capacity=max(by_id[i]['buildings'].get('building_barrack',0) for i in group)
+        required={'standing_army','military_drill'} if capacity>data['barracks_cap']['law_peasant_levies'] else set()
+        known.append(_techs(rng,data['source_countries'][donor]['techs'],count,data['tech_requires'],required))
+        for ident in group:
+            state=by_id[ident]
+            state['excluded_buildings']={kind:{'levels':amount,'missing_technologies':sorted(data['building_techs'][kind]-known[-1])}
+                                         for kind,amount in state['buildings'].items() if not data['building_techs'][kind]<=known[-1]}
+            state['buildings']={kind:amount for kind,amount in state['buildings'].items() if kind not in state['excluded_buildings']}
+            state['eligible_records']=[r for r in state['source']['building_records'] if scalar(r,'building') in state['buildings']]
+    strength=[[sum(sum(by_id[i]['buildings'].values()) for i in group),sum(by_id[i]['buildings'].get('building_barrack',0) for i in group),
+               sum(int(scalar(record,'size')) for i in group for record in by_id[i]['source']['pop_records'])] for group in groups]
+    if sides:
+        overlords,blocs=split(relation_rng,sides,strength,types,data['subject_rules'])
+    else:
+        overlords,blocs=connect(relation_rng,interconnectedness,[levels for levels,_,_ in strength],types,[by_id[i]['center'] for i in capitals],data['subject_rules'])
     bloc_of={member:bloc for bloc in blocs for member in bloc['members']}
+    starting_war=opening_war(war_rng,war,[i for i in range(len(tags)) if i not in overlords])
+    if starting_war:
+        starting_war=[{'country':tags[holder],'target':tags[owner],'state':by_id[war_rng.choice(groups[owner])]['key']}
+                      for holder,owner in (starting_war,starting_war[::-1])]
+        opener,reply=starting_war
+        histories['diplomatic_plays'].append(f"c:{opener['country']} ?= {{ create_diplomatic_play = {{ target_state = s:{opener['state']}.region_state:{opener['target']} "
+                                             f"war = yes type = dp_conquer_state add_war_goal = {{ holder = c:{reply['country']} type = conquer_state "
+                                             f"target_state = s:{reply['state']}.region_state:{reply['target']} }} }} }}")
     vanilla_blocs={}
-    for index,(tag,donor,group,capital_id,count) in enumerate(zip(tags,donors,groups,capitals,counts)):
+    for index,(tag,donor,group,capital_id) in enumerate(zip(tags,donors,groups,capitals)):
         source=data['source_countries'][donor]
         capital=by_id[capital_id]
         local_tags=dict(tag_map,**{donor:tag})
@@ -211,29 +208,20 @@ def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_u
         for ident in group:
             state=by_id[ident]
             local_states[state['source']['key']]=state['key']
-        capacity=max(by_id[i]['buildings'].get('building_barrack',0) for i in group)
-        required={'standing_army','military_drill'} if capacity>data['barracks_cap']['law_peasant_levies'] else set()
-        techs=_techs(rng,source['techs'],count,data['tech_requires'],required)
-        for ident in group:
-            state=by_id[ident]
-            state['excluded_buildings']={kind:{'levels':amount,'missing_technologies':sorted(data['building_techs'][kind]-techs)}
-                                         for kind,amount in state['buildings'].items() if not data['building_techs'][kind]<=techs}
-            state['buildings']={kind:amount for kind,amount in state['buildings'].items() if kind not in state['excluded_buildings']}
-            state['eligible_records']=[r for r in state['source']['building_records'] if scalar(r,'building') in state['buildings']]
+        techs=known[index]
         country_text=starting_history(data,donor,techs)
-        uniformity=control_rng.uniform(*ideology_uniformity) if isinstance(ideology_uniformity,(tuple,list)) else ideology_uniformity
-        share=control_rng.uniform(*primary_culture_share) if isinstance(primary_culture_share,(tuple,list)) else primary_culture_share
-        realized=population(culture_rng,data,[by_id[i] for i in group],source['cultures'],share)
+        uniformity=control_rng.uniform(*ideology_uniformity)
+        realized=population(culture_rng,data,[by_id[i] for i in group],source['cultures'],control_rng.uniform(*primary_culture_share))
         country_text+=f'\nset_variable = {{ name = interface_ideology_uniformity value = {100*uniformity:.5f} }}'
         country_text='\n'.join(f'{key} {op} {value}' for key,op,value in commands(country_text)
                                if key not in ('add_company','set_capital','set_market_capital') and not key.startswith('company:'))
         country_text=politics(country_text,data,techs,max(by_id[i]['buildings'].get('building_barrack',0) for i in group))
-        country_text=history_text(country_text,local_tags,local_states,region_map)
+        country_text=history_text(country_text,local_tags,local_states,group_map)
         for key,owner in companies.items():
             if owner==tag:
                 setup=source_companies[key][1]
                 home=scalar(setup,'set_company_state_region').removeprefix('s:')
-                country_text+=f'\nadd_company = company_type:{key}\n'+history_text(setup,local_tags,dict(local_states,**{home:company_states[key]}),region_map)
+                country_text+=f'\nadd_company = company_type:{key}\n'+history_text(setup,local_tags,dict(local_states,**{home:company_states[key]}),group_map)
         histories['countries'].append(f'c:{tag} ?= {{ {country_text} }}')
         definition=re.sub(r'^'+donor+r'\s*=',tag+' =',source['definition'],count=1)
         definition=re.sub(r'\bcapital\s*=\s*STATE_\w+',f'capital = {capital["key"]}',definition)
@@ -256,14 +244,14 @@ def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_u
                                not (key in ('create_diplomatic_pact','set_relations') and tag_map.get((scalar(value,'country') or '').removeprefix('c:')) in mates))
             if folder=='power_blocs':
                 text=re.sub(r'\bmember\s*=\s*c:\w+','',text) if bloc_of.get(index,{'leader':index})['leader']==index else ''
-            text=history_text(text,local_tags,local_states,region_map)
+            text=history_text(text,local_tags,local_states,group_map)
             if folder=='power_blocs' and 'create_power_bloc' in text:
                 vanilla_blocs[index]=scalar(text,'identity')
                 if index in bloc_of:
                     text=re.sub(r'create_power_bloc\s*=\s*\{',lambda start:start[0]+members(bloc_of[index],tags),text,count=1)
             if text:
                 histories[folder].append(f'c:{tag} ?= {{ {text} }}')
-        military_history=formations(data,donor,tag,[by_id[i] for i in group],region_of,military)
+        military_history=formations(data,donor,[by_id[i] for i in group],group_of,military)
         if military_history:
             histories['military_formations'].append(f'c:{tag} ?= {{ {military_history} }}')
         for ident in group:
@@ -271,7 +259,7 @@ def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_u
             original=state['source']
             state['country']=tag
             own_states=dict(local_states,**{original['key']:state['key']})
-            state_effects=history_text('\n'.join(f'{k} {op} {v}' for k,op,v in commands(original['state_history']) if k!='create_state'),local_tags,own_states,region_map)
+            state_effects=history_text('\n'.join(f'{k} {op} {v}' for k,op,v in commands(original['state_history']) if k!='create_state'),local_tags,own_states,group_map)
             state_effects=re.sub(r'\badd_homeland\s*=\s*(\w+)',lambda m:' '.join('add_homeland = '+culture for culture in sorted(state['culture_map'].get(m[1],{m[1]}))),state_effects)
             state_type=next((scalar(text,'state_type') for key,text in blocks(original['state_history'])
                              if key=='create_state' and scalar(text,'country')=='c:'+original['owner']),None)
@@ -279,16 +267,15 @@ def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_u
                                        f'{"state_type = "+state_type if state_type else ""} owned_provinces = {{ {" ".join(state["province_codes"])} }} }} '
                                        f'{state_effects} }}')
             histories['pops'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {" ".join(state["pop_records"])} }} }}')
-            buildings=project(state['eligible_records'],tag,state['key'],local_tags,own_states,state_countries,
-                              state['economic_scale'],scales,companies)
+            buildings=project(state['eligible_records'],tag,state['key'],local_tags,own_states,state_countries,scales,companies)
             state['generated_buildings']=' '.join(buildings)
             histories['buildings'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {state["generated_buildings"]} }} }}')
             if original['trade_history']:
-                histories['trade'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {history_text(original['trade_history'],local_tags,own_states,region_map)} }} }}')
+                histories['trade'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {history_text(original['trade_history'],local_tags,own_states,group_map)} }} }}')
         countries.append({'tag':tag,'name':name,'source':donor,'copy':donor if tag==donor else None,'country_type':types[index],
                           'states':[by_id[i]['key'] for i in group],'capital':capital['key'],'culture':source['cultures'][0],
-                          'cultures':source['cultures'],'primary_culture_share':realized,'ideology_uniformity':uniformity,'country_economy':economies[index],
-                          'tech_count':len(techs),'technologies':sorted(techs),
+                          'cultures':source['cultures'],'primary_culture_share':realized,'ideology_uniformity':uniformity,
+                          'tech_count':len(techs),'technologies':sorted(techs),'conquest_target':conquest_targets.get(tag),
                           'starting_laws':{data['law_groups'][law]:law for law in re.findall(r'activate_law\s*=\s*law_type:(\w+)',country_text)},
                           'provinces':[p for i in group for p in by_id[i]['province_codes']]})
     for number,bloc in enumerate(blocs,1):
@@ -317,16 +304,16 @@ def nations(rng,data,states,groups,capitals,strategic,sources,tech=.5,ideology_u
                         if key=='s:'+state['source']['key']:
                             for text in records:
                                 state_tags=dict(tag_map,**{t:state['country'] for t in re.findall(r'region_state:([A-Z0-9]{3})',text)})
-                                projected=history_text(text,state_tags,dict(state_map,**{state['source']['key']:state['key']}),region_map)
+                                projected=history_text(text,state_tags,dict(state_map,**{state['source']['key']:state['key']}),group_map)
                                 if projected:
                                     lines.append(f's:{state["key"]} = {{ {projected} }}')
                 else:
-                    projected=history_text('\n'.join(f'{key} = {{ {text} }}' for text in records),tag_map,state_map,region_map)
+                    projected=history_text('\n'.join(f'{key} = {{ {text} }}' for text in records),tag_map,state_map,group_map)
                     if projected:
                         lines.append(projected)
+        if folder=='ai':
+            lines.extend(f'c:{tag} ?= {{ set_secret_goal = {{ country = c:{target} secret_goal = conquer }} }}' for tag,target in conquest_targets.items())
         if folder in data['history_roots']:
             files[f'common/history/{folder}/interface.txt']=data['history_roots'][folder]+' = {\n'+'\n'.join(lines)+'\n}'
     files['common/country_definitions/interface.txt']='\n'.join(definitions)
-    tech_reference.update(realized_mean=moments([c['tech_count'] for c in countries])[0],
-                          realized_sd=moments([c['tech_count'] for c in countries])[1])
-    return {'countries':countries,'files':files,'localization':localization,'tech_reference':tech_reference,'power_blocs':power_blocs}
+    return {'countries':countries,'files':files,'localization':localization,'power_blocs':power_blocs,'starting_war':starting_war}
