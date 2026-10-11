@@ -4,7 +4,7 @@ from functools import lru_cache
 from ..actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, ACTIONS, LEVELS, TOLL_LEVELS
 from ..common import DEFAULT_GAME, evidence, progress, timed, timed_often
 from ..script import body, fields, read
-from ..recording.spec import METRIC_COLUMNS
+from ..recording.spec import EPOCH_DATE, METRIC_COLUMNS
 from ..runner.memory import MONTH_STARTS
 
 from .triggers import ENGAGED, Scope, autonomous, bloc_advantage, modifier_flag, character_scope, country_scope, evaluate, overlords, parse, subject_pairs
@@ -2304,8 +2304,16 @@ def capital_sites(s):
 def market_capital_sites(s):
     if not settled_country(s) or not market_owner(s) or moved_recently(s,'moved_market_capital_recently'):
         return []
-    capital=s.map('country','country,market_capital').get(s.player)
+    market,national=s.rows('country','market_capital,capital',country=s.player)[0]
+    capital=national if market is None else market
     return [state for state in s.states() if state!=capital and incorporation(s).get(state)==1]
+
+
+@timed_often
+def revocable(s,options):
+    unlock=dict(s.rows('charter_private','charter,unlock'))
+    unlocked={(company,kind) for charter,company,kind in s.rows('charter','charter,company,company_charter_type') if charter in unlock and EPOCH_DATE<unlock[charter]<now(s)}
+    return [option for option in options if (option['company'],option['charter']) in unlocked]
 
 
 BUILDING_CHARTERS={'monopoly_charter':'building_types','industry_charter':'extension_building_types'}
@@ -2676,9 +2684,9 @@ RULES={
     'move_capital':lambda s:product(state=capital_sites(s)),
     'move_market_capital':lambda s:product(state=market_capital_sites(s)),
     'grant_building_charter':building_charters,
-    'revoke_building_charter':building_charters,
+    'revoke_building_charter':lambda s:revocable(s,building_charters(s)),
     'grant_region_charter':region_charters,
-    'revoke_region_charter':region_charters,
+    'revoke_region_charter':lambda s:revocable(s,region_charters(s)),
     'bulk_switch_production_method_state':bulk_methods,
     'cancel_queue_item':lambda s:queue_items(s,0,0),
     'raise_queue_item':lambda s:queue_items(s,1,0),
@@ -2740,7 +2748,8 @@ RULES={
     'create_fleet':lambda s:product(option=range(len(naval_regions(s)))),
     'toggle_naval_mission_region':lambda s:[{'military_formation':fleet,'strategic_region':region} for fleet in on_mission(s,True) for region in sea_regions(s)],
     'change_naval_mission_type':lambda s:[{'military_formation':fleet,'naval_mission_type':kind} for fleet in on_mission(s,True) for kind in mission_types(s,fleet)],
-    'station_fleet':lambda s:[{'military_formation':fleet,'state':state} for fleet in free_fleets(s) for state in s.states() if trigger_coastal(s,state)],
+    'station_fleet':lambda s:[{'military_formation':fleet,'state':state} for fleet in free_fleets(s) for state in s.states()
+                              if trigger_coastal(s,state) and state!=s.map('formation_status','formation,target_location').get(fleet)],
     'rehome_fleet':lambda s:[{'military_formation':fleet,'strategic_region':region} for fleet in free_fleets(s) for region in naval_regions(s)
                              if region!=hq_regions(s)[home_of(s,fleet)][1]],
     'defend_invasion_fleet':lambda s:[{'military_formation':fleet,'front':front} for front,ended in invasions(s) if not ended for fleet in free_fleets(s)],

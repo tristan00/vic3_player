@@ -886,7 +886,8 @@ def charges_strait_toll(s,country):
 
 
 RELATION_THRESHOLDS={'friendly':80,'amicable':50,'cordial':20,'neutral':-19,'poor':-20,'cold':-50,'hostile':-80}
-METRIC_KEYS={'gdp':'GetGDP','prestige':'GetPrestige','infamy':'GetInfamy','government_legitimacy':'GetGovernmentLegitimacy','navy_size':'GetNumShips',
+METRIC_KEYS={'gdp':'GetGDP','prestige':'GetPrestige','infamy':'GetInfamy','government_legitimacy':'GetGovernmentLegitimacy','legitimacy':'GetGovernmentLegitimacy',
+             'navy_size':'GetNumShips',
              **{f'produced_{power}':f"GetPowerIncome('{power}')" for power in ('authority','influence','bureaucracy')}}
 
 
@@ -905,10 +906,11 @@ def country_test(key,operator,value,scope):
             return None
         return bool(other) and COMPARE[operator](relation_between(s,country,other.country()),threshold)
     if key in METRIC_KEYS and isinstance(value,str):
-        other=number(value)
-        if other is None:
+        if is_scope(value):
             found=target(scope,value)
             other=metric(s,found.country(),METRIC_KEYS[key]) if found else 0
+        else:
+            other=amount(s,value)
         return COMPARE[operator](metric(s,country,METRIC_KEYS[key]),other)
     if key=='country_rank':
         if value.endswith('.country_rank'):
@@ -919,6 +921,8 @@ def country_test(key,operator,value,scope):
         return COMPARE[operator](rank_of(s,country),float(next(iter(s.definitions('common/country_ranks').get(value.split(':',1)[-1],{}).get('rank_value',[])),-1)))
     if key in ('is_revolutionary','is_insurrectionary'):
         return not yes(value)
+    if key=='is_diplomatic_play_committed_participant':
+        return any(country in members for members in play_sides(s).values())==yes(value)
     if key=='has_war_with':
         found=target(scope,value)
         return bool(found) and war_between(s,country,found.country())
