@@ -31,7 +31,8 @@ def context(snapshot):
             **{('combat_unit',i):f for i,f in snapshot.rows('combat_unit','combat_unit,formation')},
             **{('method_group',(k,m)):g for k,g,m in snapshot.methods},
             **{('ownership',i):k for i,k in ownership_classes(snapshot).items()},
-            **{('treaty',t):('country',b if a==snapshot.player else a) for t,a,b in snapshot.rows('treaty','treaty,first_country,second_country')}}
+            **{('treaty',t):('country',b if a==snapshot.player else a) for t,a,b in snapshot.rows('treaty','treaty,first_country,second_country')},
+            **{('state_owner',s):c for s,c in snapshot.rows('state','state,country')}}
 
 
 @timed_often
@@ -243,7 +244,7 @@ def invalidates(name,params,links={}):
     if name in ('merge_armies','merge_fleets'):
         found.add(('object','military_formation',params['source']))
     if name in PLAYS:
-        found.add(('new_play',))
+        found.update({('new_play',),('treaty_negotiation',params['country'] if 'country' in params else links.get(('state_owner',params['state'])))})
     if name.startswith('offer_sway'):
         found.add(('sway',params['diplomatic_play'],params['country']))
     formation=params.get('military_formation')
