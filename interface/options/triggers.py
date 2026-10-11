@@ -924,6 +924,8 @@ def country_test(key,operator,value,scope):
         return COMPARE[operator](rank_of(s,country),float(next(iter(s.definitions('common/country_ranks').get(value.split(':',1)[-1],{}).get('rank_value',[])),-1)))
     if key in ('is_revolutionary','is_insurrectionary'):
         return not yes(value)
+    if key=='num_states':
+        return COMPARE[operator](len(s.rows('state','state',country=country)),amount(s,value))
     if key=='is_diplomatic_play_committed_participant':
         return any(country in members for members in play_sides(s).values())==yes(value)
     if key=='scaled_debt' and country==s.player and s.rows('player_treasury','principal,credit'):
@@ -1074,7 +1076,7 @@ HANDLED={'AND','OR','NOT','NOR','NAND','any_scope_war','calc_true_if','amount','
          'any_scope_state','any_scope_building','any_scope_character','any_primary_culture','any_subject_or_below','any_interest_group','count','limit',
          'trigger_if','trigger_else_if','trigger_else','text','target','value','has_technology_researched','has_law','has_law_or_variant',
          'is_subject','is_subject_of','is_at_war','has_journal_entry','is_diplomatic_play_enemy_of','this','has_modifier','is_country_type','has_government_type','game_date','liberty_desire',
-         'any_scope_treaty','any_scope_article','country_rank','is_revolutionary','is_insurrectionary','has_war_with','has_diplomatic_pact',
+         'any_scope_treaty','any_scope_article','country_rank','is_revolutionary','is_insurrectionary','num_states','has_war_with','has_diplomatic_pact',
          'is_in_power_bloc','is_direct_subject_of','ruler_can_have_command','can_form_nation','exists','is_power_bloc_leader','is_in_same_power_bloc',
          'has_any_strait_province','has_any_strait_control','charges_strait_toll',
          'has_diplomatic_relevance','is_adjacent_to_country','has_diplomats_expelled',
