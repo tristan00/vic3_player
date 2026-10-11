@@ -2503,6 +2503,8 @@ def country_ships(s,country):
 @timed_often
 def article_states(s,article,giver,taker):
     ports=s.map('state','state,treaty_port_potential')
+    if article=='treaty_port' and giver==s.player and not port_regions(s):
+        return []
     return [state for state, in s.rows('state','state',country=giver) if article!='treaty_port' or taker!=s.player or ports.get(state)]
 
 
