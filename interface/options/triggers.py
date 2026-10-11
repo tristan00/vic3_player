@@ -709,6 +709,9 @@ def supplied(s,market,goods):
     def compute():
         areas={area for area,owner in s.rows('market_area','market_area,market') if owner==market}
         states={state for area,state in s.rows('market_area_state','market_area,state') if area in areas}
+        hub=next((place for places in s.rows('country','market_capital,capital',country=s.map('market','market,owner').get(market)) for place in places if place is not None),None)
+        if hub in s.states():
+            states={hub}
         return {kind for state,kind in s.rows('state_goods_supply','state,goods') if state in states}
     return goods in s.memo(('market_supply',market),compute)
 
