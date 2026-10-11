@@ -926,6 +926,9 @@ def country_test(key,operator,value,scope):
         return not yes(value)
     if key=='is_diplomatic_play_committed_participant':
         return any(country in members for members in play_sides(s).values())==yes(value)
+    if key=='scaled_debt' and country==s.player and s.rows('player_treasury','principal,credit'):
+        principal,credit=s.rows('player_treasury','principal,credit')[0]
+        return COMPARE[operator](principal/credit if credit else 0,amount(s,value))
     if key=='has_war_with':
         found=target(scope,value)
         return bool(found) and war_between(s,country,found.country())
