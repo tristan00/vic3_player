@@ -1,8 +1,10 @@
 import bisect
+import logging
+import time
 from functools import cached_property
 
 from interface.common import DEFAULT_GAME, timed, timed_often
-from interface.recording.spec import TABLE
+from interface.recording.spec import NULL_DATE, TABLE
 from interface.script import read
 from ..catalogue import DUTIES, INSTITUTIONS as INSTITUTION_TYPES, LAW_ACTIONS, LAW_GROUP, LAW_GROUPS, NAVAL, RECORDED_PARAMS, PARTY_ACTIONS
 from .rewards import COSTS
@@ -17,9 +19,11 @@ POLICY=['tax_level','government_wage_level','military_wage_level']
 INTEREST_GROUPS=sorted(name for name,_ in read(DEFAULT_GAME/'game','common/interest_groups'))
 GROUP_METRICS=('clout','approval','in_government')
 GROUP_FEATURES=[f'player.interest_group.{kind}.{metric}' for kind in INTEREST_GROUPS for metric in GROUP_METRICS]
+ENACTMENT_FIELDS=('enactment_phase','checkpoint_progress','enactment_setbacks','chance','advance_chance','debate_chance','stall_chance')
+ENACTMENT=[f'law_enactment.{name}' for name in ('active','phase','progress_percent','setbacks','success_percent','advance_percent','debate_percent','stall_percent')]
 NUMBERS=['treasury','debt','interest','balance','population','bureaucracy_available','standard_of_living','government_queue_items','government_queue_left',
          'private_queue_items','private_queue_left','construction_capacity','construction_used','construction_paused','balance_gdp','battalions','mobilization_ratio',
-         'wars','army_spending','army_spending_gdp','infamy','government_legitimacy','radicals_percent']+GROUP_FEATURES+['government_spending','government_spending_gdp']+POLICY
+         'wars','army_spending','army_spending_gdp','infamy','government_legitimacy','radicals_percent']+GROUP_FEATURES+['government_spending','government_spending_gdp']+POLICY+ENACTMENT
 WEEKS_PER_YEAR=52
 LAWS=[f'law.{group}' for group in LAW_GROUPS]
 CATEGORIES=LAWS+['player.country_rank']
@@ -126,6 +130,17 @@ def target_context(links,target,state):
 def laws(active):
     current={LAW_GROUP[law_type]:law_type for law_type in active}
     return [current.get(group,NONE) for group in LAW_GROUPS]
+
+
+@timed_often
+def enactment(rows):
+    active=[values for started,*values in rows if started not in (None,NULL_DATE)]
+    if len(active)>1:
+        raise ValueError('More than one player law is being enacted')
+    if not active:
+        return [0.]+[float('nan')]*len(ENACTMENT_FIELDS)
+    values=[float('nan') if value is None else float(value) for value in active[0]]
+    return [1.,values[0]+1,values[1]*100,values[2],*(value*100 for value in values[3:])]
 
 
 @timed_often
@@ -296,6 +311,8 @@ class LiveLookup:
         government=spent(budget,expense_lines(s.connection,GOVERNMENT))
         military=next((tuple(found) for country,*found in s.rows('country_military_report','country,battalions,mobilization_ratio') if country==s.player),None)
         wars=sum(1 for _,country in s.rows('war_participant','war,country') if country==s.player)
+        own_laws=set(s.mine('law'))
+        enacting=enactment(values for law,*values in s.rows('law_private','law,enactment_start_date,'+','.join(ENACTMENT_FIELDS)) if law in own_laws)
         return {'terrain':{region:kind for (_,region),kind in majority(s.connection.execute(TERRAIN,([world],)).fetchall()).items()},
                 'states':{state:(region,country) for state,region,country in s.rows('state','state,state_region,country')},
                 'buildings':{building:building_type for building,building_type,_,_ in buildings},
@@ -325,7 +342,7 @@ class LiveLookup:
                            *army(military,wars,spent(budget,expense_lines(s.connection,ARMY)),gdp),
                            s.map('country_diplomacy','country,infamy')[s.player],float('nan') if legitimacy is None else legitimacy,
                            radicals_percent(population['radicals'],total),*groups,government,balance_gdp(government,gdp),
-                           *s.rows('player_policy',','.join(POLICY))[0]]}
+                           *s.rows('player_policy',','.join(POLICY))[0],*enacting]}
 
     @timed_often
     def state(self,state):
@@ -395,21 +412,29 @@ class LiveLookup:
 
 class Versions:
     @timed
-    def __init__(self,connection,table,keys,columns,runs):
+    def __init__(self,connection,table,keys,columns,runs,condition='',parameters=()):
+        started=time.monotonic()
         spec=TABLE[table]
-        vocabularies={column.name:column.vocabulary for column in list(spec.keys)+list(spec.columns) if column.vocabulary}
+        selected=keys+columns
+        vocabularies={column.name:column.vocabulary for column in list(spec.keys)+list(spec.columns) if column.vocabulary and column.name in selected}
         names={name:dict(connection.execute(f'select {name},name from {name}').fetchall()) for name in set(vocabularies.values())}
         self.index={}
         self.by_run={}
-        selected=keys+columns
-        for run,seq,present,*values in connection.execute(f'select run_id,seq,present,{",".join(selected)} from {table} where run_id = any(%s) order by run_id,{",".join(keys)},seq',(runs,)).fetchall():
-            values=[names[vocabularies[name]][value] if name in vocabularies and value is not None else value for name,value in zip(selected,values)]
-            key=tuple(values[:len(keys)])
-            if (run,key) not in self.index:
-                self.by_run.setdefault(run,[]).append(key)
-            seqs,states=self.index.setdefault((run,key),([],[]))
+        translated=[(i,names[vocabularies[name]]) for i,name in enumerate(selected) if name in vocabularies]
+        previous=None
+        for run,seq,present,*values in connection.execute(f'select run_id,seq,present,{",".join(selected)} from {table} where run_id = any(%s) {condition} order by run_id,{",".join(keys)},seq',(runs,*parameters)).fetchall():
+            for i,vocabulary in translated:
+                if values[i] is not None:
+                    values[i]=vocabulary[values[i]]
+            key=(run,tuple(values[:len(keys)]))
+            if key!=previous:
+                seqs,states=[],[]
+                self.index[key]=(seqs,states)
+                self.by_run.setdefault(run,[]).append(key[1])
+                previous=key
             seqs.append(seq)
             states.append(tuple(values[len(keys):]) if present else None)
+        logging.getLogger('tuning').info('history %s runs %d entities %d %.3fs',table,len(runs),len(self.index),time.monotonic()-started)
 
     def at(self,run,key,seq):
         found=self.index.get((run,key))
@@ -470,69 +495,86 @@ class WorldPrices:
 
 class History:
     @timed
-    def __init__(self,connection,runs):
+    def __init__(self,connection,runs,needed=None):
+        tables={
+            'states':('state_history',['state'],['state_region','country']),
+            'buildings':('building_history',['building'],['building_type','state','levels']),
+            'living':('state_standard_of_living_report',['state'],['average_standard_of_living_all']),
+            'literate':('state_population_report',['state'],['literacy']),
+            'shares':('state_economy_report',['state'],['gdp_contribution_percentage']),
+            'characters':('character_history',['character'],['ideology']),
+            'groups':('interest_group_history',['interest_group'],['country','party','leader','interest_group_type','in_government']),
+            'traits':('character_assigned_trait',['character','character_trait'],[]),
+            'movements':('interest_group_movement_support',['interest_group','political_movement'],['clout']),
+            'countries':('country_history',['country'],['country_rank']),
+            'law_rows':('law_history',['law'],['law_type','country','active']),
+            'enactments':('law_private',['law'],['enactment_start_date',*ENACTMENT_FIELDS]),
+            'markets':('country_history',['country'],['market']),
+            'goods':('market_goods',['market','goods'],['price']),
+            'budget':('player_budget_line',['direction','line'],['amount']),
+            'taxed':('player_taxed_goods',['goods'],[]),
+            'military':('country_military_report',['country'],['battalions','mobilization_ratio']),
+            'wars':('war_participant',['war','country'],['country']),
+            'legitimacy':('country_politics_report',['country'],['government_legitimacy']),
+            'sol':('country_standard_of_living_report',['country'],['average_standard_of_living_by_population']),
+            'gdp':('country_economy_report',['country'],['gdp']),
+            'relations':('player_relation',['country'],['relations','player_truce','country_truce']),
+            'prestige':('country_diplomacy_report',['country'],['prestige']),
+            'pacts':('pact_history',['pact'],['first_country','second_country','pact_type']),
+            'treaties':('treaty_history',['treaty'],['first_country','second_country','withdrawn','entered_into_force_on']),
+            'articles':('treaty_article_history',['treaty_article'],['treaty','treaty_article_type','source_country','target_country']),
+            'provinces':('province_history',['province'],['state']),
+            'queue':('player_construction_queue_item',['private','position'],['private','construction_left','position','state','building_type']),
+            'construction':('country_construction_report',['country'],['base_construction_speed','used_construction','is_construction_paused']),
+            'institution_rows':('institution_history',['institution'],['institution_type','country','investment']),
+            'tariff_rows':('player_tariff',['direction','goods'],['level']),
+            'events':('event_history',['event'],['event_type']),
+            'options':('event_option',['event','option'],['visible_position','default_option','enabled'])}
+        wanted=lambda name:needed is None or name in needed
         self.player=dict(connection.execute('select run_id,player_country from run where run_id = any(%s)',(runs,)).fetchall())
-        worlds=dict(connection.execute('select run_id,world_id from run where run_id = any(%s)',(runs,)).fetchall())
-        terrain=majority(connection.execute(TERRAIN,(list(set(worlds.values())),)).fetchall())
-        self.terrain={run:{region:kind for (world,region),kind in terrain.items() if world==worlds[run]} for run in runs}
-        load=lambda table,keys,columns:Versions(connection,table,keys,columns,runs)
-        self.states=load('state_history',['state'],['state_region','country'])
-        self.buildings=load('building_history',['building'],['building_type','state','levels'])
-        self.people=Latest(connection,'state_population','state',PEOPLE,runs)
-        self.living=load('state_standard_of_living_report',['state'],['average_standard_of_living_all'])
-        self.literate=load('state_population_report',['state'],['literacy'])
-        self.shares=load('state_economy_report',['state'],['gdp_contribution_percentage'])
-        self.types={kind:load(table+'_history',[table],[column]) for kind,(table,column) in TYPED.items()}
-        self.characters=load('character_history',['character'],['ideology'])
-        self.groups=load('interest_group_history',['interest_group'],['country','party','leader','interest_group_type','in_government'])
-        self.group_stats=Latest(connection,'interest_group_stats','interest_group',['clout','approval'],runs)
-        self.traits=load('character_assigned_trait',['character','character_trait'],[])
-        self.movements=load('interest_group_movement_support',['interest_group','political_movement'],['clout'])
-        self.countries=load('country_history',['country'],['country_rank'])
-        self.law_rows=load('law_history',['law'],['law_type','country','active'])
-        self.markets=load('country_history',['country'],['market'])
-        self.goods=load('market_goods',['market','goods'],['price'])
-        self.world=WorldPrices(connection,runs)
-        self.budget=load('player_budget_line',['direction','line'],['amount'])
-        self.interest=interest_line(connection)
-        self.army=expense_lines(connection,ARMY)
-        self.government=expense_lines(connection,GOVERNMENT)
-        self.policy=Samples(connection,'player_policy',POLICY,runs)
-        self.taxed=load('player_taxed_goods',['goods'],[])
-        self.military=load('country_military_report',['country'],['battalions','mobilization_ratio'])
-        self.wars=load('war_participant',['war','country'],['country'])
-        self.treasury=Samples(connection,'player_treasury',['money','principal','balance_trend_current'],runs)
-        self.population=Samples(connection,'player_population',['lower_strata','middle_strata','upper_strata','radicals'],runs)
-        self.politics=Samples(connection,'player_politics',['power_delta_bureaucracy'],runs)
-        self.legitimacy=load('country_politics_report',['country'],['government_legitimacy'])
-        self.infamy=Samples(connection,'country_diplomacy',['infamy'],runs,'country')
-        self.sol=load('country_standard_of_living_report',['country'],['average_standard_of_living_by_population'])
-        self.gdp=load('country_economy_report',['country'],['gdp'])
-        self.relations=load('player_relation',['country'],['relations','player_truce','country_truce'])
-        self.prestige=load('country_diplomacy_report',['country'],['prestige'])
-        self.pacts=load('pact_history',['pact'],['first_country','second_country','pact_type'])
-        self.treaties=load('treaty_history',['treaty'],['first_country','second_country','withdrawn','entered_into_force_on'])
-        self.articles=load('treaty_article_history',['treaty_article'],['treaty','treaty_article_type','source_country','target_country'])
-        self.provinces=load('province_history',['province'],['state'])
-        self.hours=Samples(connection,'snapshot',['game_date'],runs)
-        self.colors={}
-        for run,province,color in connection.execute('select run_id,province,color from province where run_id=any(%s)',(runs,)).fetchall():
-            self.colors.setdefault(run,{})[province]=color
-        edges={}
-        for world,first,second in connection.execute('select world_id,first_color,second_color from world_adjacency where world_id=any(%s)',(list(set(worlds.values())),)).fetchall():
-            edges.setdefault(world,[]).append((first,second))
-        self.edges={run:edges.get(world,[]) for run,world in worlds.items()}
-        self.queue=load('player_construction_queue_item',['private','position'],['private','construction_left','position','state','building_type'])
-        self.construction=load('country_construction_report',['country'],['base_construction_speed','used_construction','is_construction_paused'])
-        self.institution_rows=load('institution_history',['institution'],['institution_type','country','investment'])
-        self.tariff_rows=load('player_tariff',['direction','goods'],['level'])
-        self.events=load('event_history',['event'],['event_type'])
-        self.options=load('event_option',['event','option'],['visible_position','default_option','enabled'])
-        self.rulesets=dict(connection.execute('select run_id,ruleset_id from run where run_id = any(%s)',(runs,)).fetchall())
-        seen={}
-        for (run,_),(_,states) in self.events.index.items():
-            seen.setdefault(self.rulesets[run],set()).update(state[0] for state in states if state is not None)
-        self.defined={ruleset:defined(connection,ruleset,events) for ruleset,events in seen.items()}
+        for name,spec in tables.items():
+            if wanted(name):
+                condition,parameters='',()
+                if name=='enactments':
+                    condition='and (run_id,law) in (select run_id,law from law_private where run_id=any(%s) and present and enactment_start_date is not null and enactment_start_date<>%s)'
+                    parameters=(runs,NULL_DATE)
+                setattr(self,name,Versions(connection,*spec,runs,condition,parameters))
+        other={
+            'people':(Latest,('state_population','state',PEOPLE,runs)),
+            'group_stats':(Latest,('interest_group_stats','interest_group',['clout','approval'],runs)),
+            'world':(WorldPrices,(runs,)),
+            'interest':(interest_line,()),'army':(expense_lines,(ARMY,)),'government':(expense_lines,(GOVERNMENT,)),
+            'policy':(Samples,('player_policy',POLICY,runs)),
+            'treasury':(Samples,('player_treasury',['money','principal','balance_trend_current'],runs)),
+            'population':(Samples,('player_population',['lower_strata','middle_strata','upper_strata','radicals'],runs)),
+            'politics':(Samples,('player_politics',['power_delta_bureaucracy'],runs)),
+            'infamy':(Samples,('country_diplomacy',['infamy'],runs,'country')),
+            'hours':(Samples,('snapshot',['game_date'],runs))}
+        for name,(loader,args) in other.items():
+            if wanted(name):
+                setattr(self,name,loader(connection,*args))
+        if wanted('types'):
+            self.types={kind:Versions(connection,table+'_history',[table],[column],runs) for kind,(table,column) in TYPED.items()}
+        if wanted('terrain') or wanted('edges'):
+            worlds=dict(connection.execute('select run_id,world_id from run where run_id=any(%s)',(runs,)).fetchall())
+        if wanted('terrain'):
+            terrain=majority(connection.execute(TERRAIN,(list(set(worlds.values())),)).fetchall())
+            self.terrain={run:{region:kind for (world,region),kind in terrain.items() if world==worlds[run]} for run in runs}
+        if wanted('colors'):
+            self.colors={}
+            for run,province,color in connection.execute('select run_id,province,color from province where run_id=any(%s)',(runs,)).fetchall():
+                self.colors.setdefault(run,{})[province]=color
+        if wanted('edges'):
+            edges={}
+            for world,first,second in connection.execute('select world_id,first_color,second_color from world_adjacency where world_id=any(%s)',(list(set(worlds.values())),)).fetchall():
+                edges.setdefault(world,[]).append((first,second))
+            self.edges={run:edges.get(world,[]) for run,world in worlds.items()}
+        if wanted('defined'):
+            self.rulesets=dict(connection.execute('select run_id,ruleset_id from run where run_id=any(%s)',(runs,)).fetchall())
+            seen={}
+            for (run,_),(_,states) in self.events.index.items():
+                seen.setdefault(self.rulesets[run],set()).update(state[0] for state in states if state is not None)
+            self.defined={ruleset:defined(connection,ruleset,events) for ruleset,events in seen.items()}
 
     @timed_often
     def at(self,run,seq):
@@ -546,7 +588,16 @@ class HistoryLookup:
         self.run=run
         self.seq=seq
         self.player=history.player[run]
-        self.terrain=history.terrain[run]
+
+    @property
+    @timed_often
+    def terrain(self):
+        return self.h.terrain[self.run]
+
+    @property
+    @timed_often
+    def available(self):
+        return all(table.at(self.run,self.seq) is not None for table in (self.h.treasury,self.h.population,self.h.politics))
 
     @property
     @timed_often
@@ -569,7 +620,18 @@ class HistoryLookup:
                 *army(self.h.military.at(self.run,(self.player,),self.seq),sum(1 for country, in self.h.wars.live(self.run,self.seq) if country==self.player),
                       self.spent(self.h.army),gdp),
                 self.h.infamy.at(self.run,self.seq)[0],float('nan') if legitimacy is None else legitimacy[0],radicals_percent(population[3],total),*self.interest_groups,
-                government,balance_gdp(government,gdp),*self.h.policy.at(self.run,self.seq)]
+                government,balance_gdp(government,gdp),*self.h.policy.at(self.run,self.seq),*self.enactment]
+
+    @cached_property
+    @timed_often
+    def enactment(self):
+        rows=[]
+        for key in self.h.enactments.by_run.get(self.run,[]):
+            law=self.h.law_rows.at(self.run,key,self.seq)
+            private=self.h.enactments.at(self.run,key,self.seq)
+            if law is not None and law[1]==self.player and private is not None:
+                rows.append(private)
+        return enactment(rows)
 
     @cached_property
     @timed_often

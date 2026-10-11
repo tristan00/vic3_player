@@ -1,4 +1,5 @@
 import argparse, json, logging, math, msvcrt, random, sys, time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,10 +15,10 @@ from interface.options.available import FASTEST_SPEED
 from interface.options.effects import LATER, took_effect, took_effect_later
 from interface.options.stored import Shared, Stored
 from interface.recording.store import Store, DSN
-from interface.timing import RECORDER
+from interface.timing import RECORDER, span
 from interface.runner.session import _spawn, process as owner
-from interface.world.cache import Cached
-from interface.world.sampling import SLIDERS, PER_COUNTRY, PER_STATE
+from interface.world.bank import Bank
+from interface.world.sampling import SLIDERS, PER_COUNTRY
 from loop.sampling import batches, block_length
 
 STATE=DEFAULT_DATA/'collection.json'
@@ -90,15 +91,16 @@ def play(game,store,advisor,picker,settings):
                     reader=game.reader()
                     year,day=divmod(snapshot.hours//24,365)
                     target=(year*365+next(d for d in (90,181,273,365) if d>day))*24
-                    hours,moved=reader.date()[0],time.monotonic()
-                    while reader.date()[0]<target:
-                        if not reader.alive(): return 'defeated'
-                        if reader.date()[0]!=hours:
-                            hours,moved=reader.date()[0],time.monotonic()
-                        if time.monotonic()-moved>5:
-                            raise TimeoutError('The game date stopped advancing')
-                        time.sleep(.02)
-                    time.sleep(.25)
+                    with span('loop.run.wait_quarter','loop'):
+                        hours,moved=reader.date()[0],time.monotonic()
+                        while (current:=reader.date()[0])<target:
+                            if not reader.alive(): return 'defeated'
+                            if current!=hours:
+                                hours,moved=current,time.monotonic()
+                            if time.monotonic()-moved>5:
+                                raise TimeoutError('The game date stopped advancing')
+                            time.sleep(.02)
+                        time.sleep(.25)
                 after=capture(phase)
                 if phase=='post_run' and not target<=after.hours<target+24:
                     raise RuntimeError('The game missed the quarterly pause')
@@ -124,7 +126,7 @@ def play(game,store,advisor,picker,settings):
 def collect(settings,completed):
     RECORDER.reset()
     rng=random.Random(settings['seed']+completed)
-    world=Cached(settings['world_cache'],rng).take()
+    world=Bank(settings['world_cache']).take(rng)
     manifest=json.loads(world.read_text(encoding='utf-8'))
     country=rng.choice([c for c in manifest['countries'] if c['country_type']!='decentralized'])
     objective=draw_objective(rng)
@@ -134,10 +136,13 @@ def collect(settings,completed):
     store=Store()
     try:
         advisor.start_run(store,NAMES,objective)
-        picker.start_run(store,objective)
-        game.campaign(country['tag'],world,lock=state)
+        with ThreadPoolExecutor(1) as preparing:
+            training=preparing.submit(picker.start_run,store,objective)
+            game.campaign(country['tag'],world,lock=state)
+            Executor(game).run('pause')
+            training.result()
         generated=dict(seed=manifest['seed'],countries=len(manifest['countries']),states=len(manifest['states']),pop=1,diversity=None,
-                       **{n:country[n] if n in PER_COUNTRY else manifest[n] for n in SLIDERS if n not in PER_STATE})
+                       **{n:country[n] if n in PER_COUNTRY else manifest[n] for n in SLIDERS if n in (country if n in PER_COUNTRY else manifest)})
         store.begin_run(started_at=datetime.now(timezone.utc),kind='mini',advisors=[advisor.name],tag=country['tag'],world=world.parent.name,
                         cli_seed=settings['seed'],run_seed=settings['seed']+completed,years=settings['years'],minutes=settings['minutes'],
                         profile=settings['profile'],pool=0,runs_requested=settings['runs'],generated=generated,weights=advisor.weights,
@@ -214,7 +219,7 @@ def main(argv=None):
             if not settings['profile'] or Path(settings['profile']).name!=settings['profile'] or settings['profile'] in ('.','..'):
                 parser.error('profile must be a directory name')
             if not set(settings['advisors'])<=ADVISORS.keys() or not set(settings['pickers'])<=PICKERS.keys(): parser.error('unknown advisor or picker')
-            if not (Path(settings['world_cache'])/'index.json').is_file(): parser.error('world-cache must have an index.json')
+            if not (Path(settings['world_cache'])/'bank.json').is_file(): parser.error('world-cache must have a bank.json')
             settings['world_cache']=str(Path(settings['world_cache']).resolve())
             data['settings']=settings
         if command=='cancel': data.update(stop=False,restart=False,settings=data['active'].copy() if running else settings)

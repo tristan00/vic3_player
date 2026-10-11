@@ -10,7 +10,9 @@ from catboost import FeaturesData, Pool
 from interface.common import timed, timed_often
 from ...data.features import CATEGORIES, INSTITUTIONS, NUMBERS, PRICES, TARIFFS, TAXES, History, LiveLookup, categories
 from ...data.histograms import Histograms, Holdings, entries, live_holdings
-from ...data.endgame import COMPONENTS, HISTORY, OBJECTIVE, Trajectories, reward, scored_runs
+from ...data.endgame import HISTORY, NAME, OBJECTIVE, Trajectories, reward, scored_runs
+from ...data import features as state, histograms as hist
+from ..row.features import Selection, context
 
 LOG=logging.getLogger('loop')
 DESIGN=json.loads((Path(__file__).parent/'parameters.json').read_text(encoding='utf-8'))
@@ -25,8 +27,7 @@ PAUSES='''select la.run_id,la.before_seq,s.game_date,la.n,ac.name,p.name,p.integ
 from loop_action la join advisor_action ac on ac.advisor_action=la.advisor_action
 join snapshot s on s.run_id=la.run_id and s.seq=la.before_seq
 left join loop_decision_param p on p.run_id=la.run_id and p.n=la.n
-where la.run_id = any(%s)
-order by la.run_id,la.before_seq,la.n'''
+where la.run_id = any(%s)'''
 
 
 @timed_often
@@ -46,34 +47,63 @@ def pool(data,sizes):
 
 
 @timed
-def training_rows(connection,runs):
+def training_rows(connection,runs,columns=None,families=None,snapshots=None):
     ids=list(runs)
+    columns=STATE+CATEGORIES if columns is None else columns
+    selection=Selection(columns)
+    actions=None if families is None else families['actions']
+    held=None if families is None else families['held']
+    needed=set(selection.history)
+    if actions is None:
+        needed=None
+    else:
+        for names,required in (
+            (hist.ANSWER,{'events','options','defined'}),
+            (hist.LEADERS,{'groups','characters','traits','movements','law_rows'}),
+            (hist.QUEUE,{'queue'}),
+            (hist.PLAY,{'states','relations','countries','gdp','prestige'}),
+            ((*hist.PLAY_CONTEXT,*hist.PLAY_PACTS),{'states','relations','hours','pacts','treaties','articles','provinces','colors','edges'}),
+            (state.SITE,{'states','buildings','people','living','literate','shares'})):
+            if actions.intersection(names):
+                needed.update(required)
+        for action,params in state.KINDS.items():
+            for param,kind in params:
+                if f'{action}.{param}' in actions:
+                    needed.update({'state':{'states','terrain'},'building':{'buildings'},'character':{'characters'},'country':{'countries'}}.get(kind,{'types'} if kind in state.TYPED else set()))
+        if held is None or held.intersection((hist.BUILDINGS,hist.METHODS)):
+            needed.add('states')
     outcomes=Trajectories(connection,ids)
     pauses={}
     dates={}
-    for run_id,seq,date,n,name,param,integer,text in connection.execute(PAUSES,(ids,)).fetchall():
+    query,arguments=PAUSES,[ids]
+    if snapshots is not None:
+        selected=[(run,seq) for run in ids for seq in snapshots[run]]
+        query+=' and (la.run_id,la.before_seq) in (select * from unnest(%s::integer[],%s::integer[]))'
+        arguments.extend([[run for run,seq in selected],[seq for run,seq in selected]])
+    query+=' order by la.run_id,la.before_seq,la.n'
+    for run_id,seq,date,n,name,param,integer,text in connection.execute(query,arguments).fetchall():
         dates[(run_id,seq)]=date
-        actions=pauses.setdefault((run_id,seq),{})
-        actions.setdefault(n,(name,{}))
+        batch=pauses.setdefault((run_id,seq),{})
+        batch.setdefault(n,(name,{}))
         if param is not None:
-            actions[n][1][param]=integer if text is None else text
-    history=History(connection,ids)
-    holdings=Holdings(connection,ids)
+            batch[n][1][param]=integer if text is None else text
+    history=History(connection,ids,needed)
+    holdings=Holdings(connection,ids,held)
     rows={run_id:[] for run_id in runs}
-    for (run_id,seq),actions in pauses.items():
+    for (run_id,seq),recorded in pauses.items():
         lookup=history.at(run_id,seq)
-        numbers=lookup.numbers
         date=dates[(run_id,seq)]
-        if numbers is None:
+        if not lookup.available:
             continue
         baseline=outcomes.baseline(run_id,date)
         last=runs[run_id][1]
         if outcomes.reason(run_id,date,last,baseline) is not None:
             continue
         _,years,parts=outcomes.target(run_id,date,last,baseline)
-        batch=list(actions.values())
-        acted=entries(batch,lookup)
-        rows[run_id].append((numbers+lookup.prices+lookup.institutions+lookup.tariffs+lookup.taxes,categories(lookup),acted,holdings.at(lookup),
+        batch=list(recorded.values())
+        acted=entries(batch,lookup,actions)
+        values=context(SimpleNamespace(state=lookup),selection)
+        rows[run_id].append(([values.get(name,np.nan) for name in STATE],[values.get(name,'none') for name in CATEGORIES],acted,holdings.at(lookup),
                             [len(batch)],years,parts,seq))
     return rows
 
@@ -87,7 +117,7 @@ class TrainingCache:
 
     @timed
     def load(self,connection,runs):
-        database=connection.info.dsn
+        database=(connection.info.dsn,NAME)
         if self.database!=database:
             self.rows={}
             self.versions={}

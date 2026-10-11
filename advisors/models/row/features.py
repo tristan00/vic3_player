@@ -44,6 +44,7 @@ def identities(table):
     return [column for column in columns(table) if column.vocabulary or column.enum] if table+'_history' in TABLE else []
 
 
+@cache
 @timed_often
 def categorical(column):
     return bool(column.vocabulary or column.enum or column.check or column.kind=='text')
@@ -77,21 +78,63 @@ def fields():
 NUMERIC,CATEGORICAL=fields()
 
 
+class Selection:
+    @timed
+    def __init__(self,selected=NUMERIC+CATEGORICAL):
+        self.names=set(selected)
+        self.parameters={}
+        for param,kind in {pair for pairs in PARAMETERS.values() for pair in pairs}:
+            prefix=f'parameter.{param}.{kind}'
+            if kind in ENTITY:
+                found=[]
+                for column in columns(ENTITY[kind]):
+                    key=f'{prefix}.{column.name}'
+                    related=[field for field in identities(column.entity) if f'{key}.{field.name}' in self.names] if column.entity else []
+                    if key in self.names or related:
+                        found.append((column,related))
+                self.parameters[prefix]=found
+        self.traits=[trait for trait in TRAITS if f'target_character.trait.{trait}' in self.names]
+        self.site=bool(self.names.intersection(SITE+[f'site.{field}' for fields in STATE_REPORTS.values() for field in fields]))
+        self.site_traits=[trait for trait in STATE_TRAITS if f'site.trait.{trait}' in self.names]
+        self.diplomacy=bool(self.names.intersection(diplomacy.COUNTERPART_NUMERIC+diplomacy.COUNTERPART_CATEGORICAL))
+        self.history={'hours','treasury','population','politics'}
+        for names,required in (
+            (NUMBERS,{'legitimacy','budget','interest','sol','construction','gdp','government','queue','military','wars','army','infamy','groups','group_stats','policy','enactments','law_rows'}),
+            (PRICES,{'markets','goods','world'}),(INSTITUTIONS,{'institution_rows'}),(TARIFFS,{'tariff_rows'}),(TAXES,{'taxed'}),
+            (CATEGORIES[:-1],{'law_rows'}),(['player.country_rank'],{'countries'})):
+            if self.names.intersection(names):
+                self.history.update(required)
+        if self.site:
+            self.history.update(('buildings','people','living','literate','shares'))
+        if self.site_traits or self.diplomacy:
+            self.history.update(('states','buildings'))
+
+
+ALL=Selection()
+
+
 class Historical:
     @timed
-    def __init__(self,connection,runs):
-        self.state=History(connection,runs)
-        self.diplomacy=diplomacy.Historical(connection,runs)
-        tables=set(ENTITY.values())
+    def __init__(self,connection,runs,selection=ALL):
+        self.state=History(connection,runs,selection.history)
+        if selection.diplomacy or selection.names.intersection(diplomacy.PLAYER_NUMERIC+diplomacy.PLAYER_CATEGORICAL):
+            self.diplomacy=diplomacy.Historical(connection,runs)
+        tables={ENTITY[prefix.split('.')[2]] for prefix,specs in selection.parameters.items() if specs}
+        if selection.diplomacy:
+            tables.update(('treaty','war','diplomatic_play'))
+        if selection.traits:
+            tables.update(('character','interest_group'))
+            self.traits=Versions(connection,'character_assigned_trait',['character','character_trait'],[],runs)
+            self.trait_keys={}
+            for run,keys in self.traits.by_run.items():
+                for character,trait in keys:
+                    self.trait_keys.setdefault((run,character),[]).append(trait)
         tables.update(column.entity for table in list(tables) for column in columns(table) if column.entity and identities(column.entity))
         self.tables={table:Versions(connection,table+'_history',[table],[column.name for column in columns(table)],runs) for table in tables}
-        self.reports={table:Versions(connection,table,['state'],names,runs) for table,names in STATE_REPORTS.items()}
-        self.state_traits=Versions(connection,'state_region_trait',['state_region','state_trait'],[],runs)
-        self.traits=Versions(connection,'character_assigned_trait',['character','character_trait'],[],runs)
-        self.trait_keys={}
-        for run,keys in self.traits.by_run.items():
-            for character,trait in keys:
-                self.trait_keys.setdefault((run,character),[]).append(trait)
+        self.reports={table:Versions(connection,table,['state'],names,runs) for table,names in STATE_REPORTS.items()
+                      if any(f'site.{name}' in selection.names for name in names)}
+        if selection.site_traits:
+            self.state_traits=Versions(connection,'state_region_trait',['state_region','state_trait'],[],runs)
 
     @timed_often
     def at(self,run,seq):
@@ -178,17 +221,26 @@ class Live:
 
 
 @timed_often
-def context(point):
+def context(point,selection=ALL):
     state=point.state
-    if state.numbers is None:
-        raise ValueError('The starting snapshot lacks required player state')
-    return {**dict(zip(STATE,state.numbers+state.prices+state.institutions+state.tariffs+state.taxes)),**dict(zip(CATEGORIES,categories(state))),
-            **point.diplomacy.overview}
+    found={}
+    for names,attribute in ((NUMBERS,'numbers'),(PRICES,'prices'),(INSTITUTIONS,'institutions'),(TARIFFS,'tariffs'),(TAXES,'taxes'),(CATEGORIES[:-1],'laws')):
+        if selection.names.intersection(names):
+            values=getattr(state,attribute)
+            if values is None:
+                raise ValueError('The starting snapshot lacks required player state')
+            found.update((name,value) for name,value in zip(names,values) if name in selection.names)
+    if 'player.country_rank' in selection.names:
+        rank=state.country(state.player)
+        found['player.country_rank']='none' if rank is None else rank
+    if selection.names.intersection(diplomacy.PLAYER_NUMERIC+diplomacy.PLAYER_CATEGORICAL):
+        found.update((name,value) for name,value in point.diplomacy.overview.items() if name in selection.names)
+    return found
 
 
 @timed_often
-def action_features(name,params,point):
-    found={'action':name}
+def action_features(name,params,point,selection=ALL):
+    found={'action':name} if 'action' in selection.names else {}
     expected=dict(PARAMETERS[name])
     if set(params)!=set(expected):
         raise ValueError(f'{name} parameters differ from the catalogue: {set(params)^set(expected)}')
@@ -196,48 +248,78 @@ def action_features(name,params,point):
         value=params[param]
         prefix=f'parameter.{param}.{kind}'
         if kind=='int':
-            found[prefix]=float(value)
+            if prefix in selection.names:
+                found[prefix]=float(value)
         elif kind not in ENTITY:
-            found[prefix]=str(value)
+            if prefix in selection.names:
+                found[prefix]=str(value)
         else:
             table=ENTITY[kind]
+            selected=selection.parameters[prefix]
+            traits=selection.traits and table in ('character','interest_group')
+            if not selected and not traits:
+                continue
             target=point.entity(table,value)
-            for column in columns(table):
+            for column,related_fields in selected:
                 key=f'{prefix}.{column.name}'
                 item=None if target is None else target[column.name]
                 if column.entity:
-                    related=point.entity(column.entity,item) if item is not None and identities(column.entity) else None
-                    for field in identities(column.entity):
+                    related=point.entity(column.entity,item) if item is not None else None
+                    for field in related_fields:
                         raw=None if related is None else related[field.name]
                         found[f'{key}.{field.name}']=MISSING if raw is None else str(raw)
                 elif categorical(column):
                     found[key]=MISSING if item is None else str(item)
                 else:
                     found[key]=np.nan if item is None else (point.hours-item)/24 if column.kind=='game_hours' else float(item)
-            if table in ('character','interest_group'):
+            if traits:
                 character=value if table=='character' else None if target is None else target['leader']
                 if character is not None:
                     traits=set(point.traits(character))
-                    found.update({f'target_character.trait.{trait}':float(trait in traits) for trait in TRAITS})
-    if name in SITE_ACTIONS:
+                    found.update({f'target_character.trait.{trait}':float(trait in traits) for trait in selection.traits})
+    if name in SITE_ACTIONS and (selection.site or selection.site_traits):
         state,kind=located(name,params,point.state)
-        found.update(zip(SITE,point.state.site(state,kind)))
-        for table,names in STATE_REPORTS.items():
-            values=point.report(table,state)
-            found.update({f'site.{field}':np.nan if values is None or values[i] is None else float(values[i]) for i,field in enumerate(names)})
-        region,_=point.state.state(state)
-        traits=point.state_traits.get(region,set())
-        found.update({f'site.trait.{trait}':MISSING if region is None else str(trait in traits) for trait in STATE_TRAITS})
-    found.update(point.diplomacy.target(diplomacy.counterpart(name,params,point)))
+        if selection.site:
+            found.update((key,value) for key,value in zip(SITE,point.state.site(state,kind)) if key in selection.names)
+            for table,names in STATE_REPORTS.items():
+                if any(f'site.{field}' in selection.names for field in names):
+                    values=point.report(table,state)
+                    found.update({f'site.{field}':np.nan if values is None or values[i] is None else float(values[i]) for i,field in enumerate(names) if f'site.{field}' in selection.names})
+        if selection.site_traits:
+            region,_=point.state.state(state)
+            traits=point.state_traits.get(region,set())
+            found.update({f'site.trait.{trait}':MISSING if region is None else str(trait in traits) for trait in selection.site_traits})
+    if selection.diplomacy:
+        found.update((key,value) for key,value in point.diplomacy.target(diplomacy.counterpart(name,params,point)).items() if key in selection.names)
     return found
 
 
 @timed
-def frame(rows):
-    values=pd.DataFrame(rows)
-    numeric=values.reindex(columns=NUMERIC).astype(np.float32)
-    categories=values.reindex(columns=CATEGORICAL).fillna(ABSENT).astype(str).astype('category')
-    return pd.concat([numeric,categories],axis=1)
+def frame(rows,columns=NUMERIC+CATEGORICAL):
+    found={name:([],[]) for name in columns}
+    for i,row in enumerate(rows):
+        for name,value in row.items():
+            if name in found:
+                indices,values=found[name]
+                indices.append(i)
+                values.append(value)
+    result={}
+    numeric=set(NUMERIC)
+    for name,(indices,values) in found.items():
+        if name in numeric:
+            column=np.full(len(rows),np.nan,np.float32)
+            column[indices]=values
+        else:
+            selected=pd.Categorical(pd.Series(values,dtype=object).fillna(ABSENT).astype(str))
+            if len(indices)==len(rows):
+                column=selected
+            else:
+                categories=selected.categories.union([ABSENT]).sort_values()
+                codes=np.full(len(rows),categories.get_loc(ABSENT),np.int32)
+                codes[indices]=categories.get_indexer(selected.categories)[selected.codes]
+                column=pd.Categorical.from_codes(codes,categories)
+        result[name]=column
+    return pd.DataFrame(result,index=range(len(rows)),copy=False)
 
 
 @timed

@@ -1,5 +1,8 @@
 {
   "default": 0,
   "spread": 1,
-  "centres": {}
+  "centres": {
+    "raise_mobilisation": 1,
+    "raise_front_deployment": 1
+  }
 }

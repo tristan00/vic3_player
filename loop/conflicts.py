@@ -2,7 +2,7 @@ from interface.actions.catalogue import BY_NAME
 from interface.common import timed_often
 from interface.options.available import (BLOC_INFLUENCE, DEFAULT_TAX_COST, MAX_MONOPOLIES, MONOPOLY_COST, MOVEMENT_COST, article_cost,
                                         authority, bulk_subset, definition, metric, money, monopolies, nationalization_cost,
-                                        ownership_classes, pact_cost_multiplier, private_levels, ship_kinds)
+                                        ownership_classes, pact_cost_multiplier, private_levels, ship_kinds, stated)
 
 
 ALIASES={f'{name}_selected':name for name in ('mobilize','demobilize','raise_conscripts','start_naval_mission','end_naval_mission')}
@@ -65,6 +65,10 @@ def changes(name,params,links):
         found.add(('bloc_principles',))
     if name=='toggle_monopoly':
         found.add(('monopoly',params['building_type']))
+    if name=='set_borrow_setting':
+        found.add(('formation_borrow_setting',params['military_formation']))
+    if name=='character_interaction' and stated('common/character_interactions',params['interaction'],'cooldown'):
+        found.add(('interaction_cooldown',params['interaction']))
     if name.startswith(('retrofit_','cancel_retrofit_')) or name in ('change_ship_template','decommission_ship'):
         ships=([params['ship']] if 'ship' in params else [i for (key,i),formation in links.items() if key=='ship'
                 and (params.get('military_formation') is None or formation[1]==params['military_formation'])])
@@ -196,6 +200,11 @@ def targets(name,params,links={}):
         found.add(('enactment',))
     if name=='negotiate':
         found.add(('negotiation',))
+    if name in DELETES:
+        kind=DELETES[name]
+        found.add(('used',kind,params[kind]))
+    if name in ('merge_armies','merge_fleets'):
+        found.add(('used','military_formation',params['source']))
     return found
 
 
@@ -203,6 +212,10 @@ def targets(name,params,links={}):
 def invalidates(name,params,links={}):
     name,params=canonical(name,params)
     found={('command',name,tuple(sorted(params.items())))}|negotiations(name,params,links)|changes(name,params,links)
+    for spec in BY_NAME[name].params:
+        key,_,kind=spec.partition(':')
+        if (kind or key) not in ('int','choice'):
+            found.add(('used',kind or key,params[key]))
     if name in RESEARCH:
         found.update({('research_reset',),('research_technology',params['technology'])})
     if name=='research':

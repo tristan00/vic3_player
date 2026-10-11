@@ -91,7 +91,7 @@ COMPONENTS={'gdp':GDP,'population':POPULATION,'sol':SOL,'stock':stock}
 
 @timed_often
 def value_at(points,date):
-    return points[bisect.bisect_right([when for when,_ in points],date)-1][1]
+    return points[bisect.bisect_right(points,date,key=lambda point:point[0])-1][1]
 
 
 @timed_often

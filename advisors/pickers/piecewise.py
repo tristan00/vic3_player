@@ -1,12 +1,24 @@
 from concurrent.futures import ProcessPoolExecutor
+import logging
 
 import numpy as np
+import psycopg
 
 from interface.common import timed, timed_often
-from interface.timing import current
-from ..models.row.data import TrainingCache, load
+from interface.timing import RECORDER, current
+from ..data.endgame import NAME
 from ..models.row.features import live
-from ..models.row.model import Model
+from tuning.runtime import train as train_model
+
+LOG=logging.getLogger('loop')
+
+
+@timed
+def train(dsn):
+    RECORDER.reset()
+    with psycopg.connect(dsn,autocommit=True,options='-c default_transaction_read_only=on') as connection:
+        model,rows,starts,runs,loaded,fitted=train_model(connection,'row')
+    return model,rows,starts,runs,loaded,fitted,RECORDER.take()
 
 
 class CatBoostPiecewisePicker:
@@ -16,21 +28,21 @@ class CatBoostPiecewisePicker:
     def __init__(self):
         self.model=None
         self.trained=None
-        self.cache=TrainingCache()
 
     @timed
     def start_run(self,store,objective):
-        data=load(store.connection,cache=self.cache)
-        self.model=self.fit_apart(data)
-        params={name:value for name,value in self.model.params.items() if name!='allow_writing_files'}
-        params.update(model_kind='row',training_rows=len(data.y))
-        starts=len(data.meta[['run','before_seq']].drop_duplicates())
-        self.trained=(starts,len(np.unique(data.runs)),current().seconds,params,self.model.importance())
+        self.model,rows,starts,runs,loaded,fitted,timings=self.fit_apart(store.connection.info.dsn)
+        RECORDER.merge(timings)
+        params={name:value for name,value in self.model.params.items() if name not in ('allow_writing_files','verbose')}
+        params.update(model_kind='row',training_rows=rows)
+        self.trained=(starts,runs,current().seconds,params,self.model.importance())
+        LOG.info('%s picker trained on %d rows from %d runs in %.1fs using %s (cold load %.1fs, fit %.1fs)',
+                 self.name,rows,runs,self.trained[2],NAME,loaded,fitted)
 
     @timed
-    def fit_apart(self,data):
+    def fit_apart(self,dsn):
         with ProcessPoolExecutor(1) as fresh:
-            return fresh.submit(Model().fit,data.X,data.y).result()
+            return fresh.submit(train,dsn).result()
 
     @timed
     def pick(self,candidates,snapshot):

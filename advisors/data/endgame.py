@@ -2,12 +2,15 @@ from collections import defaultdict
 import math
 
 from interface.common import timed, timed_often
+from .construction import ConstructionActivity
+from .military import MilitaryStrength
 from .rewards import BUILDINGS, COSTS, ENDED, HOURS_PER_YEAR, OWNERS, PLAYED, PLAYERS, SNAPSHOTS, built, scored_runs, value_at
 
 COMPONENTS=('stock','population','gdp')
-NAME='endgame_three_v2'
-OBJECTIVE={'name':NAME,'weights':{'stock':1/9,'population':6/9,'gdp':2/9},
-           'alphas':{'stock':.5,'population':1.,'gdp':-.5},'window_years':1.}
+REWARD_COMPONENTS=(*COMPONENTS,'construction','military')
+NAME='endgame_military_v5'
+OBJECTIVE={'name':NAME,'weights':{'stock':1/9,'population':6/9,'gdp':2/9,'construction':.5,'military':.05},
+           'alphas':{'stock':.5,'population':1.,'gdp':-.5,'construction':0.,'military':0.},'window_years':1.}
 HISTORY=f'''select r.run_id,min(s.game_date),max(s.game_date),r.end_reason
 {ENDED}
 {PLAYED}'''
@@ -21,11 +24,12 @@ where e.run_id=any(%s) and e.present order by e.run_id,e.seq'''
 @timed_often
 def reward(years,parts):
     root=years**.5
-    return (root*parts['stock']+6*years*parts['population']+2*parts['gdp']/root)/9
+    return ((root*parts['stock']+6*years*parts['population']+2*parts['gdp']/root)/9
+            +OBJECTIVE['weights']['construction']*parts['construction']+OBJECTIVE['weights']['military']*parts['military'])
 
 
 @timed_often
-def breakdown(start,end,baseline,points):
+def breakdown(start,end,baseline,points,active_fraction,military_mean_log):
     years=(end-start)/HOURS_PER_YEAR
     if years<=0 or not math.isfinite(years):
         raise ValueError('Endgame reward requires positive duration')
@@ -47,19 +51,32 @@ def breakdown(start,end,baseline,points):
         factor=years**alpha
         parts.append({'component':name,'start_value':base,'end_ratio':last,'recent_change':change,'part':part,
                       'weight':weight,'alpha':alpha,'duration_factor':factor,'contribution':weight*factor*part})
+    if active_fraction is None or not math.isfinite(active_fraction) or not 0<=active_fraction<=1:
+        raise ValueError('Endgame reward requires a recorded construction active fraction between zero and one')
+    weight=OBJECTIVE['weights']['construction']
+    parts.append({'component':'construction','start_value':None,'end_ratio':None,'recent_change':None,
+                  'active_fraction':active_fraction,'part':active_fraction-1,'weight':weight,'alpha':0.,
+                  'duration_factor':1.,'contribution':weight*(active_fraction-1)})
+    if military_mean_log is None or not math.isfinite(military_mean_log) or military_mean_log<0:
+        raise ValueError('Endgame reward requires a nonnegative finite mean log military strength')
+    weight=OBJECTIVE['weights']['military']
+    parts.append({'component':'military','start_value':None,'end_ratio':None,'recent_change':None,
+                  'part':military_mean_log,'weight':weight,'alpha':0.,'duration_factor':1.,'contribution':weight*military_mean_log})
     raw={part['component']:part['part'] for part in parts}
     return {'years':years,'window_years':window,'score':reward(years,raw),'parts':parts}
 
 
 @timed_often
-def target(start,end,baseline,points):
-    result=breakdown(start,end,baseline,points)
+def target(start,end,baseline,points,active_fraction,military_mean_log):
+    result=breakdown(start,end,baseline,points,active_fraction,military_mean_log)
     return result['score'],result['years'],{part['component']:part['part'] for part in result['parts']}
 
 
 class Trajectories:
     @timed
     def __init__(self,connection,runs):
+        self.construction=ConstructionActivity(connection,runs)
+        self.military=MilitaryStrength(connection,runs)
         self.dates=defaultdict(dict)
         self.starts={}
         for run,seq,date in sorted(connection.execute(SNAPSHOTS,(runs,)).fetchall()):
@@ -96,15 +113,21 @@ class Trajectories:
             return 'missing_start_measurement'
         if any(value<=0 or not math.isfinite(value) for value in baseline.values()):
             return 'nonpositive_baseline'
+        if self.construction.fraction(run,date,last) is None:
+            return 'missing_construction_measurement'
+        if self.military.mean_log(run,date,last) is None:
+            return 'missing_military_measurement'
         return None
 
     @timed_often
     def target(self,run,start,end,baseline):
-        return target(start,end,baseline,{name:self.points[name][run] for name in COMPONENTS})
+        return target(start,end,baseline,{name:self.points[name][run] for name in COMPONENTS},
+                      self.construction.fraction(run,start,end),self.military.mean_log(run,start,end))
 
     @timed_often
     def breakdown(self,run,start,end,baseline):
-        return {'baseline_seq':self.starts[run,start],**breakdown(start,end,baseline,{name:self.points[name][run] for name in COMPONENTS})}
+        return {'baseline_seq':self.starts[run,start],**breakdown(start,end,baseline,{name:self.points[name][run] for name in COMPONENTS},
+                                                               self.construction.fraction(run,start,end),self.military.mean_log(run,start,end))}
 
 
 @timed

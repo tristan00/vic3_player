@@ -1,0 +1,4949 @@
+{
+  "version": 1,
+  "model": "histogram",
+  "config": {
+    "iterations": 557,
+    "depth": 10,
+    "learning_rate": 0.16652997275728781,
+    "l2_leaf_reg": 0.14390193024420833,
+    "random_strength": 6.552624364437818,
+    "rsm": 0.8017024497871449,
+    "border_count": 128,
+    "one_hot_max_size": 2,
+    "max_ctr_complexity": 1,
+    "grow_policy": "Depthwise",
+    "min_data_in_leaf": 8,
+    "bootstrap_type": "Bernoulli",
+    "subsample": 0.6301613701444335,
+    "leaf_estimation_iterations": 1,
+    "feature.context.economy": "off",
+    "feature.context.prices": "off",
+    "feature.context.institutions": "off",
+    "feature.context.tariffs": "off",
+    "feature.context.consumption_taxes": "off",
+    "feature.context.laws": "off",
+    "feature.context.rank": "off",
+    "feature.option.batch_size": "on",
+    "feature.option.abandon_law_enactment.law": "off",
+    "feature.option.accept_call_to_side.country": "off",
+    "feature.option.accept_peace_offer.war": "off",
+    "feature.option.accept_proposal.country": "off",
+    "feature.option.action": "count",
+    "bins.option.action": 128,
+    "feature.option.add_article_demand.country": "off",
+    "feature.option.add_article_demand.diplomatic_play": "off",
+    "feature.option.add_article_demand.treaty_article": "off",
+    "feature.option.add_article_demand.war_goal_type": "off",
+    "feature.option.add_bloc_article_to_treaty.giver": "off",
+    "feature.option.add_bloc_article_to_treaty.treaty": "count",
+    "bins.option.add_bloc_article_to_treaty.treaty": 128,
+    "feature.option.add_bloc_article_to_treaty.treaty_article": "off",
+    "feature.option.add_bloc_culture.country": "off",
+    "feature.option.add_commercial_article_to_treaty.giver": "off",
+    "feature.option.add_commercial_article_to_treaty.treaty": "count",
+    "bins.option.add_commercial_article_to_treaty.treaty": 0,
+    "feature.option.add_commercial_article_to_treaty.treaty_article": "off",
+    "feature.option.add_demand_for_state.diplomatic_play": "off",
+    "feature.option.add_demand_for_state.holder": "off",
+    "feature.option.add_demand_for_state.state": "off",
+    "feature.option.add_demand_for_state.war_goal_type": "off",
+    "feature.option.add_demand_on_country.country": "off",
+    "feature.option.add_demand_on_country.diplomatic_play": "off",
+    "feature.option.add_demand_on_country.holder": "off",
+    "feature.option.add_demand_on_country.war_goal_type": "off",
+    "feature.option.add_diplomatic_article_to_treaty.giver": "off",
+    "feature.option.add_diplomatic_article_to_treaty.treaty": "off",
+    "feature.option.add_diplomatic_article_to_treaty.treaty_article": "count",
+    "bins.option.add_diplomatic_article_to_treaty.treaty_article": 128,
+    "feature.option.add_goods_article_demand.country": "off",
+    "feature.option.add_goods_article_demand.diplomatic_play": "off",
+    "feature.option.add_goods_article_demand.goods": "share",
+    "bins.option.add_goods_article_demand.goods": 8,
+    "feature.option.add_goods_article_demand.treaty_article": "off",
+    "feature.option.add_goods_article_demand.war_goal_type": "off",
+    "feature.option.add_law_article_demand.commitment": "count",
+    "bins.option.add_law_article_demand.commitment": 32,
+    "feature.option.add_law_article_demand.country": "off",
+    "feature.option.add_law_article_demand.diplomatic_play": "count",
+    "bins.option.add_law_article_demand.diplomatic_play": 32,
+    "feature.option.add_law_article_demand.treaty_article": "off",
+    "feature.option.add_law_article_demand.war_goal_type": "off",
+    "feature.option.add_liberation_demand.country": "off",
+    "feature.option.add_liberation_demand.country_definition": "off",
+    "feature.option.add_liberation_demand.diplomatic_play": "off",
+    "feature.option.add_liberation_demand.war_goal_type": "share",
+    "bins.option.add_liberation_demand.war_goal_type": 8,
+    "feature.option.add_region_article_demand.country": "off",
+    "feature.option.add_region_article_demand.diplomatic_play": "off",
+    "feature.option.add_region_article_demand.strategic_region": "share",
+    "bins.option.add_region_article_demand.strategic_region": 0,
+    "feature.option.add_region_article_demand.treaty_article": "off",
+    "feature.option.add_region_article_demand.war_goal_type": "off",
+    "feature.option.add_security_article_to_treaty.giver": "off",
+    "feature.option.add_security_article_to_treaty.treaty": "off",
+    "feature.option.add_security_article_to_treaty.treaty_article": "count",
+    "bins.option.add_security_article_to_treaty.treaty_article": 8,
+    "feature.option.add_state_article_demand.country": "off",
+    "feature.option.add_state_article_demand.diplomatic_play": "off",
+    "feature.option.add_state_article_demand.state": "off",
+    "feature.option.add_state_article_demand.treaty_article": "off",
+    "feature.option.add_state_article_demand.war_goal_type": "off",
+    "feature.option.adopt_bloc_principle.power_bloc_principle": "off",
+    "feature.option.agree_to_treaty.country": "off",
+    "feature.option.annex_lapsed_subject.country": "off",
+    "feature.option.answer_event.event": "off",
+    "feature.option.answer_event.option": "off",
+    "feature.option.answers": "off",
+    "feature.option.answers.default": "count",
+    "bins.option.answers.default": 0,
+    "feature.option.answers.effect_details": "off",
+    "feature.option.answers.effects": "off",
+    "feature.option.answers.options_offered": "off",
+    "feature.option.appoint_colonial_governor.country": "off",
+    "feature.option.appoint_flagship.ship": "off",
+    "feature.option.ask_for_autonomy.country": "share",
+    "bins.option.ask_for_autonomy.country": 128,
+    "feature.option.ask_for_colonial_governor.country": "off",
+    "feature.option.ask_for_investment_rights.country": "off",
+    "feature.option.ask_for_knowledge_sharing.country": "off",
+    "feature.option.ask_for_market_control.country": "off",
+    "feature.option.ask_for_regime_support.country": "off",
+    "feature.option.ask_overlord_for_state.country": "off",
+    "feature.option.ask_overlord_for_state.state": "off",
+    "feature.option.ask_state_in_trade.country": "share",
+    "bins.option.ask_state_in_trade.country": 8,
+    "feature.option.ask_state_in_trade.state": "off",
+    "feature.option.ask_to_join_power_bloc.power_bloc": "share",
+    "bins.option.ask_to_join_power_bloc.power_bloc": 32,
+    "feature.option.back_initiator.diplomatic_play": "off",
+    "feature.option.back_target.diplomatic_play": "off",
+    "feature.option.bolster_movement.political_movement": "off",
+    "feature.option.buy_out_statewide.building_type": "off",
+    "feature.option.buy_out_statewide.ownership": "off",
+    "feature.option.buy_out_statewide.state": "off",
+    "feature.option.call_off_coup.country": "off",
+    "feature.option.call_off_invasion.military_formation": "off",
+    "feature.option.call_up_conscripts.combat_unit_type": "off",
+    "feature.option.call_up_conscripts.military_formation": "off",
+    "feature.option.call_up_conscripts.state": "off",
+    "feature.option.cancel_fleet_refit.military_formation": "off",
+    "feature.option.cancel_institution_decrease.institution": "off",
+    "feature.option.cancel_institution_increase.institution": "off",
+    "feature.option.cancel_queued_construction.building_type": "off",
+    "feature.option.cancel_queued_construction.state": "off",
+    "feature.option.cancel_queued_research.technology": "off",
+    "feature.option.cancel_queued_ship.ship_type": "off",
+    "feature.option.cancel_queued_ship_for_fleet.military_formation": "off",
+    "feature.option.cancel_queued_ship_for_fleet.ship_type": "off",
+    "feature.option.cancel_ship_order.index": "off",
+    "feature.option.cancel_ship_refit.ship": "off",
+    "feature.option.cancelled.queue_position": "off",
+    "feature.option.cancelled.queue_progress": "off",
+    "feature.option.change_fleet_mission.military_formation": "off",
+    "feature.option.change_fleet_mission.naval_mission_type": "off",
+    "feature.option.change_fleet_mission_area.military_formation": "off",
+    "feature.option.change_fleet_mission_area.strategic_region": "share",
+    "bins.option.change_fleet_mission_area.strategic_region": 0,
+    "feature.option.change_subject_culture.country": "off",
+    "feature.option.clear_objective.military_formation": "off",
+    "feature.option.clear_objective.state": "off",
+    "feature.option.combine_armies.military_formation": "off",
+    "feature.option.combine_armies.source": "off",
+    "feature.option.combine_fleets.military_formation": "off",
+    "feature.option.combine_fleets.source": "off",
+    "feature.option.concede_demand.country": "off",
+    "feature.option.construct_bureaucracy.building_type": "off",
+    "feature.option.construct_bureaucracy.state": "off",
+    "feature.option.construct_construction_capacity.building_type": "off",
+    "feature.option.construct_construction_capacity.state": "count",
+    "bins.option.construct_construction_capacity.state": 32,
+    "feature.option.construct_consumer_goods.building_type": "off",
+    "feature.option.construct_consumer_goods.state": "count",
+    "bins.option.construct_consumer_goods.state": 128,
+    "feature.option.construct_food_production.building_type": "off",
+    "feature.option.construct_food_production.state": "off",
+    "feature.option.construct_industrial_goods.building_type": "off",
+    "feature.option.construct_industrial_goods.state": "count",
+    "bins.option.construct_industrial_goods.state": 0,
+    "feature.option.construct_infrastructure.building_type": "off",
+    "feature.option.construct_infrastructure.state": "off",
+    "feature.option.construct_innovation.building_type": "count",
+    "bins.option.construct_innovation.building_type": 128,
+    "feature.option.construct_innovation.state": "share",
+    "bins.option.construct_innovation.state": 8,
+    "feature.option.construct_military_goods.building_type": "off",
+    "feature.option.construct_military_goods.state": "off",
+    "feature.option.construct_monuments.building_type": "off",
+    "feature.option.construct_monuments.state": "off",
+    "feature.option.construct_naval_administration.state": "off",
+    "feature.option.construct_naval_fortification.state": "off",
+    "feature.option.construct_plantations.building_type": "off",
+    "feature.option.construct_plantations.state": "off",
+    "feature.option.construct_raw_materials.building_type": "off",
+    "feature.option.construct_raw_materials.state": "off",
+    "feature.option.construct_trade_capacity.building_type": "count",
+    "bins.option.construct_trade_capacity.building_type": 8,
+    "feature.option.construct_trade_capacity.state": "off",
+    "feature.option.damage_relations.country": "off",
+    "feature.option.declare_rivalry.country": "off",
+    "feature.option.decline_call_to_side.country": "off",
+    "feature.option.decline_proposal.country": "count",
+    "bins.option.decline_proposal.country": 128,
+    "feature.option.defend_against_invasion.front": "off",
+    "feature.option.defend_against_invasion.military_formation": "off",
+    "feature.option.defend_against_invasion_at_sea.front": "off",
+    "feature.option.defend_against_invasion_at_sea.military_formation": "off",
+    "feature.option.demand_bloc_article_made_acceptable.country": "off",
+    "feature.option.demand_bloc_article_made_acceptable.treaty_article": "off",
+    "feature.option.demand_bloc_article_under_threat.country": "off",
+    "feature.option.demand_bloc_article_under_threat.treaty_article": "off",
+    "feature.option.demand_commercial_article_made_acceptable.country": "off",
+    "feature.option.demand_commercial_article_made_acceptable.treaty_article": "count",
+    "bins.option.demand_commercial_article_made_acceptable.treaty_article": 8,
+    "feature.option.demand_commercial_article_under_threat.country": "off",
+    "feature.option.demand_commercial_article_under_threat.treaty_article": "off",
+    "feature.option.demand_diplomatic_article_made_acceptable.country": "off",
+    "feature.option.demand_diplomatic_article_made_acceptable.treaty_article": "off",
+    "feature.option.demand_diplomatic_article_under_threat.country": "off",
+    "feature.option.demand_diplomatic_article_under_threat.treaty_article": "off",
+    "feature.option.demand_for_state.diplomatic_play_type": "count",
+    "bins.option.demand_for_state.diplomatic_play_type": 0,
+    "feature.option.demand_for_state.state": "off",
+    "feature.option.demand_liberation.country": "off",
+    "feature.option.demand_liberation.country_definition": "count",
+    "bins.option.demand_liberation.country_definition": 32,
+    "feature.option.demand_liberation.diplomatic_play_type": "off",
+    "feature.option.demand_of_country.country": "off",
+    "feature.option.demand_of_country.diplomatic_play_type": "off",
+    "feature.option.demand_security_article_made_acceptable.country": "off",
+    "feature.option.demand_security_article_made_acceptable.treaty_article": "share",
+    "bins.option.demand_security_article_made_acceptable.treaty_article": 8,
+    "feature.option.demand_security_article_under_threat.country": "off",
+    "feature.option.demand_security_article_under_threat.treaty_article": "off",
+    "feature.option.demobilise_army.military_formation": "share",
+    "bins.option.demobilise_army.military_formation": 128,
+    "feature.option.design_ship.ship_modification": "off",
+    "feature.option.design_ship.ship_type": "off",
+    "feature.option.disband_army.military_formation": "count",
+    "bins.option.disband_army.military_formation": 0,
+    "feature.option.disband_battalions.combat_unit_type": "off",
+    "feature.option.disband_battalions.military_formation": "count",
+    "bins.option.disband_battalions.military_formation": 128,
+    "feature.option.disband_company.company_type": "off",
+    "feature.option.disband_fleet.military_formation": "off",
+    "feature.option.disband_one_unit.combat_unit": "off",
+    "feature.option.dismiss_flagship.ship": "off",
+    "feature.option.divide_army.military_formation": "off",
+    "feature.option.divide_fleet.military_formation": "off",
+    "feature.option.downsize_building.building": "count",
+    "bins.option.downsize_building.building": 32,
+    "feature.option.drop_bloc_article_from_treaty.giver": "off",
+    "feature.option.drop_bloc_article_from_treaty.treaty": "off",
+    "feature.option.drop_bloc_article_from_treaty.treaty_article": "count",
+    "bins.option.drop_bloc_article_from_treaty.treaty_article": 0,
+    "feature.option.drop_commercial_article_from_treaty.giver": "off",
+    "feature.option.drop_commercial_article_from_treaty.treaty": "count",
+    "bins.option.drop_commercial_article_from_treaty.treaty": 8,
+    "feature.option.drop_commercial_article_from_treaty.treaty_article": "share",
+    "bins.option.drop_commercial_article_from_treaty.treaty_article": 128,
+    "feature.option.drop_diplomatic_article_from_treaty.giver": "off",
+    "feature.option.drop_diplomatic_article_from_treaty.treaty": "off",
+    "feature.option.drop_diplomatic_article_from_treaty.treaty_article": "off",
+    "feature.option.drop_security_article_from_treaty.giver": "off",
+    "feature.option.drop_security_article_from_treaty.treaty": "off",
+    "feature.option.drop_security_article_from_treaty.treaty_article": "off",
+    "feature.option.drop_war_goal.country": "off",
+    "feature.option.drop_war_goal.diplomatic_play": "share",
+    "bins.option.drop_war_goal.diplomatic_play": 8,
+    "feature.option.drop_war_goal.war_goal_type": "off",
+    "feature.option.embark_troops.fleet": "count",
+    "bins.option.embark_troops.fleet": 8,
+    "feature.option.embark_troops.military_formation": "off",
+    "feature.option.enact_new_law.law": "count",
+    "bins.option.enact_new_law.law": 8,
+    "feature.option.end_fleet_mission.military_formation": "off",
+    "feature.option.end_payment_relief.country": "off",
+    "feature.option.end_raised_payments.country": "off",
+    "feature.option.end_rivalry.country": "off",
+    "feature.option.end_service_exemption.country": "off",
+    "feature.option.end_standing_pact.country": "off",
+    "feature.option.end_standing_pact.diplomatic_action": "off",
+    "feature.option.end_state_monopoly.building_type": "off",
+    "feature.option.enforce_subject_military_access.country": "off",
+    "feature.option.establish_colony.state": "off",
+    "feature.option.establish_company.company_type": "off",
+    "feature.option.evangelise_subject.country": "off",
+    "feature.option.exchange_bloc_articles.country": "off",
+    "feature.option.exchange_bloc_articles.demand": "off",
+    "feature.option.exchange_bloc_articles.treaty_article": "off",
+    "feature.option.exchange_commercial_articles.country": "off",
+    "feature.option.exchange_commercial_articles.demand": "off",
+    "feature.option.exchange_commercial_articles.treaty_article": "off",
+    "feature.option.exchange_diplomatic_articles.country": "off",
+    "feature.option.exchange_diplomatic_articles.demand": "count",
+    "bins.option.exchange_diplomatic_articles.demand": 32,
+    "feature.option.exchange_diplomatic_articles.treaty_article": "off",
+    "feature.option.exchange_security_articles.country": "count",
+    "bins.option.exchange_security_articles.country": 128,
+    "feature.option.exchange_security_articles.demand": "off",
+    "feature.option.exchange_security_articles.treaty_article": "off",
+    "feature.option.exchange_states.country": "off",
+    "feature.option.exchange_states.given": "off",
+    "feature.option.exchange_states.taken": "off",
+    "feature.option.exempt_subject_from_service.country": "off",
+    "feature.option.expel_diplomats.country": "off",
+    "feature.option.expropriate_statewide.building_type": "off",
+    "feature.option.expropriate_statewide.ownership": "off",
+    "feature.option.expropriate_statewide.state": "off",
+    "feature.option.force_bloc_regime_change.country": "off",
+    "feature.option.force_bloc_religion.country": "off",
+    "feature.option.forgive_obligation.country": "off",
+    "feature.option.form_army.option": "off",
+    "feature.option.form_fleet.option": "off",
+    "feature.option.found_power_bloc.power_bloc_identity": "off",
+    "feature.option.found_power_bloc.power_bloc_principle": "off",
+    "feature.option.fund_lobby.country": "off",
+    "feature.option.give_command.character": "off",
+    "feature.option.give_command.military_formation": "off",
+    "feature.option.give_order.character": "off",
+    "feature.option.give_order.commander_order_type": "off",
+    "feature.option.give_state_in_trade.country": "off",
+    "feature.option.give_state_in_trade.state": "off",
+    "feature.option.give_up_colony.state": "off",
+    "feature.option.grant_charter.charter": "off",
+    "feature.option.grant_charter.company": "off",
+    "feature.option.grant_charter_for_building_type.building_type": "off",
+    "feature.option.grant_charter_for_building_type.charter": "off",
+    "feature.option.grant_charter_for_building_type.company": "off",
+    "feature.option.grant_charter_for_region.charter": "off",
+    "feature.option.grant_charter_for_region.company": "off",
+    "feature.option.grant_charter_for_region.state": "off",
+    "feature.option.grant_independence.country": "off",
+    "feature.option.grant_state_to_subject.country": "off",
+    "feature.option.grant_state_to_subject.state": "off",
+    "feature.option.grant_subject_investment_rights.country": "off",
+    "feature.option.grant_subject_own_market.country": "share",
+    "bins.option.grant_subject_own_market.country": 8,
+    "feature.option.halt_construction_sector.building": "off",
+    "feature.option.impose_law_on_subject.law": "share",
+    "bins.option.impose_law_on_subject.law": 32,
+    "feature.option.improve_relations.country": "off",
+    "feature.option.interact_with_character.character": "count",
+    "bins.option.interact_with_character.character": 128,
+    "feature.option.interact_with_character.interaction": "share",
+    "bins.option.interact_with_character.interaction": 128,
+    "feature.option.interest_group.leader_ideologies": "off",
+    "feature.option.interest_group.leader_traits": "off",
+    "feature.option.invite_to_power_bloc.country": "off",
+    "feature.option.land_troops.military_formation": "off",
+    "feature.option.lean_towards_initiator.diplomatic_play": "count",
+    "bins.option.lean_towards_initiator.diplomatic_play": 8,
+    "feature.option.lean_towards_target.diplomatic_play": "off",
+    "feature.option.loosen_strait_access.state": "off",
+    "feature.option.loosen_strait_access.strait": "off",
+    "feature.option.lower_building_priority.building_type": "off",
+    "feature.option.lower_building_priority.state": "off",
+    "feature.option.lower_consumption_taxes.goods": "off",
+    "feature.option.lower_embargoes.country": "off",
+    "feature.option.lower_export_tariff.goods": "off",
+    "feature.option.lower_government.interest_group": "off",
+    "feature.option.lower_import_tariff.goods": "off",
+    "feature.option.lower_incorporation.state": "count",
+    "bins.option.lower_incorporation.state": 128,
+    "feature.option.lower_institution_level.institution": "off",
+    "feature.option.lower_ship_priority.index": "share",
+    "bins.option.lower_ship_priority.index": 8,
+    "feature.option.lower_state_decrees.decree": "count",
+    "bins.option.lower_state_decrees.decree": 8,
+    "feature.option.lower_state_decrees.state": "count",
+    "bins.option.lower_state_decrees.state": 32,
+    "feature.option.lower_strait_toll.strait": "off",
+    "feature.option.lower_subject_autonomy.country": "count",
+    "bins.option.lower_subject_autonomy.country": 8,
+    "feature.option.lower_subject_payments.country": "off",
+    "feature.option.lower_subsidies.building": "off",
+    "feature.option.lower_subsidies_statewide.building_type": "off",
+    "feature.option.lower_subsidies_statewide.ownership": "share",
+    "bins.option.lower_subsidies_statewide.ownership": 0,
+    "feature.option.lower_subsidies_statewide.state": "off",
+    "feature.option.make_demand_primary.country": "off",
+    "feature.option.make_demand_primary.diplomatic_play": "off",
+    "feature.option.make_demand_primary.war_goal_type": "off",
+    "feature.option.mobilise_army.military_formation": "off",
+    "feature.option.move_battalions.military_formation": "off",
+    "feature.option.move_battalions.target": "off",
+    "feature.option.move_ship.ship": "count",
+    "bins.option.move_ship.ship": 8,
+    "feature.option.move_ship.target": "share",
+    "bins.option.move_ship.target": 8,
+    "feature.option.move_ships.military_formation": "off",
+    "feature.option.move_ships.target": "off",
+    "feature.option.narrow_strait_passage.state": "off",
+    "feature.option.narrow_strait_passage.strait": "off",
+    "feature.option.nationalise_building.building": "count",
+    "bins.option.nationalise_building.building": 128,
+    "feature.option.nationalise_building.levels": "off",
+    "feature.option.negotiate_over_law.interest_group": "off",
+    "feature.option.offer_building_for_sale.building": "off",
+    "feature.option.offer_peace.war": "off",
+    "feature.option.offer_white_peace.war": "off",
+    "feature.option.pause_colony.state": "share",
+    "bins.option.pause_colony.state": 8,
+    "feature.option.plan_invasion.military_formation": "off",
+    "feature.option.plan_invasion.state": "off",
+    "feature.option.plan_seaborne_invasion.fleet": "off",
+    "feature.option.plan_seaborne_invasion.military_formation": "off",
+    "feature.option.plan_seaborne_invasion.state": "off",
+    "feature.option.play.adjacent_states": "off",
+    "feature.option.play.gdp_ratio": "off",
+    "feature.option.play.land_border": "off",
+    "feature.option.play.pacts": "off",
+    "feature.option.play.player_truce_days": "off",
+    "feature.option.play.prestige_ratio": "off",
+    "feature.option.play.relations": "off",
+    "feature.option.play.target_state_adjacent": "share",
+    "bins.option.play.target_state_adjacent": 0,
+    "feature.option.play.target_truce_days": "off",
+    "feature.option.play.treaty_articles": "off",
+    "feature.option.play.truce": "off",
+    "feature.option.press_war_goal.country": "off",
+    "feature.option.press_war_goal.diplomatic_play": "off",
+    "feature.option.press_war_goal.war_goal_type": "share",
+    "bins.option.press_war_goal.war_goal_type": 32,
+    "feature.option.promote_officer.character": "off",
+    "feature.option.propose_bloc_article.country": "off",
+    "feature.option.propose_bloc_article.giver": "off",
+    "feature.option.propose_bloc_article.treaty_article": "off",
+    "feature.option.propose_bloc_article_for_term.country": "off",
+    "feature.option.propose_bloc_article_for_term.days": "off",
+    "feature.option.propose_bloc_article_for_term.giver": "off",
+    "feature.option.propose_bloc_article_for_term.treaty_article": "off",
+    "feature.option.propose_bloc_article_with_obligation.country": "off",
+    "feature.option.propose_bloc_article_with_obligation.giver": "off",
+    "feature.option.propose_bloc_article_with_obligation.obligation": "off",
+    "feature.option.propose_bloc_article_with_obligation.treaty_article": "count",
+    "bins.option.propose_bloc_article_with_obligation.treaty_article": 128,
+    "feature.option.propose_commercial_article.country": "off",
+    "feature.option.propose_commercial_article.giver": "off",
+    "feature.option.propose_commercial_article.treaty_article": "off",
+    "feature.option.propose_commercial_article_for_term.country": "off",
+    "feature.option.propose_commercial_article_for_term.days": "off",
+    "feature.option.propose_commercial_article_for_term.giver": "off",
+    "feature.option.propose_commercial_article_for_term.treaty_article": "off",
+    "feature.option.propose_commercial_article_with_obligation.country": "off",
+    "feature.option.propose_commercial_article_with_obligation.giver": "off",
+    "feature.option.propose_commercial_article_with_obligation.obligation": "off",
+    "feature.option.propose_commercial_article_with_obligation.treaty_article": "off",
+    "feature.option.propose_company_monopoly.building_type": "off",
+    "feature.option.propose_company_monopoly.company": "off",
+    "feature.option.propose_company_monopoly.country": "count",
+    "bins.option.propose_company_monopoly.country": 8,
+    "feature.option.propose_company_monopoly.giver": "off",
+    "feature.option.propose_company_monopoly.treaty_article": "off",
+    "feature.option.propose_diplomatic_article.country": "off",
+    "feature.option.propose_diplomatic_article.giver": "off",
+    "feature.option.propose_diplomatic_article.treaty_article": "count",
+    "bins.option.propose_diplomatic_article.treaty_article": 32,
+    "feature.option.propose_diplomatic_article_for_term.country": "off",
+    "feature.option.propose_diplomatic_article_for_term.days": "share",
+    "bins.option.propose_diplomatic_article_for_term.days": 0,
+    "feature.option.propose_diplomatic_article_for_term.giver": "off",
+    "feature.option.propose_diplomatic_article_for_term.treaty_article": "off",
+    "feature.option.propose_diplomatic_article_with_obligation.country": "off",
+    "feature.option.propose_diplomatic_article_with_obligation.giver": "count",
+    "bins.option.propose_diplomatic_article_with_obligation.giver": 32,
+    "feature.option.propose_diplomatic_article_with_obligation.obligation": "share",
+    "bins.option.propose_diplomatic_article_with_obligation.obligation": 32,
+    "feature.option.propose_diplomatic_article_with_obligation.treaty_article": "off",
+    "feature.option.propose_goods_article.country": "off",
+    "feature.option.propose_goods_article.giver": "off",
+    "feature.option.propose_goods_article.goods": "off",
+    "feature.option.propose_goods_article.treaty_article": "off",
+    "feature.option.propose_goods_quantity_article.country": "off",
+    "feature.option.propose_goods_quantity_article.giver": "off",
+    "feature.option.propose_goods_quantity_article.goods": "off",
+    "feature.option.propose_goods_quantity_article.share": "off",
+    "feature.option.propose_goods_quantity_article.treaty_article": "off",
+    "feature.option.propose_law_commitment.commitment": "off",
+    "feature.option.propose_law_commitment.country": "off",
+    "feature.option.propose_law_commitment.giver": "off",
+    "feature.option.propose_law_commitment.treaty_article": "off",
+    "feature.option.propose_money_transfer.country": "off",
+    "feature.option.propose_money_transfer.giver": "off",
+    "feature.option.propose_money_transfer.share": "off",
+    "feature.option.propose_money_transfer.treaty_article": "off",
+    "feature.option.propose_region_article.country": "share",
+    "bins.option.propose_region_article.country": 128,
+    "feature.option.propose_region_article.giver": "off",
+    "feature.option.propose_region_article.strategic_region": "share",
+    "bins.option.propose_region_article.strategic_region": 128,
+    "feature.option.propose_region_article.treaty_article": "share",
+    "bins.option.propose_region_article.treaty_article": 128,
+    "feature.option.propose_security_article.country": "off",
+    "feature.option.propose_security_article.giver": "off",
+    "feature.option.propose_security_article.treaty_article": "off",
+    "feature.option.propose_security_article_for_term.country": "off",
+    "feature.option.propose_security_article_for_term.days": "off",
+    "feature.option.propose_security_article_for_term.giver": "off",
+    "feature.option.propose_security_article_for_term.treaty_article": "off",
+    "feature.option.propose_security_article_with_obligation.country": "off",
+    "feature.option.propose_security_article_with_obligation.giver": "off",
+    "feature.option.propose_security_article_with_obligation.obligation": "off",
+    "feature.option.propose_security_article_with_obligation.treaty_article": "off",
+    "feature.option.propose_ship_transfer.country": "off",
+    "feature.option.propose_ship_transfer.giver": "off",
+    "feature.option.propose_ship_transfer.ship": "count",
+    "bins.option.propose_ship_transfer.ship": 8,
+    "feature.option.propose_ship_transfer.treaty_article": "count",
+    "bins.option.propose_ship_transfer.treaty_article": 128,
+    "feature.option.propose_state_article.country": "off",
+    "feature.option.propose_state_article.giver": "off",
+    "feature.option.propose_state_article.state": "off",
+    "feature.option.propose_state_article.treaty_article": "off",
+    "feature.option.propose_subject_transfer.country": "off",
+    "feature.option.propose_subject_transfer.giver": "count",
+    "bins.option.propose_subject_transfer.giver": 32,
+    "feature.option.propose_subject_transfer.subject": "off",
+    "feature.option.propose_subject_transfer.treaty_article": "off",
+    "feature.option.queue_military_technology.technology": "off",
+    "feature.option.queue_production_technology.technology": "off",
+    "feature.option.queue_ship.ship_type": "off",
+    "feature.option.queue_ship_for_fleet.military_formation": "off",
+    "feature.option.queue_ship_for_fleet.ship_type": "off",
+    "feature.option.queue_society_technology.technology": "count",
+    "bins.option.queue_society_technology.technology": 8,
+    "feature.option.raise_army_conscripts.military_formation": "count",
+    "bins.option.raise_army_conscripts.military_formation": 128,
+    "feature.option.raise_building_priority.building_type": "off",
+    "feature.option.raise_building_priority.state": "off",
+    "feature.option.raise_consumption_taxes.goods": "off",
+    "feature.option.raise_embargoes.country": "off",
+    "feature.option.raise_export_tariff.goods": "off",
+    "feature.option.raise_government.interest_group": "off",
+    "feature.option.raise_import_tariff.goods": "off",
+    "feature.option.raise_incorporation.state": "off",
+    "feature.option.raise_institution_level.institution": "off",
+    "feature.option.raise_regular_army.combat_unit_type": "off",
+    "feature.option.raise_regular_army.military_formation": "off",
+    "feature.option.raise_regular_army.state": "off",
+    "feature.option.raise_ship_priority.index": "off",
+    "feature.option.raise_state_decrees.decree": "off",
+    "feature.option.raise_state_decrees.state": "off",
+    "feature.option.raise_strait_toll.strait": "off",
+    "feature.option.raise_subject_autonomy.country": "off",
+    "feature.option.raise_subject_payments.country": "off",
+    "feature.option.raise_subsidies.building": "count",
+    "bins.option.raise_subsidies.building": 8,
+    "feature.option.raise_subsidies_statewide.building_type": "count",
+    "bins.option.raise_subsidies_statewide.building_type": 32,
+    "feature.option.raise_subsidies_statewide.ownership": "share",
+    "bins.option.raise_subsidies_statewide.ownership": 0,
+    "feature.option.raise_subsidies_statewide.state": "off",
+    "feature.option.rebase_fleet.military_formation": "share",
+    "bins.option.rebase_fleet.military_formation": 0,
+    "feature.option.rebase_fleet.strategic_region": "off",
+    "feature.option.rebuild_ship_to_design.index": "count",
+    "bins.option.rebuild_ship_to_design.index": 128,
+    "feature.option.rebuild_ship_to_design.ship": "off",
+    "feature.option.recall_fleet_for_repairs.military_formation": "off",
+    "feature.option.recruit_commander.character": "off",
+    "feature.option.recruit_commander_for.character": "off",
+    "feature.option.recruit_commander_for.military_formation": "off",
+    "feature.option.redesign_ship.index": "off",
+    "feature.option.redesign_ship.ship_modification": "off",
+    "feature.option.redesign_ship.ship_type": "off",
+    "feature.option.refit_fleet.military_formation": "off",
+    "feature.option.refit_fleet_in_port.military_formation": "off",
+    "feature.option.refit_ship.ship": "off",
+    "feature.option.refuse_demand.country": "off",
+    "feature.option.refuse_treaty.country": "off",
+    "feature.option.rehome_army.military_formation": "off",
+    "feature.option.rehome_army.strategic_region": "off",
+    "feature.option.relocate_market_capital.state": "off",
+    "feature.option.relocate_national_capital.state": "off",
+    "feature.option.remove_bloc_member.country": "off",
+    "feature.option.repeal_law_amendment.amendment": "off",
+    "feature.option.replace_bloc_principle.power_bloc_principle": "share",
+    "bins.option.replace_bloc_principle.power_bloc_principle": 32,
+    "feature.option.replace_bloc_principle.slot": "off",
+    "feature.option.research_military_technology.technology": "off",
+    "feature.option.research_production_technology.technology": "off",
+    "feature.option.research_society_technology.technology": "count",
+    "bins.option.research_society_technology.technology": 8,
+    "feature.option.reserve_building_type_for_state.building_type": "share",
+    "bins.option.reserve_building_type_for_state.building_type": 0,
+    "feature.option.reset_building_methods.building": "off",
+    "feature.option.reset_methods_statewide.state": "off",
+    "feature.option.restart_construction_sector.building": "off",
+    "feature.option.resume_colony.state": "count",
+    "bins.option.resume_colony.state": 8,
+    "feature.option.return_market_control.country": "count",
+    "bins.option.return_market_control.country": 0,
+    "feature.option.revoke_charter.charter": "off",
+    "feature.option.revoke_charter.company": "off",
+    "feature.option.revoke_charter_for_building_type.building_type": "off",
+    "feature.option.revoke_charter_for_building_type.charter": "off",
+    "feature.option.revoke_charter_for_building_type.company": "off",
+    "feature.option.revoke_charter_for_region.charter": "off",
+    "feature.option.revoke_charter_for_region.company": "off",
+    "feature.option.revoke_charter_for_region.state": "off",
+    "feature.option.scrap_ship.ship": "share",
+    "bins.option.scrap_ship.ship": 0,
+    "feature.option.scrap_ship_design.index": "off",
+    "feature.option.scrap_ship_design.ship_type": "off",
+    "feature.option.send_conscripts_home.combat_unit_type": "count",
+    "bins.option.send_conscripts_home.combat_unit_type": 0,
+    "feature.option.send_conscripts_home.military_formation": "off",
+    "feature.option.send_new_ships_to_fleet.military_formation": "share",
+    "bins.option.send_new_ships_to_fleet.military_formation": 32,
+    "feature.option.send_to_front.front": "count",
+    "bins.option.send_to_front.front": 128,
+    "feature.option.send_to_front.military_formation": "share",
+    "bins.option.send_to_front.military_formation": 32,
+    "feature.option.set_army_flag.flag": "share",
+    "bins.option.set_army_flag.flag": 0,
+    "feature.option.set_army_flag.military_formation": "count",
+    "bins.option.set_army_flag.military_formation": 32,
+    "feature.option.set_army_lending.index": "off",
+    "feature.option.set_army_lending.military_formation": "count",
+    "bins.option.set_army_lending.military_formation": 8,
+    "feature.option.set_army_supply_priority.level": "off",
+    "feature.option.set_army_supply_priority.military_formation": "off",
+    "feature.option.set_fleet_ship_design.index": "off",
+    "feature.option.set_fleet_ship_design.military_formation": "off",
+    "feature.option.set_fleet_ship_design.ship_type": "off",
+    "feature.option.set_objective.military_formation": "off",
+    "feature.option.set_objective.state": "off",
+    "feature.option.set_standard_ship_design.index": "off",
+    "feature.option.set_standard_ship_design.ship_type": "off",
+    "feature.option.set_standard_unit_type.combat_unit_type": "off",
+    "feature.option.set_standard_unit_type.military_formation": "share",
+    "bins.option.set_standard_unit_type.military_formation": 0,
+    "feature.option.share_knowledge_with_subject.country": "share",
+    "bins.option.share_knowledge_with_subject.country": 0,
+    "feature.option.site.buildings_of_type": "off",
+    "feature.option.site.gdp_share": "off",
+    "feature.option.site.literacy": "off",
+    "feature.option.site.peasants": "off",
+    "feature.option.site.population": "share",
+    "bins.option.site.population": 32,
+    "feature.option.site.standard_of_living": "count",
+    "bins.option.site.standard_of_living": 32,
+    "feature.option.site.unemployed": "share",
+    "bins.option.site.unemployed": 8,
+    "feature.option.stage_coup.country": "off",
+    "feature.option.stake_colonial_claim.country": "off",
+    "feature.option.stake_colonial_claim.state": "off",
+    "feature.option.start_fleet_mission.military_formation": "off",
+    "feature.option.start_fleet_mission.naval_mission_type": "count",
+    "bins.option.start_fleet_mission.naval_mission_type": 32,
+    "feature.option.station_army.military_formation": "off",
+    "feature.option.station_army.state": "off",
+    "feature.option.station_army_at_headquarters.military_formation": "off",
+    "feature.option.station_army_at_headquarters.strategic_region": "off",
+    "feature.option.station_fleet_in_state.military_formation": "count",
+    "bins.option.station_fleet_in_state.military_formation": 0,
+    "feature.option.station_fleet_in_state.state": "off",
+    "feature.option.stay_neutral.diplomatic_play": "off",
+    "feature.option.stay_on_the_fence.diplomatic_play": "off",
+    "feature.option.stop_bolstering_movement.political_movement": "off",
+    "feature.option.stop_damaging_relations.country": "off",
+    "feature.option.stop_evangelising_subject.country": "off",
+    "feature.option.stop_funding_lobby.country": "off",
+    "feature.option.stop_improving_relations.country": "off",
+    "feature.option.stop_sharing_knowledge.country": "off",
+    "feature.option.stop_supporting_separatists.country": "off",
+    "feature.option.stop_supporting_subject_regime.country": "off",
+    "feature.option.stop_suppressing_movement.political_movement": "off",
+    "feature.option.subjugate_bloc_member.country": "off",
+    "feature.option.support_separatists.country": "count",
+    "bins.option.support_separatists.country": 32,
+    "feature.option.support_subject_regime.country": "off",
+    "feature.option.suppress_movement.political_movement": "off",
+    "feature.option.surrender_war.war": "off",
+    "feature.option.sway_ally.country": "share",
+    "bins.option.sway_ally.country": 32,
+    "feature.option.sway_ally.diplomatic_play": "off",
+    "feature.option.sway_country.country": "off",
+    "feature.option.sway_country.diplomatic_play": "off",
+    "feature.option.sway_with_goods_article.country": "count",
+    "bins.option.sway_with_goods_article.country": 0,
+    "feature.option.sway_with_goods_article.diplomatic_play": "off",
+    "feature.option.sway_with_goods_article.goods": "off",
+    "feature.option.sway_with_goods_article.treaty_article": "off",
+    "feature.option.sway_with_goods_article.war_goal_type": "off",
+    "feature.option.sway_with_law_article.commitment": "off",
+    "feature.option.sway_with_law_article.country": "off",
+    "feature.option.sway_with_law_article.diplomatic_play": "off",
+    "feature.option.sway_with_law_article.treaty_article": "share",
+    "bins.option.sway_with_law_article.treaty_article": 128,
+    "feature.option.sway_with_law_article.war_goal_type": "off",
+    "feature.option.sway_with_pact.country": "off",
+    "feature.option.sway_with_pact.diplomatic_action": "off",
+    "feature.option.sway_with_pact.diplomatic_play": "off",
+    "feature.option.sway_with_region_article.country": "off",
+    "feature.option.sway_with_region_article.diplomatic_play": "off",
+    "feature.option.sway_with_region_article.strategic_region": "off",
+    "feature.option.sway_with_region_article.treaty_article": "share",
+    "bins.option.sway_with_region_article.treaty_article": 32,
+    "feature.option.sway_with_region_article.war_goal_type": "off",
+    "feature.option.sway_with_state.country": "off",
+    "feature.option.sway_with_state.diplomatic_play": "off",
+    "feature.option.sway_with_state.state": "off",
+    "feature.option.sway_with_state_article.country": "off",
+    "feature.option.sway_with_state_article.diplomatic_play": "off",
+    "feature.option.sway_with_state_article.state": "off",
+    "feature.option.sway_with_state_article.treaty_article": "off",
+    "feature.option.sway_with_state_article.war_goal_type": "off",
+    "feature.option.sway_with_state_war_goal.country": "off",
+    "feature.option.sway_with_state_war_goal.diplomatic_play": "off",
+    "feature.option.sway_with_state_war_goal.state": "off",
+    "feature.option.sway_with_state_war_goal.war_goal_type": "off",
+    "feature.option.sway_with_subject.country": "off",
+    "feature.option.sway_with_subject.diplomatic_play": "off",
+    "feature.option.sway_with_subject.subject": "count",
+    "bins.option.sway_with_subject.subject": 128,
+    "feature.option.sway_with_war_goal.country": "off",
+    "feature.option.sway_with_war_goal.diplomatic_play": "off",
+    "feature.option.sway_with_war_goal.target": "share",
+    "bins.option.sway_with_war_goal.target": 32,
+    "feature.option.sway_with_war_goal.war_goal_type": "share",
+    "bins.option.sway_with_war_goal.war_goal_type": 32,
+    "feature.option.switch_building_method.building": "off",
+    "feature.option.switch_building_method.production_method": "off",
+    "feature.option.switch_methods_statewide.building_type": "off",
+    "feature.option.switch_methods_statewide.ownership": "off",
+    "feature.option.switch_methods_statewide.production_method": "off",
+    "feature.option.switch_methods_statewide.state": "off",
+    "feature.option.switch_off_mobilisation_option.military_formation": "count",
+    "bins.option.switch_off_mobilisation_option.military_formation": 0,
+    "feature.option.switch_off_mobilisation_option.mobilization_option": "off",
+    "feature.option.switch_on_mobilisation_option.military_formation": "off",
+    "feature.option.switch_on_mobilisation_option.mobilization_option": "off",
+    "feature.option.take_away_command.character": "share",
+    "bins.option.take_away_command.character": 128,
+    "feature.option.take_back_subject_market.country": "off",
+    "feature.option.take_journal_option.button": "count",
+    "bins.option.take_journal_option.button": 0,
+    "feature.option.take_journal_option.journal_entry": "off",
+    "feature.option.take_national_decision.decision": "off",
+    "feature.option.take_state_from_subject.country": "off",
+    "feature.option.take_state_from_subject.state": "off",
+    "feature.option.tighten_strait_access.state": "count",
+    "bins.option.tighten_strait_access.state": 8,
+    "feature.option.tighten_strait_access.strait": "off",
+    "feature.option.toggle_decision_alert.decision": "off",
+    "feature.option.upgrade_conscript_units.combat_unit_type": "share",
+    "bins.option.upgrade_conscript_units.combat_unit_type": 8,
+    "feature.option.upgrade_conscript_units.military_formation": "off",
+    "feature.option.upgrade_regular_units.combat_unit_type": "share",
+    "bins.option.upgrade_regular_units.combat_unit_type": 0,
+    "feature.option.upgrade_regular_units.military_formation": "count",
+    "bins.option.upgrade_regular_units.military_formation": 32,
+    "feature.option.violate_neutrality.country": "off",
+    "feature.option.widen_strait_passage.state": "count",
+    "bins.option.widen_strait_passage.state": 0,
+    "feature.option.widen_strait_passage.strait": "off",
+    "feature.option.withdraw_bloc_treaty.treaty": "off",
+    "feature.option.withdraw_building_from_sale.building": "off",
+    "feature.option.withdraw_commercial_treaty.treaty": "off",
+    "feature.option.withdraw_diplomatic_treaty.treaty": "off",
+    "feature.option.withdraw_from_confrontation.diplomatic_play": "off",
+    "feature.option.withdraw_security_treaty.treaty": "off",
+    "feature.option.withdraw_subject_investment_rights.country": "off",
+    "feature.holdings.player.buildings": "off",
+    "feature.holdings.player.production_methods": "off",
+    "feature.holdings.player.character_roles": "off",
+    "feature.holdings.player.character_ideologies": "off",
+    "feature.holdings.player.population_shares": "off"
+  },
+  "groups": {
+    "context.economy": {
+      "kind": "columns",
+      "role": "context",
+      "columns": [
+        "treasury",
+        "debt",
+        "interest",
+        "balance",
+        "population",
+        "bureaucracy_available",
+        "standard_of_living",
+        "government_queue_items",
+        "government_queue_left",
+        "private_queue_items",
+        "private_queue_left",
+        "construction_capacity",
+        "construction_used",
+        "construction_paused",
+        "balance_gdp",
+        "battalions",
+        "mobilization_ratio",
+        "wars",
+        "army_spending",
+        "army_spending_gdp",
+        "infamy",
+        "government_legitimacy",
+        "radicals_percent",
+        "player.interest_group.ig_armed_forces.clout",
+        "player.interest_group.ig_armed_forces.approval",
+        "player.interest_group.ig_armed_forces.in_government",
+        "player.interest_group.ig_devout.clout",
+        "player.interest_group.ig_devout.approval",
+        "player.interest_group.ig_devout.in_government",
+        "player.interest_group.ig_industrialists.clout",
+        "player.interest_group.ig_industrialists.approval",
+        "player.interest_group.ig_industrialists.in_government",
+        "player.interest_group.ig_intelligentsia.clout",
+        "player.interest_group.ig_intelligentsia.approval",
+        "player.interest_group.ig_intelligentsia.in_government",
+        "player.interest_group.ig_landowners.clout",
+        "player.interest_group.ig_landowners.approval",
+        "player.interest_group.ig_landowners.in_government",
+        "player.interest_group.ig_petty_bourgeoisie.clout",
+        "player.interest_group.ig_petty_bourgeoisie.approval",
+        "player.interest_group.ig_petty_bourgeoisie.in_government",
+        "player.interest_group.ig_rural_folk.clout",
+        "player.interest_group.ig_rural_folk.approval",
+        "player.interest_group.ig_rural_folk.in_government",
+        "player.interest_group.ig_trade_unions.clout",
+        "player.interest_group.ig_trade_unions.approval",
+        "player.interest_group.ig_trade_unions.in_government",
+        "government_spending",
+        "government_spending_gdp",
+        "tax_level",
+        "government_wage_level",
+        "military_wage_level",
+        "law_enactment.active",
+        "law_enactment.phase",
+        "law_enactment.progress_percent",
+        "law_enactment.setbacks",
+        "law_enactment.success_percent",
+        "law_enactment.advance_percent",
+        "law_enactment.debate_percent",
+        "law_enactment.stall_percent"
+      ]
+    },
+    "context.prices": {
+      "kind": "columns",
+      "role": "context",
+      "columns": [
+        "price.ammunition",
+        "price.small_arms",
+        "price.artillery",
+        "price.tanks",
+        "price.aeroplanes",
+        "price.manowars",
+        "price.ironclads",
+        "price.grain",
+        "price.fish",
+        "price.fabric",
+        "price.wood",
+        "price.groceries",
+        "price.clothes",
+        "price.furniture",
+        "price.paper",
+        "price.services",
+        "price.transportation",
+        "price.electricity",
+        "price.merchant_marine",
+        "price.clippers",
+        "price.steamers",
+        "price.silk",
+        "price.dye",
+        "price.sulfur",
+        "price.coal",
+        "price.iron",
+        "price.lead",
+        "price.hardwood",
+        "price.rubber",
+        "price.oil",
+        "price.engines",
+        "price.steel",
+        "price.glass",
+        "price.fertilizer",
+        "price.tools",
+        "price.explosives",
+        "price.porcelain",
+        "price.meat",
+        "price.fruit",
+        "price.liquor",
+        "price.wine",
+        "price.tea",
+        "price.coffee",
+        "price.sugar",
+        "price.tobacco",
+        "price.opium",
+        "price.automobiles",
+        "price.telephones",
+        "price.radios",
+        "price.luxury_clothes",
+        "price.luxury_furniture",
+        "price.gold",
+        "price.fine_art",
+        "price_above_world.ammunition",
+        "price_above_world.small_arms",
+        "price_above_world.artillery",
+        "price_above_world.tanks",
+        "price_above_world.aeroplanes",
+        "price_above_world.manowars",
+        "price_above_world.ironclads",
+        "price_above_world.grain",
+        "price_above_world.fish",
+        "price_above_world.fabric",
+        "price_above_world.wood",
+        "price_above_world.groceries",
+        "price_above_world.clothes",
+        "price_above_world.furniture",
+        "price_above_world.paper",
+        "price_above_world.services",
+        "price_above_world.transportation",
+        "price_above_world.electricity",
+        "price_above_world.merchant_marine",
+        "price_above_world.clippers",
+        "price_above_world.steamers",
+        "price_above_world.silk",
+        "price_above_world.dye",
+        "price_above_world.sulfur",
+        "price_above_world.coal",
+        "price_above_world.iron",
+        "price_above_world.lead",
+        "price_above_world.hardwood",
+        "price_above_world.rubber",
+        "price_above_world.oil",
+        "price_above_world.engines",
+        "price_above_world.steel",
+        "price_above_world.glass",
+        "price_above_world.fertilizer",
+        "price_above_world.tools",
+        "price_above_world.explosives",
+        "price_above_world.porcelain",
+        "price_above_world.meat",
+        "price_above_world.fruit",
+        "price_above_world.liquor",
+        "price_above_world.wine",
+        "price_above_world.tea",
+        "price_above_world.coffee",
+        "price_above_world.sugar",
+        "price_above_world.tobacco",
+        "price_above_world.opium",
+        "price_above_world.automobiles",
+        "price_above_world.telephones",
+        "price_above_world.radios",
+        "price_above_world.luxury_clothes",
+        "price_above_world.luxury_furniture",
+        "price_above_world.gold",
+        "price_above_world.fine_art"
+      ]
+    },
+    "context.institutions": {
+      "kind": "columns",
+      "role": "context",
+      "columns": [
+        "institution.institution_colonial_affairs",
+        "institution.institution_social_security",
+        "institution.institution_workplace_safety",
+        "institution.institution_schools",
+        "institution.institution_police",
+        "institution.institution_health_system",
+        "institution.institution_home_affairs"
+      ]
+    },
+    "context.tariffs": {
+      "kind": "columns",
+      "role": "context",
+      "columns": [
+        "tariff.import.ammunition",
+        "tariff.import.small_arms",
+        "tariff.import.artillery",
+        "tariff.import.tanks",
+        "tariff.import.aeroplanes",
+        "tariff.import.manowars",
+        "tariff.import.ironclads",
+        "tariff.import.grain",
+        "tariff.import.fish",
+        "tariff.import.fabric",
+        "tariff.import.wood",
+        "tariff.import.groceries",
+        "tariff.import.clothes",
+        "tariff.import.furniture",
+        "tariff.import.paper",
+        "tariff.import.services",
+        "tariff.import.transportation",
+        "tariff.import.electricity",
+        "tariff.import.merchant_marine",
+        "tariff.import.clippers",
+        "tariff.import.steamers",
+        "tariff.import.silk",
+        "tariff.import.dye",
+        "tariff.import.sulfur",
+        "tariff.import.coal",
+        "tariff.import.iron",
+        "tariff.import.lead",
+        "tariff.import.hardwood",
+        "tariff.import.rubber",
+        "tariff.import.oil",
+        "tariff.import.engines",
+        "tariff.import.steel",
+        "tariff.import.glass",
+        "tariff.import.fertilizer",
+        "tariff.import.tools",
+        "tariff.import.explosives",
+        "tariff.import.porcelain",
+        "tariff.import.meat",
+        "tariff.import.fruit",
+        "tariff.import.liquor",
+        "tariff.import.wine",
+        "tariff.import.tea",
+        "tariff.import.coffee",
+        "tariff.import.sugar",
+        "tariff.import.tobacco",
+        "tariff.import.opium",
+        "tariff.import.automobiles",
+        "tariff.import.telephones",
+        "tariff.import.radios",
+        "tariff.import.luxury_clothes",
+        "tariff.import.luxury_furniture",
+        "tariff.import.gold",
+        "tariff.import.fine_art",
+        "tariff.export.ammunition",
+        "tariff.export.small_arms",
+        "tariff.export.artillery",
+        "tariff.export.tanks",
+        "tariff.export.aeroplanes",
+        "tariff.export.manowars",
+        "tariff.export.ironclads",
+        "tariff.export.grain",
+        "tariff.export.fish",
+        "tariff.export.fabric",
+        "tariff.export.wood",
+        "tariff.export.groceries",
+        "tariff.export.clothes",
+        "tariff.export.furniture",
+        "tariff.export.paper",
+        "tariff.export.services",
+        "tariff.export.transportation",
+        "tariff.export.electricity",
+        "tariff.export.merchant_marine",
+        "tariff.export.clippers",
+        "tariff.export.steamers",
+        "tariff.export.silk",
+        "tariff.export.dye",
+        "tariff.export.sulfur",
+        "tariff.export.coal",
+        "tariff.export.iron",
+        "tariff.export.lead",
+        "tariff.export.hardwood",
+        "tariff.export.rubber",
+        "tariff.export.oil",
+        "tariff.export.engines",
+        "tariff.export.steel",
+        "tariff.export.glass",
+        "tariff.export.fertilizer",
+        "tariff.export.tools",
+        "tariff.export.explosives",
+        "tariff.export.porcelain",
+        "tariff.export.meat",
+        "tariff.export.fruit",
+        "tariff.export.liquor",
+        "tariff.export.wine",
+        "tariff.export.tea",
+        "tariff.export.coffee",
+        "tariff.export.sugar",
+        "tariff.export.tobacco",
+        "tariff.export.opium",
+        "tariff.export.automobiles",
+        "tariff.export.telephones",
+        "tariff.export.radios",
+        "tariff.export.luxury_clothes",
+        "tariff.export.luxury_furniture",
+        "tariff.export.gold",
+        "tariff.export.fine_art"
+      ]
+    },
+    "context.consumption_taxes": {
+      "kind": "columns",
+      "role": "context",
+      "columns": [
+        "consumption_tax.ammunition",
+        "consumption_tax.small_arms",
+        "consumption_tax.artillery",
+        "consumption_tax.tanks",
+        "consumption_tax.aeroplanes",
+        "consumption_tax.manowars",
+        "consumption_tax.ironclads",
+        "consumption_tax.grain",
+        "consumption_tax.fish",
+        "consumption_tax.fabric",
+        "consumption_tax.wood",
+        "consumption_tax.groceries",
+        "consumption_tax.clothes",
+        "consumption_tax.furniture",
+        "consumption_tax.paper",
+        "consumption_tax.services",
+        "consumption_tax.transportation",
+        "consumption_tax.electricity",
+        "consumption_tax.merchant_marine",
+        "consumption_tax.clippers",
+        "consumption_tax.steamers",
+        "consumption_tax.silk",
+        "consumption_tax.dye",
+        "consumption_tax.sulfur",
+        "consumption_tax.coal",
+        "consumption_tax.iron",
+        "consumption_tax.lead",
+        "consumption_tax.hardwood",
+        "consumption_tax.rubber",
+        "consumption_tax.oil",
+        "consumption_tax.engines",
+        "consumption_tax.steel",
+        "consumption_tax.glass",
+        "consumption_tax.fertilizer",
+        "consumption_tax.tools",
+        "consumption_tax.explosives",
+        "consumption_tax.porcelain",
+        "consumption_tax.meat",
+        "consumption_tax.fruit",
+        "consumption_tax.liquor",
+        "consumption_tax.wine",
+        "consumption_tax.tea",
+        "consumption_tax.coffee",
+        "consumption_tax.sugar",
+        "consumption_tax.tobacco",
+        "consumption_tax.opium",
+        "consumption_tax.automobiles",
+        "consumption_tax.telephones",
+        "consumption_tax.radios",
+        "consumption_tax.luxury_clothes",
+        "consumption_tax.luxury_furniture",
+        "consumption_tax.gold",
+        "consumption_tax.fine_art"
+      ]
+    },
+    "context.laws": {
+      "kind": "columns",
+      "role": "context",
+      "columns": [
+        "law.lawgroup_governance_principles",
+        "law.lawgroup_distribution_of_power",
+        "law.lawgroup_citizenship",
+        "law.lawgroup_caste_hegemony",
+        "law.lawgroup_edo_social_system",
+        "law.lawgroup_church_and_state",
+        "law.lawgroup_bureaucracy",
+        "law.lawgroup_army_model",
+        "law.lawgroup_navy_model",
+        "law.lawgroup_internal_security",
+        "law.lawgroup_economic_system",
+        "law.lawgroup_trade_policy",
+        "law.lawgroup_taxation",
+        "law.lawgroup_land_reform",
+        "law.lawgroup_colonization",
+        "law.lawgroup_policing",
+        "law.lawgroup_education_system",
+        "law.lawgroup_health_system",
+        "law.lawgroup_free_speech",
+        "law.lawgroup_labor_rights",
+        "law.lawgroup_childrens_rights",
+        "law.lawgroup_rights_of_women",
+        "law.lawgroup_welfare",
+        "law.lawgroup_migration",
+        "law.lawgroup_slavery",
+        "law.lawgroup_labour_associations"
+      ]
+    },
+    "context.rank": {
+      "kind": "columns",
+      "role": "context",
+      "columns": [
+        "player.country_rank"
+      ]
+    },
+    "option.batch_size": {
+      "kind": "columns",
+      "role": "option",
+      "columns": [
+        "batch_size"
+      ]
+    },
+    "option.abandon_law_enactment.law": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "abandon_law_enactment.law"
+    },
+    "option.accept_call_to_side.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "accept_call_to_side.country"
+    },
+    "option.accept_peace_offer.war": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "accept_peace_offer.war"
+    },
+    "option.accept_proposal.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "accept_proposal.country"
+    },
+    "option.action": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "action"
+    },
+    "option.add_article_demand.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_article_demand.country"
+    },
+    "option.add_article_demand.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_article_demand.diplomatic_play"
+    },
+    "option.add_article_demand.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_article_demand.treaty_article"
+    },
+    "option.add_article_demand.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_article_demand.war_goal_type"
+    },
+    "option.add_bloc_article_to_treaty.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_bloc_article_to_treaty.giver"
+    },
+    "option.add_bloc_article_to_treaty.treaty": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_bloc_article_to_treaty.treaty"
+    },
+    "option.add_bloc_article_to_treaty.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_bloc_article_to_treaty.treaty_article"
+    },
+    "option.add_bloc_culture.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_bloc_culture.country"
+    },
+    "option.add_commercial_article_to_treaty.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_commercial_article_to_treaty.giver"
+    },
+    "option.add_commercial_article_to_treaty.treaty": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_commercial_article_to_treaty.treaty"
+    },
+    "option.add_commercial_article_to_treaty.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_commercial_article_to_treaty.treaty_article"
+    },
+    "option.add_demand_for_state.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_demand_for_state.diplomatic_play"
+    },
+    "option.add_demand_for_state.holder": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_demand_for_state.holder"
+    },
+    "option.add_demand_for_state.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_demand_for_state.state"
+    },
+    "option.add_demand_for_state.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_demand_for_state.war_goal_type"
+    },
+    "option.add_demand_on_country.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_demand_on_country.country"
+    },
+    "option.add_demand_on_country.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_demand_on_country.diplomatic_play"
+    },
+    "option.add_demand_on_country.holder": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_demand_on_country.holder"
+    },
+    "option.add_demand_on_country.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_demand_on_country.war_goal_type"
+    },
+    "option.add_diplomatic_article_to_treaty.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_diplomatic_article_to_treaty.giver"
+    },
+    "option.add_diplomatic_article_to_treaty.treaty": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_diplomatic_article_to_treaty.treaty"
+    },
+    "option.add_diplomatic_article_to_treaty.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_diplomatic_article_to_treaty.treaty_article"
+    },
+    "option.add_goods_article_demand.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_goods_article_demand.country"
+    },
+    "option.add_goods_article_demand.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_goods_article_demand.diplomatic_play"
+    },
+    "option.add_goods_article_demand.goods": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_goods_article_demand.goods"
+    },
+    "option.add_goods_article_demand.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_goods_article_demand.treaty_article"
+    },
+    "option.add_goods_article_demand.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_goods_article_demand.war_goal_type"
+    },
+    "option.add_law_article_demand.commitment": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_law_article_demand.commitment"
+    },
+    "option.add_law_article_demand.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_law_article_demand.country"
+    },
+    "option.add_law_article_demand.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_law_article_demand.diplomatic_play"
+    },
+    "option.add_law_article_demand.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_law_article_demand.treaty_article"
+    },
+    "option.add_law_article_demand.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_law_article_demand.war_goal_type"
+    },
+    "option.add_liberation_demand.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_liberation_demand.country"
+    },
+    "option.add_liberation_demand.country_definition": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_liberation_demand.country_definition"
+    },
+    "option.add_liberation_demand.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_liberation_demand.diplomatic_play"
+    },
+    "option.add_liberation_demand.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_liberation_demand.war_goal_type"
+    },
+    "option.add_region_article_demand.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_region_article_demand.country"
+    },
+    "option.add_region_article_demand.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_region_article_demand.diplomatic_play"
+    },
+    "option.add_region_article_demand.strategic_region": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_region_article_demand.strategic_region"
+    },
+    "option.add_region_article_demand.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_region_article_demand.treaty_article"
+    },
+    "option.add_region_article_demand.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_region_article_demand.war_goal_type"
+    },
+    "option.add_security_article_to_treaty.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_security_article_to_treaty.giver"
+    },
+    "option.add_security_article_to_treaty.treaty": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_security_article_to_treaty.treaty"
+    },
+    "option.add_security_article_to_treaty.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_security_article_to_treaty.treaty_article"
+    },
+    "option.add_state_article_demand.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_state_article_demand.country"
+    },
+    "option.add_state_article_demand.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_state_article_demand.diplomatic_play"
+    },
+    "option.add_state_article_demand.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_state_article_demand.state"
+    },
+    "option.add_state_article_demand.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_state_article_demand.treaty_article"
+    },
+    "option.add_state_article_demand.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "add_state_article_demand.war_goal_type"
+    },
+    "option.adopt_bloc_principle.power_bloc_principle": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "adopt_bloc_principle.power_bloc_principle"
+    },
+    "option.agree_to_treaty.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "agree_to_treaty.country"
+    },
+    "option.annex_lapsed_subject.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "annex_lapsed_subject.country"
+    },
+    "option.answer_event.event": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "answer_event.event"
+    },
+    "option.answer_event.option": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "answer_event.option"
+    },
+    "option.answers": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "answers"
+    },
+    "option.answers.default": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "answers.default"
+    },
+    "option.answers.effect_details": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "answers.effect_details"
+    },
+    "option.answers.effects": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "answers.effects"
+    },
+    "option.answers.options_offered": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "answers.options_offered"
+    },
+    "option.appoint_colonial_governor.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "appoint_colonial_governor.country"
+    },
+    "option.appoint_flagship.ship": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "appoint_flagship.ship"
+    },
+    "option.ask_for_autonomy.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "ask_for_autonomy.country"
+    },
+    "option.ask_for_colonial_governor.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "ask_for_colonial_governor.country"
+    },
+    "option.ask_for_investment_rights.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "ask_for_investment_rights.country"
+    },
+    "option.ask_for_knowledge_sharing.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "ask_for_knowledge_sharing.country"
+    },
+    "option.ask_for_market_control.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "ask_for_market_control.country"
+    },
+    "option.ask_for_regime_support.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "ask_for_regime_support.country"
+    },
+    "option.ask_overlord_for_state.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "ask_overlord_for_state.country"
+    },
+    "option.ask_overlord_for_state.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "ask_overlord_for_state.state"
+    },
+    "option.ask_state_in_trade.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "ask_state_in_trade.country"
+    },
+    "option.ask_state_in_trade.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "ask_state_in_trade.state"
+    },
+    "option.ask_to_join_power_bloc.power_bloc": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "ask_to_join_power_bloc.power_bloc"
+    },
+    "option.back_initiator.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "back_initiator.diplomatic_play"
+    },
+    "option.back_target.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "back_target.diplomatic_play"
+    },
+    "option.bolster_movement.political_movement": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "bolster_movement.political_movement"
+    },
+    "option.buy_out_statewide.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "buy_out_statewide.building_type"
+    },
+    "option.buy_out_statewide.ownership": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "buy_out_statewide.ownership"
+    },
+    "option.buy_out_statewide.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "buy_out_statewide.state"
+    },
+    "option.call_off_coup.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "call_off_coup.country"
+    },
+    "option.call_off_invasion.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "call_off_invasion.military_formation"
+    },
+    "option.call_up_conscripts.combat_unit_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "call_up_conscripts.combat_unit_type"
+    },
+    "option.call_up_conscripts.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "call_up_conscripts.military_formation"
+    },
+    "option.call_up_conscripts.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "call_up_conscripts.state"
+    },
+    "option.cancel_fleet_refit.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "cancel_fleet_refit.military_formation"
+    },
+    "option.cancel_institution_decrease.institution": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "cancel_institution_decrease.institution"
+    },
+    "option.cancel_institution_increase.institution": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "cancel_institution_increase.institution"
+    },
+    "option.cancel_queued_construction.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "cancel_queued_construction.building_type"
+    },
+    "option.cancel_queued_construction.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "cancel_queued_construction.state"
+    },
+    "option.cancel_queued_research.technology": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "cancel_queued_research.technology"
+    },
+    "option.cancel_queued_ship.ship_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "cancel_queued_ship.ship_type"
+    },
+    "option.cancel_queued_ship_for_fleet.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "cancel_queued_ship_for_fleet.military_formation"
+    },
+    "option.cancel_queued_ship_for_fleet.ship_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "cancel_queued_ship_for_fleet.ship_type"
+    },
+    "option.cancel_ship_order.index": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "cancel_ship_order.index"
+    },
+    "option.cancel_ship_refit.ship": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "cancel_ship_refit.ship"
+    },
+    "option.cancelled.queue_position": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "cancelled.queue_position"
+    },
+    "option.cancelled.queue_progress": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "cancelled.queue_progress"
+    },
+    "option.change_fleet_mission.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "change_fleet_mission.military_formation"
+    },
+    "option.change_fleet_mission.naval_mission_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "change_fleet_mission.naval_mission_type"
+    },
+    "option.change_fleet_mission_area.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "change_fleet_mission_area.military_formation"
+    },
+    "option.change_fleet_mission_area.strategic_region": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "change_fleet_mission_area.strategic_region"
+    },
+    "option.change_subject_culture.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "change_subject_culture.country"
+    },
+    "option.clear_objective.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "clear_objective.military_formation"
+    },
+    "option.clear_objective.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "clear_objective.state"
+    },
+    "option.combine_armies.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "combine_armies.military_formation"
+    },
+    "option.combine_armies.source": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "combine_armies.source"
+    },
+    "option.combine_fleets.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "combine_fleets.military_formation"
+    },
+    "option.combine_fleets.source": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "combine_fleets.source"
+    },
+    "option.concede_demand.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "concede_demand.country"
+    },
+    "option.construct_bureaucracy.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_bureaucracy.building_type"
+    },
+    "option.construct_bureaucracy.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_bureaucracy.state"
+    },
+    "option.construct_construction_capacity.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_construction_capacity.building_type"
+    },
+    "option.construct_construction_capacity.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_construction_capacity.state"
+    },
+    "option.construct_consumer_goods.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_consumer_goods.building_type"
+    },
+    "option.construct_consumer_goods.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_consumer_goods.state"
+    },
+    "option.construct_food_production.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_food_production.building_type"
+    },
+    "option.construct_food_production.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_food_production.state"
+    },
+    "option.construct_industrial_goods.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_industrial_goods.building_type"
+    },
+    "option.construct_industrial_goods.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_industrial_goods.state"
+    },
+    "option.construct_infrastructure.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_infrastructure.building_type"
+    },
+    "option.construct_infrastructure.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_infrastructure.state"
+    },
+    "option.construct_innovation.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_innovation.building_type"
+    },
+    "option.construct_innovation.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_innovation.state"
+    },
+    "option.construct_military_goods.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_military_goods.building_type"
+    },
+    "option.construct_military_goods.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_military_goods.state"
+    },
+    "option.construct_monuments.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_monuments.building_type"
+    },
+    "option.construct_monuments.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_monuments.state"
+    },
+    "option.construct_naval_administration.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_naval_administration.state"
+    },
+    "option.construct_naval_fortification.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_naval_fortification.state"
+    },
+    "option.construct_plantations.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_plantations.building_type"
+    },
+    "option.construct_plantations.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_plantations.state"
+    },
+    "option.construct_raw_materials.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_raw_materials.building_type"
+    },
+    "option.construct_raw_materials.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_raw_materials.state"
+    },
+    "option.construct_trade_capacity.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_trade_capacity.building_type"
+    },
+    "option.construct_trade_capacity.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "construct_trade_capacity.state"
+    },
+    "option.damage_relations.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "damage_relations.country"
+    },
+    "option.declare_rivalry.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "declare_rivalry.country"
+    },
+    "option.decline_call_to_side.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "decline_call_to_side.country"
+    },
+    "option.decline_proposal.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "decline_proposal.country"
+    },
+    "option.defend_against_invasion.front": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "defend_against_invasion.front"
+    },
+    "option.defend_against_invasion.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "defend_against_invasion.military_formation"
+    },
+    "option.defend_against_invasion_at_sea.front": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "defend_against_invasion_at_sea.front"
+    },
+    "option.defend_against_invasion_at_sea.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "defend_against_invasion_at_sea.military_formation"
+    },
+    "option.demand_bloc_article_made_acceptable.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_bloc_article_made_acceptable.country"
+    },
+    "option.demand_bloc_article_made_acceptable.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_bloc_article_made_acceptable.treaty_article"
+    },
+    "option.demand_bloc_article_under_threat.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_bloc_article_under_threat.country"
+    },
+    "option.demand_bloc_article_under_threat.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_bloc_article_under_threat.treaty_article"
+    },
+    "option.demand_commercial_article_made_acceptable.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_commercial_article_made_acceptable.country"
+    },
+    "option.demand_commercial_article_made_acceptable.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_commercial_article_made_acceptable.treaty_article"
+    },
+    "option.demand_commercial_article_under_threat.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_commercial_article_under_threat.country"
+    },
+    "option.demand_commercial_article_under_threat.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_commercial_article_under_threat.treaty_article"
+    },
+    "option.demand_diplomatic_article_made_acceptable.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_diplomatic_article_made_acceptable.country"
+    },
+    "option.demand_diplomatic_article_made_acceptable.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_diplomatic_article_made_acceptable.treaty_article"
+    },
+    "option.demand_diplomatic_article_under_threat.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_diplomatic_article_under_threat.country"
+    },
+    "option.demand_diplomatic_article_under_threat.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_diplomatic_article_under_threat.treaty_article"
+    },
+    "option.demand_for_state.diplomatic_play_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_for_state.diplomatic_play_type"
+    },
+    "option.demand_for_state.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_for_state.state"
+    },
+    "option.demand_liberation.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_liberation.country"
+    },
+    "option.demand_liberation.country_definition": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_liberation.country_definition"
+    },
+    "option.demand_liberation.diplomatic_play_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_liberation.diplomatic_play_type"
+    },
+    "option.demand_of_country.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_of_country.country"
+    },
+    "option.demand_of_country.diplomatic_play_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_of_country.diplomatic_play_type"
+    },
+    "option.demand_security_article_made_acceptable.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_security_article_made_acceptable.country"
+    },
+    "option.demand_security_article_made_acceptable.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_security_article_made_acceptable.treaty_article"
+    },
+    "option.demand_security_article_under_threat.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_security_article_under_threat.country"
+    },
+    "option.demand_security_article_under_threat.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demand_security_article_under_threat.treaty_article"
+    },
+    "option.demobilise_army.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "demobilise_army.military_formation"
+    },
+    "option.design_ship.ship_modification": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "design_ship.ship_modification"
+    },
+    "option.design_ship.ship_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "design_ship.ship_type"
+    },
+    "option.disband_army.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "disband_army.military_formation"
+    },
+    "option.disband_battalions.combat_unit_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "disband_battalions.combat_unit_type"
+    },
+    "option.disband_battalions.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "disband_battalions.military_formation"
+    },
+    "option.disband_company.company_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "disband_company.company_type"
+    },
+    "option.disband_fleet.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "disband_fleet.military_formation"
+    },
+    "option.disband_one_unit.combat_unit": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "disband_one_unit.combat_unit"
+    },
+    "option.dismiss_flagship.ship": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "dismiss_flagship.ship"
+    },
+    "option.divide_army.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "divide_army.military_formation"
+    },
+    "option.divide_fleet.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "divide_fleet.military_formation"
+    },
+    "option.downsize_building.building": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "downsize_building.building"
+    },
+    "option.drop_bloc_article_from_treaty.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_bloc_article_from_treaty.giver"
+    },
+    "option.drop_bloc_article_from_treaty.treaty": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_bloc_article_from_treaty.treaty"
+    },
+    "option.drop_bloc_article_from_treaty.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_bloc_article_from_treaty.treaty_article"
+    },
+    "option.drop_commercial_article_from_treaty.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_commercial_article_from_treaty.giver"
+    },
+    "option.drop_commercial_article_from_treaty.treaty": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_commercial_article_from_treaty.treaty"
+    },
+    "option.drop_commercial_article_from_treaty.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_commercial_article_from_treaty.treaty_article"
+    },
+    "option.drop_diplomatic_article_from_treaty.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_diplomatic_article_from_treaty.giver"
+    },
+    "option.drop_diplomatic_article_from_treaty.treaty": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_diplomatic_article_from_treaty.treaty"
+    },
+    "option.drop_diplomatic_article_from_treaty.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_diplomatic_article_from_treaty.treaty_article"
+    },
+    "option.drop_security_article_from_treaty.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_security_article_from_treaty.giver"
+    },
+    "option.drop_security_article_from_treaty.treaty": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_security_article_from_treaty.treaty"
+    },
+    "option.drop_security_article_from_treaty.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_security_article_from_treaty.treaty_article"
+    },
+    "option.drop_war_goal.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_war_goal.country"
+    },
+    "option.drop_war_goal.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_war_goal.diplomatic_play"
+    },
+    "option.drop_war_goal.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "drop_war_goal.war_goal_type"
+    },
+    "option.embark_troops.fleet": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "embark_troops.fleet"
+    },
+    "option.embark_troops.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "embark_troops.military_formation"
+    },
+    "option.enact_new_law.law": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "enact_new_law.law"
+    },
+    "option.end_fleet_mission.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "end_fleet_mission.military_formation"
+    },
+    "option.end_payment_relief.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "end_payment_relief.country"
+    },
+    "option.end_raised_payments.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "end_raised_payments.country"
+    },
+    "option.end_rivalry.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "end_rivalry.country"
+    },
+    "option.end_service_exemption.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "end_service_exemption.country"
+    },
+    "option.end_standing_pact.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "end_standing_pact.country"
+    },
+    "option.end_standing_pact.diplomatic_action": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "end_standing_pact.diplomatic_action"
+    },
+    "option.end_state_monopoly.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "end_state_monopoly.building_type"
+    },
+    "option.enforce_subject_military_access.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "enforce_subject_military_access.country"
+    },
+    "option.establish_colony.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "establish_colony.state"
+    },
+    "option.establish_company.company_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "establish_company.company_type"
+    },
+    "option.evangelise_subject.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "evangelise_subject.country"
+    },
+    "option.exchange_bloc_articles.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_bloc_articles.country"
+    },
+    "option.exchange_bloc_articles.demand": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_bloc_articles.demand"
+    },
+    "option.exchange_bloc_articles.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_bloc_articles.treaty_article"
+    },
+    "option.exchange_commercial_articles.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_commercial_articles.country"
+    },
+    "option.exchange_commercial_articles.demand": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_commercial_articles.demand"
+    },
+    "option.exchange_commercial_articles.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_commercial_articles.treaty_article"
+    },
+    "option.exchange_diplomatic_articles.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_diplomatic_articles.country"
+    },
+    "option.exchange_diplomatic_articles.demand": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_diplomatic_articles.demand"
+    },
+    "option.exchange_diplomatic_articles.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_diplomatic_articles.treaty_article"
+    },
+    "option.exchange_security_articles.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_security_articles.country"
+    },
+    "option.exchange_security_articles.demand": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_security_articles.demand"
+    },
+    "option.exchange_security_articles.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_security_articles.treaty_article"
+    },
+    "option.exchange_states.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_states.country"
+    },
+    "option.exchange_states.given": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_states.given"
+    },
+    "option.exchange_states.taken": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exchange_states.taken"
+    },
+    "option.exempt_subject_from_service.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "exempt_subject_from_service.country"
+    },
+    "option.expel_diplomats.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "expel_diplomats.country"
+    },
+    "option.expropriate_statewide.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "expropriate_statewide.building_type"
+    },
+    "option.expropriate_statewide.ownership": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "expropriate_statewide.ownership"
+    },
+    "option.expropriate_statewide.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "expropriate_statewide.state"
+    },
+    "option.force_bloc_regime_change.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "force_bloc_regime_change.country"
+    },
+    "option.force_bloc_religion.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "force_bloc_religion.country"
+    },
+    "option.forgive_obligation.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "forgive_obligation.country"
+    },
+    "option.form_army.option": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "form_army.option"
+    },
+    "option.form_fleet.option": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "form_fleet.option"
+    },
+    "option.found_power_bloc.power_bloc_identity": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "found_power_bloc.power_bloc_identity"
+    },
+    "option.found_power_bloc.power_bloc_principle": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "found_power_bloc.power_bloc_principle"
+    },
+    "option.fund_lobby.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "fund_lobby.country"
+    },
+    "option.give_command.character": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "give_command.character"
+    },
+    "option.give_command.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "give_command.military_formation"
+    },
+    "option.give_order.character": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "give_order.character"
+    },
+    "option.give_order.commander_order_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "give_order.commander_order_type"
+    },
+    "option.give_state_in_trade.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "give_state_in_trade.country"
+    },
+    "option.give_state_in_trade.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "give_state_in_trade.state"
+    },
+    "option.give_up_colony.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "give_up_colony.state"
+    },
+    "option.grant_charter.charter": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "grant_charter.charter"
+    },
+    "option.grant_charter.company": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "grant_charter.company"
+    },
+    "option.grant_charter_for_building_type.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "grant_charter_for_building_type.building_type"
+    },
+    "option.grant_charter_for_building_type.charter": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "grant_charter_for_building_type.charter"
+    },
+    "option.grant_charter_for_building_type.company": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "grant_charter_for_building_type.company"
+    },
+    "option.grant_charter_for_region.charter": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "grant_charter_for_region.charter"
+    },
+    "option.grant_charter_for_region.company": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "grant_charter_for_region.company"
+    },
+    "option.grant_charter_for_region.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "grant_charter_for_region.state"
+    },
+    "option.grant_independence.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "grant_independence.country"
+    },
+    "option.grant_state_to_subject.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "grant_state_to_subject.country"
+    },
+    "option.grant_state_to_subject.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "grant_state_to_subject.state"
+    },
+    "option.grant_subject_investment_rights.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "grant_subject_investment_rights.country"
+    },
+    "option.grant_subject_own_market.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "grant_subject_own_market.country"
+    },
+    "option.halt_construction_sector.building": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "halt_construction_sector.building"
+    },
+    "option.impose_law_on_subject.law": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "impose_law_on_subject.law"
+    },
+    "option.improve_relations.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "improve_relations.country"
+    },
+    "option.interact_with_character.character": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "interact_with_character.character"
+    },
+    "option.interact_with_character.interaction": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "interact_with_character.interaction"
+    },
+    "option.interest_group.leader_ideologies": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "interest_group.leader_ideologies"
+    },
+    "option.interest_group.leader_traits": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "interest_group.leader_traits"
+    },
+    "option.invite_to_power_bloc.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "invite_to_power_bloc.country"
+    },
+    "option.land_troops.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "land_troops.military_formation"
+    },
+    "option.lean_towards_initiator.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lean_towards_initiator.diplomatic_play"
+    },
+    "option.lean_towards_target.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lean_towards_target.diplomatic_play"
+    },
+    "option.loosen_strait_access.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "loosen_strait_access.state"
+    },
+    "option.loosen_strait_access.strait": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "loosen_strait_access.strait"
+    },
+    "option.lower_building_priority.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_building_priority.building_type"
+    },
+    "option.lower_building_priority.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_building_priority.state"
+    },
+    "option.lower_consumption_taxes.goods": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_consumption_taxes.goods"
+    },
+    "option.lower_embargoes.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_embargoes.country"
+    },
+    "option.lower_export_tariff.goods": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_export_tariff.goods"
+    },
+    "option.lower_government.interest_group": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_government.interest_group"
+    },
+    "option.lower_import_tariff.goods": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_import_tariff.goods"
+    },
+    "option.lower_incorporation.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_incorporation.state"
+    },
+    "option.lower_institution_level.institution": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_institution_level.institution"
+    },
+    "option.lower_ship_priority.index": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_ship_priority.index"
+    },
+    "option.lower_state_decrees.decree": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_state_decrees.decree"
+    },
+    "option.lower_state_decrees.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_state_decrees.state"
+    },
+    "option.lower_strait_toll.strait": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_strait_toll.strait"
+    },
+    "option.lower_subject_autonomy.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_subject_autonomy.country"
+    },
+    "option.lower_subject_payments.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_subject_payments.country"
+    },
+    "option.lower_subsidies.building": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_subsidies.building"
+    },
+    "option.lower_subsidies_statewide.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_subsidies_statewide.building_type"
+    },
+    "option.lower_subsidies_statewide.ownership": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_subsidies_statewide.ownership"
+    },
+    "option.lower_subsidies_statewide.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "lower_subsidies_statewide.state"
+    },
+    "option.make_demand_primary.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "make_demand_primary.country"
+    },
+    "option.make_demand_primary.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "make_demand_primary.diplomatic_play"
+    },
+    "option.make_demand_primary.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "make_demand_primary.war_goal_type"
+    },
+    "option.mobilise_army.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "mobilise_army.military_formation"
+    },
+    "option.move_battalions.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "move_battalions.military_formation"
+    },
+    "option.move_battalions.target": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "move_battalions.target"
+    },
+    "option.move_ship.ship": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "move_ship.ship"
+    },
+    "option.move_ship.target": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "move_ship.target"
+    },
+    "option.move_ships.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "move_ships.military_formation"
+    },
+    "option.move_ships.target": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "move_ships.target"
+    },
+    "option.narrow_strait_passage.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "narrow_strait_passage.state"
+    },
+    "option.narrow_strait_passage.strait": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "narrow_strait_passage.strait"
+    },
+    "option.nationalise_building.building": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "nationalise_building.building"
+    },
+    "option.nationalise_building.levels": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "nationalise_building.levels"
+    },
+    "option.negotiate_over_law.interest_group": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "negotiate_over_law.interest_group"
+    },
+    "option.offer_building_for_sale.building": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "offer_building_for_sale.building"
+    },
+    "option.offer_peace.war": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "offer_peace.war"
+    },
+    "option.offer_white_peace.war": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "offer_white_peace.war"
+    },
+    "option.pause_colony.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "pause_colony.state"
+    },
+    "option.plan_invasion.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "plan_invasion.military_formation"
+    },
+    "option.plan_invasion.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "plan_invasion.state"
+    },
+    "option.plan_seaborne_invasion.fleet": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "plan_seaborne_invasion.fleet"
+    },
+    "option.plan_seaborne_invasion.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "plan_seaborne_invasion.military_formation"
+    },
+    "option.plan_seaborne_invasion.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "plan_seaborne_invasion.state"
+    },
+    "option.play.adjacent_states": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "play.adjacent_states"
+    },
+    "option.play.gdp_ratio": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "play.gdp_ratio"
+    },
+    "option.play.land_border": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "play.land_border"
+    },
+    "option.play.pacts": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "play.pacts"
+    },
+    "option.play.player_truce_days": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "play.player_truce_days"
+    },
+    "option.play.prestige_ratio": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "play.prestige_ratio"
+    },
+    "option.play.relations": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "play.relations"
+    },
+    "option.play.target_state_adjacent": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "play.target_state_adjacent"
+    },
+    "option.play.target_truce_days": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "play.target_truce_days"
+    },
+    "option.play.treaty_articles": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "play.treaty_articles"
+    },
+    "option.play.truce": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "play.truce"
+    },
+    "option.press_war_goal.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "press_war_goal.country"
+    },
+    "option.press_war_goal.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "press_war_goal.diplomatic_play"
+    },
+    "option.press_war_goal.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "press_war_goal.war_goal_type"
+    },
+    "option.promote_officer.character": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "promote_officer.character"
+    },
+    "option.propose_bloc_article.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_bloc_article.country"
+    },
+    "option.propose_bloc_article.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_bloc_article.giver"
+    },
+    "option.propose_bloc_article.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_bloc_article.treaty_article"
+    },
+    "option.propose_bloc_article_for_term.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_bloc_article_for_term.country"
+    },
+    "option.propose_bloc_article_for_term.days": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_bloc_article_for_term.days"
+    },
+    "option.propose_bloc_article_for_term.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_bloc_article_for_term.giver"
+    },
+    "option.propose_bloc_article_for_term.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_bloc_article_for_term.treaty_article"
+    },
+    "option.propose_bloc_article_with_obligation.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_bloc_article_with_obligation.country"
+    },
+    "option.propose_bloc_article_with_obligation.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_bloc_article_with_obligation.giver"
+    },
+    "option.propose_bloc_article_with_obligation.obligation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_bloc_article_with_obligation.obligation"
+    },
+    "option.propose_bloc_article_with_obligation.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_bloc_article_with_obligation.treaty_article"
+    },
+    "option.propose_commercial_article.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_commercial_article.country"
+    },
+    "option.propose_commercial_article.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_commercial_article.giver"
+    },
+    "option.propose_commercial_article.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_commercial_article.treaty_article"
+    },
+    "option.propose_commercial_article_for_term.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_commercial_article_for_term.country"
+    },
+    "option.propose_commercial_article_for_term.days": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_commercial_article_for_term.days"
+    },
+    "option.propose_commercial_article_for_term.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_commercial_article_for_term.giver"
+    },
+    "option.propose_commercial_article_for_term.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_commercial_article_for_term.treaty_article"
+    },
+    "option.propose_commercial_article_with_obligation.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_commercial_article_with_obligation.country"
+    },
+    "option.propose_commercial_article_with_obligation.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_commercial_article_with_obligation.giver"
+    },
+    "option.propose_commercial_article_with_obligation.obligation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_commercial_article_with_obligation.obligation"
+    },
+    "option.propose_commercial_article_with_obligation.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_commercial_article_with_obligation.treaty_article"
+    },
+    "option.propose_company_monopoly.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_company_monopoly.building_type"
+    },
+    "option.propose_company_monopoly.company": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_company_monopoly.company"
+    },
+    "option.propose_company_monopoly.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_company_monopoly.country"
+    },
+    "option.propose_company_monopoly.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_company_monopoly.giver"
+    },
+    "option.propose_company_monopoly.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_company_monopoly.treaty_article"
+    },
+    "option.propose_diplomatic_article.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_diplomatic_article.country"
+    },
+    "option.propose_diplomatic_article.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_diplomatic_article.giver"
+    },
+    "option.propose_diplomatic_article.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_diplomatic_article.treaty_article"
+    },
+    "option.propose_diplomatic_article_for_term.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_diplomatic_article_for_term.country"
+    },
+    "option.propose_diplomatic_article_for_term.days": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_diplomatic_article_for_term.days"
+    },
+    "option.propose_diplomatic_article_for_term.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_diplomatic_article_for_term.giver"
+    },
+    "option.propose_diplomatic_article_for_term.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_diplomatic_article_for_term.treaty_article"
+    },
+    "option.propose_diplomatic_article_with_obligation.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_diplomatic_article_with_obligation.country"
+    },
+    "option.propose_diplomatic_article_with_obligation.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_diplomatic_article_with_obligation.giver"
+    },
+    "option.propose_diplomatic_article_with_obligation.obligation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_diplomatic_article_with_obligation.obligation"
+    },
+    "option.propose_diplomatic_article_with_obligation.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_diplomatic_article_with_obligation.treaty_article"
+    },
+    "option.propose_goods_article.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_goods_article.country"
+    },
+    "option.propose_goods_article.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_goods_article.giver"
+    },
+    "option.propose_goods_article.goods": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_goods_article.goods"
+    },
+    "option.propose_goods_article.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_goods_article.treaty_article"
+    },
+    "option.propose_goods_quantity_article.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_goods_quantity_article.country"
+    },
+    "option.propose_goods_quantity_article.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_goods_quantity_article.giver"
+    },
+    "option.propose_goods_quantity_article.goods": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_goods_quantity_article.goods"
+    },
+    "option.propose_goods_quantity_article.share": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_goods_quantity_article.share"
+    },
+    "option.propose_goods_quantity_article.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_goods_quantity_article.treaty_article"
+    },
+    "option.propose_law_commitment.commitment": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_law_commitment.commitment"
+    },
+    "option.propose_law_commitment.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_law_commitment.country"
+    },
+    "option.propose_law_commitment.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_law_commitment.giver"
+    },
+    "option.propose_law_commitment.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_law_commitment.treaty_article"
+    },
+    "option.propose_money_transfer.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_money_transfer.country"
+    },
+    "option.propose_money_transfer.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_money_transfer.giver"
+    },
+    "option.propose_money_transfer.share": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_money_transfer.share"
+    },
+    "option.propose_money_transfer.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_money_transfer.treaty_article"
+    },
+    "option.propose_region_article.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_region_article.country"
+    },
+    "option.propose_region_article.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_region_article.giver"
+    },
+    "option.propose_region_article.strategic_region": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_region_article.strategic_region"
+    },
+    "option.propose_region_article.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_region_article.treaty_article"
+    },
+    "option.propose_security_article.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_security_article.country"
+    },
+    "option.propose_security_article.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_security_article.giver"
+    },
+    "option.propose_security_article.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_security_article.treaty_article"
+    },
+    "option.propose_security_article_for_term.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_security_article_for_term.country"
+    },
+    "option.propose_security_article_for_term.days": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_security_article_for_term.days"
+    },
+    "option.propose_security_article_for_term.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_security_article_for_term.giver"
+    },
+    "option.propose_security_article_for_term.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_security_article_for_term.treaty_article"
+    },
+    "option.propose_security_article_with_obligation.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_security_article_with_obligation.country"
+    },
+    "option.propose_security_article_with_obligation.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_security_article_with_obligation.giver"
+    },
+    "option.propose_security_article_with_obligation.obligation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_security_article_with_obligation.obligation"
+    },
+    "option.propose_security_article_with_obligation.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_security_article_with_obligation.treaty_article"
+    },
+    "option.propose_ship_transfer.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_ship_transfer.country"
+    },
+    "option.propose_ship_transfer.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_ship_transfer.giver"
+    },
+    "option.propose_ship_transfer.ship": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_ship_transfer.ship"
+    },
+    "option.propose_ship_transfer.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_ship_transfer.treaty_article"
+    },
+    "option.propose_state_article.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_state_article.country"
+    },
+    "option.propose_state_article.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_state_article.giver"
+    },
+    "option.propose_state_article.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_state_article.state"
+    },
+    "option.propose_state_article.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_state_article.treaty_article"
+    },
+    "option.propose_subject_transfer.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_subject_transfer.country"
+    },
+    "option.propose_subject_transfer.giver": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_subject_transfer.giver"
+    },
+    "option.propose_subject_transfer.subject": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_subject_transfer.subject"
+    },
+    "option.propose_subject_transfer.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "propose_subject_transfer.treaty_article"
+    },
+    "option.queue_military_technology.technology": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "queue_military_technology.technology"
+    },
+    "option.queue_production_technology.technology": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "queue_production_technology.technology"
+    },
+    "option.queue_ship.ship_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "queue_ship.ship_type"
+    },
+    "option.queue_ship_for_fleet.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "queue_ship_for_fleet.military_formation"
+    },
+    "option.queue_ship_for_fleet.ship_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "queue_ship_for_fleet.ship_type"
+    },
+    "option.queue_society_technology.technology": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "queue_society_technology.technology"
+    },
+    "option.raise_army_conscripts.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_army_conscripts.military_formation"
+    },
+    "option.raise_building_priority.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_building_priority.building_type"
+    },
+    "option.raise_building_priority.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_building_priority.state"
+    },
+    "option.raise_consumption_taxes.goods": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_consumption_taxes.goods"
+    },
+    "option.raise_embargoes.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_embargoes.country"
+    },
+    "option.raise_export_tariff.goods": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_export_tariff.goods"
+    },
+    "option.raise_government.interest_group": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_government.interest_group"
+    },
+    "option.raise_import_tariff.goods": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_import_tariff.goods"
+    },
+    "option.raise_incorporation.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_incorporation.state"
+    },
+    "option.raise_institution_level.institution": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_institution_level.institution"
+    },
+    "option.raise_regular_army.combat_unit_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_regular_army.combat_unit_type"
+    },
+    "option.raise_regular_army.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_regular_army.military_formation"
+    },
+    "option.raise_regular_army.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_regular_army.state"
+    },
+    "option.raise_ship_priority.index": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_ship_priority.index"
+    },
+    "option.raise_state_decrees.decree": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_state_decrees.decree"
+    },
+    "option.raise_state_decrees.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_state_decrees.state"
+    },
+    "option.raise_strait_toll.strait": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_strait_toll.strait"
+    },
+    "option.raise_subject_autonomy.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_subject_autonomy.country"
+    },
+    "option.raise_subject_payments.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_subject_payments.country"
+    },
+    "option.raise_subsidies.building": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_subsidies.building"
+    },
+    "option.raise_subsidies_statewide.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_subsidies_statewide.building_type"
+    },
+    "option.raise_subsidies_statewide.ownership": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_subsidies_statewide.ownership"
+    },
+    "option.raise_subsidies_statewide.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "raise_subsidies_statewide.state"
+    },
+    "option.rebase_fleet.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "rebase_fleet.military_formation"
+    },
+    "option.rebase_fleet.strategic_region": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "rebase_fleet.strategic_region"
+    },
+    "option.rebuild_ship_to_design.index": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "rebuild_ship_to_design.index"
+    },
+    "option.rebuild_ship_to_design.ship": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "rebuild_ship_to_design.ship"
+    },
+    "option.recall_fleet_for_repairs.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "recall_fleet_for_repairs.military_formation"
+    },
+    "option.recruit_commander.character": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "recruit_commander.character"
+    },
+    "option.recruit_commander_for.character": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "recruit_commander_for.character"
+    },
+    "option.recruit_commander_for.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "recruit_commander_for.military_formation"
+    },
+    "option.redesign_ship.index": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "redesign_ship.index"
+    },
+    "option.redesign_ship.ship_modification": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "redesign_ship.ship_modification"
+    },
+    "option.redesign_ship.ship_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "redesign_ship.ship_type"
+    },
+    "option.refit_fleet.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "refit_fleet.military_formation"
+    },
+    "option.refit_fleet_in_port.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "refit_fleet_in_port.military_formation"
+    },
+    "option.refit_ship.ship": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "refit_ship.ship"
+    },
+    "option.refuse_demand.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "refuse_demand.country"
+    },
+    "option.refuse_treaty.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "refuse_treaty.country"
+    },
+    "option.rehome_army.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "rehome_army.military_formation"
+    },
+    "option.rehome_army.strategic_region": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "rehome_army.strategic_region"
+    },
+    "option.relocate_market_capital.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "relocate_market_capital.state"
+    },
+    "option.relocate_national_capital.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "relocate_national_capital.state"
+    },
+    "option.remove_bloc_member.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "remove_bloc_member.country"
+    },
+    "option.repeal_law_amendment.amendment": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "repeal_law_amendment.amendment"
+    },
+    "option.replace_bloc_principle.power_bloc_principle": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "replace_bloc_principle.power_bloc_principle"
+    },
+    "option.replace_bloc_principle.slot": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "replace_bloc_principle.slot"
+    },
+    "option.research_military_technology.technology": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "research_military_technology.technology"
+    },
+    "option.research_production_technology.technology": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "research_production_technology.technology"
+    },
+    "option.research_society_technology.technology": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "research_society_technology.technology"
+    },
+    "option.reserve_building_type_for_state.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "reserve_building_type_for_state.building_type"
+    },
+    "option.reset_building_methods.building": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "reset_building_methods.building"
+    },
+    "option.reset_methods_statewide.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "reset_methods_statewide.state"
+    },
+    "option.restart_construction_sector.building": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "restart_construction_sector.building"
+    },
+    "option.resume_colony.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "resume_colony.state"
+    },
+    "option.return_market_control.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "return_market_control.country"
+    },
+    "option.revoke_charter.charter": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "revoke_charter.charter"
+    },
+    "option.revoke_charter.company": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "revoke_charter.company"
+    },
+    "option.revoke_charter_for_building_type.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "revoke_charter_for_building_type.building_type"
+    },
+    "option.revoke_charter_for_building_type.charter": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "revoke_charter_for_building_type.charter"
+    },
+    "option.revoke_charter_for_building_type.company": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "revoke_charter_for_building_type.company"
+    },
+    "option.revoke_charter_for_region.charter": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "revoke_charter_for_region.charter"
+    },
+    "option.revoke_charter_for_region.company": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "revoke_charter_for_region.company"
+    },
+    "option.revoke_charter_for_region.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "revoke_charter_for_region.state"
+    },
+    "option.scrap_ship.ship": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "scrap_ship.ship"
+    },
+    "option.scrap_ship_design.index": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "scrap_ship_design.index"
+    },
+    "option.scrap_ship_design.ship_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "scrap_ship_design.ship_type"
+    },
+    "option.send_conscripts_home.combat_unit_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "send_conscripts_home.combat_unit_type"
+    },
+    "option.send_conscripts_home.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "send_conscripts_home.military_formation"
+    },
+    "option.send_new_ships_to_fleet.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "send_new_ships_to_fleet.military_formation"
+    },
+    "option.send_to_front.front": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "send_to_front.front"
+    },
+    "option.send_to_front.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "send_to_front.military_formation"
+    },
+    "option.set_army_flag.flag": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_army_flag.flag"
+    },
+    "option.set_army_flag.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_army_flag.military_formation"
+    },
+    "option.set_army_lending.index": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_army_lending.index"
+    },
+    "option.set_army_lending.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_army_lending.military_formation"
+    },
+    "option.set_army_supply_priority.level": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_army_supply_priority.level"
+    },
+    "option.set_army_supply_priority.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_army_supply_priority.military_formation"
+    },
+    "option.set_fleet_ship_design.index": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_fleet_ship_design.index"
+    },
+    "option.set_fleet_ship_design.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_fleet_ship_design.military_formation"
+    },
+    "option.set_fleet_ship_design.ship_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_fleet_ship_design.ship_type"
+    },
+    "option.set_objective.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_objective.military_formation"
+    },
+    "option.set_objective.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_objective.state"
+    },
+    "option.set_standard_ship_design.index": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_standard_ship_design.index"
+    },
+    "option.set_standard_ship_design.ship_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_standard_ship_design.ship_type"
+    },
+    "option.set_standard_unit_type.combat_unit_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_standard_unit_type.combat_unit_type"
+    },
+    "option.set_standard_unit_type.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "set_standard_unit_type.military_formation"
+    },
+    "option.share_knowledge_with_subject.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "share_knowledge_with_subject.country"
+    },
+    "option.site.buildings_of_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "site.buildings_of_type"
+    },
+    "option.site.gdp_share": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "site.gdp_share"
+    },
+    "option.site.literacy": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "site.literacy"
+    },
+    "option.site.peasants": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "site.peasants"
+    },
+    "option.site.population": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "site.population"
+    },
+    "option.site.standard_of_living": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "site.standard_of_living"
+    },
+    "option.site.unemployed": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "site.unemployed"
+    },
+    "option.stage_coup.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "stage_coup.country"
+    },
+    "option.stake_colonial_claim.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "stake_colonial_claim.country"
+    },
+    "option.stake_colonial_claim.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "stake_colonial_claim.state"
+    },
+    "option.start_fleet_mission.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "start_fleet_mission.military_formation"
+    },
+    "option.start_fleet_mission.naval_mission_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "start_fleet_mission.naval_mission_type"
+    },
+    "option.station_army.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "station_army.military_formation"
+    },
+    "option.station_army.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "station_army.state"
+    },
+    "option.station_army_at_headquarters.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "station_army_at_headquarters.military_formation"
+    },
+    "option.station_army_at_headquarters.strategic_region": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "station_army_at_headquarters.strategic_region"
+    },
+    "option.station_fleet_in_state.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "station_fleet_in_state.military_formation"
+    },
+    "option.station_fleet_in_state.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "station_fleet_in_state.state"
+    },
+    "option.stay_neutral.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "stay_neutral.diplomatic_play"
+    },
+    "option.stay_on_the_fence.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "stay_on_the_fence.diplomatic_play"
+    },
+    "option.stop_bolstering_movement.political_movement": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "stop_bolstering_movement.political_movement"
+    },
+    "option.stop_damaging_relations.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "stop_damaging_relations.country"
+    },
+    "option.stop_evangelising_subject.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "stop_evangelising_subject.country"
+    },
+    "option.stop_funding_lobby.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "stop_funding_lobby.country"
+    },
+    "option.stop_improving_relations.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "stop_improving_relations.country"
+    },
+    "option.stop_sharing_knowledge.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "stop_sharing_knowledge.country"
+    },
+    "option.stop_supporting_separatists.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "stop_supporting_separatists.country"
+    },
+    "option.stop_supporting_subject_regime.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "stop_supporting_subject_regime.country"
+    },
+    "option.stop_suppressing_movement.political_movement": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "stop_suppressing_movement.political_movement"
+    },
+    "option.subjugate_bloc_member.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "subjugate_bloc_member.country"
+    },
+    "option.support_separatists.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "support_separatists.country"
+    },
+    "option.support_subject_regime.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "support_subject_regime.country"
+    },
+    "option.suppress_movement.political_movement": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "suppress_movement.political_movement"
+    },
+    "option.surrender_war.war": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "surrender_war.war"
+    },
+    "option.sway_ally.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_ally.country"
+    },
+    "option.sway_ally.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_ally.diplomatic_play"
+    },
+    "option.sway_country.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_country.country"
+    },
+    "option.sway_country.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_country.diplomatic_play"
+    },
+    "option.sway_with_goods_article.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_goods_article.country"
+    },
+    "option.sway_with_goods_article.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_goods_article.diplomatic_play"
+    },
+    "option.sway_with_goods_article.goods": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_goods_article.goods"
+    },
+    "option.sway_with_goods_article.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_goods_article.treaty_article"
+    },
+    "option.sway_with_goods_article.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_goods_article.war_goal_type"
+    },
+    "option.sway_with_law_article.commitment": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_law_article.commitment"
+    },
+    "option.sway_with_law_article.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_law_article.country"
+    },
+    "option.sway_with_law_article.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_law_article.diplomatic_play"
+    },
+    "option.sway_with_law_article.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_law_article.treaty_article"
+    },
+    "option.sway_with_law_article.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_law_article.war_goal_type"
+    },
+    "option.sway_with_pact.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_pact.country"
+    },
+    "option.sway_with_pact.diplomatic_action": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_pact.diplomatic_action"
+    },
+    "option.sway_with_pact.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_pact.diplomatic_play"
+    },
+    "option.sway_with_region_article.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_region_article.country"
+    },
+    "option.sway_with_region_article.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_region_article.diplomatic_play"
+    },
+    "option.sway_with_region_article.strategic_region": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_region_article.strategic_region"
+    },
+    "option.sway_with_region_article.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_region_article.treaty_article"
+    },
+    "option.sway_with_region_article.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_region_article.war_goal_type"
+    },
+    "option.sway_with_state.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_state.country"
+    },
+    "option.sway_with_state.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_state.diplomatic_play"
+    },
+    "option.sway_with_state.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_state.state"
+    },
+    "option.sway_with_state_article.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_state_article.country"
+    },
+    "option.sway_with_state_article.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_state_article.diplomatic_play"
+    },
+    "option.sway_with_state_article.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_state_article.state"
+    },
+    "option.sway_with_state_article.treaty_article": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_state_article.treaty_article"
+    },
+    "option.sway_with_state_article.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_state_article.war_goal_type"
+    },
+    "option.sway_with_state_war_goal.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_state_war_goal.country"
+    },
+    "option.sway_with_state_war_goal.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_state_war_goal.diplomatic_play"
+    },
+    "option.sway_with_state_war_goal.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_state_war_goal.state"
+    },
+    "option.sway_with_state_war_goal.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_state_war_goal.war_goal_type"
+    },
+    "option.sway_with_subject.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_subject.country"
+    },
+    "option.sway_with_subject.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_subject.diplomatic_play"
+    },
+    "option.sway_with_subject.subject": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_subject.subject"
+    },
+    "option.sway_with_war_goal.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_war_goal.country"
+    },
+    "option.sway_with_war_goal.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_war_goal.diplomatic_play"
+    },
+    "option.sway_with_war_goal.target": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_war_goal.target"
+    },
+    "option.sway_with_war_goal.war_goal_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "sway_with_war_goal.war_goal_type"
+    },
+    "option.switch_building_method.building": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "switch_building_method.building"
+    },
+    "option.switch_building_method.production_method": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "switch_building_method.production_method"
+    },
+    "option.switch_methods_statewide.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "switch_methods_statewide.building_type"
+    },
+    "option.switch_methods_statewide.ownership": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "switch_methods_statewide.ownership"
+    },
+    "option.switch_methods_statewide.production_method": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "switch_methods_statewide.production_method"
+    },
+    "option.switch_methods_statewide.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "switch_methods_statewide.state"
+    },
+    "option.switch_off_mobilisation_option.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "switch_off_mobilisation_option.military_formation"
+    },
+    "option.switch_off_mobilisation_option.mobilization_option": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "switch_off_mobilisation_option.mobilization_option"
+    },
+    "option.switch_on_mobilisation_option.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "switch_on_mobilisation_option.military_formation"
+    },
+    "option.switch_on_mobilisation_option.mobilization_option": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "switch_on_mobilisation_option.mobilization_option"
+    },
+    "option.take_away_command.character": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "take_away_command.character"
+    },
+    "option.take_back_subject_market.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "take_back_subject_market.country"
+    },
+    "option.take_journal_option.button": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "take_journal_option.button"
+    },
+    "option.take_journal_option.journal_entry": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "take_journal_option.journal_entry"
+    },
+    "option.take_national_decision.decision": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "take_national_decision.decision"
+    },
+    "option.take_state_from_subject.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "take_state_from_subject.country"
+    },
+    "option.take_state_from_subject.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "take_state_from_subject.state"
+    },
+    "option.tighten_strait_access.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "tighten_strait_access.state"
+    },
+    "option.tighten_strait_access.strait": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "tighten_strait_access.strait"
+    },
+    "option.toggle_decision_alert.decision": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "toggle_decision_alert.decision"
+    },
+    "option.upgrade_conscript_units.combat_unit_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "upgrade_conscript_units.combat_unit_type"
+    },
+    "option.upgrade_conscript_units.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "upgrade_conscript_units.military_formation"
+    },
+    "option.upgrade_regular_units.combat_unit_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "upgrade_regular_units.combat_unit_type"
+    },
+    "option.upgrade_regular_units.military_formation": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "upgrade_regular_units.military_formation"
+    },
+    "option.violate_neutrality.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "violate_neutrality.country"
+    },
+    "option.widen_strait_passage.state": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "widen_strait_passage.state"
+    },
+    "option.widen_strait_passage.strait": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "widen_strait_passage.strait"
+    },
+    "option.withdraw_bloc_treaty.treaty": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "withdraw_bloc_treaty.treaty"
+    },
+    "option.withdraw_building_from_sale.building": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "withdraw_building_from_sale.building"
+    },
+    "option.withdraw_commercial_treaty.treaty": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "withdraw_commercial_treaty.treaty"
+    },
+    "option.withdraw_diplomatic_treaty.treaty": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "withdraw_diplomatic_treaty.treaty"
+    },
+    "option.withdraw_from_confrontation.diplomatic_play": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "withdraw_from_confrontation.diplomatic_play"
+    },
+    "option.withdraw_security_treaty.treaty": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "withdraw_security_treaty.treaty"
+    },
+    "option.withdraw_subject_investment_rights.country": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "withdraw_subject_investment_rights.country"
+    },
+    "holdings.player.buildings": {
+      "kind": "histogram",
+      "role": "context",
+      "source": "held",
+      "family": "player.buildings"
+    },
+    "holdings.player.production_methods": {
+      "kind": "histogram",
+      "role": "context",
+      "source": "held",
+      "family": "player.production_methods"
+    },
+    "holdings.player.character_roles": {
+      "kind": "histogram",
+      "role": "context",
+      "source": "held",
+      "family": "player.character_roles"
+    },
+    "holdings.player.character_ideologies": {
+      "kind": "histogram",
+      "role": "context",
+      "source": "held",
+      "family": "player.character_ideologies"
+    },
+    "holdings.player.population_shares": {
+      "kind": "histogram",
+      "role": "context",
+      "source": "held",
+      "family": "player.population_shares"
+    }
+  },
+  "trial": 215,
+  "objective": {
+    "name": "endgame_military_v5",
+    "weights": {
+      "stock": 0.1111111111111111,
+      "population": 0.6666666666666666,
+      "gdp": 0.2222222222222222,
+      "construction": 0.5,
+      "military": 0.05
+    },
+    "alphas": {
+      "stock": 0.5,
+      "population": 1.0,
+      "gdp": -0.5,
+      "construction": 0.0,
+      "military": 0.0
+    },
+    "window_years": 1.0
+  },
+  "search": "D:\\vic3_data\\tuning\\pickers\\20261009T022901Z\\histogram",
+  "dataset_digest": "4852760c625269ace690a4ad08f628da31266ee225fd89675ab730982ca0cd11",
+  "source_digest": "5cc475b6f0b2c5310334139a9472616ca2a73f83499e45a2362b32d5ea1008ab",
+  "validation": {
+    "entropy": 0.8330948091499919,
+    "std": 0.47673495409525884,
+    "spread": 0.8176210695903445,
+    "differentiation": 0.825172306792356,
+    "rmse": 0.779585601576729,
+    "normalized_rmse": 0.7671943607495105,
+    "reward_loss": 0.4341312861728036,
+    "score": 0.20075805250415996,
+    "snapshots": 144,
+    "runs": 36,
+    "collapsed_fraction": 0.0
+  },
+  "installed_at": "2026-10-09T04:21:23.541432+00:00",
+  "artifact": "D:\\vic3_data\\tuning\\pickers\\20261009T022901Z\\histogram\\result_00215.model.pkl.gz",
+  "artifact_digest": "c90bf5a318fef5635d42908ecbf5469d6a0d2f87dd9721a45832d58a15adc5a7",
+  "threads": 16,
+  "weighting": {
+    "revision": 0,
+    "updated": 1791512941.4781892,
+    "weights": {
+      "differentiation": 0.8999999999999999,
+      "reward": 0.10000000000000002
+    }
+  }
+}
