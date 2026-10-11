@@ -1066,6 +1066,12 @@ def armies(s,mobilized):
 
 
 @timed_often
+def empty_armies(s):
+    manned={formation for formation, in s.rows('combat_unit','formation')}
+    return [ident for ident, in s.rows('formation','formation',country=s.player,formation_type=0,dead=False) if ident not in manned]
+
+
+@timed_often
 def selected_units(s,formation):
     return dict(s.rows('formation_selected_unit_type','combat_unit_group,combat_unit_type',formation=formation))
 
@@ -2759,7 +2765,7 @@ RULES={
     'mobilize':lambda s:product(military_formation=[f for f in armies(s,False) if not demobilizing(s,f)] if mobilization_committed(s) else []),
     'demobilize':lambda s:product(military_formation=armies(s,True)),
     'raise_conscripts':lambda s:product(military_formation=[i for i,r in s.rows('formation_status','formation,raised_conscripts') if i in armies(s,True) and not r and at_home(s,i) and conscript_types(s,i)]),
-    'disband_formation':lambda s:product(military_formation=[f for f in s.formations() if all(idle_room(s,c) for c in leaders(s,f))]),
+    'disband_formation':lambda s:product(military_formation=[f for f in [*empty_armies(s),*s.formations('fleet')] if all(idle_room(s,c) for c in leaders(s,f))]),
     'mobilize_all':lambda s:[{}] if mobilization_committed(s) and [f for f in armies(s,False) if not demobilizing(s,f)] else [],
     'demobilize_all':lambda s:[{}] if armies(s,True) else [],
     'toggle_mobilization_option':lambda s:[{'military_formation':formation,'mobilization_option':option} for formation in settled(s,s.formations('army'))

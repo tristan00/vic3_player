@@ -106,8 +106,8 @@ class Context:
 
     @cached_property
     @timed_often
-    def armies(self):
-        return set(self.s.formations('army'))
+    def fleets(self):
+        return set(self.s.formations('fleet'))
 
     @cached_property
     @timed_often
@@ -302,7 +302,7 @@ def recruited(c):
 
 @timed_often
 def disbanded(c,army):
-    return [single('disband_formation',option) for option in c.o['disband_formation'] if (option['military_formation'] in c.armies)==army]
+    return [single('disband_formation',option) for option in c.o['disband_formation'] if (option['military_formation'] in c.fleets)!=army]
 
 
 @timed_often
