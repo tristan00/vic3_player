@@ -1149,7 +1149,7 @@ TRANSFER_MINIMUM=4
 def reaches(s,formation,region):
     components=march_components(s)
     here=components.get(located(s,formation),set())
-    return any(components[state]&here for state,strategic in state_regions(s).items() if strategic==region and state in components)
+    return any(components[state]&here for state in s.states() if state_regions(s).get(state)==region and state in components)
 
 
 @timed_often
