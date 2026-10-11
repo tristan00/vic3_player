@@ -80,6 +80,8 @@ def changes(name,params,links):
         found.add(('ship_templates',params['ship_type']))
     if name in ('disband_regulars','disband_conscripts','transfer_battalions'):
         found.update(('object','combat_unit',i) for (key,i),formation in links.items() if key=='combat_unit' and formation==params.get('military_formation'))
+    if name=='set_default_unit_type':
+        found.add(('default_unit_type',params['military_formation'],*stated('common/combat_unit_types',params['combat_unit_type'],'group')))
     return found
 
 
