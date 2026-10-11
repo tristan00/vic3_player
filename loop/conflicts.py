@@ -1,7 +1,7 @@
 from interface.actions.catalogue import BY_NAME
 from interface.common import timed_often
-from interface.options.available import (BLOC_INFLUENCE, DEFAULT_TAX_COST, MAX_MONOPOLIES, MONOPOLY_COST, MOVEMENT_COST, article_cost,
-                                        authority, bulk_subset, definition, metric, money, monopolies, nationalization_cost,
+from interface.options.available import (BLOC_INFLUENCE, CHARTER_COST, DEFAULT_TAX_COST, MAX_MONOPOLIES, MONOPOLY_COST, MOVEMENT_COST, article_cost,
+                                        authority, bulk_subset, chartered, definition, free_charters, metric, money, monopolies, nationalization_cost,
                                         ownership_classes, pact_cost_multiplier, private_levels, ship_kinds, stated)
 
 
@@ -86,7 +86,7 @@ def changes(name,params,links):
 @timed_often
 def resources(snapshot):
     return {'authority':max(0,authority(snapshot)),'influence':max(0,metric(snapshot,"GetPowerDelta('influence')")),
-            'money':max(0,money(snapshot)),'monopolies':max(0,MAX_MONOPOLIES-len(monopolies(snapshot)))}
+            'money':max(0,money(snapshot)),'monopolies':max(0,MAX_MONOPOLIES-len(monopolies(snapshot))),'charters':free_charters(snapshot)}
 
 
 @timed_often
@@ -100,6 +100,8 @@ def cost(snapshot,name,params):
         needed['authority']=MOVEMENT_COST
     if name=='toggle_monopoly' and params['building_type'] not in monopolies(snapshot):
         needed.update(authority=MONOPOLY_COST,monopolies=1)
+    if name in ('grant_building_charter','grant_region_charter') or name=='toggle_charter' and (params['company'],params['charter']) not in chartered(snapshot):
+        needed.update({'charters':1} if free_charters(snapshot) else {'authority':CHARTER_COST})
     if name=='character_interaction' and params['interaction'] in ('patronize','ostracize','retire_daimyo','grant_peerage'):
         interaction=params['interaction']
         needed['authority']=25 if interaction=='grant_peerage' else 100

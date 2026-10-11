@@ -7,7 +7,7 @@ from ..script import body, fields, read
 from ..recording.spec import EPOCH_DATE, METRIC_COLUMNS
 from ..runner.memory import MONTH_STARTS
 
-from .triggers import ENGAGED, Scope, autonomous, bloc_advantage, modifier_flag, character_scope, country_scope, evaluate, overlords, parse, subject_pairs
+from .triggers import ENGAGED, Scope, autonomous, bloc_advantage, modifier_flag, modifier_value, character_scope, country_scope, evaluate, overlords, parse, subject_pairs
 from .triggers import play_sides, play_enemies, indirect_overlords, stance, coastal as trigger_coastal, laws as trigger_laws, technologies as trigger_technologies
 from .triggers import dlc_feature, homeland, primary_cultures
 
@@ -2333,6 +2333,22 @@ def revocable(s,options):
 
 
 BUILDING_CHARTERS={'monopoly_charter':'building_types','industry_charter':'extension_building_types'}
+CHARTER_COST=100
+FREE_CHARTERS=re.compile(r'country_free_charters_add\s*=\s*(-?[\d.]+)')
+
+
+@timed_often
+def chartered(s):
+    mine=set(s.mine('company'))
+    return [(company,kind) for _,company,kind in s.rows('charter','charter,company,company_charter_type') if company in mine]
+
+
+@timed_often
+def free_charters(s):
+    rank=s.map('country','country,country_rank').get(s.player)
+    texts=[' '.join(stated('common/country_ranks',rank,'modifier')),*(' '.join(stated('common/power_bloc_principles',principle,'member_modifier')) for principle in bloc_principles(s))]
+    allowed=modifier_value(s,s.player,'country_free_charters_add')+sum(float(value) for text in texts for value in FREE_CHARTERS.findall(text))
+    return max(0,allowed-len(chartered(s)))
 REGION_CHARTER='colonization_charter'
 
 
