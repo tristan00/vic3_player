@@ -366,6 +366,107 @@ thead th {
   font-weight: 600;
 }
 
+.pick {
+  position: relative;
+}
+
+.pick summary {
+  list-style: none;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 1px solid #cdd2dc;
+  border-radius: 5px;
+  padding: 2px 9px;
+  background: var(--surface);
+}
+
+.pick summary::-webkit-details-marker {
+  display: none;
+}
+
+.pick summary b {
+  color: var(--ink);
+  font-weight: 600;
+  margin-left: 3px;
+}
+
+.pick.on summary {
+  background: var(--live-bg);
+  border-color: #9dbdee;
+}
+
+.pick.on summary b {
+  color: var(--live);
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 4;
+  min-width: 100%;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid #cdd2dc;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px #1d243322;
+  padding: 6px 9px;
+  color: var(--ink);
+}
+
+.menu-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  white-space: nowrap;
+}
+
+.option label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.option input {
+  margin: 0;
+}
+
+.option a {
+  visibility: hidden;
+  font-size: 11.5px;
+}
+
+.option:hover a {
+  visibility: visible;
+}
+
+.key {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+td .same {
+  color: #a9b0be;
+}
+
+.levels th.right,
+.levels td.right {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
 input,
 select,
 button {
