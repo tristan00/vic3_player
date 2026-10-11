@@ -114,6 +114,7 @@ def after(event):
 def states(code,action,chain,index,values):
     command=fill(action.command,values)
     valid=fill(action.valid,values) if action.valid else ''
+    why=fill(action.why,values)
     match=[fill(condition,values) for _,condition in chain if condition]
     base=conjunction(equal('interface_action',code),equal('interface_choice',index) if index is not None else '',
                      "GetVariableSystem.Exists('interface_key_ready')" if needs_key(action) else '',
@@ -127,12 +128,12 @@ def states(code,action,chain,index,values):
         start=[*start,"GetVariableSystem.Set('interface_transport', '1')"]
     if valid:
         variants=((1,valid,[*start,"GetVariableSystem.Set('interface_action_valid', '1')","GetVariableSystem.Set('interface_action_desc', '')",command,*done]),
-                  (1,f'Not({valid})',[*start,"GetVariableSystem.Set('interface_action_valid', '0')",f"GetVariableSystem.Set('interface_action_desc', {action.why or chr(39)*2})",*done]),
-                  (2,'',start+result(command,valid,fill(action.why,values))+done))
+                  (1,f'Not({valid})',[*start,"GetVariableSystem.Set('interface_action_valid', '0')",f"GetVariableSystem.Set('interface_action_desc', {why or chr(39)*2})",*done]),
+                  (2,'',start+result(command,valid,why)+done))
     else:
         overseas=["GetVariableSystem.Set('interface_overseas', '1')"] if action.overseas else []
-        variants=((1,'',start+result(command,valid,fill(action.why,values))+[f'Execute({command})',*overseas,*done]),
-                  (2,'',start+result(command,valid,fill(action.why,values))+done))
+        variants=((1,'',start+result(command,valid,why)+[f'Execute({command})',*overseas,*done]),
+                  (2,'',start+result(command,valid,why)+done))
     out=[]
     if action.overseas:
         listing,needs,opener=action.overseas

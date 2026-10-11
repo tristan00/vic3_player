@@ -4,7 +4,7 @@ from pathlib import Path
 
 from ..actions import gui as action_gui
 from ..common import timed, write_json, write_script, timed_often
-from ..recording.capture import UI_CHECKS, capture_body, capture_guis, capture_widgets
+from ..recording.capture import LOG_START, UI_CHECKS, capture_body, capture_guis, capture_widgets, log_hooks
 from ..script import read, scalar
 
 
@@ -170,6 +170,7 @@ def prepare(game,tag,world,extra=()):
                      'on_monthly_pulse = { on_actions = { interface_quarterly_pause } }\n'
                      'interface_quarterly_pause = { trigger = { OR = { month = 0 month = 3 month = 6 month = 9 } } effect = { every_country = { limit = { is_player = yes } '
                      'set_variable = { name = interface_quarterly_pause value = 1 } } } }\n')
+    write_script(mod/'common/on_actions/interface_log.txt',log_hooks())
     body=capture_body(game.game_dir,tag,world)
     write_script(mod/'events/c.txt','namespace = interface_capture\ninterface_capture.1 = { type = country_event hidden = yes immediate = {\n'
                  +body+'set_variable = { name = interface_capture_done value = 1 } set_variable = { name = interface_capture value = 0 }\n} }\n')
@@ -179,7 +180,7 @@ def prepare(game,tag,world,extra=()):
                  'if = { limit = { NOT = { has_variable = interface_capture_seq } } '
                  'set_variable = { name = interface_capture_seq value = 0 } } '
                  'if = { limit = { NOT = { has_variable = interface_quarterly_pause } } '
-                 'set_variable = { name = interface_quarterly_pause value = 0 } } '+action_gui.START+' } }\n'
+                 'set_variable = { name = interface_quarterly_pause value = 0 } } '+LOG_START+action_gui.START+' } }\n'
                  'interface_quarterly_paused = { scope = country effect = { set_variable = { name = interface_quarterly_pause value = 0 } } }\n'
                  'interface_state = { scope = country effect = { debug_log = "INTERFACE|paused|[GetVariableSystem.Get(\'interface_request\')]|[TimeKeeper.IsPaused]"\n'+PAD+'\n} }\n'
                  +capture_guis()+TRANSPORT_GUI+action_gui.DONE

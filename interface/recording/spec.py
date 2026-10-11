@@ -34,16 +34,17 @@ VOCABULARIES={
     'war_goal_type':('common/war_goal_types',),'game_rule_setting':('common/game_rules',),
     'localization_key':None,'scope_name':None,'ui_window':None,'antagonize_reason':None,'advisor':None,'action':None,'advisor_action':None}
 
-ENUMS=('ai_attitude','approval_state','battle_status','battle_type','civil_war_side','civil_war_type','event_status','formation_flag',
-       'formation_type','hq_type','influence_type','influence_type_reason','law_checkpoint_result','law_phase','managed_status','play_side','privatization_request',
-       'scope_type','shipping_lane_type','slave_basket','strait_access_permissions','strait_access_status','supply_priority','supply_ship_construction_level',
-       'tariff_level','tax_level','toll_rate','treaty_side',
+ENUMS=('ai_attitude','approval_state','battle_status','battle_type','civil_war_side','civil_war_type','formation_flag',
+       'formation_type','hq_type','influence_type','influence_type_reason','law_checkpoint_result','law_phase','managed_status','play_side',
+       'scope_type','shipping_lane_type','strait_access_permissions','strait_access_status','supply_priority','supply_ship_construction_level',
+       'tariff_level','tax_level','toll_rate',
        'wage_level','war_goal_demand_type','war_goal_pressed','war_goal_status')
 
-CHECKS={'ownership_owner':('country','self','manor_house','financial_district','company','company_regional_headquarter'),'budget_direction':('income','expense'),'tariff_direction':('import','export'),'goods_consumer':('pops','buildings','government','military'),
+CHECKS={'ownership_owner':('country','self','manor_house','financial_district','company','company_regional_headquarter','vanished_building'),'budget_direction':('income','expense'),'tariff_direction':('import','export'),'goods_consumer':('pops','buildings','government','military'),
         'migration_direction':('inbound','outbound'),'diplomatic_play_role':('initiator','target','initiator_ally','target_ally','interested'),
         'diplomatic_side':('source','target'),'battle_role':('attacker','defender'),'expulsion_direction':('by_player','of_player'),
-        'obligation_direction':('owes_player','player_owes'),'strait_type':('NATURAL','ARTIFICIAL'),'proposal_kind':('treaty','demand','sway','action_proposal')}
+        'obligation_direction':('owes_player','player_owes'),'strait_type':('NATURAL','ARTIFICIAL'),'proposal_kind':('treaty','demand','sway','action_proposal'),
+        'war_event_kind':('wargoal_enforced','capitulation','peace_signed','war_end'),'battle_stage':('start','end')}
 
 
 class Col:
@@ -86,6 +87,10 @@ def oe(name,enum=None):
 
 def x(name,check):
     return Col(name,T,check=check)
+
+
+def ox(name,check):
+    return Col(name,T,True,check=check)
 
 
 def d(name,unset=EPOCH_DATE):
@@ -206,8 +211,7 @@ entity('diplomatic_play',[rr('initiator','country'),rr('target','country'),v('di
                           f('target_maneuvers',I4),d('end_date'),f('escalation',I4),r('war')])
 child('diplomatic_play_country','diplomatic_play',[rr('country'),x('role','diplomatic_play_role')])
 child('diplomatic_play_record','diplomatic_play',[rr('country')],[e('play_side')],'player')
-entity('treaty',[rr('first_country','country'),rr('second_country','country'),d('entered_into_force_on'),f('binding_period',I4),e('withdrawn_by','treaty_side'),
-                 f('withdrawn',B)])
+entity('treaty',[rr('first_country','country'),rr('second_country','country'),d('entered_into_force_on'),f('binding_period',I4),f('withdrawn',B)])
 entity('treaty_article',[rr('treaty'),v('treaty_article_type'),r('source_country','country'),r('target_country','country')])
 entity('power_bloc',[v('power_bloc_identity'),v('power_bloc_map_texture'),f('cohesion',F),f('mandate_progress',F)])
 child('power_bloc_adopted_principle','power_bloc',[v('power_bloc_principle')],[o('position',I2)])
@@ -249,7 +253,7 @@ child('harvest_condition_area','harvest_condition',[f('position',I2)],[f('intens
 entity('famine',[rr('state'),f('start_date',H),f('num_births',I4),f('num_deaths',I4)])
 entity('province',[r('state'),r('controller','country')])
 
-entity('building',[v('building_type'),r('state'),f('levels',I4),e('slave_basket'),f('active',B),f('subsidized',B),e('privatization_requested','privatization_request'),
+entity('building',[v('building_type'),r('state'),f('levels',I4),f('slave_basket',I2),f('active',B),f('subsidized',B),f('privatization_requested',I2),
                    f('dead',B)])
 private('building',[f('auto_expand',B),f('output_paused',B),f('monopoly',B),f('privatizable',B)])
 subject('building_flow','building',[f('balance_subsidies',F),f('trade_revenue',F),f('input_goods_shortage',F),f('tariffs',F),f('tolls',F),f('subventions',F),
@@ -261,7 +265,7 @@ child('building_goods','building',[v('goods')],[o('input',F),o('output',F),o('sl
 child('building_failed_hire','building',[f('position',I2)],[r('workplace','building')])
 entity('building_ownership',[rr('building'),x('owner_kind','ownership_owner'),r('owner_country','country'),r('owner_building','building'),r('owner_company','company'),
                              f('levels',I4),f('privatization',B),f('in_owner_assets',B)])
-entity('market',[rr('owner','country')])
+entity('market',[r('owner','country')])
 child('market_goods','market',[v('goods')],[f('price',F),f('sell_orders',F),f('buy_orders',F)])
 entity('market_area',[rr('market')])
 child('market_area_state','market_area',[rr('state')],[f('port',B)])
@@ -306,7 +310,8 @@ child('political_movement_character','political_movement',[rr('character')])
 child('political_movement_character_ideology','political_movement',[v('ideology')])
 child('political_movement_timed_modifier','political_movement',[v('modifier')],[f('instances',I4),d('last_end_date')])
 entity('law',[rr('country'),v('law_type'),f('progress',F),e('phase','law_phase'),d('checkpoint_or_stop_date',NULL_DATE),f('active',B),r('imposer','country')])
-private('law',[e('checkpoint_result','law_checkpoint_result'),ov('replacing_law_type','law_type'),d('enactment_start_date',NULL_DATE),o('chance',F)])
+private('law',[e('checkpoint_result','law_checkpoint_result'),ov('replacing_law_type','law_type'),d('enactment_start_date',NULL_DATE),o('chance',F),
+               o('enactment_phase',I4),o('checkpoint_progress',F),o('enactment_setbacks',I4),o('advance_chance',F),o('debate_chance',F),o('stall_chance',F)])
 child('law_amendment','law',[rr('amendment')])
 entity('amendment',[rr('law'),v('amendment_type'),r('sponsor','interest_group'),f('timeout',I4),d('timeout_date',NULL_DATE)])
 entity('party',[rr('country'),v('party_type'),f('votes',I4)])
@@ -339,7 +344,7 @@ entity('formation',[rr('country'),e('formation_type'),ov('name_key','localizatio
                     f('color_blue',I2),r('supply_hub','state'),e('supply_priority'),r('attached_to_fleet','formation'),f('dead',B)])
 subject('formation_status','formation',[r('province',sentinel=65535),o('current_location',I4,-1),o('target_location',I4,-1),r('naval_mission'),f('x',F),f('y',F),
                                          f('organization',F),f('sea_presence',F),f('supply',F),f('delivered_supply',F),f('supply_ships',I4),f('mobilized',B),
-                                         f('raised_conscripts',B)])
+                                         f('raised_conscripts',B),oe('current_location_type','scope_type'),oe('target_location_type','scope_type')])
 private('formation',[rr('home_hq','hq'),r('strategic_objective','state'),f('travel_distance',F)])
 child('formation_report','formation',[],[f('default_fleet',B),f('demobilizing',B),f('invading',B),f('embarked',B),f('docked',B),f('recalled',B),
                                           f('hit_points_percent',F),f('deployable',B),f('display_name',T),f('retrofittable',I4),f('retrofitting',B)],'player')
@@ -377,6 +382,16 @@ child('battle_side','battle',[x('side','battle_role')],[r('commander','character
 child('battle_occupation','battle',[rr('state')],[f('fraction',F),f('occupation_progress',F)])
 sample('battle_attacker_manpower_sample','battle',[f('attacker_manpower',I4)])
 sample('battle_defender_manpower_sample','battle',[f('defender_manpower',I4)])
+sample('battle_start',None,[r('battle'),o('naval_battle',I4),r('state'),r('front'),r('province'),r('attacker_country','country'),r('defender_country','country'),
+                            r('attacker','character'),r('defender','character'),o('attacker_manpower',I4),o('defender_manpower',I4),f('naval',B)])
+sample('battle_result',None,[f('year',I2),f('month',I2),rr('winner','country'),r('loser','country'),r('state'),r('attacker','character'),r('defender','character'),
+                             r('battle'),f('empty',B),f('naval',B),o('naval_battle',I4),ox('winner_role','battle_role'),o('attacker_manpower',I4),
+                             o('defender_manpower',I4)])
+sample('battle_unit',None,[rr('battle'),x('stage','battle_stage'),rr('combat_unit'),rr('country'),ox('side','battle_role'),f('manpower',I4),f('demoralized',I4),
+                           f('morale',F),f('offense',F),f('defense',F),f('engaged',B)])
+sample('battle_ship',None,[f('naval_battle',I4),x('stage','battle_stage'),rr('ship'),r('fleet','formation'),rr('country'),ox('side','battle_role'),f('hit_points',F),
+                           f('crew',I4)])
+sample('war_event',None,[f('year',I2),f('month',I2),x('kind','war_event_kind'),rr('country'),r('target_country','country')])
 entity('country_ai',[rr('country')])
 child('country_ai_strategy','country_ai',[f('position',I2)],[v('ai_strategy')])
 child('country_ai_region_stance','country_ai',[v('strategic_region')],[v('stance','ai_region_stance')])
@@ -388,7 +403,7 @@ child('journal_entry_target','journal_entry',[v('name_key','scope_name')],[e('sc
 child('journal_entry_progress_bar','journal_entry',[v('scripted_progress_bar')],[f('value',F)],'player')
 child('journal_entry_timed_modifier','journal_entry',[v('modifier')],(),'player')
 child('journal_entry_involved_country','journal_entry',[rr('country')],(),'player')
-entity('event',[v('event_type'),rr('origin_country','country'),oe('status','event_status')],'player')
+entity('event',[v('event_type'),rr('origin_country','country')],'player')
 child('event_target','event',[v('name_key','scope_name')],[e('scope_type'),f('scope_target',I8)],'player')
 child('event_option','event',[f('option',I2)],[f('enabled',B),f('default_option',B),o('visible_position',I2,-1),o('text',T),o('description',T)],'player')
 

@@ -19,6 +19,7 @@ RUN_GAP=1<<16
 SCALE=100000
 IDENTITY_OFFSETS={'building':16,'country':24}
 CONTROL_VARIABLES=('interface_capture','interface_capture_done','interface_capture_seq')
+IDENTITY_MAPS='log_'
 CHUNK=1024
 HEAP_LOW,HEAP_HIGH=0x10000000000,0x7f0000000000
 MONTH_STARTS=[0,31,59,90,120,151,181,212,243,273,304,334]
@@ -215,12 +216,12 @@ class Reader:
             code=int(self.tokens(np.array([value],dtype=np.int64))[0])
         return self.names[code-1][1]
 
-    def item(self,kind,value):
+    def item(self,kind,value,whole=False):
         if kind==3:
             return ('flag',self.token(value))
         if kind==1:
             return ('value',value/SCALE)
-        return (int(kind),int(value)&0xffffff)
+        return (int(kind),((int(value)&0xffffffff)^0x80000000)-0x80000000 if whole else int(value)&0xffffff)
 
     @timed
     def holder(self):
@@ -241,7 +242,7 @@ class Reader:
         name=self.token
         store=self.word(address+spec['vectors']['country_variable'][4])
         if not store:
-            return {'variables':{},'lists':{},'maps':{}}
+            return {'variables':{},'lists':{},'maps':{},'days':{}}
         pointer,capacity,count=struct.unpack('<QII',self.read(store+8,16))
         if count>capacity:
             raise RuntimeError('Invalid variable store')
@@ -263,6 +264,7 @@ class Reader:
         if count>capacity:
             raise RuntimeError('Invalid variable map container')
         maps={}
+        days={}
         raw=self.read(pointer,count*48) if count else b''
         for index in range(count):
             code,=struct.unpack_from('<I',raw,index*48)
@@ -271,14 +273,20 @@ class Reader:
                 raise RuntimeError('Invalid variable map capacity')
             slots=self.read(table,(mask+1+overflow)*48)
             entries={}
+            left={}
+            logged=name(code).startswith(IDENTITY_MAPS)
             for position in range(mask+1+overflow):
                 if slots[position*48+4]:
-                    key_kind,key,value_kind,value=struct.unpack_from('<I4xqI4xq',slots,position*48+8)
-                    entries[self.item(key_kind,key)]=self.item(value_kind,value)
+                    key_kind,key,value_kind,value,remaining=struct.unpack_from('<I4xqI4xqi',slots,position*48+8)
+                    entry=self.item(key_kind,key)
+                    entries[entry]=self.item(value_kind,value,logged)
+                    left[entry]=remaining
             if len(entries)!=size:
                 raise RuntimeError(f'Variable map {name(code)} holds {size} entries but {len(entries)} slots are occupied')
             maps[name(code)]=entries
-        return {'variables':variables,'lists':lists,'maps':maps}
+            if logged:
+                days[name(code)]=left
+        return {'variables':variables,'lists':lists,'maps':maps,'days':days}
 
     @timed_often
     def control_targets(self):
@@ -286,8 +294,11 @@ class Reader:
 
     @timed_often
     def write_variables(self,writes):
-        process=psutil.Process(self.pid)
-        process.suspend()
+        try:
+            process=psutil.Process(self.pid)
+            process.suspend()
+        except (psutil.AccessDenied,psutil.NoSuchProcess) as error:
+            raise GameCrashed(f'The game process {self.pid} cannot be suspended') from error
         try:
             addresses=self.variables(tuple(dict.fromkeys(name for name,_,_ in writes)))
             self.write([(addresses[name]+offset,data) for name,offset,data in writes])

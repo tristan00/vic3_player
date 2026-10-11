@@ -4,6 +4,7 @@ import json
 import logging
 from pathlib import Path
 import pickle
+import psycopg
 import random
 import re
 import time
@@ -15,8 +16,8 @@ from ..common import DEFAULT_DATA, slot, timed, timed_often
 from ..runner.memory import LAYOUT, MONTH_STARTS
 from ..timing import span
 from ..script import alerts, blocks, body, building_methods, decisions, definitions, event_effects, event_options, keys, method_effects, production_methods, read, scalar
-from .capture import (ALERT_SCOPES, BORROW_MAPS, RELEASE_MAPS, FORMABLE_MAPS, GROUPS, MESSAGE_MAPS, METRICS, PART, PROPOSAL_MAPS, UI_CHECKS, evaluable, method_block, metric_map,
-                      map_data, missing_references, plain, province_colors)
+from .capture import (ALERT_SCOPES, BORROW_MAPS, RELEASE_MAPS, FORMABLE_MAPS, GROUPS, LOG_DAYS, LOG_MAPS, MESSAGE_MAPS, METRICS, PART, PROPOSAL_MAPS, SHIP_MAPS, UI_CHECKS, UNIT_MAPS,
+                      evaluable, method_block, metric_map, map_data, missing_references, plain, province_colors)
 from .geography import geometry, mini_world, vanilla_world
 from .spec import VOCABULARIES
 from .tables import Built, build
@@ -29,7 +30,8 @@ ENUM_SOURCES={'approval_state':'interest_group.approval_state','influence_type':
               'war_goal_status':'war_goal.status','toll_rate':'strait.first_toll_rate','strait_access_status':'strait.first_access_status',
               'strait_access_permissions':'strait.first_access_permissions','civil_war_type':'civil_war.type','battle_type':'battle.type',
               'battle_status':'battle.status','play_side':'front_side.play_side','ai_attitude':'ai_country_goal.attitude','hq_type':'hq.type',
-              'tax_level':'country.tax_level','supply_ship_construction_level':'country.supply_ship_construction_level'}
+              'tax_level':'country.tax_level','supply_ship_construction_level':'country.supply_ship_construction_level','wage_level':'country.wage_level',
+              'war_goal_pressed':'war_goal.pressed','law_phase':'law.phase'}
 BUDGET_LINES={('income',1):'income_taxes',('income',2):'poll_taxes',('income',7):'investment',('income',15):'market_fees',
               ('expense',1):'government_slaves',('expense',2):'government_goods',('expense',3):'government_wages',('expense',4):'military_slaves',
               ('expense',5):'military_goods',('expense',6):'military_wages',('expense',7):'construction_goods',('expense',8):'subsidies',
@@ -91,7 +93,7 @@ def record(game,store,phase):
             constants,meta,open_windows=snapshot_meta(tables,label)
             rows=build(Capture(tables,label,player,reader.goods_codes.tolist(),open_windows),store.orders,colors)
         seq=store.write(Built(rows,constants,meta,colors),phase,datetime.now(timezone.utc),reading.ms+assembling.ms)
-    except RuntimeError as error:
+    except (RuntimeError,psycopg.Error) as error:
         path=DEFAULT_DATA/'refusals'/f'{time.strftime("%Y%m%dT%H%M%S")}.pkl'
         path.parent.mkdir(parents=True,exist_ok=True)
         with open(path,'wb') as handle:
@@ -183,6 +185,7 @@ def register(game,session,world,store):
     enums={enum:{int(value):name for value,name in LAYOUT['enums'][source].items() if isinstance(name,str)} for enum,source in ENUM_SOURCES.items()}
     enums['scope_type']={int(value):name for value,name in LAYOUT['scope_types'].items()}
     enums['tariff_level']={int(value):name for value,name in LAYOUT['tariff_levels'].items()}
+    enums['formation_flag']=dict(enumerate(keys(root,'common/military_formation_flags',mods)))
     lines=[(direction,line,name) for (direction,line),name in BUDGET_LINES.items()]
     effects=method_effects(root,mods)
     identity=hashlib.sha256(repr((members,table,options,consequences,methods,dlc,gaps,effects)).encode('utf-8')).digest()
@@ -200,7 +203,7 @@ def register(game,session,world,store):
 class Held:
     @timed_often
     def __init__(self,held,nonce,picks):
-        self.variables,self.lists,self.maps=held['variables'],held['lists'],held['maps']
+        self.variables,self.lists,self.maps,self.days=held['variables'],held['lists'],held['maps'],held['days']
         self.picks=picks
         if self.variables.get('cap_seq')!=('value',nonce):
             raise RuntimeError(f'The capture holder carries request {self.variables.get("cap_seq")}, not {nonce}')
@@ -268,6 +271,30 @@ def ident(item):
     return item[1]
 
 
+LOG_TEXT={'log_kind','log_role','log_unit_role','log_unit_engaged','log_ship_role'}
+LOG_NUMBERS={'year','month','event','manpower','demoralized','morale','offense','defense','points','crew'}
+
+
+@timed_often
+def _logged(held,maps,required,prefix):
+    first,last=(int(number(held.variables[prefix+name])) for name in ('_base','_count'))
+    keys=[('value',float(index)) for index in range(first+1,last+1)]
+    columns=[held.mapped(name) for name in maps]
+    for position,(name,column) in enumerate(zip(maps,columns)):
+        if not set(column)<=set(keys) or (position<required and len(column)!=len(keys)):
+            raise RuntimeError(f'{name} holds {len(column)} entries for the {len(keys)} logged from {first+1} to {last}')
+    reads=[text if name in LOG_TEXT else number if name.rsplit('_',1)[1] in LOG_NUMBERS else ident for name in maps]
+    return keys,[(index,*(read(column[key]) if key in column else None for read,column in zip(reads,columns))) for index,key in enumerate(keys,first+1)]
+
+
+@timed_often
+def _conflicts(held,hours):
+    keys,events=_logged(held,LOG_MAPS,4,'log')
+    left=held.days.get('log_kind',{})
+    dated=[(row[0],(hours//24-LOG_DAYS+left[key])*24,*row[1:]) for key,row in zip(keys,events)]
+    return dated,_logged(held,UNIT_MAPS,8,'log_unit')[1],_logged(held,SHIP_MAPS,5,'log_ship')[1]
+
+
 MONTH_NAMES=('January','February','March','April','May','June','July','August','September','October','November','December')
 
 
@@ -297,6 +324,7 @@ def _metrics(held,kind,groups,owners):
 
 @timed
 def _scripted(tables,snapshot,held,tags,label,player,living,world,maps):
+    events,units,ships=_conflicts(held,tables['game_state']['date'][0])
     countries={slot(c) for c in snapshot['country']['id'].tolist()}
     states={int(s)&0xffffff for s,owner in zip(snapshot['state']['id'].tolist(),snapshot['state']['country'].tolist()) if slot(owner)!=-1}
     owners={'public':living,'allowed_public':countries,'player':{player},'allowed_player':{player},'state':states,'allowed_state':states}
@@ -351,8 +379,12 @@ def _scripted(tables,snapshot,held,tags,label,player,living,world,maps):
     put(tables,'state_setting',[('state','int4'),('colonization_paused','int4')],
                sorted((state,flag(paused)) for state,paused in held.fields('player_state',held.listed('cap_obj_player_state'),('colonization_paused',))))
     law_types=dict(zip((int(i)&0xffffff for i in snapshot['law']['id'].tolist()),snapshot['law']['law'].tolist()))
-    put(tables,'law_chance',[('law','text'),('chance','float8')],
-               sorted({(label(law_types[law]),number(chance)) for law,chance in held.fields('law',held.listed('cap_obj_law'),('chance',))}))
+    put(tables,'law_chance',[('law','text'),('chance','float8'),('enactment_phase','int4'),('checkpoint_progress','float8'),('enactment_setbacks','int4'),
+                             ('advance_chance','float8'),('debate_chance','float8'),('stall_chance','float8')],
+               sorted((label(law_types[law]),number(chance),flag(phase),number(progress),flag(setbacks),number(advance),number(debate),number(stall))
+                      for law,chance,phase,progress,setbacks,advance,debate,stall in
+                      held.fields('law',held.listed('cap_obj_law'),('chance','enactment_phase','checkpoint_progress','enactment_setbacks',
+                                                                'advance_chance','debate_chance','stall_chance'))))
     put(tables,'diplomats_expelled',[('country','int4'),('direction','text')],
                sorted({(country,direction) for direction in ('by','of') for country in held.objects('cap_expelled_'+direction)}))
     put(tables,'obligation',[('country','int4'),('direction','text')],
@@ -424,6 +456,9 @@ def _scripted(tables,snapshot,held,tags,label,player,living,world,maps):
     put(tables,'releasable_country',[('ord','int4'),('name','text'),('possible','int4')],
                sorted((int(text(key)),plain(text(name)),flag(release_possible[key])) for key,name in release_names.items()))
     put(tables,'message_feed',[('ord','int4'),('date','text'),('type','text'),('name','text'),('description','text')],_messages(held))
+    put(tables,'conflict_log',[('n','int4'),('date','int4')]+[(name[len('log_'):],'int4') for name in LOG_MAPS],events)
+    put(tables,'conflict_unit',[('n','int4')]+[(name[len('log_'):],'int4') for name in UNIT_MAPS],units)
+    put(tables,'conflict_ship',[('n','int4')]+[(name[len('log_'):],'int4') for name in SHIP_MAPS],ships)
     return colors
 
 

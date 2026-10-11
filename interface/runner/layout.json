@@ -15,17 +15,110 @@
     "0": "none",
     "1": "value",
     "2": "boolean",
+    "3": "flag",
+    "4": "color",
     "5": "ctry",
+    "6": "battle",
+    "7": "battle_side",
+    "8": "build",
+    "9": "building_type",
+    "10": "building_group",
     "11": "com",
+    "12": "character_role",
+    "13": "civil_war",
+    "14": "new_combat_unit",
+    "15": "combat_unit_type",
+    "16": "commander_order_type",
+    "17": "company",
+    "18": "company_type",
+    "19": "country_creation",
+    "20": "country_definition",
+    "21": "country_formation",
+    "22": "cultural_community",
     "23": "cul",
+    "24": "decree",
+    "25": "da",
+    "26": "diplomatic_demand",
+    "27": "pact",
+    "28": "dp",
+    "29": "dpt",
+    "30": "dr",
+    "31": "diplomatic_catalyst",
+    "32": "diplomatic_catalyst_type",
+    "33": "diplomatic_catalyst_category",
+    "34": "political_lobby",
+    "35": "political_lobby_type",
+    "36": "political_lobby_appeasement",
+    "37": "front",
+    "38": "goods",
+    "39": "hq",
+    "40": "ideology",
+    "41": "institution",
+    "42": "institution_type",
+    "43": "im",
     "44": "ig",
+    "45": "ig_t",
+    "46": "ig_type",
+    "47": "interest_tier_type",
     "48": "journal_entry",
     "49": "pol",
     "50": "law_type",
+    "51": "market",
+    "52": "market_goods",
+    "53": "military_formation",
+    "54": "naval_battle",
+    "55": "naval_mission",
+    "56": "naval_mission_type",
+    "57": "invasion",
+    "58": "objective",
+    "59": "party",
+    "60": "political_movement",
+    "61": "political_movement_type",
+    "62": "political_movement_category",
+    "63": "pop",
+    "64": "pop_type",
+    "65": "power_bloc",
+    "66": "power_bloc_identity",
+    "67": "power_bloc_principle",
+    "68": "prov",
+    "69": "rel",
+    "70": "container",
+    "71": "ship",
+    "72": "ship_group",
+    "73": "ship_modification_type",
+    "74": "ship_type",
+    "75": "shipping_lanes",
     "76": "state",
+    "77": "state_goods",
     "78": "st_r",
-    "3": "flag",
-    "61": "political_movement_type"
+    "79": "state_trait",
+    "80": "strait",
+    "81": "strait_type",
+    "82": "sr",
+    "83": "sway",
+    "84": "technology",
+    "85": "technology_status",
+    "86": "theater",
+    "87": "travel_connection",
+    "88": "travel_connection_definition",
+    "89": "travel_node",
+    "90": "travel_node_definition",
+    "91": "war",
+    "92": "mobilization_option",
+    "93": "geographic_region",
+    "94": "power_bloc_principle_group",
+    "95": "harvest_condition",
+    "96": "harvest_condition_area",
+    "97": "harvest_condition_type",
+    "98": "treaty_article",
+    "99": "treaty_options",
+    "100": "treaty_article_options",
+    "101": "treaty",
+    "102": "war_goal",
+    "103": "war_goal_type",
+    "104": "amendment_type",
+    "105": "amendment",
+    "106": "decision"
   },
   "budget_lines": {
     "expense": {
@@ -51,14 +144,18 @@
   },
   "enums": {
     "country.supply_ship_construction_level": {
-      "3": "high",
+      "0": "very_low",
       "1": "low",
-      "0": "very_low"
+      "2": "medium",
+      "3": "high",
+      "4": "very_high"
     },
     "country.tax_level": {
-      "3": "high",
+      "0": "very_low",
       "1": "low",
-      "0": "very_low"
+      "2": "medium",
+      "3": "high",
+      "4": "very_high"
     },
     "culture.name_format": {
       "0": "first_last",
@@ -74,24 +171,29 @@
     },
     "interest_group.approval_state": {
       "0": "angry",
+      "1": "unhappy",
+      "2": "neutral",
       "3": "happy",
-      "4": "loyal",
-      "1": "unhappy"
+      "4": "loyal"
     },
     "interest_group.influence_type": {
       "0": "influential",
-      "1": "neutral"
+      "1": "neutral",
+      "2": "marginal"
     },
     "interest_group.influence_type_reason": {
-      "1": "above_influential_cutoff",
       "0": "above_influential_threshold",
-      "2": "below_marginalization_threshold"
+      "1": "above_influential_cutoff",
+      "2": "below_marginalization_threshold",
+      "3": "none",
+      "4": "revolting"
     },
     "law.enactment_last_checkpoint_result": {
+      "0": "none",
+      "1": "success",
       "2": "advance",
       "3": "debate",
-      "4": "stall",
-      "1": "success"
+      "4": "stall"
     },
     "formation.type": {
       "0": "army",
@@ -117,8 +219,9 @@
       "7": "technology"
     },
     "political_movement.managed_status": {
-      "2": "promoted",
-      "1": "suppressed"
+      "0": "neutral",
+      "1": "suppressed",
+      "2": "promoted"
     },
     "shipping_lane.shipping_lane_type": {
       "1": "goods_transfer",
@@ -129,9 +232,11 @@
       "1": "secondary_demand"
     },
     "war_goal.status": {
+      "0": "loose",
       "1": "active",
+      "2": "executed",
       "3": "discarded",
-      "2": "executed"
+      "4": "invalid"
     },
     "strait.first_toll_rate": {
       "0": "no_tolls",
@@ -147,19 +252,27 @@
     },
     "interest_group.civil_war": {
       "0": "revolution",
+      "1": "secession",
       "2": "none"
     },
     "civil_war.type": {
-      "0": "revolution"
+      "0": "revolution",
+      "1": "secession"
     },
     "formation.units_name_type": {
       "1": "culture"
     },
     "battle.type": {
-      "0": "land"
+      "0": "land",
+      "1": "land_invasion",
+      "2": "naval_invasion_landing",
+      "3": "invalid"
     },
     "battle.status": {
-      "1": "attacker_victory"
+      "0": "fighting",
+      "1": "attacker_victory",
+      "2": "defender_victory",
+      "3": "invalid"
     },
     "ai_goal.type": {
       "0": "handle_ongoing_constructions",
@@ -285,14 +398,19 @@
     },
     "ai_country_goal.attitude": {
       "0": "belligerent",
-      "4": "wary",
-      "8": "cooperative",
-      "10": "protective",
+      "1": "domineering",
       "2": "antagonistic",
+      "3": "rebellious",
+      "4": "wary",
+      "5": "disinterested",
       "6": "cautious",
-      "5": 0,
+      "7": "conciliatory",
+      "8": "cooperative",
+      "9": "loyal",
+      "10": "protective",
       "11": "genial",
-      "1": "domineering"
+      "12": "defiant",
+      "13": "aloof"
     },
     "ai_country_goal.secret_goal": {
       "5": "conquer",
@@ -346,6 +464,24 @@
       "1": "no_enemies",
       "2": "only_allies",
       "3": "only_controller"
+    },
+    "country.wage_level": {
+      "0": "very_low",
+      "1": "low",
+      "2": "medium",
+      "3": "high",
+      "4": "very_high"
+    },
+    "law.phase": {
+      "0": "enactment_phase_0",
+      "1": "enactment_phase_1",
+      "2": "enactment_phase_2"
+    },
+    "war_goal.pressed": {
+      "0": "not_pressed",
+      "1": "pressed_by_attacker",
+      "2": "pressed_by_defender",
+      "3": "pressed_by_attacker_and_defender"
     }
   },
   "casualty_reasons": {
@@ -353,12 +489,14 @@
     "1": "battle"
   },
   "tariff_levels": {
+    "0": "max_subventions",
     "1": "high_subventions",
     "2": "low_subventions",
     "3": "no_tariffs_or_subventions",
     "4": "low_tariffs",
     "5": "high_tariffs",
-    "6": "max_tariffs"
+    "6": "max_tariffs",
+    "7": "none"
   },
   "tables": {
     "amendment": {
@@ -2881,10 +3019,6 @@
         "runtime_id": [
           "i",
           8
-        ],
-        "status": [
-          "i",
-          76
         ]
       },
       "keys": {
@@ -3621,6 +3755,14 @@
         "target_location_identity": [
           "i",
           320
+        ],
+        "current_location_type": [
+          "i",
+          296
+        ],
+        "target_location_type": [
+          "i",
+          312
         ],
         "flag": [
           "i",
@@ -5377,10 +5519,6 @@
         "binding_period": [
           "i",
           256
-        ],
-        "withdrawn_by": [
-          "i",
-          152
         ],
         "withdrawn": [
           "i",

@@ -1,5 +1,6 @@
 from ..actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, LEVELS, TOLL_LEVELS
 from ..common import timed_often
+from .triggers import indirect_overlords, overlords
 from .available import (SLOT, TARIFF_CODES, armies, bloc_principles, changing, colonies, construction_paused, construction_queue, cooling,
                         enacting_laws, event_options, formation_report, formation_setting, home_region, in_default, in_force, incorporation, involved, issued_decrees, latest_design,
                         leaning, metric, monopolies, own_templates, ownership_classes, play_members, player_blocs, player_value, power_bloc_members, principal, private_levels,
@@ -177,7 +178,11 @@ def plays(s):
 
 @timed_often
 def started(b,a,target,diplomatic_play_type):
-    return any(ident not in plays(b) and row==(a.player,target,diplomatic_play_type) for ident,row in plays(a).items())
+    leaders={target}|overlords(b,target)|indirect_overlords(b,target)
+    goals={play for play,country,creator in a.rows('war_goal','diplomatic_play,target_country,creator') if country==target and creator==a.player}
+    return any(ident not in plays(b) and initiator==a.player and kind==diplomatic_play_type
+               and (opponent==target or opponent in leaders and ident in goals)
+               for ident,(initiator,opponent,kind) in plays(a).items())
 
 
 @timed_often

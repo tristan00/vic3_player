@@ -405,11 +405,6 @@ create table civil_war_type (
   name text unique
 );
 
-create table event_status (
-  event_status int2 primary key,
-  name text unique
-);
-
 create table formation_flag (
   formation_flag int2 primary key,
   name text unique
@@ -455,11 +450,6 @@ create table play_side (
   name text unique
 );
 
-create table privatization_request (
-  privatization_request int2 primary key,
-  name text unique
-);
-
 create table scope_type (
   scope_type int2 primary key,
   name text unique
@@ -467,11 +457,6 @@ create table scope_type (
 
 create table shipping_lane_type (
   shipping_lane_type int2 primary key,
-  name text unique
-);
-
-create table slave_basket (
-  slave_basket int2 primary key,
   name text unique
 );
 
@@ -507,11 +492,6 @@ create table tax_level (
 
 create table toll_rate (
   toll_rate int2 primary key,
-  name text unique
-);
-
-create table treaty_side (
-  treaty_side int2 primary key,
   name text unique
 );
 
@@ -722,19 +702,16 @@ create table run (
   world_seed int8,
   countries int2,
   states int2,
-  tech float8,
   pop float8,
   modernity float8,
   copies float8,
   diversity float8,
   military float8,
-  tech_variation float8,
-  country_economy float8,
-  local_economy float8,
   source_regions int2,
   ideology_uniformity float8 check (ideology_uniformity between 0 and 1),
   primary_culture_share float8 check (primary_culture_share between 0 and 1),
   interconnectedness float8 check (interconnectedness between 0 and 1),
+  antagonism float8 check (antagonism between 0 and 1),
   picker text not null check (picker in ('first', 'catboost', 'catboost_piecewise')),
   candidates int2 not null check (candidates >= 1),
   objective_gdp float8 not null check (objective_gdp between 0 and 1),
@@ -742,8 +719,8 @@ create table run (
   objective_sol float8 not null check (objective_sol between 0 and 1),
   objective_alpha float8 not null check (objective_alpha between 0 and 1),
   objective_stock float8 not null check (objective_stock between 0 and 1),
-  check ((kind = 'mini') = (num_nonnulls(world_seed, countries, states, tech, pop) = 5)),
-  check ((kind = 'vanilla') = (num_nulls(world_seed, countries, states, tech, pop) = 5)),
+  check ((kind = 'mini') = (num_nonnulls(world_seed, countries, states, pop) = 4)),
+  check ((kind = 'vanilla') = (num_nulls(world_seed, countries, states, pop) = 4)),
   check (kind = 'mini' or copies is null),
   check (kind = 'mini' or modernity is null),
   check (kind = 'mini' or diversity is null),
@@ -2395,16 +2372,14 @@ create table treaty_history (
   second_country int4,
   entered_into_force_on game_hours,
   binding_period int4,
-  withdrawn_by int2,
   withdrawn bool,
   primary key (run_id, treaty, seq),
   foreign key (run_id, treaty) references treaty,
   foreign key (run_id, seq) references snapshot,
   foreign key (run_id, first_country) references country,
   foreign key (run_id, second_country) references country,
-  foreign key (withdrawn_by) references treaty_side,
-  check (present = (num_nulls(first_country, second_country, binding_period, withdrawn_by, withdrawn) = 0)),
-  check (present or num_nonnulls(first_country, second_country, entered_into_force_on, binding_period, withdrawn_by, withdrawn) = 0)
+  check (present = (num_nulls(first_country, second_country, binding_period, withdrawn) = 0)),
+  check (present or num_nonnulls(first_country, second_country, entered_into_force_on, binding_period, withdrawn) = 0)
 );
 
 create table treaty_article_history (
@@ -2949,8 +2924,6 @@ create table building_history (
   foreign key (run_id, seq) references snapshot,
   foreign key (building_type) references building_type,
   foreign key (run_id, state) references state,
-  foreign key (slave_basket) references slave_basket,
-  foreign key (privatization_requested) references privatization_request,
   check (present = (num_nulls(building_type, levels, slave_basket, active, subsidized, privatization_requested, dead) = 0)),
   check (present or num_nonnulls(building_type, state, levels, slave_basket, active, subsidized, privatization_requested, dead) = 0)
 );
@@ -3069,7 +3042,7 @@ create table building_ownership_history (
   foreign key (run_id, building_ownership) references building_ownership,
   foreign key (run_id, seq) references snapshot,
   foreign key (run_id, building) references building,
-  check (owner_kind in ('country', 'self', 'manor_house', 'financial_district', 'company', 'company_regional_headquarter')),
+  check (owner_kind in ('country', 'self', 'manor_house', 'financial_district', 'company', 'company_regional_headquarter', 'vanished_building')),
   foreign key (run_id, owner_country) references country,
   foreign key (run_id, owner_building) references building,
   foreign key (run_id, owner_company) references company,
@@ -3087,7 +3060,6 @@ create table market_history (
   foreign key (run_id, market) references market,
   foreign key (run_id, seq) references snapshot,
   foreign key (run_id, owner) references country,
-  check (present = (num_nulls(owner) = 0)),
   check (present or num_nonnulls(owner) = 0)
 );
 
@@ -3682,13 +3654,19 @@ create table law_private (
   replacing_law_type int2,
   enactment_start_date game_hours,
   chance float8,
+  enactment_phase int4,
+  checkpoint_progress float8,
+  enactment_setbacks int4,
+  advance_chance float8,
+  debate_chance float8,
+  stall_chance float8,
   primary key (run_id, law, seq),
   foreign key (run_id, law) references law,
   foreign key (run_id, seq) references snapshot,
   foreign key (checkpoint_result) references law_checkpoint_result,
   foreign key (replacing_law_type) references law_type,
   check (present = (num_nulls(checkpoint_result) = 0)),
-  check (present or num_nonnulls(checkpoint_result, replacing_law_type, enactment_start_date, chance) = 0)
+  check (present or num_nonnulls(checkpoint_result, replacing_law_type, enactment_start_date, chance, enactment_phase, checkpoint_progress, enactment_setbacks, advance_chance, debate_chance, stall_chance) = 0)
 );
 
 create table law_amendment (
@@ -4125,11 +4103,15 @@ create table formation_status (
   supply_ships int4 not null,
   mobilized bool not null,
   raised_conscripts bool not null,
+  current_location_type int2,
+  target_location_type int2,
   primary key (run_id, formation, seq),
   foreign key (run_id, formation) references formation,
   foreign key (run_id, seq) references snapshot,
   foreign key (run_id, province) references province,
-  foreign key (run_id, naval_mission) references naval_mission
+  foreign key (run_id, naval_mission) references naval_mission,
+  foreign key (current_location_type) references scope_type,
+  foreign key (target_location_type) references scope_type
 );
 
 create table formation_private (
@@ -4673,6 +4655,129 @@ create table battle_defender_manpower_sample (
   foreign key (run_id, seq) references snapshot
 );
 
+create table battle_start (
+  run_id int4 not null,
+  n int4 not null,
+  seq int4 not null,
+  date game_hours,
+  battle int4,
+  naval_battle int4,
+  state int4,
+  front int4,
+  province int4,
+  attacker_country int4,
+  defender_country int4,
+  attacker int4,
+  defender int4,
+  attacker_manpower int4,
+  defender_manpower int4,
+  naval bool not null,
+  primary key (run_id, n),
+  foreign key (run_id, seq) references snapshot,
+  foreign key (run_id, battle) references battle,
+  foreign key (run_id, state) references state,
+  foreign key (run_id, front) references front,
+  foreign key (run_id, province) references province,
+  foreign key (run_id, attacker_country) references country,
+  foreign key (run_id, defender_country) references country,
+  foreign key (run_id, attacker) references character,
+  foreign key (run_id, defender) references character
+);
+
+create table battle_result (
+  run_id int4 not null,
+  n int4 not null,
+  seq int4 not null,
+  date game_hours,
+  year int2 not null,
+  month int2 not null,
+  winner int4 not null,
+  loser int4,
+  state int4,
+  attacker int4,
+  defender int4,
+  battle int4,
+  empty bool not null,
+  naval bool not null,
+  naval_battle int4,
+  winner_role text,
+  attacker_manpower int4,
+  defender_manpower int4,
+  primary key (run_id, n),
+  foreign key (run_id, seq) references snapshot,
+  foreign key (run_id, winner) references country,
+  foreign key (run_id, loser) references country,
+  foreign key (run_id, state) references state,
+  foreign key (run_id, attacker) references character,
+  foreign key (run_id, defender) references character,
+  foreign key (run_id, battle) references battle,
+  check (winner_role in ('attacker', 'defender'))
+);
+
+create table battle_unit (
+  run_id int4 not null,
+  n int4 not null,
+  seq int4 not null,
+  date game_hours,
+  battle int4 not null,
+  stage text not null,
+  combat_unit int4 not null,
+  country int4 not null,
+  side text,
+  manpower int4 not null,
+  demoralized int4 not null,
+  morale float8 not null,
+  offense float8 not null,
+  defense float8 not null,
+  engaged bool not null,
+  primary key (run_id, n),
+  foreign key (run_id, seq) references snapshot,
+  foreign key (run_id, battle) references battle,
+  check (stage in ('start', 'end')),
+  foreign key (run_id, combat_unit) references combat_unit,
+  foreign key (run_id, country) references country,
+  check (side in ('attacker', 'defender'))
+);
+
+create table battle_ship (
+  run_id int4 not null,
+  n int4 not null,
+  seq int4 not null,
+  date game_hours,
+  naval_battle int4 not null,
+  stage text not null,
+  ship int4 not null,
+  fleet int4,
+  country int4 not null,
+  side text,
+  hit_points float8 not null,
+  crew int4 not null,
+  primary key (run_id, n),
+  foreign key (run_id, seq) references snapshot,
+  check (stage in ('start', 'end')),
+  foreign key (run_id, ship) references ship,
+  foreign key (run_id, fleet) references formation,
+  foreign key (run_id, country) references country,
+  check (side in ('attacker', 'defender'))
+);
+
+create table war_event (
+  run_id int4 not null,
+  n int4 not null,
+  seq int4 not null,
+  date game_hours,
+  year int2 not null,
+  month int2 not null,
+  kind text not null,
+  country int4 not null,
+  target_country int4,
+  primary key (run_id, n),
+  foreign key (run_id, seq) references snapshot,
+  check (kind in ('wargoal_enforced', 'capitulation', 'peace_signed', 'war_end')),
+  foreign key (run_id, country) references country,
+  foreign key (run_id, target_country) references country
+);
+
 create table country_ai_history (
   run_id int4 not null,
   country_ai int4 not null,
@@ -4839,15 +4944,13 @@ create table event_history (
   present bool not null,
   event_type int2,
   origin_country int4,
-  status int2,
   primary key (run_id, event, seq),
   foreign key (run_id, event) references event,
   foreign key (run_id, seq) references snapshot,
   foreign key (event_type) references event_type,
   foreign key (run_id, origin_country) references country,
-  foreign key (status) references event_status,
   check (present = (num_nulls(event_type, origin_country) = 0)),
-  check (present or num_nonnulls(event_type, origin_country, status) = 0)
+  check (present or num_nonnulls(event_type, origin_country) = 0)
 );
 
 create table event_target (
@@ -5467,8 +5570,8 @@ create function diplomatic_play_record_at(run int4, at int4) returns table ("dip
   select l.diplomatic_play, l.country, l.seq, l.play_side from diplomatic_play a, lateral (select distinct on (country) diplomatic_play, country, seq, play_side, present from diplomatic_play_record t where t.run_id = run and t.diplomatic_play = a.diplomatic_play and t.seq <= at order by country desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
-create function treaty_at(run int4, at int4) returns table ("treaty" int4, "seq" int4, "first_country" int4, "second_country" int4, "entered_into_force_on" game_hours, "binding_period" int4, "withdrawn_by" int2, "withdrawn" bool) language sql stable as $$
-  select l.treaty, l.seq, l.first_country, l.second_country, l.entered_into_force_on, l.binding_period, l.withdrawn_by, l.withdrawn from treaty a, lateral (select treaty, seq, first_country, second_country, entered_into_force_on, binding_period, withdrawn_by, withdrawn, present from treaty_history t where t.run_id = run and t.treaty = a.treaty and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
+create function treaty_at(run int4, at int4) returns table ("treaty" int4, "seq" int4, "first_country" int4, "second_country" int4, "entered_into_force_on" game_hours, "binding_period" int4, "withdrawn" bool) language sql stable as $$
+  select l.treaty, l.seq, l.first_country, l.second_country, l.entered_into_force_on, l.binding_period, l.withdrawn from treaty a, lateral (select treaty, seq, first_country, second_country, entered_into_force_on, binding_period, withdrawn, present from treaty_history t where t.run_id = run and t.treaty = a.treaty and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function treaty_article_at(run int4, at int4) returns table ("treaty_article" int4, "seq" int4, "treaty" int4, "treaty_article_type" int2, "source_country" int4, "target_country" int4) language sql stable as $$
@@ -5747,8 +5850,8 @@ create function law_at(run int4, at int4) returns table ("law" int4, "seq" int4,
   select l.law, l.seq, l.country, l.law_type, l.progress, l.phase, l.checkpoint_or_stop_date, l.active, l.imposer from law a, lateral (select law, seq, country, law_type, progress, phase, checkpoint_or_stop_date, active, imposer, present from law_history t where t.run_id = run and t.law = a.law and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
-create function law_private_at(run int4, at int4) returns table ("law" int4, "seq" int4, "checkpoint_result" int2, "replacing_law_type" int2, "enactment_start_date" game_hours, "chance" float8) language sql stable as $$
-  select l.law, l.seq, l.checkpoint_result, l.replacing_law_type, l.enactment_start_date, l.chance from law a, lateral (select law, seq, checkpoint_result, replacing_law_type, enactment_start_date, chance, present from law_private t where t.run_id = run and t.law = a.law and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
+create function law_private_at(run int4, at int4) returns table ("law" int4, "seq" int4, "checkpoint_result" int2, "replacing_law_type" int2, "enactment_start_date" game_hours, "chance" float8, "enactment_phase" int4, "checkpoint_progress" float8, "enactment_setbacks" int4, "advance_chance" float8, "debate_chance" float8, "stall_chance" float8) language sql stable as $$
+  select l.law, l.seq, l.checkpoint_result, l.replacing_law_type, l.enactment_start_date, l.chance, l.enactment_phase, l.checkpoint_progress, l.enactment_setbacks, l.advance_chance, l.debate_chance, l.stall_chance from law a, lateral (select law, seq, checkpoint_result, replacing_law_type, enactment_start_date, chance, enactment_phase, checkpoint_progress, enactment_setbacks, advance_chance, debate_chance, stall_chance, present from law_private t where t.run_id = run and t.law = a.law and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function law_amendment_at(run int4, at int4) returns table ("law" int4, "amendment" int4, "seq" int4) language sql stable as $$
@@ -6007,8 +6110,8 @@ create function journal_entry_involved_country_at(run int4, at int4) returns tab
   select l.journal_entry, l.country, l.seq from journal_entry a, lateral (select distinct on (country) journal_entry, country, seq, present from journal_entry_involved_country t where t.run_id = run and t.journal_entry = a.journal_entry and t.seq <= at order by country desc, t.seq desc) l where a.run_id = run and l.present
 $$;
 
-create function event_at(run int4, at int4) returns table ("event" int4, "seq" int4, "event_type" int2, "origin_country" int4, "status" int2) language sql stable as $$
-  select l.event, l.seq, l.event_type, l.origin_country, l.status from event a, lateral (select event, seq, event_type, origin_country, status, present from event_history t where t.run_id = run and t.event = a.event and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
+create function event_at(run int4, at int4) returns table ("event" int4, "seq" int4, "event_type" int2, "origin_country" int4) language sql stable as $$
+  select l.event, l.seq, l.event_type, l.origin_country from event a, lateral (select event, seq, event_type, origin_country, present from event_history t where t.run_id = run and t.event = a.event and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and l.present
 $$;
 
 create function event_target_at(run int4, at int4) returns table ("event" int4, "name_key" int4, "seq" int4, "scope_type" int2, "scope_target" int8) language sql stable as $$
@@ -6119,8 +6222,8 @@ create function interest_group_stats_at(run int4, at int4) returns table ("inter
   select l.interest_group, l.seq, l.approval, l.political_strength, l.radicals_political_strength, l.loyalists_political_strength, l.clout from interest_group a, lateral (select present from interest_group_history h where h.run_id = run and h.interest_group = a.interest_group and h.seq <= at order by h.seq desc limit 1) o, lateral (select interest_group, seq, approval, political_strength, radicals_political_strength, loyalists_political_strength, clout from interest_group_stats t where t.run_id = run and t.interest_group = a.interest_group and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and o.present
 $$;
 
-create function formation_status_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "province" int4, "current_location" int4, "target_location" int4, "naval_mission" int4, "x" float8, "y" float8, "organization" float8, "sea_presence" float8, "supply" float8, "delivered_supply" float8, "supply_ships" int4, "mobilized" bool, "raised_conscripts" bool) language sql stable as $$
-  select l.formation, l.seq, l.province, l.current_location, l.target_location, l.naval_mission, l.x, l.y, l.organization, l.sea_presence, l.supply, l.delivered_supply, l.supply_ships, l.mobilized, l.raised_conscripts from formation a, lateral (select present from formation_history h where h.run_id = run and h.formation = a.formation and h.seq <= at order by h.seq desc limit 1) o, lateral (select formation, seq, province, current_location, target_location, naval_mission, x, y, organization, sea_presence, supply, delivered_supply, supply_ships, mobilized, raised_conscripts from formation_status t where t.run_id = run and t.formation = a.formation and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and o.present
+create function formation_status_at(run int4, at int4) returns table ("formation" int4, "seq" int4, "province" int4, "current_location" int4, "target_location" int4, "naval_mission" int4, "x" float8, "y" float8, "organization" float8, "sea_presence" float8, "supply" float8, "delivered_supply" float8, "supply_ships" int4, "mobilized" bool, "raised_conscripts" bool, "current_location_type" int2, "target_location_type" int2) language sql stable as $$
+  select l.formation, l.seq, l.province, l.current_location, l.target_location, l.naval_mission, l.x, l.y, l.organization, l.sea_presence, l.supply, l.delivered_supply, l.supply_ships, l.mobilized, l.raised_conscripts, l.current_location_type, l.target_location_type from formation a, lateral (select present from formation_history h where h.run_id = run and h.formation = a.formation and h.seq <= at order by h.seq desc limit 1) o, lateral (select formation, seq, province, current_location, target_location, naval_mission, x, y, organization, sea_presence, supply, delivered_supply, supply_ships, mobilized, raised_conscripts, current_location_type, target_location_type from formation_status t where t.run_id = run and t.formation = a.formation and t.seq <= at order by t.seq desc limit 1) l where a.run_id = run and o.present
 $$;
 
 create index country_history_seq on country_history using brin (run_id, seq) with (autosummarize = on);
@@ -6326,6 +6429,11 @@ create index battle_side_seq on battle_side using brin (run_id, seq) with (autos
 create index battle_occupation_seq on battle_occupation using brin (run_id, seq) with (autosummarize = on);
 create index battle_attacker_manpower_sample_seq on battle_attacker_manpower_sample using brin (run_id, seq) with (autosummarize = on);
 create index battle_defender_manpower_sample_seq on battle_defender_manpower_sample using brin (run_id, seq) with (autosummarize = on);
+create index battle_start_seq on battle_start using brin (run_id, seq) with (autosummarize = on);
+create index battle_result_seq on battle_result using brin (run_id, seq) with (autosummarize = on);
+create index battle_unit_seq on battle_unit using brin (run_id, seq) with (autosummarize = on);
+create index battle_ship_seq on battle_ship using brin (run_id, seq) with (autosummarize = on);
+create index war_event_seq on war_event using brin (run_id, seq) with (autosummarize = on);
 create index country_ai_history_seq on country_ai_history using brin (run_id, seq) with (autosummarize = on);
 create index country_ai_strategy_seq on country_ai_strategy using brin (run_id, seq) with (autosummarize = on);
 create index country_ai_region_stance_seq on country_ai_region_stance using brin (run_id, seq) with (autosummarize = on);

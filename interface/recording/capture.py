@@ -368,7 +368,11 @@ GROUP_SPECS=(
     ('interest_group','cap_obj_interest_group','Scope.GetInterestGroup','InterestGroup.MakeScope',
      (('amenability','InterestGroup.GetAmenability','CFixedPoint'),('negotiated','InterestGroup.HasNegotiated','bool'))),
     ('player_state','cap_obj_player_state','Scope.GetState','State.MakeScope',(('colonization_paused','State.IsColonizationPaused','bool'),)),
-    ('law','cap_obj_law','Scope.GetLaw','Law.MakeScope',(('chance','Law.GetCheckpointSuccessChance','CFixedPoint'),)),
+    ('law','cap_obj_law','Scope.GetLaw','Law.MakeScope',
+     (('chance','Law.GetCheckpointSuccessChance','CFixedPoint'),('enactment_phase','Law.GetEnactmentPhase','int32'),
+      ('checkpoint_progress','Law.GetCheckpointProgress','CFixedPoint'),('enactment_setbacks','Law.GetEnactmentSetbackCount','int32'),
+      ('advance_chance','Law.GetCheckpointAdvanceChance','CFixedPoint'),('debate_chance','Law.GetCheckpointDebateChance','CFixedPoint'),
+      ('stall_chance','Law.GetCheckpointStallChance','CFixedPoint'))),
     ('power_bloc','cap_obj_power_bloc','Scope.GetPowerBloc','PowerBloc.MakeScope',(('mandates','PowerBloc.GetNumMandates','int32'),)),
     ('journal','cap_obj_journal','Scope.GetJournalEntry','JournalEntry.MakeScope',
      (('progress','JournalEntry.GetGoalProgressValue','CFixedPoint'),('goal','JournalEntry.CalcCurrentGoalValue','CFixedPoint'),
@@ -492,7 +496,7 @@ def capture_body(game_dir,tag,world=None):
     body=(f'save_scope_as = actor\nset_variable = {{ name = cap_seq value = var:interface_capture_seq }}\n'
           f'{country_typing(game_dir,tag,mods,world)}\n{object_lists()}\n{journal}\n{objectives}\n{subgoals}\n{checks}\n{shown}\n{methods}\n'
           f'{issued}\n{valid}\n{supply}\n{monopolies}\n{consumed}\n{straits}\n{ports}\n{diplomatic}\n{interactions}\n{buttons}\n{province_block(map_data(game_dir,world))}\n')
-    return clears(body)+pick_clears(body)+body
+    return LOG_CLEAR+clears(body)+pick_clears(body)+body
 
 
 @timed_often
@@ -507,6 +511,147 @@ def clears(body):
 
 
 MESSAGE_MAPS=('cap_message_date','cap_message_type','cap_message_name','cap_message_text')
+
+
+LOG_DAYS=10000
+
+
+LOG_COUNTERS=('log_count','log_seen','log_base','log_unit_count','log_unit_base','log_ship_count','log_ship_base')
+
+
+LOG_MAPS=('log_kind','log_year','log_month','log_country','log_other','log_state','log_attacker','log_defender','log_battle','log_naval','log_front','log_province','log_role',
+          'log_attacker_manpower','log_defender_manpower')
+
+
+UNIT_VALUES=('manpower','demoralized','morale','offense','defense')
+
+
+UNIT_MAPS=('log_unit_event','log_unit','log_unit_country')+tuple('log_unit_'+field for field in UNIT_VALUES)+('log_unit_role','log_unit_engaged')
+
+
+SHIP_VALUES=('hit_points','crew')
+
+
+SHIP_MAPS=('log_ship_event','log_ship','log_ship_country')+tuple('log_ship_'+field for field in SHIP_VALUES)+('log_ship_fleet','log_ship_role')
+
+
+BATTLE_SCOPES={'log_other':'scope:enemy_country','log_state':'scope:state','log_attacker':'scope:attacker','log_defender':'scope:defender'}
+
+
+LAND_SCOPES={**BATTLE_SCOPES,'log_battle':'scope:battle','log_front':'scope:battle.front','log_province':'scope:battle.attacker_side.province'}
+
+
+NAVAL_SCOPES={**BATTLE_SCOPES,'log_naval':'scope:battle'}
+
+
+WAR_HOOKS=(('on_wargoal_enforced','wargoal_enforced','root',{'log_other':'scope:target'}),('on_capitulation','capitulation','root',{}),
+           ('on_peace_agreement_signed_war_leader','peace_signed','root',{}),('on_war_end','war_end','scope:actor',{'log_other':'scope:target'}))
+
+
+LOG_START='if = { limit = { NOT = { has_variable = log_count } } '+' '.join(f'set_variable = {{ name = {name} value = 0 }}' for name in LOG_COUNTERS)+' } '
+
+
+LOG_CLEAR=(LOG_START+'if = { limit = { var:log_count = var:log_seen } '+' '.join(f'clear_variable_map = {name}' for name in LOG_MAPS+UNIT_MAPS+SHIP_MAPS)
+           +' set_variable = { name = log_base value = var:log_count } set_variable = { name = log_unit_base value = var:log_unit_count } '
+           'set_variable = { name = log_ship_base value = var:log_ship_count } } set_variable = { name = log_seen value = var:log_count }\n')
+
+
+@timed_often
+def measured(name,counter,value):
+    return f'set_variable = {{ name = log_value value = {value} }} '+mapped(name,'var:'+counter,'var:log_value')
+
+
+@timed_often
+def log_role(name,counter,country):
+    return when('exists = scope:attacker','if = { limit = { '+country+' = { has_war_with = scope:attacker.owner } } '+mapped(name,'var:'+counter,'flag:defender')
+                +' } else = { '+mapped(name,'var:'+counter,'flag:attacker')+' }')
+
+
+@timed_often
+def log_event(kind,scopes):
+    return ('change_variable = { name = log_count add = 1 } set_variable = { name = log_now_year value = year } set_variable = { name = log_now_month value = month } '
+            f'add_to_variable_map = {{ name = log_kind key = var:log_count value = flag:{kind} days = {LOG_DAYS} }} '
+            +mapped('log_year','var:log_count','var:log_now_year')+' '+mapped('log_month','var:log_count','var:log_now_month')+' '
+            +mapped('log_country','var:log_count','scope:log_country')+' '+' '.join(when('exists = '+scope,mapped(name,'var:log_count',scope)) for name,scope in scopes.items()))
+
+
+@timed_often
+def log_sides(field):
+    return ' '.join(measured(f'log_{side}_manpower','log_count',f'scope:battle.{side}_side.{field}') for side in ('attacker','defender'))
+
+
+@timed_often
+def log_row(prefix,scope,owner,values,extra):
+    counter=prefix+'_count'
+    return (f'change_variable = {{ name = {counter} add = 1 }} '+mapped(prefix+'_event','var:'+counter,'var:log_count')+' '+mapped(prefix,'var:'+counter,scope)+' '
+            +mapped(prefix+'_country','var:'+counter,owner)+' '+' '.join(measured(f'{prefix}_{field}',counter,f'{scope}.{field}') for field in values)+' '
+            +log_role(prefix+'_role',counter,owner)+' '+extra)
+
+
+@timed_often
+def log_opened(members,limit,kept,scope,row):
+    return (members+' = { '+limit+'save_scope_as = '+scope[len('scope:'):]+f' remove_from_global_variable_map = {{ name = {kept} key = {scope} }} '
+            f'add_to_global_variable_map = {{ name = {kept} key = {scope} value = scope:battle }} scope:log_holder = {{ {row} }} }}')
+
+
+@timed_often
+def log_closed(kept,scope,owner,row):
+    return (f'every_key_in_global_variable_map = {{ variable = {kept} save_scope_as = {scope[len("scope:"):]} '
+            +when(f'"global_variable_map({kept}|{scope})" ?= scope:battle',f'add_to_local_variable_list = {{ name = log_closed target = {scope} }} '
+                  +when('exists = '+owner,'scope:log_holder = { '+row+' }'))
+            +f' }} every_in_local_list = {{ variable = log_closed remove_from_global_variable_map = {{ name = {kept} key = this }} }}')
+
+
+@timed_often
+def log_unit(engaged):
+    return log_row('log_unit','scope:log_unit','scope:log_unit.owner',UNIT_VALUES,engaged)
+
+
+@timed_often
+def log_ship():
+    return log_row('log_ship','scope:log_ship','scope:log_ship.country',SHIP_VALUES,
+                   when('exists = scope:log_ship.ship_fleet',mapped('log_ship_fleet','var:log_ship_count','scope:log_ship.ship_fleet')))
+
+
+@timed_often
+def log_once(variable,body):
+    return when(f'NOT = {{ var:{variable} ?= scope:battle }}',f'set_variable = {{ name = {variable} value = scope:battle }} '+body)
+
+
+@timed_often
+def log_land_end(kind):
+    engaged=when('is_target_in_local_variable_list = { name = log_engaged target = scope:log_unit }',mapped('log_unit_engaged','var:log_unit_count','flag:yes'))
+    return (log_event(kind,LAND_SCOPES)+' '+log_role('log_role','log_count','scope:log_country')+' '+log_sides('current_manpower')
+            +' scope:battle = { every_combat_unit = { add_to_local_variable_list = { name = log_engaged target = this } } } '
+            +log_closed('log_open_unit','scope:log_unit','scope:log_unit.owner',log_unit(engaged)))
+
+
+@timed_often
+def log_fleet(country):
+    return country+' = { '+log_opened('every_scope_ship','limit = { is_in_battle = yes } ','log_open_ship','scope:log_ship',log_ship())+' }'
+
+
+@timed_often
+def log_bodies():
+    role=log_role('log_role','log_count','scope:log_country')
+    units=log_opened('every_combat_unit','limit = { exists = owner } ','log_open_unit','scope:log_unit',log_unit(mapped('log_unit_engaged','var:log_unit_count','flag:yes')))
+    bodies={'battle_started':('on_battle_started','root',log_once('log_started',log_event('battle_started',LAND_SCOPES)+' '+role+' '+log_sides('starting_manpower')
+                                                                  +' scope:battle = { '+units+' }')),
+            'battle_won':('on_battle_won','root',log_land_end('battle_won')),
+            'empty_battle_won':('on_empty_battle_won','root',log_land_end('empty_battle_won')),
+            'naval_battle_started':('on_naval_battle_started','root',log_once('log_naval_started',log_event('naval_battle_started',NAVAL_SCOPES)+' '+role+' '+log_fleet('scope:log_country')+' '
+                                                                              +when('exists = scope:enemy_country',log_fleet('scope:enemy_country')))),
+            'naval_battle_won':('on_naval_battle_won','root',log_event('naval_battle_won',NAVAL_SCOPES)+' '+role+' '
+                                +log_closed('log_open_ship','scope:log_ship','scope:log_ship.country',log_ship()))}
+    bodies.update({kind:(hook,country,log_event(kind,scopes)) for hook,kind,country,scopes in WAR_HOOKS})
+    return bodies
+
+
+@timed_often
+def log_hooks():
+    return ''.join(f'{hook} = {{ on_actions = {{ interface_log_{kind} }} }}\n'
+                   f'interface_log_{kind} = {{ effect = {{ {country} = {{ save_scope_as = log_country }} every_country = {{ limit = {{ is_player = yes }} save_scope_as = log_holder '
+                   +LOG_START+body+' } } }\n' for kind,(hook,country,body) in log_bodies().items())
 
 
 PROPOSAL_MAPS=('cap_proposal_actor','cap_proposal_kind')

@@ -51,6 +51,8 @@ class LogTail:
         self.total=0
         self.lost=0
         self.known=None
+        self.signature=None
+        self.checked=0
         self.offset=0
         self.last=b''
         self.unsettled=None
@@ -84,6 +86,11 @@ class LogTail:
     @timed_often
     def step(self):
         with self.lock:
+            stat=os.stat(self.directory/'debug.log')
+            signature=(stat.st_ino,stat.st_size,stat.st_mtime_ns)
+            checked=time.monotonic()
+            if signature==self.signature and self.unsettled is None and checked-self.checked<POLL:
+                return
             files=self.files()
             if 0 not in files:
                 return
@@ -125,6 +132,8 @@ class LogTail:
                 if len(self.buffer)>WINDOW:
                     cut=self.buffer.find(b'\n',len(self.buffer)-WINDOW)+1
                     del self.buffer[:cut]
+            self.signature=signature
+            self.checked=checked
 
     @timed_often
     def scan(self,added):

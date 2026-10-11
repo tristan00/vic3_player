@@ -2259,9 +2259,9 @@ def standard_methods(s):
         active=s.grouped('building_production_method_active','building,production_method')
         counts={}
         for ident,kind,levels in s.buildings():
-            for method in active.get(ident,()) if levels else ():
+            for method in active.get(ident,()):
                 tally=counts.setdefault((kind,group_of.get((kind,method))),{})
-                tally[method]=tally.get(method,0)+levels
+                tally[method]=tally.get(method,0)+1
         return {key:max(tally,key=tally.get) for key,tally in counts.items() if sorted(tally.values())[-2:].count(max(tally.values()))==1}
     return s.memo('standard_methods',compute)
 
@@ -2476,8 +2476,8 @@ def article_inputs(s,kind,giver,taker,article):
     if kind=='ship':
         return [{'ship':ship} for ship in country_ships(s,giver)]
     if kind=='monopoly':
-        return [{'company':company,'building_type':building} for company,name in s.rows('company','company,company_type',country=taker)
-                for block in definition(s,'common/company_types',name,'building_types') for building in block.split()]
+        return [{'company':company,'building_type':building} for company,name,headquarters in s.rows('company','company,company_type,building',country=taker)
+                if headquarters is not None for block in definition(s,'common/company_types',name,'building_types') for building in block.split()]
     if kind=='money':
         return [{'share':share} for share in TREATY_SHARES]
     return [{'goods':goods,'share':share} for goods in traded(s) for share in TREATY_SHARES]

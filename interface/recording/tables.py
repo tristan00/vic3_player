@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 
 from ..common import progress, slot, timed, timed_often
+from .capture import LOG_MAPS,SHIP_MAPS,UNIT_MAPS
 from .spec import DROPPED_COUNTRY_METRICS,DROPPED_STATE_METRICS,EPOCH_DATE,METRIC_COLUMNS,METRICS_KINDS,TABLE,TABLES
 
 SLOT=0xffffff
@@ -121,13 +122,15 @@ def ownership_owner(ident,building,owner_type,owner,types,headquarters,owning):
         raise RuntimeError(f'Ownership {ident} has owner type {owner_type}, neither a country nor a building')
     if owner==building:
         kind='self'
-    elif types.get(owner) in owning:
+    elif owner not in types:
+        kind='vanished_building'
+    elif types[owner] in owning:
         kind=owning[types[owner]]
     else:
-        raise RuntimeError(f'Ownership {ident} is owned by building {owner} of type {types.get(owner)}, which is no ownership building')
+        raise RuntimeError(f'Ownership {ident} is owned by building {owner} of type {types[owner]}, which is no ownership building')
     if kind=='company' and owner not in headquarters:
         raise RuntimeError(f'Ownership {ident} is owned by company headquarters {owner}, which no captured company names as its headquarters')
-    return {'owner_kind':kind,'owner_country':None,'owner_building':owner,'owner_company':headquarters.get(owner) if kind=='company' else None}
+    return {'owner_kind':kind,'owner_country':None,'owner_building':owner,'owner_company':headquarters[owner] if kind=='company' else None}
 
 
 def movement_modifiers(children,ids,label):
@@ -462,6 +465,7 @@ def diplomacy(c):
     if relation:
         pairs={i:(a,b,ta,tb) for i,a,b,ta,tb in zip(relation['id'],relation['first_country'],relation['second_country'],relation['first_truce'],relation['second_truce'])}
         private=c.rows('relation_private','id','relations','improve_relations','tension')
+        living=set(c.table('state')['country'])
         for i,relations,improve,tension in private:
             first,second,first_truce,second_truce=pairs[i]
             if first&SLOT==c.player:
@@ -470,7 +474,8 @@ def diplomacy(c):
                 other,own,theirs=first,second_truce,first_truce
             else:
                 raise RuntimeError(f'Private relation {i} is not between the player and another country')
-            c.add('player_relation',country=other,relations=relations,improve_relations=improve,tension=tension,player_truce=own,country_truce=theirs)
+            if other in living:
+                c.add('player_relation',country=other,relations=relations,improve_relations=improve,tension=tension,player_truce=own,country_truce=theirs)
     t=c.table('pact')
     if t:
         for ident,first,second,kind,liberty in zip(t['ident'],t['targets_first'],t['targets_second'],t['pact_action'],t['liberty_desire']):
@@ -510,8 +515,7 @@ def diplomacy(c):
     if t:
         for index,ident in enumerate(t['ident']):
             c.add('treaty_history',treaty=ident,first_country=t['first_country'][index],second_country=t['second_country'][index],
-                  entered_into_force_on=t['entered_into_force_on'][index],binding_period=t['binding_period'][index],withdrawn_by=t['withdrawn_by'][index],
-                  withdrawn=flag(t['withdrawn'][index]))
+                  entered_into_force_on=t['entered_into_force_on'][index],binding_period=t['binding_period'][index],withdrawn=flag(t['withdrawn'][index]))
     t=c.table('treaty_article')
     if t:
         for ident,treaty,kind,source,target in zip(t['ident'],t['treaty'],t['treaty_article_article'],t['source_country'],t['target_country']):
@@ -739,7 +743,7 @@ def buildings(c):
             elif listed is None or listed[0]!=building&SLOT or listed[1]!=ident:
                 raise RuntimeError(f'Ownership {ident} is not listed among the owners of building {building}')
             asset=assets.pop(i,None)
-            if asset is not None and (asset[0]!=owner&SLOT or asset[1]!=ident):
+            if asset is not None and (asset[0]!=owner&SLOT or asset[1]!=ident or owner not in captured):
                 raise RuntimeError(f'Ownership {ident} is listed among the assets of {asset[0]}, not of its owner {owner}')
             c.add('building_ownership_history',building_ownership=ident,building=building,**ownership_owner(ident,building,owner_type,owner,types,headquarters,owning),
                   levels=levels,privatization=flag(privatization),in_owner_assets=asset is not None)
@@ -935,7 +939,11 @@ def politics(c):
     t=c.table('law')
     if t:
         ids=idents(t)
-        chances=dict(c.rows('law_chance','law','chance'))
+        fields=('chance','enactment_phase','checkpoint_progress','enactment_setbacks','advance_chance','debate_chance','stall_chance')
+        reports=c.rows('law_chance','law',*fields)
+        chances={law:dict(zip(fields,values)) for law,*values in reports}
+        if len(chances)!=len(reports):
+            raise RuntimeError('Law reports contain duplicate law types')
         held={}
         for index,i in enumerate(t['id']):
             c.add('law_history',law=ids[i],country=t['country'][index],law_type=c.label(t['law'][index]),progress=t['progress'][index],phase=t['phase'][index],
@@ -945,10 +953,10 @@ def politics(c):
         if len(held)!=len(chances):
             raise RuntimeError('Law chances do not each match one player law')
         private=c.rows('law_private','id','enactment_last_checkpoint_result','replace','enactment_start_date')
-        if set(held)-{i for i,*_ in private}:
-            raise RuntimeError('Law chances for laws without private data')
+        if set(held)!={i for i,*_ in private}:
+            raise RuntimeError('Law reports do not each match one player law with private data')
         for i,result,replacing,start in private:
-            c.add('law_private',law=ids[i],checkpoint_result=result,replacing_law_type=c.label(replacing),enactment_start_date=start,chance=held.get(i))
+            c.add('law_private',law=ids[i],checkpoint_result=result,replacing_law_type=c.label(replacing),enactment_start_date=start,**held[i])
         for i,items in c.children('law_amendments','id','value').items():
             for amendment, in items:
                 c.add('law_amendment',law=ids[i],amendment=amendment)
@@ -1087,7 +1095,8 @@ def military(c):
                   target_location=t['target_location_identity'][index],naval_mission=t['naval_mission'][index],x=xy[0],y=xy[1],
                   organization=t['organization'][index],sea_presence=t['sea_presence'][index],supply=t['supply'][index],
                   delivered_supply=t['delivered_supply'][index],supply_ships=t['supply_ships'][index],mobilized=flag(t['is_mobilized'][index]),
-                  raised_conscripts=flag(t['has_raised_conscripts'][index]))
+                  raised_conscripts=flag(t['has_raised_conscripts'][index]),current_location_type=t['current_location_type'][index],
+                  target_location_type=t['target_location_type'][index])
         settings={f:values for f,*values in c.rows('formation_setting','formation',*FORMATION_PRIVATE,'hit_points_percent','retrofittable','retrofitting')}
         deployable={f for f, in c.rows('formation_deployable','formation')}
         display=dict(c.rows('formation_name','formation','name'))
@@ -1309,8 +1318,8 @@ def journal(c):
         if set(t['scope_root_definition'])-{0}:
             raise RuntimeError('event.scope_root_definition is not always 0')
         labels=dict(zip(t['id'],t['event_event']))
-        for ident,kind,origin,status in zip(t['ident'],t['event_event'],t['origin_country'],t['status']):
-            c.add('event_history',event=ident,event_type=c.label(kind),origin_country=origin,status=status)
+        for ident,kind,origin in zip(t['ident'],t['event_event'],t['origin_country']):
+            c.add('event_history',event=ident,event_type=c.label(kind),origin_country=origin)
         for i,items in c.children('event_target','id','name','scope_type','identity','definition').items():
             for name,scope,target,definition in items:
                 if definition!=0:
@@ -1333,7 +1342,49 @@ def journal(c):
                       text=text,description=description)
 
 
-BUILDERS=(countries,player,diplomacy,states,pops,cultures,buildings,markets,companies,politics,characters,military,wars,ai,journal,metrics)
+BATTLE_STARTS={'battle_started':False,'naval_battle_started':True}
+BATTLE_RESULTS={'battle_won':(False,False),'empty_battle_won':(True,False),'naval_battle_won':(False,True)}
+STAGES={**dict.fromkeys(BATTLE_STARTS,'start'),**dict.fromkeys(BATTLE_RESULTS,'end')}
+
+
+def whole(value):
+    return None if value is None else int(value)
+
+
+@timed_often
+def conflict_rows(c,table,maps,events):
+    rows=[]
+    for n,event,*values in c.rows(table,'n',*(name[len('log_'):] for name in maps)):
+        if int(event) not in events or events[int(event)][0] not in STAGES:
+            raise RuntimeError(f'{table} row {n} belongs to event {event}, which is no battle event of this capture')
+        rows.append((n,*events[int(event)],*values))
+    return rows
+
+
+@timed_often
+def conflicts(c):
+    events={}
+    for n,date,kind,year,month,country,other,state,attacker,defender,battle,naval,front,province,role,attacker_manpower,defender_manpower in c.rows(
+            'conflict_log','n','date',*(name[len('log_'):] for name in LOG_MAPS)):
+        events[n]=(kind,date,battle,naval)
+        if kind in BATTLE_STARTS:
+            leading,facing={'attacker':(country,other),'defender':(other,country),None:(None,None)}[role]
+            c.add('battle_start',n=n,date=date,battle=battle,naval_battle=naval,state=state,front=front,province=province,attacker_country=leading,defender_country=facing,
+                  attacker=attacker,defender=defender,attacker_manpower=whole(attacker_manpower),defender_manpower=whole(defender_manpower),naval=BATTLE_STARTS[kind])
+        elif kind in BATTLE_RESULTS:
+            empty,at_sea=BATTLE_RESULTS[kind]
+            c.add('battle_result',n=n,date=date,year=int(year),month=int(month),winner=country,loser=other,state=state,attacker=attacker,defender=defender,battle=battle,
+                  empty=empty,naval=at_sea,naval_battle=naval,winner_role=role,attacker_manpower=whole(attacker_manpower),defender_manpower=whole(defender_manpower))
+        else:
+            c.add('war_event',n=n,date=date,year=int(year),month=int(month),kind=kind,country=country,target_country=other)
+    for n,kind,date,battle,_,unit,country,manpower,demoralized,morale,offense,defense,role,engaged in conflict_rows(c,'conflict_unit',UNIT_MAPS,events):
+        c.add('battle_unit',n=n,date=date,battle=battle,stage=STAGES[kind],combat_unit=unit,country=country,side=role,manpower=int(manpower),demoralized=int(demoralized),
+              morale=morale,offense=offense,defense=defense,engaged=engaged is not None)
+    for n,kind,date,_,naval,ship,country,hit_points,crew,fleet,role in conflict_rows(c,'conflict_ship',SHIP_MAPS,events):
+        c.add('battle_ship',n=n,date=date,naval_battle=naval,stage=STAGES[kind],ship=ship,fleet=fleet,country=country,side=role,hit_points=hit_points,crew=int(crew))
+
+
+BUILDERS=(countries,player,diplomacy,states,pops,cultures,buildings,markets,companies,politics,characters,military,wars,conflicts,ai,journal,metrics)
 
 
 @timed_often

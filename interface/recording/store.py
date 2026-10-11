@@ -237,17 +237,17 @@ class Store:
         tag=self.names('country_definition',[pending['tag']])[0]
         run_id=cursor.execute('insert into run (run_id,kind,source_session,started_at,heartbeat_at,progress_at,progress_step,world_id,ruleset_id,player_country,'
                               'game_speed,first_start,custom_rng_seed,tag,world_file,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,'
-                              'world_seed,countries,states,tech,pop,modernity,copies,diversity,military,picker,candidates,objective_gdp,objective_population,objective_sol,objective_alpha,objective_stock) '
-                              'values ((select coalesce(max(run_id),0)+1 from run),%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
+                              'world_seed,countries,states,pop,modernity,copies,diversity,military,picker,candidates,objective_gdp,objective_population,objective_sol,objective_alpha,objective_stock) '
+                              'values ((select coalesce(max(run_id),0)+1 from run),%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
                               (pending['kind'],self.session,pending['started_at'],'open_run',self.world_id,self.ruleset_id,constants['player_country'],
                                constants['game_speed'],constants['first_start'],constants['custom_rng_seed'],tag,pending['world'],pending['cli_seed'],
                                pending['run_seed'],pending['years'],pending['minutes'],pending['profile'],pending['pool'],pending['runs_requested'],
-                               *[None if pending['generated'] is None else pending['generated'].get(k) for k in ('seed','countries','states','tech','pop','modernity','copies','diversity','military')],pending['picker'],pending['candidates'],pending['objective'][0]['gdp'],pending['objective'][0]['population'],pending['objective'][0]['sol'],pending['objective'][1],pending['objective'][0]['stock'])).fetchone()[0]
+                               *[None if pending['generated'] is None else pending['generated'].get(k) for k in ('seed','countries','states','pop','modernity','copies','diversity','military')],pending['picker'],pending['candidates'],pending['objective'][0]['gdp'],pending['objective'][0]['population'],pending['objective'][0]['sol'],pending['objective'][1],pending['objective'][0]['stock'])).fetchone()[0]
         names=sorted(pending['weights'])
         if pending['generated'] is not None:
             values=pending['generated']
-            cursor.execute('update run set tech_variation=%s,country_economy=%s,source_regions=%s,ideology_uniformity=%s,primary_culture_share=%s,interconnectedness=%s where run_id=%s',
-                           (*[values.get(key) for key in ('tech_variation','country_economy','source_regions','ideology_uniformity','primary_culture_share','interconnectedness')],run_id))
+            cursor.execute('update run set source_regions=%s,ideology_uniformity=%s,primary_culture_share=%s,interconnectedness=%s,antagonism=%s where run_id=%s',
+                           (*[values.get(key) for key in ('source_groups','ideology_uniformity','primary_culture_share','interconnectedness','antagonism')],run_id))
         self.copy(cursor,'run_weight',('run_id','advisor_action','weight','centre'),
                   [(run_id,action,pending['weights'][name],pending['centres'].get(name)) for name,action in zip(names,self.names('advisor_action',names))])
         self.copy(cursor,'run_advisor',('run_id','position','advisor'),enumerate_rows(run_id,self.names('advisor',pending['advisors'])))
