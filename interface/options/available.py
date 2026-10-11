@@ -716,10 +716,10 @@ def governing(s):
 
 
 @timed_often
-def opposed_in_government(s,law):
+def opposed_in_government(s,law,sponsor):
     ideologies=group_ideologies(s)
     clouts=s.map('interest_group_stats','interest_group,clout')
-    stances=[(stance(s,ideologies.get(ident,[]),law),clouts[ident]) for ident in governing(s)]
+    stances=[(1 if ident==sponsor else stance(s,ideologies.get(ident,[]),law),clouts[ident]) for ident in governing(s)]
     opposing=[clout for value,clout in stances if value<0]
     return law is not None and bool(opposing) and sum(opposing)>=sum(clout for value,clout in stances if value>0)
 
@@ -2748,9 +2748,9 @@ RULES={
     'enact_law':lambda s:product(law=enactable(s)),
     'cancel_enactment':lambda s:[{}] if enacting(s) else [],
     'impose_law':lambda s:product(law=imposable(s)),
-    'repeal_amendment':lambda s:product(amendment=[ident for ident,law,kind in s.rows('amendment','amendment,law,amendment_type')
+    'repeal_amendment':lambda s:product(amendment=[ident for ident,kind,sponsor in s.rows('amendment','amendment,amendment_type,sponsor')
                                                    if ident in repealable(s)
-                                                   and opposed_in_government(s,next(iter(definition(s,'common/amendments',kind,'parent')),None))
+                                                   and opposed_in_government(s,next(iter(definition(s,'common/amendments',kind,'parent')),None),sponsor)
                                                    and passes(s,'common/amendments',kind,('can_repeal',),country_scope(s))]),
     'toggle_bolster_movement':lambda s:product(political_movement=movements(s,PROMOTED)),
     'toggle_suppress_movement':lambda s:product(political_movement=movements(s,SUPPRESSED)),
