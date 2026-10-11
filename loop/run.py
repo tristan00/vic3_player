@@ -17,12 +17,12 @@ from interface.options.stored import Shared, Stored
 from interface.recording.store import Store, DSN
 from interface.timing import RECORDER, span
 from interface.runner.session import _spawn, process as owner
-from interface.world.bank import Bank
+from interface.world.bank import take
 from interface.world.sampling import SLIDERS, PER_COUNTRY
 from loop.sampling import batches, block_length
 
 STATE=DEFAULT_DATA/'collection.json'
-DEFAULTS=dict(profile='actions',world_cache='',runs=1,warmup=0,years=100.,minutes=30.,seed=int(time.time()),advisors=['random'],pickers=['first'])
+DEFAULTS=dict(profile='actions',world_cache=[],runs=1,warmup=0,years=100.,minutes=30.,seed=int(time.time()),advisors=['random'],pickers=['first'])
 
 @contextmanager
 def state():
@@ -126,7 +126,7 @@ def play(game,store,advisor,picker,settings):
 def collect(settings,completed):
     RECORDER.reset()
     rng=random.Random(settings['seed']+completed)
-    world=Bank(settings['world_cache']).take(rng)
+    world=take(settings['world_cache'],rng)
     manifest=json.loads(world.read_text(encoding='utf-8'))
     country=rng.choice([c for c in manifest['countries'] if c['country_type']!='decentralized'])
     objective=draw_objective(rng)
@@ -193,7 +193,7 @@ def main(argv=None):
     parser.add_argument('--now',action='store_true',help='stop the current run immediately')
     parser.add_argument('--completed',type=int,help='completed runs when starting an existing collection')
     for name,value in DEFAULTS.items():
-        parser.add_argument('--'+name.replace('_','-'),type=type(value[0]) if isinstance(value,list) else type(value),
+        parser.add_argument('--'+name.replace('_','-'),type=str if isinstance(value,list) else type(value),
                             nargs='+' if isinstance(value,list) else None,default=argparse.SUPPRESS)
     args=vars(parser.parse_args(argv))
     command,now,completed=args.pop('command'),args.pop('now'),args.pop('completed')
@@ -219,8 +219,9 @@ def main(argv=None):
             if not settings['profile'] or Path(settings['profile']).name!=settings['profile'] or settings['profile'] in ('.','..'):
                 parser.error('profile must be a directory name')
             if not set(settings['advisors'])<=ADVISORS.keys() or not set(settings['pickers'])<=PICKERS.keys(): parser.error('unknown advisor or picker')
-            if not (Path(settings['world_cache'])/'bank.json').is_file(): parser.error('world-cache must have a bank.json')
-            settings['world_cache']=str(Path(settings['world_cache']).resolve())
+            if not settings['world_cache'] or any(not (Path(directory)/'bank.json').is_file() for directory in settings['world_cache']):
+                parser.error('world-cache must list directories that each have a bank.json')
+            settings['world_cache']=sorted({str(Path(directory).resolve()) for directory in settings['world_cache']})
             data['settings']=settings
         if command=='cancel': data.update(stop=False,restart=False,settings=data['active'].copy() if running else settings)
         if command in ('stop','restart'): data.update(stop=command=='stop',restart=command=='restart')

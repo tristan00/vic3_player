@@ -44,7 +44,7 @@ function Collection({ found, rows }: { found: any; rows: any[] }) {
           )}
         </span>
       </div>
-      <Facts items={Object.entries(settings).map(([name, value]) => [name, Array.isArray(value) ? value.join(', ') : name === 'world_cache' ? String(value).split(/[\\/]/).pop() : String(value)])} />
+      <Facts items={Object.entries(settings).map(([name, value]) => [name, Array.isArray(value) ? value.map((item) => (name === 'world_cache' ? String(item).split(/[\\/]/).pop() : item)).join(', ') : String(value)])} />
     </Panel>
   )
 }

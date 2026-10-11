@@ -27,13 +27,8 @@ class Bank:
             publish(self.path,{'outputs':sorted({str(path) for path in [*known,output]})})
 
     @timed
-    def take(self,rng):
-        available=[path for output in self.outputs() for path in worlds(output)]
-        if not available:
-            raise ValueError('Bank has no completed worlds')
-        path=rng.choice(available)
-        checked(path)
-        return path
+    def available(self):
+        return [path for output in self.outputs() for path in worlds(output)]
 
     @timed
     def append(self,count,countries,states=(10,30),workers=20,seed=None,game=DEFAULT_GAME,source_group_pool=None,country_pool=None,**levels):
@@ -47,3 +42,13 @@ class Bank:
     def status(self):
         outputs=[{'output':str(output),'worlds':len(worlds(output)),'status':status(output)} for output in self.outputs()]
         return {'worlds':sum(output['worlds'] for output in outputs),'outputs':outputs}
+
+
+@timed
+def take(directories,rng):
+    available=sorted({path for directory in directories for path in Bank(directory).available()})
+    if not available:
+        raise ValueError('World banks have no completed worlds')
+    path=rng.choice(available)
+    checked(path)
+    return path

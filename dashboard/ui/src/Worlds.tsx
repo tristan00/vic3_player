@@ -68,11 +68,11 @@ export function Worlds() {
       <h1>Worlds</h1>
       <Waiting loaded={bank}>
         {() =>
-          bank.data.directory ? (
-            <Panel title="World bank" extra={bank.data.directory}>
-              <Facts items={[['worlds', num(bank.data.worlds)], ...bank.data.outputs.flatMap((output: any, index: number) => Object.entries(output.status ?? {}).filter(([name]) => name !== 'pid' && name !== 'created').map(([name, value]) => [`output ${index + 1} ${name}`, typeof value === 'number' && value > 1e9 && value < 1e11 ? time(value) : typeof value === 'number' ? num(value) : String(value)] as [string, string]))]} />
+          bank.data.banks.map((found: any) => (
+            <Panel key={found.directory} title="World bank" extra={found.directory}>
+              <Facts items={[['worlds', num(found.worlds)], ...found.outputs.flatMap((output: any, index: number) => Object.entries(output.status ?? {}).filter(([name]) => name !== 'pid' && name !== 'created').map(([name, value]) => [`output ${index + 1} ${name}`, typeof value === 'number' && value > 1e9 && value < 1e11 ? time(value) : typeof value === 'number' ? num(value) : String(value)] as [string, string]))]} />
             </Panel>
-          ) : null
+          ))
         }
       </Waiting>
       <Waiting loaded={worlds}>

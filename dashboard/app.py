@@ -260,7 +260,7 @@ def world_image(world:ID,name:str):
 @db.often
 def bank():
     settings=runs.collection().get('settings')
-    return db.reply({'directory':settings['world_cache'],**worlds.bank(settings['world_cache'])} if settings else {'directory':None})
+    return db.reply({'banks':[{'directory':directory,**worlds.bank(directory)} for directory in settings['world_cache']] if settings else []})
 
 
 @app.get('/api/tuning')
