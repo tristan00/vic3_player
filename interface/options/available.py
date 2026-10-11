@@ -554,6 +554,13 @@ def inherited(s,kind,field):
 
 
 @timed_often
+def company_monopolies(s):
+    chartered={company for _,company,kind in s.rows('charter','charter,company,company_charter_type') if kind=='monopoly_charter'}
+    kinds=s.map('company','company,company_type',country=s.player)
+    return monopolies(s)&{kind for company in chartered if company in kinds for kind in stated('common/company_types',kinds[company],'building_types')}
+
+
+@timed_often
 def private_kinds(s):
     monopolized=monopolies(s)
     return {kind for kind in building_kinds(s,buildable=True) if inherited(s,kind,'is_government_funded')!=['yes'] and kind not in monopolized}
@@ -563,7 +570,8 @@ def private_kinds(s):
 def monopolizable(s):
     held=monopolies(s)
     return sorted(kind for kind in building_kinds(s,buildable=True) if definition(s,'common/buildings',kind,'unique')!=['yes']
-                  and inherited(s,kind,'is_government_funded')!=['yes'] and (kind in held or (authority(s)>=MONOPOLY_COST and len(held)<MAX_MONOPOLIES)))
+                  and inherited(s,kind,'is_government_funded')!=['yes'] and kind not in company_monopolies(s)
+                  and (kind in held or (authority(s)>=MONOPOLY_COST and len(held)<MAX_MONOPOLIES)))
 
 
 MONOPOLY_COST=100
@@ -2684,7 +2692,7 @@ RULES={
     'resume_construction_output':lambda s:product(building=[i for i,k,_ in s.buildings() if k=='building_construction_sector' and setting(s,i,'output_paused')]),
     'nationalize':lambda s:[] if law_flag(s,'country_disable_nationalization_bool') else
                            [{'building':ident,'levels':n} for ident,levels in private_levels(s).items() for n in range(1,levels+1)
-                            if money(s)>=nationalization_cost(s,ident)*n],
+                            if money(s)>=nationalization_cost(s,ident)*n and located_buildings(s)[ident][0] not in company_monopolies(s)],
     'toggle_privatization':lambda s:[] if law_flag(s,'country_force_privatization_bool') else product(building=[i for i in owned_of(s,private_kinds(s)) if privatizable(s,i) or privatization_requested(s,i)]),
     'toggle_monopoly':lambda s:product(building_type=monopolizable(s)),
     'subsidies_on':lambda s:product(building=[i for i in subsidized(s,0) if i in owned_of(s,private_kinds(s))]),
