@@ -666,6 +666,7 @@ def active_laws(s):
 
 NO_DATE=43791240
 PRINCIPLE_SLOTS=4
+SLOT_MEMBERS=(0,0,5,10)
 BLOC_INFLUENCE=500
 ENACTMENT_COOLDOWN_HOURS=730*24
 
@@ -2310,6 +2311,13 @@ def market_capital_sites(s):
 
 
 @timed_often
+def grantable(s):
+    held={(company,kind) for _,company,kind in s.rows('charter','charter,company,company_charter_type')}
+    return [option for option in building_charters(s)
+            if (option['building_type'] not in monopolies(s) if option['charter']=='monopoly_charter' else (option['company'],option['charter']) not in held)]
+
+
+@timed_often
 def revocable(s,options):
     unlock=dict(s.rows('charter_private','charter,unlock'))
     unlocked={(company,kind) for charter,company,kind in s.rows('charter','charter,company,company_charter_type') if charter in unlock and EPOCH_DATE<unlock[charter]<now(s)}
@@ -2691,7 +2699,7 @@ RULES={
     'reset_production_methods':lambda s:product(state=sorted({s.map('building','building,state')[ident] for ident in resettable(s)})),
     'move_capital':lambda s:product(state=capital_sites(s)),
     'move_market_capital':lambda s:product(state=market_capital_sites(s)),
-    'grant_building_charter':building_charters,
+    'grant_building_charter':grantable,
     'revoke_building_charter':lambda s:revocable(s,building_charters(s)),
     'grant_region_charter':region_charters,
     'revoke_region_charter':lambda s:revocable(s,region_charters(s)),
@@ -2960,6 +2968,7 @@ RULES={
     'set_strategic_objective':lambda s:[{'military_formation':f,'state':st} for states in [strategic_objective_states(s)] for f in settled(s,s.formations('army')) for st in states
                                         if st!=formation_setting(s,f,'strategic_objective')],
     'pick_principle':lambda s:[{'slot':len(held),'power_bloc_principle':levels[0]} for held in [bloc_principles(s)] if bloc_leader(s) and mandates(s) and len(held)<PRINCIPLE_SLOTS
+                               and sum(bloc in player_blocs(s) for bloc, in s.rows('country','power_bloc'))>=SLOT_MEMBERS[len(held)]
                                for identity in [bloc_identity(s)]
                                for group in s.definitions('common/power_bloc_principle_groups')
                                for levels in [definition(s,'common/power_bloc_principle_groups',group,'levels')] if levels and not set(levels)&held and principle_allowed(s,levels[0])
