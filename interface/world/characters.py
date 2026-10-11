@@ -18,9 +18,9 @@ def scripts(game,files):
             character=re.sub(r'\broot\b','scope:interface_ideology_character',character)
             choices.append(f'1 = {{ trigger = {{ owner = {{ {country} }} {character} }} set_ideology = ideology:{name} }}')
     effect=('interface_uniform_ideology = { if = { limit = { is_adult = yes exists = owner '
-            'owner = { has_variable = interface_ideology_uniformity } NOT = { has_variable = interface_ideology_sampled } } '
+            'owner = { has_variable = interface_random_ideology_share } NOT = { has_variable = interface_ideology_sampled } } '
             'set_variable = interface_ideology_sampled save_scope_as = interface_ideology_character '
-            'random = { chance = owner.var:interface_ideology_uniformity random_list = { '+'\n'.join(choices)+' } } } }')
+            'random = { chance = owner.var:interface_random_ideology_share random_list = { '+'\n'.join(choices)+' } } } }')
     files['common/scripted_effects/interface_ideologies.txt']=effect
     path=game/'common/on_actions/00_code_on_actions.txt'
     name=path.relative_to(game).as_posix()

@@ -246,8 +246,8 @@ class Store:
         names=sorted(pending['weights'])
         if pending['generated'] is not None:
             values=pending['generated']
-            cursor.execute('update run set source_regions=%s,ideology_uniformity=%s,primary_culture_share=%s,interconnectedness=%s,antagonism=%s where run_id=%s',
-                           (*[values.get(key) for key in ('source_groups','ideology_uniformity','primary_culture_share','interconnectedness','antagonism')],run_id))
+            cursor.execute('update run set source_regions=%s,random_ideology_share=%s,primary_culture_share=%s,interconnectedness=%s,antagonism=%s where run_id=%s',
+                           (*[values.get(key) for key in ('source_groups','random_ideology_share','primary_culture_share','interconnectedness','antagonism')],run_id))
         self.copy(cursor,'run_weight',('run_id','advisor_action','weight','centre'),
                   [(run_id,action,pending['weights'][name],pending['centres'].get(name)) for name,action in zip(names,self.names('advisor_action',names))])
         self.copy(cursor,'run_advisor',('run_id','position','advisor'),enumerate_rows(run_id,self.names('advisor',pending['advisors'])))

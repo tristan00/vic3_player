@@ -123,7 +123,7 @@ def politics(text,data,techs,capacity):
 
 
 @timed
-def nations(rng,data,states,groups,capitals,strategic,country_pool,ideology_uniformity,copies,primary_culture_share,military,interconnectedness,antagonism,war,sides):
+def nations(rng,data,states,groups,capitals,strategic,country_pool,random_ideology_share,copies,primary_culture_share,military,interconnectedness,antagonism,war,sides):
     by_id={s['id']:s for s in states}
     group_of={s['id']:r['key'] for r in strategic for s in r['states']}
     identity_rng=random.Random(rng.getrandbits(64))
@@ -210,9 +210,9 @@ def nations(rng,data,states,groups,capitals,strategic,country_pool,ideology_unif
             local_states[state['source']['key']]=state['key']
         techs=known[index]
         country_text=starting_history(data,donor,techs)
-        uniformity=control_rng.uniform(*ideology_uniformity)
+        random_ideology=control_rng.uniform(*random_ideology_share)
         realized=population(culture_rng,data,[by_id[i] for i in group],source['cultures'],control_rng.uniform(*primary_culture_share))
-        country_text+=f'\nset_variable = {{ name = interface_ideology_uniformity value = {100*uniformity:.5f} }}'
+        country_text+=f'\nset_variable = {{ name = interface_random_ideology_share value = {100*random_ideology:.5f} }}'
         country_text='\n'.join(f'{key} {op} {value}' for key,op,value in commands(country_text)
                                if key not in ('add_company','set_capital','set_market_capital') and not key.startswith('company:'))
         country_text=politics(country_text,data,techs,max(by_id[i]['buildings'].get('building_barrack',0) for i in group))
@@ -274,7 +274,7 @@ def nations(rng,data,states,groups,capitals,strategic,country_pool,ideology_unif
                 histories['trade'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {history_text(original['trade_history'],local_tags,own_states,group_map)} }} }}')
         countries.append({'tag':tag,'name':name,'source':donor,'copy':donor if tag==donor else None,'country_type':types[index],
                           'states':[by_id[i]['key'] for i in group],'capital':capital['key'],'culture':source['cultures'][0],
-                          'cultures':source['cultures'],'primary_culture_share':realized,'ideology_uniformity':uniformity,
+                          'cultures':source['cultures'],'primary_culture_share':realized,'random_ideology_share':random_ideology,
                           'tech_count':len(techs),'technologies':sorted(techs),'conquest_target':conquest_targets.get(tag),
                           'starting_laws':{data['law_groups'][law]:law for law in re.findall(r'activate_law\s*=\s*law_type:(\w+)',country_text)},
                           'provinces':[p for i in group for p in by_id[i]['province_codes']]})

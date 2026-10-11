@@ -3,10 +3,10 @@ import random
 from ..common import timed_often
 
 
-SAMPLING={'ideology_uniformity':(0,1),'copies':(1,1),'source_groups':(1,4),'primary_culture_share':(0,1),
+SAMPLING={'random_ideology_share':(0,1),'copies':(1,1),'source_groups':(1,4),'primary_culture_share':(0,1),
           'military':(0,1),'interconnectedness':(0,1),'antagonism':(0,1),'war':(0,0),'sides':(0,0)}
 SLIDERS=tuple(SAMPLING)
-PER_COUNTRY=('ideology_uniformity','primary_culture_share')
+PER_COUNTRY=('random_ideology_share','primary_culture_share')
 WHOLE=('source_groups','sides')
 
 
