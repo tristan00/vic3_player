@@ -2176,7 +2176,7 @@ def pact_terms():
         if 'pact' in found and found.get('can_select_to_break')!=['no']:
             inner=dict(fields(' '.join(found['pact'])))
             terms[name]=(' '.join(inner.get('actor_can_break',())),
-                         None if inner.get('is_two_sided_pact')==['no'] else ' '.join(inner.get('target_can_break',())))
+                         ' '.join(inner['target_can_break']) if 'target_can_break' in inner and inner.get('is_two_sided_pact')!=['no'] else None)
     return terms
 
 
