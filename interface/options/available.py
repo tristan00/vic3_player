@@ -2364,6 +2364,14 @@ def naval_regions(s):
 
 
 @timed_often
+def port_regions(s):
+    def compute():
+        located=s.map('building','building,state')
+        return {state_regions(s).get(located[ident]) for ident,kind,levels in s.buildings() if kind=='building_port' and levels}
+    return s.memo('port_regions',compute)
+
+
+@timed_often
 def sea_regions(s):
     return [name for name,fields in s.definitions('common/strategic_regions').items() if not fields.get('capital_province') and name.startswith('region_interface_sea')]
 
@@ -2751,7 +2759,7 @@ RULES={
     'station_fleet':lambda s:[{'military_formation':fleet,'state':state} for fleet in free_fleets(s) for state in s.states()
                               if trigger_coastal(s,state) and state!=s.map('formation_status','formation,target_location').get(fleet)],
     'rehome_fleet':lambda s:[{'military_formation':fleet,'strategic_region':region} for fleet in free_fleets(s) for region in naval_regions(s)
-                             if region!=hq_regions(s)[home_of(s,fleet)][1]],
+                             if region!=hq_regions(s)[home_of(s,fleet)][1] and region in port_regions(s)],
     'defend_invasion_fleet':lambda s:[{'military_formation':fleet,'front':front} for front,ended in invasions(s) if not ended for fleet in free_fleets(s)],
     'assign_flagship':lambda s:product(ship=[ship for ship,_ in fleet_ships(s) if stated('common/ship_types',ship_kinds(s)[ship],'can_be_flagship')==['yes']]),
     'unassign_flagship':lambda s:product(ship=[ship for ship,_ in fleet_ships(s)]),
