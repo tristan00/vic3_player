@@ -2,7 +2,7 @@ from interface.actions.catalogue import BY_NAME
 from interface.common import timed_often
 from interface.options.available import (BLOC_INFLUENCE, CHARTER_COST, DEFAULT_TAX_COST, MAX_MONOPOLIES, MONOPOLY_COST, MOVEMENT_COST, article_cost,
                                         authority, bulk_subset, chartered, definition, free_charters, metric, money, monopolies, nationalization_cost,
-                                        ownership_classes, pact_cost_multiplier, private_levels, ship_kinds, stated)
+                                        ownership_classes, pact_cost_multiplier, private_levels, ship_kinds, stated, subjects)
 
 
 ALIASES={f'{name}_selected':name for name in ('mobilize','demobilize','raise_conscripts','start_naval_mission','end_naval_mission')}
@@ -32,7 +32,8 @@ def context(snapshot):
             **{('method_group',(k,m)):g for k,g,m in snapshot.methods},
             **{('ownership',i):k for i,k in ownership_classes(snapshot).items()},
             **{('treaty',t):('country',b if a==snapshot.player else a) for t,a,b in snapshot.rows('treaty','treaty,first_country,second_country')},
-            **{('state_owner',s):c for s,c in snapshot.rows('state','state,country')}}
+            **{('state_owner',s):c for s,c in snapshot.rows('state','state,country')},
+            **{('law_owner',l):c for held in [subjects(snapshot)] for l,c in snapshot.rows('law','law,country') if c in held}}
 
 
 @timed_often
@@ -83,6 +84,8 @@ def changes(name,params,links):
         found.update(('object','combat_unit',i) for (key,i),formation in links.items() if key=='combat_unit' and formation==params.get('military_formation'))
     if name=='set_default_unit_type':
         found.add(('default_unit_type',params['military_formation'],*stated('common/combat_unit_types',params['combat_unit_type'],'group')))
+    if name=='impose_law':
+        found.add(('law_imposition',links.get(('law_owner',params['law']))))
     return found
 
 
