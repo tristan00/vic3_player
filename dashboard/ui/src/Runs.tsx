@@ -1,5 +1,6 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useApi } from './api'
+import { Buildings } from './Buildings'
 import { Lines } from './charts'
 import { PALETTE, heading, label, num, time } from './format'
 import { Facts, Grid, Panel, Pill, Waiting, type Col } from './Grid'
@@ -69,56 +70,6 @@ function Through({ run, live }: { run: number; live: boolean }) {
           ))}
         </div>
       )}
-    </Waiting>
-  )
-}
-
-const VIEWS = ['type', 'location', 'production_method']
-const SHOWN = 6
-const OTHER = '#8a93a3'
-
-function Buildings({ run, live }: { run: number; live: boolean }) {
-  const found = useApi(`/api/runs/${run}/buildings`, live ? 15000 : 0)
-  const [query, setQuery] = useSearchParams()
-  const by = VIEWS.includes(query.get('by') ?? '') ? query.get('by')! : 'type'
-  return (
-    <Waiting loaded={found}>
-      {() => {
-        const years: number[] = found.data.years
-        const last = years.length - 1
-        const total = (at: number) => found.data.by.type.reduce((sum: number, entry: any) => sum + entry.levels[at], 0)
-        const rows: any[] = found.data.by[by].map((entry: any) => ({ ...entry, place: { id: entry.state, label: entry.name }, start: entry.levels[0], end: entry.levels[last], change: entry.levels[last] - entry.levels[0], peak: Math.max(...entry.levels), share: total(last) ? entry.levels[last] / total(last) : null }))
-        const ranked = [...rows].sort((a, b) => b.peak - a.peak || a.name.localeCompare(b.name))
-        const shown = ranked.slice(0, SHOWN).sort((a, b) => a.name.localeCompare(b.name))
-        const rest = ranked.slice(SHOWN)
-        const series = [
-          ...shown.map((row, index) => ({ name: row.name, color: PALETTE[index], points: years.map((year, at) => [year, row.levels[at]] as [number, number]) })),
-          ...(rest.length ? [{ name: `${rest.length} others`, color: OTHER, points: years.map((year, at) => [year, rest.reduce((sum, row) => sum + row.levels[at], 0)] as [number, number]) }] : []),
-        ]
-        return (
-          <>
-            <div className="lead">
-              <span className="choice">
-                {VIEWS.map((name) => (
-                  <a key={name} className={name === by ? 'on' : ''} onClick={() => setQuery(name === 'type' ? { tab: 'buildings' } : { tab: 'buildings', by: name })}>
-                    {label(name)}
-                  </a>
-                ))}
-              </span>
-            </div>
-            <Facts items={[['levels at start', num(total(0))], [`levels at ${found.data.dates[last]}`, num(total(last))], ['change', num(total(last) - total(0))], [`${label(by)}s`, rows.length]]} />
-            <Panel title={`Building levels by ${label(by)}`} extra={rest.length ? `the ${SHOWN} highest at their peak, the rest summed` : undefined}>
-              <Lines zero step height={280} series={series} />
-            </Panel>
-            <Grid
-              run={run}
-              rows={rows}
-              sort={{ name: 'end', desc: true }}
-              columns={[by === 'location' ? { name: 'place', label: 'location', kind: 'entity:state' } : { name: 'name', label: label(by), kind: 'name' }, { name: 'start', kind: 'int' }, { name: 'end', kind: 'int' }, { name: 'change', kind: 'int' }, { name: 'peak', kind: 'int' }, { name: 'share', label: by === 'production_method' ? 'share of levels using it' : 'share of levels', kind: 'share' }]}
-            />
-          </>
-        )
-      }}
     </Waiting>
   )
 }

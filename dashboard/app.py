@@ -164,8 +164,9 @@ def run_series(run:RUN):
 
 @app.get('/api/runs/{run}/buildings')
 @db.often
-def run_buildings(run:RUN):
-    return db.reply(buildings.series(run))
+def run_buildings(run:RUN,by:Annotated[list[str]|None,Query()]=None,kind:Annotated[str|None,Query(alias='type')]=None,
+                  location:Annotated[int|None,Query(ge=-LARGEST-1,le=LARGEST)]=None,production_method:str|None=None):
+    return db.reply(buildings.series(run,by,kind,location,production_method))
 
 
 @app.get('/api/runs/{run}/actions')
