@@ -845,11 +845,9 @@
       "disposition": "drop"
     },
     "character_list": {
-      "basis": "script variable list; script variables are never rendered generically",
       "disposition": "drop"
     },
     "character_list_item": {
-      "basis": "script variable list; script variables are never rendered generically",
       "disposition": "drop"
     },
     "character_timed_modifier": {
@@ -1162,11 +1160,9 @@
       ]
     },
     "country_list": {
-      "basis": "script variable list; script variables are never rendered generically",
       "disposition": "drop"
     },
     "country_list_item": {
-      "basis": "script variable list; script variables are never rendered generically",
       "disposition": "drop"
     },
     "country_literacy": {
@@ -1510,7 +1506,6 @@
       ]
     },
     "diplomatic_demand": {
-      "basis": "player-only record with no resolvable owner",
       "disposition": "drop"
     },
     "diplomatic_play": {
@@ -1598,7 +1593,6 @@
       ]
     },
     "event_option": {
-      "basis": "player-only record with no resolvable owner",
       "disposition": "drop"
     },
     "event_option_state": {
@@ -1742,7 +1736,6 @@
       ]
     },
     "game_session": {
-      "basis": "multiplayer session metadata, not world state",
       "disposition": "drop"
     },
     "game_state": {
@@ -1762,7 +1755,6 @@
       "disposition": "drop"
     },
     "global_rng": {
-      "basis": "engine RNG state; no gui binding, and knowing it predicts the simulation",
       "disposition": "drop"
     },
     "global_variable": {
@@ -1772,7 +1764,6 @@
       "disposition": "drop"
     },
     "global_variable_lists": {
-      "basis": "script variable container; script variables are never rendered generically",
       "disposition": "drop"
     },
     "global_variable_lists_list": {
@@ -1782,7 +1773,6 @@
       "disposition": "drop"
     },
     "global_variable_store": {
-      "basis": "script variable container; script variables are never rendered generically",
       "disposition": "drop"
     },
     "goods_order": {
@@ -1913,11 +1903,9 @@
       ]
     },
     "interest_group_list": {
-      "basis": "script variable list; script variables are never rendered generically",
       "disposition": "drop"
     },
     "interest_group_list_item": {
-      "basis": "script variable list; script variables are never rendered generically",
       "disposition": "drop"
     },
     "interest_group_loyalist_trend": {
@@ -1982,15 +1970,12 @@
       "disposition": "drop"
     },
     "ironman": {
-      "basis": "save configuration, not world state",
       "disposition": "drop"
     },
     "ironman_override": {
-      "basis": "save configuration, not world state",
       "disposition": "drop"
     },
     "ironman_setting": {
-      "basis": "save configuration, not world state",
       "disposition": "drop"
     },
     "journal_entry": {
@@ -2021,11 +2006,9 @@
       ]
     },
     "journal_entry_list": {
-      "basis": "script variable list; script variables are never rendered generically",
       "disposition": "drop"
     },
     "journal_entry_list_item": {
-      "basis": "script variable list; script variables are never rendered generically",
       "disposition": "drop"
     },
     "journal_entry_progress_bar": {
@@ -2141,7 +2124,6 @@
       "disposition": "drop"
     },
     "navy_ai_active_transfer": {
-      "basis": "naval AI internals; no gui binding",
       "disposition": "drop"
     },
     "navy_ai_assignment": {
@@ -2154,7 +2136,6 @@
       "disposition": "drop"
     },
     "navy_ai_assignment_province_range": {
-      "basis": "naval AI internals; no gui binding",
       "disposition": "drop"
     },
     "navy_ai_assignment_wanted_ratio": {
@@ -2173,41 +2154,33 @@
       "disposition": "drop"
     },
     "navy_ai_lost_supply_ships": {
-      "basis": "naval AI internals; no gui binding",
       "disposition": "drop"
     },
     "navy_ai_pending_fleet_creation": {
-      "basis": "naval AI internals; no gui binding",
       "disposition": "drop"
     },
     "navy_ai_pending_transfer": {
-      "basis": "naval AI internals; no gui binding",
       "disposition": "drop"
     },
     "navy_ai_pending_transfer_ship": {
-      "basis": "naval AI internals; no gui binding",
       "disposition": "drop"
     },
     "navy_ai_sea": {
       "disposition": "drop"
     },
     "navy_ai_sea_node_piracy_heat": {
-      "basis": "naval AI internals; no gui binding",
       "disposition": "drop"
     },
     "navy_ai_sea_project_power_region": {
       "disposition": "drop"
     },
     "navy_ai_shipping_lane": {
-      "basis": "naval AI internals; no gui binding",
       "disposition": "drop"
     },
     "navy_ai_supply_path": {
-      "basis": "naval AI internals; no gui binding",
       "disposition": "drop"
     },
     "navy_ai_supply_path_raid_heat": {
-      "basis": "naval AI internals; no gui binding",
       "disposition": "drop"
     },
     "navy_ai_template": {
@@ -2289,11 +2262,9 @@
       "disposition": "drop"
     },
     "political_lobby_list": {
-      "basis": "script variable list; script variables are never rendered generically",
       "disposition": "drop"
     },
     "political_lobby_list_item": {
-      "basis": "script variable list; script variables are never rendered generically",
       "disposition": "drop"
     },
     "political_lobby_members": {
@@ -2437,7 +2408,6 @@
       ]
     },
     "proposal": {
-      "basis": "player-only record with no resolvable owner",
       "disposition": "drop"
     },
     "proposal_target": {
@@ -2678,11 +2648,9 @@
       ]
     },
     "state_list": {
-      "basis": "script variable list; script variables are never rendered generically",
       "disposition": "drop"
     },
     "state_list_item": {
-      "basis": "script variable list; script variables are never rendered generically",
       "disposition": "drop"
     },
     "state_local_price": {
@@ -2716,11 +2684,9 @@
       ]
     },
     "state_region_list": {
-      "basis": "script variable list; script variables are never rendered generically",
       "disposition": "drop"
     },
     "state_region_list_item": {
-      "basis": "script variable list; script variables are never rendered generically",
       "disposition": "drop"
     },
     "state_region_resource": {
@@ -2785,7 +2751,6 @@
       ]
     },
     "supply_ship": {
-      "basis": "player-only record with no resolvable owner",
       "disposition": "drop"
     },
     "tariff_level": {
