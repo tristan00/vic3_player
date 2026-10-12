@@ -1510,9 +1510,14 @@ def principal(s):
 
 
 @timed_often
-def mobilization_committed(s):
+def committed_plays(s):
     ends=s.map('diplomatic_play','diplomatic_play,end_date')
-    return bool(principal(s)) or any(s.player in members and ends.get(play) is None for (play,side),members in play_members(s).items())
+    return set(principal(s))|{play for (play,side),members in play_members(s).items() if s.player in members and ends.get(play) is None}
+
+
+@timed_often
+def mobilization_committed(s):
+    return bool(committed_plays(s))
 
 
 @timed_often
