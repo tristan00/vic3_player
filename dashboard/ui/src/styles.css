@@ -791,3 +791,57 @@ td:hover .filterable a.only {
   color: var(--faint);
   padding: 10px 0;
 }
+
+.tabs.sub {
+  font-size: 12.5px;
+  margin-top: -6px;
+}
+
+.tabs.sub a {
+  padding: 4px 10px;
+}
+
+.ledger {
+  table-layout: fixed;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger th.right,
+.ledger td.right {
+  padding-left: 2px;
+  padding-right: 5px;
+}
+
+.ledger .pinned {
+  position: sticky;
+  background: var(--surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ledger thead .pinned {
+  background: #f8f9fb;
+  z-index: 1;
+}
+
+.ledger tbody tr:hover .pinned {
+  background: #f8fafd;
+}
+
+.ledger tr.total td {
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+
+.twist {
+  display: inline-block;
+  width: 16px;
+  color: var(--dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+.twist:hover {
+  text-decoration: none;
+  color: var(--ink);
+}
