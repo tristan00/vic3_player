@@ -13,7 +13,8 @@ VOCABULARY={}
 LABELS={}
 MANIFESTS={}
 ENGLISH={}
-TEXT=re.compile(r'^\s+([\w.-]+):\d*\s+"([^"$\[\]#@£]+)"\s*$',re.M)
+TEXT=re.compile(r'^\s+([\w.-]+):\d*\s+"([^"\[\]#@£]+)"\s*$',re.M)
+REFERENCE=re.compile(r'\$([\w.-]+)\$')
 FOREIGN='''select s.relname::text,array_agg(a.attname::text order by x.i),t.relname::text
 from pg_constraint c join pg_class s on s.oid=c.conrelid join pg_class t on t.oid=c.confrelid
 cross join lateral unnest(c.conkey) with ordinality x(k,i) join pg_attribute a on a.attrelid=c.conrelid and a.attnum=x.k
@@ -76,11 +77,25 @@ def key(table,code):
 
 
 @db.often
+def spelled(written,name,within=()):
+    text=written.get(name)
+    if text is None or name in within:
+        return None
+    parts=[spelled(written,inner,(*within,name)) for inner in REFERENCE.findall(text)]
+    if None in parts:
+        return None
+    text=REFERENCE.sub(lambda _:parts.pop(0),text)
+    return None if '$' in text else text
+
+
+@db.often
 def english():
     with LOCK:
         if not ENGLISH:
+            written={}
             for path in sorted((DEFAULT_GAME/'game'/'localization'/'english').rglob('*.yml')):
-                ENGLISH.update(TEXT.findall(path.read_text(encoding='utf-8-sig')))
+                written.update(TEXT.findall(path.read_text(encoding='utf-8-sig')))
+            ENGLISH.update({name:text for name,text in ((name,spelled(written,name) if '$' in text else text) for name,text in written.items()) if text is not None})
         return ENGLISH
 
 
