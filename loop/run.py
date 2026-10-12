@@ -72,7 +72,7 @@ def play(game,store,advisor,picker,settings):
             snapshot.load()
             wars=live_wars(snapshot)
             forced=[('mobilize_all',{})] if wars-fought and RULES['mobilize_all'](snapshot) else []
-            fought=wars
+            fought=wars if forced else fought&wars
             length=block_length(advisor.random) if picker.name=='catboost_piecewise' else None
             drawn=batches(snapshot,advisor,1 if picker.name=='first' else 100,length,forced)
             chosen,predictions=picker.pick([[(n,p) for n,p,_ in b] for b in drawn],snapshot)
