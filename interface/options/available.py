@@ -848,13 +848,13 @@ def switch_methods(s):
 
 
 @timed_often
-def bulk_methods(s):
+def bulk_methods(s,by_state):
     classes=ownership_classes(s)
     located=s.map('building','building,state')
     kinds={ident:kind for ident,kind,_ in s.buildings()}
-    groups={(kinds[option['building']],located[option['building']],ownership,option['production_method'])
+    groups={(kinds[option['building']],located[option['building']] if by_state else None,ownership,option['production_method'])
             for option in switch_methods(s) for ownership in ('any',*classes.get(option['building'],()))}
-    return [{'building_type':kind,'state':state,'production_method':method,'ownership':ownership}
+    return [{'building_type':kind,**({'state':state} if by_state else {}),'production_method':method,'ownership':ownership}
             for kind,state,ownership,method in sorted(groups,key=str)]
 
 
@@ -2738,7 +2738,8 @@ RULES={
     'revoke_building_charter':lambda s:revocable(s,building_charters(s)),
     'grant_region_charter':region_charters,
     'revoke_region_charter':lambda s:revocable(s,region_charters(s)),
-    'bulk_switch_production_method_state':bulk_methods,
+    'bulk_switch_production_method':lambda s:bulk_methods(s,False),
+    'bulk_switch_production_method_state':lambda s:bulk_methods(s,True),
     'cancel_queue_item':lambda s:queue_items(s,0,0),
     'raise_queue_item':lambda s:queue_items(s,1,0),
     'first_queue_item':lambda s:queue_items(s,1,0),

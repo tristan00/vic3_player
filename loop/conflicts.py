@@ -32,15 +32,17 @@ def context(snapshot):
             **{('method_group',(k,m)):g for k,g,m in snapshot.methods},
             **{('ownership',i):k for i,k in ownership_classes(snapshot).items()},
             **{('treaty',t):('country',b if a==snapshot.player else a) for t,a,b in snapshot.rows('treaty','treaty,first_country,second_country')},
-            **{('state_owner',s):c for s,c in snapshot.rows('state','state,country')},
+            **{('state_owner',s):c for s,c in snapshot.rows('state','state,country')},('player','country'):snapshot.player,
             **{('law_owner',l):c for held in [subjects(snapshot)] for l,c in snapshot.rows('law','law,country') if c in held}}
 
 
 @timed_often
 def changes(name,params,links):
     found=set()
+    nationwide=name=='bulk_switch_production_method'
     buildings=([params['building']] if 'building' in params else
-               [ident for (key,ident),site in links.items() if key=='building_site' and site[0]==params.get('state')
+               [ident for (key,ident),site in links.items() if key=='building_site'
+                and (links.get(('state_owner',site[0]))==links.get(('player','country')) if nationwide else site[0]==params.get('state'))
                 and site[1]==params.get('building_type',site[1]) and (params.get('ownership','any')=='any' or params['ownership'] in links.get(('ownership',ident),()))])
     if 'production_method' in params:
         found.update(('building_method',i,links.get(('method_group',(links.get(('building_site',i),(None,None))[1],params['production_method'])),params['production_method'])) for i in buildings)

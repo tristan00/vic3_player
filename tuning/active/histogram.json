@@ -755,7 +755,10 @@
     "feature.holdings.player.production_methods": "off",
     "feature.holdings.player.character_roles": "off",
     "feature.holdings.player.character_ideologies": "off",
-    "feature.holdings.player.population_shares": "off"
+    "feature.holdings.player.population_shares": "off",
+    "feature.option.switch_methods_nationwide.building_type": "off",
+    "feature.option.switch_methods_nationwide.ownership": "off",
+    "feature.option.switch_methods_nationwide.production_method": "off"
   },
   "groups": {
     "context.economy": {
@@ -4675,6 +4678,24 @@
       "role": "option",
       "source": "actions",
       "family": "switch_building_method.production_method"
+    },
+    "option.switch_methods_nationwide.building_type": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "switch_methods_nationwide.building_type"
+    },
+    "option.switch_methods_nationwide.ownership": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "switch_methods_nationwide.ownership"
+    },
+    "option.switch_methods_nationwide.production_method": {
+      "kind": "histogram",
+      "role": "option",
+      "source": "actions",
+      "family": "switch_methods_nationwide.production_method"
     },
     "option.switch_methods_statewide.building_type": {
       "kind": "histogram",

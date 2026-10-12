@@ -1,9 +1,9 @@
 from ..actions.catalogue import ACCESS_PERMISSIONS, ACCESS_STATUSES, LEVELS, TOLL_LEVELS
 from ..common import timed_often
 from .triggers import indirect_overlords, overlords
-from .available import (SLOT, TARIFF_CODES, armies, bloc_principles, changing, colonies, construction_paused, construction_queue, cooling,
+from .available import (SLOT, TARIFF_CODES, armies, bloc_principles, bulk_subset, changing, colonies, construction_paused, construction_queue, cooling,
                         enacting_laws, event_options, formation_report, formation_setting, home_region, in_default, in_force, incorporation, involved, issued_decrees, latest_design,
-                        leaning, metric, monopolies, own_templates, ownership_classes, play_members, player_blocs, player_value, power_bloc_members, principal, private_levels,
+                        leaning, metric, monopolies, own_templates, play_members, player_blocs, player_value, power_bloc_members, principal, private_levels,
                         privatization_requested, recruitable, selected_units, setting, ship_paused, ship_queues, state_regions, strait_sides, strait_value,
                         definition, journal_button, shown_buttons, pact_terms,
                         technologies, trade_level)
@@ -34,10 +34,8 @@ def queued_last(b,a,state,building_type):
 
 
 @timed_often
-def members(s,building_type,state,ownership):
-    classes=ownership_classes(s)
-    located=s.map('building','building,state')
-    return [ident for ident,kind,_ in s.buildings() if kind==building_type and located.get(ident)==state and (ownership=='any' or ownership in classes.get(ident,()))]
+def switched(b,a,building_type,production_method,ownership,state=None):
+    return any(production_method in methods(a).get(i,()) and production_method not in methods(b).get(i,()) for i in bulk_subset(b,building_type,state,ownership))
 
 
 @timed_often
@@ -352,12 +350,12 @@ EFFECTS={
     'toggle_monopoly':lambda b,a,building_type:(building_type in monopolies(a))!=(building_type in monopolies(b)),
     'subsidies_on':lambda b,a,building:bool(subsidy(a).get(building)),
     'subsidies_off':lambda b,a,building:not subsidy(a).get(building),
-    'subset_subsidies_on_state':lambda b,a,building_type,state,ownership:bool(members(b,building_type,state,ownership)) and all(subsidy(a).get(i) for i in members(b,building_type,state,ownership)),
-    'subset_subsidies_off_state':lambda b,a,building_type,state,ownership:not any(subsidy(a).get(i) for i in members(b,building_type,state,ownership)),
-    'bulk_nationalize_state':lambda b,a,building_type,state,ownership:privately_held(a,members(b,building_type,state,ownership))<privately_held(b,members(b,building_type,state,ownership)),
-    'bulk_expropriate_state':lambda b,a,building_type,state,ownership:privately_held(a,members(b,building_type,state,ownership))<privately_held(b,members(b,building_type,state,ownership)),
-    'bulk_switch_production_method_state':lambda b,a,building_type,state,production_method,ownership:any(
-        production_method in methods(a).get(i,()) and production_method not in methods(b).get(i,()) for i in members(b,building_type,state,ownership)),
+    'subset_subsidies_on_state':lambda b,a,building_type,state,ownership:bool(bulk_subset(b,building_type,state,ownership)) and all(subsidy(a).get(i) for i in bulk_subset(b,building_type,state,ownership)),
+    'subset_subsidies_off_state':lambda b,a,building_type,state,ownership:not any(subsidy(a).get(i) for i in bulk_subset(b,building_type,state,ownership)),
+    'bulk_nationalize_state':lambda b,a,building_type,state,ownership:privately_held(a,bulk_subset(b,building_type,state,ownership))<privately_held(b,bulk_subset(b,building_type,state,ownership)),
+    'bulk_expropriate_state':lambda b,a,building_type,state,ownership:privately_held(a,bulk_subset(b,building_type,state,ownership))<privately_held(b,bulk_subset(b,building_type,state,ownership)),
+    'bulk_switch_production_method':switched,
+    'bulk_switch_production_method_state':switched,
     'switch_production_method':lambda b,a,building,production_method:production_method in methods(a).get(building,()),
     'reset_building_production_methods':lambda b,a,building:methods(a).get(building)!=methods(b).get(building),
     'reset_production_methods':lambda b,a,state:any(methods(a).get(ident)!=methods(b).get(ident) for ident,where in b.map('building','building,state').items() if where==state),

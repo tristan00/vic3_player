@@ -18,7 +18,7 @@ SIDES=(('offer','us'),('demand','them'),('agree','both'))
 STATE_PICKS=('diplomatic_action_first_state','diplomatic_action_second_state')
 PLAIN={'downsize_building':('downsize',),'raise_subsidies':('subsidies_on',),'lower_subsidies':('subsidies_off',),'nationalise_building':('nationalize',),
        'raise_subsidies_statewide':('subset_subsidies_on_state',),'lower_subsidies_statewide':('subset_subsidies_off_state',),'buy_out_statewide':('bulk_nationalize_state',),
-       'expropriate_statewide':('bulk_expropriate_state',),'switch_methods_statewide':('bulk_switch_production_method_state',),
+       'expropriate_statewide':('bulk_expropriate_state',),'switch_methods_statewide':('bulk_switch_production_method_state',),'switch_methods_nationwide':('bulk_switch_production_method',),
        'reset_methods_statewide':('reset_production_methods',),'reset_building_methods':('reset_building_production_methods',),
        'relocate_national_capital':('move_capital',),'relocate_market_capital':('move_market_capital',),
        'grant_charter_for_building_type':('grant_building_charter',),'revoke_charter_for_building_type':('revoke_building_charter',),
