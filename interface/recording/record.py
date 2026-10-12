@@ -409,6 +409,8 @@ def _scripted(tables,snapshot,held,tags,label,player,living,world,maps):
     company_countries=dict(zip((int(i)&0xffffff for i in snapshot['company']['id'].tolist()),(slot(c) for c in snapshot['company']['country'].tolist())))
     put(tables,'company_owns_country',[('company_type','text'),('country','int4'),('owned_country','int4')],
                sorted({(label(company_types[ident(company)]),company_countries[ident(company)],ident(country)) for country,company in held.mapped('cap_owning_company').items()}))
+    put(tables,'company_regional_hq',[('building','int4'),('company','int4')],
+               sorted((ident(building),ident(company)) for building,company in held.mapped('cap_regional_hq').items()))
     put(tables,'journal_button_shown',[('journal_entry','text'),('button','text')],
                sorted({(entry,text(item)) for entry,items in held.prefixed('cap_button_').items() for item in items}))
     put(tables,'interaction_possible',[('character','int4'),('interaction','text')],

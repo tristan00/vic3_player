@@ -115,7 +115,7 @@ def owning_types(company_types):
             **{f'building_regional_{company}':'company_regional_headquarter' for company in company_types}}
 
 
-def ownership_owner(ident,building,owner_type,owner,types,headquarters,owning):
+def ownership_owner(ident,building,owner_type,owner,types,dead,companies,owning):
     if owner_type==OWNER_COUNTRY:
         return {'owner_kind':'country','owner_country':owner,'owner_building':None,'owner_company':None}
     if owner_type!=OWNER_BUILDING:
@@ -128,9 +128,23 @@ def ownership_owner(ident,building,owner_type,owner,types,headquarters,owning):
         kind=owning[types[owner]]
     else:
         raise RuntimeError(evidence(ownership=ident,owner=owner,owner_building_type=types[owner]))
-    if kind=='company' and owner not in headquarters:
-        raise RuntimeError(evidence(ownership=ident,owner=owner))
-    return {'owner_kind':kind,'owner_country':None,'owner_building':owner,'owner_company':headquarters[owner] if kind=='company' else None}
+    if kind in companies and owner not in companies[kind]:
+        if owner not in dead:
+            raise RuntimeError(evidence(ownership=ident,owner=owner,owner_kind=kind))
+        kind='vanished_building'
+    return {'owner_kind':kind,'owner_country':None,'owner_building':owner,'owner_company':companies[kind][owner] if kind in companies else None}
+
+
+@timed_often
+def company_buildings(c,types):
+    t=c.table('company')
+    kinds={ident:c.label(kind) for ident,kind in zip(t['ident'],t['company_type'])} if t else {}
+    headquarters={building:ident for ident,building in zip(t['ident'],t['building']) if building!=-1} if t else {}
+    regional={c.ident('building',building):c.ident('company',company) for building,company in c.rows('company_regional_hq','building','company')}
+    wrong=[(building,company) for building,company in regional.items() if types.get(building)!='building_regional_'+kinds[company]]
+    if wrong:
+        raise RuntimeError(evidence(regional=wrong[:5],types=[types.get(building) for building,_ in wrong[:5]]))
+    return {'company':headquarters,'company_regional_headquarter':regional}
 
 
 def movement_modifiers(children,ids,label):
@@ -732,7 +746,8 @@ def buildings(c):
         assets={value&SLOT:(owner,value) for owner,_,value in c.rows('building_assets','id','ord','value')}
         captured=set(c.table('building')['ident']) if c.table('building') else set()
         types={ident:c.label(code) for ident,code in zip(c.table('building')['ident'],c.table('building')['building'])} if c.table('building') else {}
-        headquarters={building:ident for ident,building in zip(c.table('company')['ident'],c.table('company')['building']) if building!=-1} if c.table('company') else {}
+        dead={ident for ident,gone in zip(c.table('building')['ident'],c.table('building')['dead']) if flag(gone)} if c.table('building') else set()
+        companies=company_buildings(c,types)
         owning=owning_types(c.order('common/company_types'))
         for i,ident,building,owner_type,owner,levels,privatization in zip(t['id'],t['ident'],t['building'],t['identity_type'],t['identity_building'],
                                                                            t['levels'],t['privatization']):
@@ -745,7 +760,7 @@ def buildings(c):
             asset=assets.pop(i,None)
             if asset is not None and (asset[0]!=owner&SLOT or asset[1]!=ident or owner not in captured):
                 raise RuntimeError(evidence(ownership=ident,asset_owner=asset[0],owner=owner))
-            c.add('building_ownership_history',building_ownership=ident,building=building,**ownership_owner(ident,building,owner_type,owner,types,headquarters,owning),
+            c.add('building_ownership_history',building_ownership=ident,building=building,**ownership_owner(ident,building,owner_type,owner,types,dead,companies,owning),
                   levels=levels,privatization=flag(privatization),in_owner_assets=asset is not None)
         if owners or assets:
             raise RuntimeError(evidence(owners=sorted(owners)[:3],assets=sorted(assets)[:3]))

@@ -428,8 +428,9 @@ def country_typing(game_dir,tag,mods,world):
              when(f'c:{tag} = {{ owes_obligation_to = prev }}',on_root(listed('cap_player_owes','scope:cap_country'))),
              on_root(listed('cap_obj_country','scope:cap_country'))]
     owning='owning_company ?= { '+on_root(mapped('cap_owning_company','scope:cap_country','prev'))+' }'
+    regional='every_company = { save_scope_as = cap_company every_scope_regional_hqs = { '+on_root(mapped('cap_regional_hq','prev','scope:cap_company'))+' } }'
     body='\n'.join(typing)
-    return (f'every_country = {{ save_scope_as = cap_country\n{body}\n{owning}\n}}\n'
+    return (f'every_country = {{ save_scope_as = cap_country\n{body}\n{owning}\n{regional}\n}}\n'
             f'every_decentralized_country = {{ save_scope_as = cap_country\n{body}\n}}')
 
 
