@@ -1019,8 +1019,13 @@ def war_fronts(s):
 
 
 @timed_often
+def live_wars(s):
+    return set(s.wars())&{war for war,dead,peace in s.rows('war','war,dead,peace_date') if not dead and peace is None}
+
+
+@timed_often
 def strategic_objective_states(s):
-    wars=set(s.wars())&{war for war,dead,peace in s.rows('war','war,dead,peace_date') if not dead and peace is None}
+    wars=live_wars(s)
     countries={country for war,country in s.rows('war_participant','war,country') if war in wars}
     return [state for state,country in s.rows('state','state,country') if country in countries]
 

@@ -14,11 +14,12 @@ def block_length(rng):
 
 class Sampler:
     @timed
-    def __init__(self,snapshot,advisor):
+    def __init__(self,snapshot,advisor,forced=()):
         self.random=advisor.random
         self.weights={'answer_event':1,**advisor.weights}
         offered=offer(snapshot,available(snapshot))
         links=context(snapshot)
+        self.claimed={claim for command in forced for claim in invalidates(*command,links)}
         self.budget=resources(snapshot)
         questions=[[('answer_event',c) for c in offered.get('answer_event',[]) if c.params['event']==event]
                    for event in sorted({c.params['event'] for c in offered.get('answer_event',[])})]
@@ -33,7 +34,7 @@ class Sampler:
     def block(self,length):
         if length<1:
             raise ValueError(evidence(length=length))
-        block,claimed,budget=[],set(),self.budget.copy()
+        block,claimed,budget=[],set(self.claimed),self.budget.copy()
         pools=[pool[:] for pool in self.pools]
         question=0
         for position in range(length):
@@ -60,6 +61,6 @@ class Sampler:
 
 
 @timed
-def batches(snapshot,advisor,count,length=None):
-    sampler=Sampler(snapshot,advisor)
+def batches(snapshot,advisor,count,length=None,forced=()):
+    sampler=Sampler(snapshot,advisor,forced)
     return [sampler.block(block_length(advisor.random) if length is None else length) for _ in range(count)]

@@ -11,7 +11,7 @@ from advisors.data.rewards import draw_objective
 from interface import GameInterface, record
 from interface.actions import Executor
 from interface.common import DEFAULT_DATA, Defeated, GameCrashed, evidence, timed, write_json
-from interface.options.available import FASTEST_SPEED
+from interface.options.available import FASTEST_SPEED, RULES, live_wars
 from interface.options.effects import LATER, took_effect, took_effect_later
 from interface.options.stored import Shared, Stored
 from interface.recording.store import Store, DSN
@@ -64,17 +64,21 @@ def play(game,store,advisor,picker,settings):
         executor.run('pause')
         snapshot=capture('start')
         start,deadline=snapshot.hours,time.monotonic()+settings['minutes']*60
-        seq,turn,dirty,late=0,0,0,[]
+        seq,turn,dirty,late,fought=0,0,0,[],set()
         while time.monotonic()<deadline and snapshot.hours-start<settings['years']*8760:
             treasury=snapshot.rows('player_treasury','principal,credit')
             if treasury and 0<treasury[0][0]>=treasury[0][1]: return 'debt_cap'
             turn+=1
+            snapshot.load()
+            wars=live_wars(snapshot)
+            forced=[('mobilize_all',{})] if wars-fought and RULES['mobilize_all'](snapshot) else []
+            fought=wars
             length=block_length(advisor.random) if picker.name=='catboost_piecewise' else None
-            drawn=batches(snapshot,advisor,1 if picker.name=='first' else 100,length)
+            drawn=batches(snapshot,advisor,1 if picker.name=='first' else 100,length,forced)
             chosen,predictions=picker.pick([[(n,p) for n,p,_ in b] for b in drawn],snapshot)
             if predictions is not None:
                 store.record_pick(snapshot.seq,[[n for n,_,_ in b] for b in drawn],predictions,chosen)
-            for phase,block in (('post_action',drawn[chosen]),('post_run',[(None,None,('set_speed',{'speed':FASTEST_SPEED})),(None,None,('unpause',{}))])):
+            for phase,block in (('post_action',[(None,None,command) for command in forced]+drawn[chosen]),('post_run',[(None,None,('set_speed',{'speed':FASTEST_SPEED})),(None,None,('unpause',{}))])):
                 pending=[]
                 for decision,params,(name,arguments) in block:
                     if name=='set_speed' and snapshot.meta['speed']==int(arguments['speed']): continue
