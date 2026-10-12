@@ -3,6 +3,8 @@
   "spread": 1,
   "centres": {
     "raise_mobilisation": 1,
-    "raise_front_deployment": 1
+    "raise_front_deployment": 1,
+    "change_production_method": 1,
+    "change_production_method_statewide": 1
   }
 }
