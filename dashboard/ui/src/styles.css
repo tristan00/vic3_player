@@ -801,36 +801,103 @@ td:hover .filterable a.only {
   padding: 4px 10px;
 }
 
-.ledger {
+.lead input {
+  width: 220px;
+}
+
+.matrix,
+.spans {
   table-layout: fixed;
-  font-variant-numeric: tabular-nums;
 }
 
-.ledger th.right,
-.ledger td.right {
-  padding-left: 2px;
-  padding-right: 5px;
-}
-
-.ledger .pinned {
-  position: sticky;
-  background: var(--surface);
+.matrix td:first-child,
+.spans td {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.ledger thead .pinned {
-  background: #f8f9fb;
-  z-index: 1;
+.matrix th.right,
+.matrix td.right {
+  padding-left: 0;
+  padding-right: 6px;
+  font-size: 12.5px;
 }
 
-.ledger tbody tr:hover .pinned {
-  background: #f8fafd;
+.matrix thead th.right {
+  font-size: 11.5px;
 }
 
-.ledger tr.total td {
+.matrix tr.total td,
+.matrix tr.section td {
   font-weight: 600;
+}
+
+.matrix tr.total td {
   border-bottom: 1px solid var(--line);
+}
+
+.matrix tr.section td {
+  background: #f8f9fb;
+  color: var(--dim);
+  border-top: 1px solid var(--line);
+}
+
+.matrix tr.inner td:first-child,
+.spans tr.inner td {
+  padding-left: 42px;
+}
+
+.spans th.lane,
+.spans td.lane {
+  padding: 0;
+  overflow: hidden;
+}
+
+.spans th.lane {
+  height: 26px;
+}
+
+.spans th.lane span {
+  position: absolute;
+  bottom: 4px;
+  padding-left: 4px;
+  font-weight: 400;
+  font-size: 11.5px;
+  color: var(--faint);
+  border-left: 1px solid #cdd2dc;
+  white-space: nowrap;
+}
+
+.spans td.lane {
+  position: relative;
+  height: 26px;
+  background-image: var(--years);
+}
+
+.spans tbody tr:hover td.lane {
+  background-color: #f8fafd;
+  background-image: var(--years);
+}
+
+.spans td.lane span {
+  position: absolute;
+  top: 3px;
+  height: 20px;
+  line-height: 20px;
+  padding: 0 5px;
+  font-size: 12px;
+  background: #2a78d621;
+  border-left: 2px solid #2a78d68c;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spans.counts td.lane span {
+  padding: 0;
+  border-left-width: 1px;
+  text-align: center;
+  text-overflow: clip;
 }
 
 .twist {
