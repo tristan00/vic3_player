@@ -6,6 +6,7 @@ import { colors, label, num, span, sum, time } from './format'
 import { Facts, Figures, Grid, Panel, Pill, Waiting, columnsOf } from './Grid'
 
 const TABS: Record<string, string> = { chart: 'chart', hyperparameters: 'hyperparameters', results: 'trial results', settings: 'trial settings' }
+const SIZES = [['training_runs', 'training runs'], ['training_rows', 'training rows'], ['input_features', 'input features'], ['runs', 'validation runs'], ['snapshots', 'validation snapshots']]
 
 function tone(state: string | null) {
   return state === 'running' ? 'live' : state === 'failed' || state === 'interrupted' ? 'bad' : 'plain'
@@ -127,6 +128,8 @@ export function Search() {
           const trend = done.map((row) => [row.trial, (best = Math.min(best, row.loss))] as [number, number])
           const winner = rows.find((row) => row.trial === found.winner)
           const current = found.status?.current
+          const sized = SIZES.map(([name]) => name)
+          const latest = done[done.length - 1]
           return (
             <>
               <Figures
@@ -140,6 +143,7 @@ export function Search() {
                   ['installed', found.installed ?? '—'],
                 ]}
               />
+              {latest && <Facts items={SIZES.filter(([name]) => name !== 'input_features').map(([name, title]) => [title, num(latest[name])] as [string, string])} />}
               {current && <Facts items={[['running trial', current.trial], ['seconds', num(current.seconds, 3)], ['memory GiB', num(current.memory_gb, 3)], ['step', current.detail?.step ?? '']]} />}
               {found.status?.error && <pre className="problem">{found.status.error}</pre>}
               <Panel title="Tuner">
@@ -190,8 +194,9 @@ export function Search() {
                       { name: 'trial', render: (row) => <a onClick={() => change('trial', String(row.trial))}>{row.trial}</a> },
                       { name: 'state', render: (row) => <Pill value={row.state} tone={row.state === 'completed' ? 'plain' : 'warn'} /> },
                       { name: 'loss', kind: 'num' },
-                      ...columnsOf(rows).filter((column) => found.measures.includes(column.name)),
-                      ...columnsOf(rows).filter((column) => !['trial', 'state', 'loss', ...found.measures, ...found.settings].includes(column.name)),
+                      ...SIZES.map(([name, title]) => ({ name, label: title, kind: 'int', group: 'data size' })),
+                      ...columnsOf(rows).filter((column) => found.measures.includes(column.name) && !sized.includes(column.name)),
+                      ...columnsOf(rows).filter((column) => !['trial', 'state', 'loss', ...sized, ...found.measures, ...found.settings].includes(column.name)),
                     ]}
                   />
                 </Panel>

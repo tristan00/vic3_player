@@ -121,6 +121,8 @@ def detail(search,model):
         settings+=[key for key in config if '.' not in key and key not in settings]
         rows.append({'trial':found['trial'],'state':found['state'],'loss':loss(metrics,weights['weights']) if metrics else None,
                      **{key:value for key,value in (metrics or {}).items() if key!='score'},
+                     'training_rows':found.get('training_rows'),'input_features':found.get('features'),
+                     'training_runs':len(found['train_ids']) if 'train_ids' in found else None,
                      'seconds':found.get('seconds'),'peak_memory_gb':found.get('peak_memory_gb'),'method':proposal.get('method'),
                      'predicted_score':proposal.get('predicted_score'),'uncertainty':proposal.get('uncertainty'),'proposal_seconds':proposal.get('seconds'),
                      'feature_groups_on':sum(config[key]!='off' for key in flags),
