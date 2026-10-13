@@ -59,15 +59,15 @@ class Space:
         return result
 
     @timed_often
-    def draw(self,rng):
+    def draw(self,rng,scopes):
         config={}
-        density=float(rng.uniform(.15,.95))
+        densities={scope:float(rng.uniform(.15,.95)) for scope in sorted(set(scopes.values()))}
         for name,spec in self.parameters.items():
             if spec['kind']=='choice':
                 choices=spec['values']
                 value=choices[int(rng.integers(len(choices)))]
                 if name.startswith('feature.'):
-                    value='off' if rng.random()>density else choices[int(rng.integers(1,len(choices)))]
+                    value='off' if rng.random()>densities[scopes[name[8:]]] else choices[int(rng.integers(1,len(choices)))]
             else:
                 value=float(np.exp(rng.uniform(np.log(spec['low']),np.log(spec['high']))) if spec.get('log') else rng.uniform(spec['low'],spec['high']))
                 if spec['kind']=='integer':
@@ -77,7 +77,7 @@ class Space:
         sampled=dict(config)
         if repaired:
             config['feature.option.action']=self.parameters['feature.option.action']['values'][1]
-        return self.canonical(config),{'feature_probability':density,'action_required':repaired,'sampled':sampled}
+        return self.canonical(config),{'feature_probability':densities,'action_required':repaired,'sampled':sampled}
 
     @timed_often
     def vector(self,config):
@@ -97,6 +97,13 @@ class Space:
                     low,high,value=np.log([low,high,value])
                 values.append(float((value-low)/(high-low)))
         return values
+
+
+@timed_often
+def density_scopes(model,groups):
+    if model!='row':
+        return dict.fromkeys(groups,'all')
+    return {name:name.split('.')[3] if name.startswith('option.parameter.') else group['role'] for name,group in groups.items()}
 
 
 @timed_often

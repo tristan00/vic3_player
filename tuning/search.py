@@ -3,7 +3,7 @@ from sklearn.ensemble import RandomForestRegressor
 
 from interface.common import timed
 from . import RANDOM_TRIALS
-from .space import identity
+from .space import density_scopes, identity
 from .metrics import loss
 
 CANDIDATES=256
@@ -17,9 +17,10 @@ def propose(space,history,seed,model,weighting):
     random_trials=RANDOM_TRIALS
     count=1 if len(history)<random_trials else CANDIDATES
     seen={identity(trial['config']) for trial in history}
+    scopes=density_scopes(model,space.groups)
     candidates=[]
     while len(candidates)<count:
-        config,sampling=space.draw(rng)
+        config,sampling=space.draw(rng,scopes)
         key=identity(config)
         if key not in seen:
             candidates.append({'index':len(candidates),'config':config,'sampling':sampling})
