@@ -53,6 +53,13 @@ def redraw(connection,run_id,seq,count,seed,weights=None,snapshot=None):
 
 
 @timed
+def mobilization(snapshot,fought):
+    hostile={('play',play) for play in committed_plays(snapshot)}|{('war',war) for war in live_wars(snapshot)}
+    forced=[('mobilize_all',{})] if hostile-fought and RULES['mobilize_all'](snapshot) else []
+    return forced,hostile if forced else fought&hostile
+
+
+@timed
 def play(game,store,advisor,picker,settings):
     executor=Executor(game)
     shared=Shared(store.connection)
@@ -70,15 +77,15 @@ def play(game,store,advisor,picker,settings):
             if treasury and 0<treasury[0][0]>=treasury[0][1]: return 'debt_cap'
             turn+=1
             snapshot.load()
-            hostile={('play',play) for play in committed_plays(snapshot)}|{('war',war) for war in live_wars(snapshot)}
-            forced=[('mobilize_all',{})] if hostile-fought and RULES['mobilize_all'](snapshot) else []
-            fought=hostile if forced else fought&hostile
+            forced,fought=mobilization(snapshot,fought)
             length=block_length(advisor.random) if picker.name=='catboost_piecewise' else None
             drawn=batches(snapshot,advisor,1 if picker.name=='first' else 100,length,forced)
             chosen,predictions=picker.pick([[(n,p) for n,p,_ in b] for b in drawn],snapshot)
             if predictions is not None:
                 store.record_pick(snapshot.seq,[[n for n,_,_ in b] for b in drawn],predictions,chosen)
-            for phase,block in (('post_action',[(None,None,command) for command in forced]+drawn[chosen]),('post_run',[(None,None,('set_speed',{'speed':FASTEST_SPEED})),(None,None,('unpause',{}))])):
+            for phase in ('post_action','post_run'):
+                if phase=='post_run': forced,fought=mobilization(snapshot,fought)
+                block=[(None,None,command) for command in forced]+(drawn[chosen] if phase=='post_action' else [(None,None,('set_speed',{'speed':FASTEST_SPEED})),(None,None,('unpause',{}))])
                 pending=[]
                 for decision,params,(name,arguments) in block:
                     if name=='set_speed' and snapshot.meta['speed']==int(arguments['speed']): continue
