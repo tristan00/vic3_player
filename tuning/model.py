@@ -19,17 +19,21 @@ def pool(frame,y=None,weights=None,threads=1):
 
 class Monitor:
     @timed_often
-    def __init__(self,path,stage):
-        self.path,self.stage=path,stage
-        self.started=time.monotonic()
+    def __init__(self,path,stage,iterations):
+        self.path,self.stage,self.iterations=path,stage,iterations
+        self.first=None
         self.last=0.
 
     @timed_often
     def after_iteration(self,info):
-        elapsed=time.monotonic()-self.started
-        if elapsed-self.last>=5 or info.iteration==1:
-            write(self.path,{**self.stage,'step':'fit','iteration':info.iteration,'fit_seconds':elapsed,'updated':time.time()})
-            self.last=elapsed
+        now=time.monotonic()
+        if self.first is None:
+            self.first=(info.iteration,now)
+        done,boosted=info.iteration-self.first[0],now-self.first[1]
+        if boosted-self.last>=1 or not done:
+            write(self.path,{**self.stage,'step':'fit','iteration':info.iteration,'boost_seconds':boosted,
+                             'remaining_seconds':(self.iterations-info.iteration)*boosted/done if done else None,'updated':time.time()})
+            self.last=boosted
         return True
 
 

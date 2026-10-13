@@ -14,7 +14,7 @@ from advisors.data.histograms import entries, live_holdings
 from advisors.models.histogram import data as batch
 from advisors.models.row import data as action
 from advisors.models.row import features as row
-from interface.common import evidence, timed
+from interface.common import evidence, timed, timed_often
 from interface.options.stored import Shared, Stored
 from interface.recording.store import DSN
 from . import VERSION
@@ -156,6 +156,28 @@ def pack(connection,directory,manifest):
         path=directory/f'scoring_{model}.pkl.gz'
         save(path,{'keys':keys,'features':features,'validation':validation,'targets':targets,'pauses':pauses})
         manifest['files'][path.name]=digest(path)
+        if model!='row':
+            records,targets,_,weights=training(connection,{run:bounds[run] for run in manifest['train']},model)
+            path=directory/f'training_{model}.pkl.gz'
+            save(path,{'records':[{'state':record['state'],'size':record['size'],**{source:grouped(record[source]) for source in ('actions','held')}} for record in records],
+                       'targets':targets,'weights':weights})
+            manifest['files'][path.name]=digest(path)
+
+
+@timed_often
+def grouped(entries):
+    found={}
+    for entry in entries:
+        found.setdefault(entry[0],[]).append(entry)
+    return found
+
+
+@timed
+def stored(directory,model,families):
+    found=load(directory/f'training_{model}.pkl.gz')
+    records=[{'state':record['state'],'size':record['size'],**{source:[entry for family in families[source] for entry in record[source].get(family,())] for source in ('actions','held')}}
+             for record in found['records']]
+    return records,found['targets'],found['weights']
 
 
 @timed

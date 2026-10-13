@@ -22,6 +22,7 @@ from .storage import digest, read, save, source_digest, write
 
 LOG=logging.getLogger('tuning')
 SECONDS=40
+PROJECTION=2
 
 
 @timed
@@ -59,7 +60,7 @@ def execute(directory,request,seconds,memory_gb,heartbeat):
         process=psutil.Process(child.pid)
         created=process.create_time()
         peak=0
-        state=None
+        state=projected=None
         last_beat=-1.
         try:
             while child.poll() is None:
@@ -75,9 +76,16 @@ def execute(directory,request,seconds,memory_gb,heartbeat):
                     break
                 if elapsed-last_beat>=1:
                     progress=output.with_suffix('.progress.json')
-                    heartbeat({'trial':request['trial'],'pid':child.pid,'created':created,'seconds':elapsed,'memory_gb':memory/2**30,
-                               'detail':read(progress) if progress.exists() else {'step':'starting'}})
+                    detail=read(progress) if progress.exists() else {'step':'starting'}
+                    heartbeat({'trial':request['trial'],'pid':child.pid,'created':created,'seconds':elapsed,'memory_gb':memory/2**30,'detail':detail})
                     last_beat=elapsed
+                    if detail.get('remaining_seconds') is not None and detail['boost_seconds']>=PROJECTION:
+                        projected=elapsed+detail['remaining_seconds']-(time.time()-detail['updated'])
+                        if projected>seconds:
+                            state='time_limit'
+                            stop(process)
+                            break
+                        projected=None
                 time.sleep(min(.05,max(0,seconds-(time.monotonic()-started))))
         finally:
             if child.poll() is None:
@@ -87,7 +95,7 @@ def execute(directory,request,seconds,memory_gb,heartbeat):
     if elapsed>seconds and state is None:
         state='time_limit'
     if state:
-        result={'state':state,'error':f'{state}: {seconds}s / {memory_gb} GiB'}
+        result={'state':state,'error':f'{state}: {seconds}s / {memory_gb} GiB'+(f', projected {projected:.0f}s' if projected else '')}
     elif not output.is_file():
         result={'state':'failed','error':f'Worker exited {child.returncode} without a result; see {output.with_suffix(".stderr.log").name}'}
     else:

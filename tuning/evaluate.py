@@ -4,7 +4,7 @@ import time
 import numpy as np
 
 from interface.common import evidence, timed
-from .data import training, validate_manifest
+from .data import stored, training, validate_manifest
 from .features import loaded_columns, selected_families
 from .metrics import SPEC, differentiation, summarize
 from .model import Monitor, PickerModel
@@ -27,11 +27,14 @@ def evaluate(connection,directory,manifest,model,config,threads,seed,progress_pa
             stage['timings'][stage['step']]=now-stage['step_started']
         stage.update(step=step,step_started=now,updated=now)
         write(progress_path,stage)
-    progress('assemble training from database')
-    features,y,_,weights=training(connection,{run:bounds[run] for run in manifest['train']},model,columns,families=families)
+    progress('assemble training rows')
+    if model=='row':
+        features,y,_,weights=training(connection,{run:bounds[run] for run in manifest['train']},model,columns)
+    else:
+        features,y,weights=stored(directory,model,families)
     progress('fit')
     fitted=PickerModel(model,config,groups,threads,seed)
-    fitted.fit(features,y,weights,Monitor(progress_path,stage))
+    fitted.fit(features,y,weights,Monitor(progress_path,stage,config['iterations']))
     rows=len(y)
     check=features.iloc[:min(100,len(y))].copy() if model=='row' else features[:min(100,len(y))]
     before=fitted.predict(check)
