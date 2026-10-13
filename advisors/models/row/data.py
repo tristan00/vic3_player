@@ -1,4 +1,6 @@
 from collections import Counter, defaultdict
+from concurrent.futures import ProcessPoolExecutor
+from itertools import repeat
 import logging
 from pathlib import Path
 import time
@@ -6,13 +8,16 @@ from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
+import psycopg
 
 from interface.common import evidence, timed, timed_often
+from interface.timing import RECORDER
 from ...data.endgame import COMPONENTS, HISTORY, NAME, OBJECTIVE, REWARD_COMPONENTS, Trajectories, reward, scored_runs
 from .features import CATEGORICAL, NUMERIC, PLAYER_FIELDS, SITE, STATE_REPORTS, Historical, Selection, action_features, context, frame
 from .batch import characters, parameters, sites
 
 LOG=logging.getLogger('loop')
+LOADERS=8
 OUTPUT=Path(__file__).resolve().parents[3]/'artifacts/row_model'
 METADATA=['run','action_number','before_seq','baseline_seq','start_hour','end_hour','years',
           *[f'baseline.{name}' for name in COMPONENTS],*[f'reward_part.{name}' for name in REWARD_COMPONENTS]]
@@ -87,6 +92,41 @@ def training_rows(connection,bounds,columns=None,snapshots=None):
     traits=characters(connection,requested,selection)
     features=pd.concat([states,actions,selected,placed,traits],axis=1).reindex(columns=columns)
     return SimpleNamespace(X=features,meta=pd.DataFrame(metadata,columns=METADATA),omitted=omitted)
+
+
+@timed
+def share(dsn,bounds,columns,snapshots):
+    RECORDER.reset()
+    with psycopg.connect(dsn,connect_timeout=5) as connection:
+        connection.execute('set transaction isolation level repeatable read read only')
+        data=training_rows(connection,bounds,columns,snapshots)
+    return data,RECORDER.take()
+
+
+@timed
+def gathered(connection,bounds,columns=None,snapshots=None):
+    ids=sorted(bounds)
+    count=min(LOADERS,len(ids))
+    if count<2:
+        return training_rows(connection,bounds,columns,snapshots)
+    shares=[{run:bounds[run] for run in ids[start::count]} for start in range(count)]
+    with ProcessPoolExecutor(count) as pool:
+        found=list(pool.map(share,repeat(connection.info.dsn),shares,repeat(columns),repeat(snapshots)))
+    for _,timings in found:
+        RECORDER.merge(timings)
+    omitted={run:counts for data,_ in found for run,counts in data.omitted.items()}
+    parts=[data for data,_ in found if len(data.meta)] or [found[0][0]]
+    meta=pd.concat([part.meta for part in parts],ignore_index=True)
+    order=np.lexsort((meta.action_number.to_numpy(),meta.run.to_numpy()))
+    joined={}
+    for name in parts[0].X.columns:
+        pieces=[part.X[name] for part in parts]
+        whole=(pd.api.types.union_categoricals(pieces,sort_categories=True) if isinstance(pieces[0].dtype,pd.CategoricalDtype)
+               else np.concatenate([piece.to_numpy() for piece in pieces]))
+        joined[name]=whole.take(order)
+    LOG.info('row gathered rows %d runs %d loaders %d',len(meta),len(ids),count)
+    return SimpleNamespace(X=pd.DataFrame(joined,index=range(len(meta)),copy=False),meta=meta.iloc[order].reset_index(drop=True),
+                           omitted={run:omitted[run] for run in bounds})
 
 
 class TrainingCache:

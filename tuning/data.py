@@ -171,7 +171,7 @@ def training(connection,bounds,model,columns=None,snapshots=None,families=None):
         y=np.asarray([record['y'] for record in features])
         keys=np.asarray([(run,record['seq']) for run,records in found.items() for record in records])
     else:
-        data=action.training_rows(connection,bounds,columns,snapshots)
+        data=action.gathered(connection,bounds,columns,snapshots)
         features=data.X
         meta=data.meta
         y=reward(meta.years.to_numpy(),{name:meta[f'reward_part.{name}'].to_numpy() for name in REWARD_COMPONENTS})

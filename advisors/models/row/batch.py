@@ -4,7 +4,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from interface.common import evidence, timed
+from interface.common import evidence, timed, timed_often
 from interface.recording.spec import TABLE
 from ...catalogue import NAVAL
 from ...data.features import PEOPLE, SITE
@@ -48,17 +48,22 @@ def parameters(connection,actions,selection):
     for name in set(selected)-numeric:
         result[name].fill(ABSENT)
     grouped=defaultdict(list)
+    plans={}
     for position,(run,seq,hours,name,params) in enumerate(actions):
-        expected=PARAMETERS[name]
-        if set(params)!={param for param,kind in expected}:
-            raise ValueError(evidence(name=name,params=sorted(params),expected=expected))
-        for param,kind in expected:
-            prefix=f'parameter.{param}.{kind}'
-            if selection.parameters.get(prefix) or prefix in result:
-                grouped[prefix].append((position,run,seq,hours,params[param]))
+        plan=plans.get(name)
+        if plan is None:
+            expected=PARAMETERS[name]
+            prefixes=[(param,f'parameter.{param}.{kind}') for param,kind in expected]
+            plan=plans[name]=({param for param,kind in expected},
+                              [(param,grouped[prefix]) for param,prefix in prefixes if selection.parameters.get(prefix) or prefix in result])
+        if params.keys()!=plan[0]:
+            raise ValueError(evidence(name=name,params=sorted(params),expected=PARAMETERS[name]))
+        for param,rows in plan[1]:
+            rows.append((position,run,seq,hours,params[param]))
+    placed={}
     for prefix,rows in grouped.items():
         requests=pd.DataFrame(rows,columns=['position','run','seq','hours','ident'],dtype=object)
-        indices=requests['position'].to_numpy(dtype=np.int64)
+        indices=placed[prefix]=requests['position'].to_numpy(dtype=np.int64)
         kind=prefix.split('.')[2]
         if kind not in ENTITY:
             result[prefix][indices]=requests['ident'].to_numpy(dtype=np.float32) if kind=='int' else requests['ident'].astype(str).to_numpy()
@@ -87,8 +92,21 @@ def parameters(connection,actions,selection):
                     values=(hours.to_numpy(dtype=np.float64)-values)/24
                 result[key][indices]=values
     for name in set(selected)&set(CATEGORICAL):
-        result[name]=pd.Categorical(result[name])
+        result[name]=labelled(result[name],placed.get('.'.join(name.split('.')[:3])))
     return pd.DataFrame(result,index=range(len(actions)),copy=False)
+
+
+@timed_often
+def labelled(values,indices):
+    if indices is None:
+        return pd.Categorical.from_codes(np.zeros(len(values),np.int8),pd.Categorical(values[:1]).categories)
+    if len(indices)==len(values):
+        return pd.Categorical(values)
+    chosen=pd.Categorical(values[indices])
+    categories=chosen.categories.union([ABSENT]).sort_values()
+    codes=np.full(len(values),categories.get_loc(ABSENT),np.int32)
+    codes[indices]=categories.get_indexer(chosen.categories)[chosen.codes]
+    return pd.Categorical.from_codes(codes,categories)
 
 
 @timed

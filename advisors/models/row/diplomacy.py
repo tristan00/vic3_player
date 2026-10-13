@@ -28,6 +28,8 @@ COUNTERPART_NUMERIC=[COUNTERPART+name for name in ('relations','tension','player
                                                  'gdp_ratio','battalions_ratio','liberty_desire','weekly_liberty_desire_change','same_bloc',
                                                  'player_bloc_leverage','counterpart_bloc_leverage')]
 COUNTERPART_CATEGORICAL=[COUNTERPART+'subject_relationship',*[COUNTERPART+kind for kind in AGREEMENTS]]
+PARTNERS={(kind,direction):PLAYER+kind+'.'+direction for kind,directions in AGREEMENTS.items() for direction in directions}
+UNARRANGED={COUNTERPART+kind:'none' for kind in AGREEMENTS}
 TABLES={'country':(['country'],['power_bloc','bloc_leader']),
         'power_bloc':(['power_bloc'],['power_bloc_identity','cohesion','mandate_progress']),
         'pact':(['pact'],['first_country','second_country','pact_type']),
@@ -135,7 +137,7 @@ class Diplomacy:
                 ratio(sum(self.gdp.get(subject,np.nan) for subject in subjects),self.gdp.get(self.player,np.nan)),
                 np.nan if own is None else float(own[1]),cohesion,mandate,
                 np.nan if own is None else sum(found==bloc for found,_ in self.countries.values()) if bloc is not None else 0]
-        return {**dict(zip(PLAYER_NUMERIC[:14],values)),**{PLAYER+kind+'.'+direction:len(partners) for (kind,direction),partners in self.partners.items()},
+        return {**dict(zip(PLAYER_NUMERIC[:14],values)),**{PARTNERS[key]:len(partners) for key,partners in self.partners.items()},
                 PLAYER+'subject_type':MISSING if own is None else subject_type,PLAYER+'bloc_identity':identity}
 
     @timed_often
@@ -156,8 +158,9 @@ class Diplomacy:
                 *self.liberty.get(country,(np.nan,np.nan)),float(bloc is not None and bloc==other_bloc),
                 self.leverage.get((country,bloc),0.) if bloc is not None else np.nan,
                 self.leverage.get((self.player,other_bloc),0.) if other_bloc is not None else np.nan]
-        found={**dict(zip(COUNTERPART_NUMERIC,values)),COUNTERPART+'subject_relationship':relationship,
-               **{COUNTERPART+kind:direction(self.arrangements[country][kind]) for kind in AGREEMENTS}}
+        found={**dict(zip(COUNTERPART_NUMERIC,values)),COUNTERPART+'subject_relationship':relationship,**UNARRANGED}
+        for kind,directions in self.arrangements[country].items():
+            found[COUNTERPART+kind]=direction(directions)
         self.counterparts[country]=found
         return found
 

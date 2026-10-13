@@ -16,6 +16,7 @@ OMIT={'first_name_key','last_name_key','name_key','localized_name_key','company_
       'map_color_override','color_red','color_green','color_blue','power_bloc_map_texture','trends_initialized'}
 STATE=NUMBERS+PRICES+INSTITUTIONS+TARIFFS+TAXES
 PLAYER_FIELDS=STATE+CATEGORIES+diplomacy.PLAYER_NUMERIC+diplomacy.PLAYER_CATEGORICAL
+STATE_PARTS=((NUMBERS,'numbers'),(PRICES,'prices'),(INSTITUTIONS,'institutions'),(TARIFFS,'tariffs'),(TAXES,'taxes'),(CATEGORIES[:-1],'laws'))
 MISSING='<missing>'
 ABSENT='<not-applicable>'
 TRAITS=sorted(name for name,_ in read(DEFAULT_GAME/'game','common/character_traits'))
@@ -96,6 +97,9 @@ class Selection:
         self.traits=[trait for trait in TRAITS if f'target_character.trait.{trait}' in self.names]
         self.site=bool(self.names.intersection(SITE+[f'site.{field}' for fields in STATE_REPORTS.values() for field in fields]))
         self.site_traits=[trait for trait in STATE_TRAITS if f'site.trait.{trait}' in self.names]
+        self.state=[(attribute,len(names),[i for i,name in enumerate(names) if name in self.names],[name for name in names if name in self.names])
+                    for names,attribute in STATE_PARTS if self.names.intersection(names)]
+        self.player=[name for name in diplomacy.PLAYER_NUMERIC+diplomacy.PLAYER_CATEGORICAL if name in self.names]
         self.diplomacy=bool(self.names.intersection(diplomacy.COUNTERPART_NUMERIC+diplomacy.COUNTERPART_CATEGORICAL))
         self.history={'hours','treasury','population','politics'}
         for names,required in (
@@ -224,17 +228,17 @@ class Live:
 def context(point,selection=ALL):
     state=point.state
     found={}
-    for names,attribute in ((NUMBERS,'numbers'),(PRICES,'prices'),(INSTITUTIONS,'institutions'),(TARIFFS,'tariffs'),(TAXES,'taxes'),(CATEGORIES[:-1],'laws')):
-        if selection.names.intersection(names):
-            values=getattr(state,attribute)
-            if values is None:
-                raise ValueError(evidence(attribute=attribute))
-            found.update((name,value) for name,value in zip(names,values) if name in selection.names)
+    for attribute,size,indices,names in selection.state:
+        values=getattr(state,attribute)
+        if values is None:
+            raise ValueError(evidence(attribute=attribute))
+        found.update(zip(names,values if len(names)==size else [values[i] for i in indices]))
     if 'player.country_rank' in selection.names:
         rank=state.country(state.player)
         found['player.country_rank']='none' if rank is None else rank
-    if selection.names.intersection(diplomacy.PLAYER_NUMERIC+diplomacy.PLAYER_CATEGORICAL):
-        found.update((name,value) for name,value in point.diplomacy.overview.items() if name in selection.names)
+    if selection.player:
+        overview=point.diplomacy.overview
+        found.update((name,overview[name]) for name in selection.player)
     return found
 
 
@@ -297,12 +301,19 @@ def action_features(name,params,point,selection=ALL):
 @timed
 def frame(rows,columns=NUMERIC+CATEGORICAL):
     found={name:([],[]) for name in columns}
-    for i,row in enumerate(rows):
-        for name,value in row.items():
+    keys=tuple(rows[0]) if len(rows) else ()
+    if keys and all(tuple(row)==keys for row in rows):
+        every=range(len(rows))
+        for name,values in zip(keys,zip(*(row.values() for row in rows))):
             if name in found:
-                indices,values=found[name]
-                indices.append(i)
-                values.append(value)
+                found[name]=(every,values)
+    else:
+        for i,row in enumerate(rows):
+            for name,value in row.items():
+                if name in found:
+                    indices,values=found[name]
+                    indices.append(i)
+                    values.append(value)
     result={}
     numeric=set(NUMERIC)
     for name,(indices,values) in found.items():
