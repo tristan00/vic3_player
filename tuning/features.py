@@ -13,7 +13,11 @@ from interface.common import evidence, timed, timed_often
 
 @timed_often
 def context_groups():
-    return {'context.economy':list(state.NUMBERS),'context.prices':list(state.PRICES),
+    split={'context.construction':state.CONSTRUCTION,'context.military':state.MILITARY,'context.interest_groups':state.GROUP_FEATURES,'context.policy':state.POLICY,
+           'context.law_enactment':state.ENACTMENT,'context.war':state.WAR,'context.world':state.WORLD}
+    taken={column for columns in split.values() for column in columns}
+    return {'context.economy':[column for column in state.NUMBERS if column not in taken],**{name:list(columns) for name,columns in split.items()},
+            'context.prices':list(state.PRICES),
             'context.institutions':list(state.INSTITUTIONS),'context.tariffs':list(state.TARIFFS),
             'context.consumption_taxes':list(state.TAXES),'context.laws':list(state.LAWS),
             'context.rank':['player.country_rank']}

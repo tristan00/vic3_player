@@ -7,7 +7,7 @@ from interface.common import DEFAULT_GAME, evidence, timed, timed_often
 from interface.recording.spec import NULL_DATE, TABLE
 from interface.script import read
 from ..catalogue import DUTIES, INSTITUTIONS as INSTITUTION_TYPES, LAW_ACTIONS, LAW_GROUP, LAW_GROUPS, NAVAL, RECORDED_PARAMS, PARTY_ACTIONS
-from .rewards import COSTS
+from .rewards import COSTS, HOURS_PER_YEAR
 
 TYPED={'law':('law','law_type'),'institution':('institution','institution_type'),'interest_group':('interest_group','interest_group_type'),
        'political_movement':('political_movement','political_movement_type'),'journal_entry':('journal_entry','journal_entry_type'),
@@ -21,9 +21,15 @@ GROUP_METRICS=('clout','approval','in_government')
 GROUP_FEATURES=[f'player.interest_group.{kind}.{metric}' for kind in INTEREST_GROUPS for metric in GROUP_METRICS]
 ENACTMENT_FIELDS=('enactment_phase','checkpoint_progress','enactment_setbacks','chance','advance_chance','debate_chance','stall_chance')
 ENACTMENT=[f'law_enactment.{name}' for name in ('active','phase','progress_percent','setbacks','success_percent','advance_percent','debate_percent','stall_percent')]
-NUMBERS=['treasury','debt','interest','balance','population','bureaucracy_available','standard_of_living','government_queue_items','government_queue_left',
-         'private_queue_items','private_queue_left','construction_capacity','construction_used','construction_paused','balance_gdp','battalions','mobilization_ratio',
-         'wars','army_spending','army_spending_gdp','infamy','government_legitimacy','radicals_percent']+GROUP_FEATURES+['government_spending','government_spending_gdp']+POLICY+ENACTMENT
+CONSTRUCTION=['government_queue_items','government_queue_left','private_queue_items','private_queue_left','construction_capacity','construction_used','construction_paused']
+MILITARY=['battalions','mobilization_ratio','wars','army_spending','army_spending_gdp']
+WAR=['war.support','war.battles_won','war.battles_lost','war.advances_made','war.advances_suffered']
+SLIDERS=['countries','states','military','source_regions','random_ideology_share','primary_culture_share','interconnectedness','antagonism']
+WORLD=[f'world.{name}' for name in SLIDERS]
+NUMBERS=(['treasury','debt','interest','balance','population','bureaucracy_available','standard_of_living']+CONSTRUCTION+['balance_gdp']+MILITARY
+         +['infamy','government_legitimacy','radicals_percent']+GROUP_FEATURES+['government_spending','government_spending_gdp']+POLICY+ENACTMENT+WAR+WORLD)
+BATTLES=['date','winner','loser','empty']
+RUN_SLIDERS=f'select run_id,{",".join(SLIDERS)} from run where run_id = any(%s)'
 WEEKS_PER_YEAR=52
 LAWS=[f'law.{group}' for group in LAW_GROUPS]
 CATEGORIES=LAWS+['player.country_rank']
@@ -124,6 +130,18 @@ def target_context(links,target,state):
     own,theirs=truces.get(target,(0.,0.))
     adjacent=borders.get(target,set())
     return [float(own>0 or theirs>0),own,theirs,float(bool(adjacent)),len(adjacent),float(state in adjacent) if state is not None else 0.],sorted(agreements.get(target,()))
+
+
+@timed_often
+def war(supports,battles,hours,player):
+    recent=[(winner,loser,empty) for date,winner,loser,empty in battles if date>hours-HOURS_PER_YEAR]
+    return [min(supports,default=float('nan')),
+            *(float(sum(1 for *sides,empty in recent if empty==unopposed and sides[side]==player)) for unopposed in (False,True) for side in (0,1))]
+
+
+@timed
+def run_sliders(connection,runs):
+    return {run:[float('nan') if value is None else float(value) for value in values] for run,*values in connection.execute(RUN_SLIDERS,(runs,)).fetchall()}
 
 
 @timed_often
@@ -310,7 +328,8 @@ class LiveLookup:
         budget=s.rows('player_budget_line','direction,line,amount')
         government=spent(budget,expense_lines(s.connection,GOVERNMENT))
         military=next((tuple(found) for country,*found in s.rows('country_military_report','country,battalions,mobilization_ratio') if country==s.player),None)
-        wars=sum(1 for _,country in s.rows('war_participant','war,country') if country==s.player)
+        supports=[support for _,country,support in s.rows('war_participant','war,country,war_support') if country==s.player]
+        battles=s.connection.execute(f'select {",".join(BATTLES)} from battle_result where run_id=%s and seq<=%s',(s.run_id,s.seq)).fetchall()
         own_laws=set(s.mine('law'))
         enacting=enactment(values for law,*values in s.rows('law_private','law,enactment_start_date,'+','.join(ENACTMENT_FIELDS)) if law in own_laws)
         return {'terrain':{region:kind for (_,region),kind in majority(s.connection.execute(TERRAIN,([world],)).fetchall()).items()},
@@ -339,10 +358,11 @@ class LiveLookup:
                            treasury['balance_trend_current'],total,
                            politics['power_delta_bureaucracy'],float('nan') if sol is None else sol,*queues(queue),*construction(report),
                            balance_gdp(treasury['balance_trend_current'],gdp),
-                           *army(military,wars,spent(budget,expense_lines(s.connection,ARMY)),gdp),
+                           *army(military,len(supports),spent(budget,expense_lines(s.connection,ARMY)),gdp),
                            s.map('country_diplomacy','country,infamy')[s.player],float('nan') if legitimacy is None else legitimacy,
                            radicals_percent(population['radicals'],total),*groups,government,balance_gdp(government,gdp),
-                           *s.rows('player_policy',','.join(POLICY))[0],*enacting]}
+                           *s.rows('player_policy',','.join(POLICY))[0],*enacting,*war(supports,battles,s.hours,s.player),
+                           *run_sliders(s.connection,[s.run_id])[s.run_id]]}
 
     @timed_often
     def state(self,state):
@@ -463,6 +483,10 @@ class Samples:
         position=bisect.bisect_right(seqs,seq)-1
         return None if position<0 else rows[position]
 
+    def until(self,run,seq):
+        seqs,rows=self.index.get(run,([],[]))
+        return rows[:bisect.bisect_right(seqs,seq)]
+
 
 class Latest:
     @timed
@@ -514,7 +538,7 @@ class History:
             'budget':('player_budget_line',['direction','line'],['amount']),
             'taxed':('player_taxed_goods',['goods'],[]),
             'military':('country_military_report',['country'],['battalions','mobilization_ratio']),
-            'wars':('war_participant',['war','country'],['country']),
+            'wars':('war_participant',['war','country'],['country','war_support']),
             'legitimacy':('country_politics_report',['country'],['government_legitimacy']),
             'sol':('country_standard_of_living_report',['country'],['average_standard_of_living_by_population']),
             'gdp':('country_economy_report',['country'],['gdp']),
@@ -549,7 +573,9 @@ class History:
             'population':(Samples,('player_population',['lower_strata','middle_strata','upper_strata','radicals'],runs)),
             'politics':(Samples,('player_politics',['power_delta_bureaucracy'],runs)),
             'infamy':(Samples,('country_diplomacy',['infamy'],runs,'country')),
-            'hours':(Samples,('snapshot',['game_date'],runs))}
+            'hours':(Samples,('snapshot',['game_date'],runs)),
+            'battles':(Samples,('battle_result',BATTLES,runs)),
+            'sliders':(run_sliders,(runs,))}
         for name,(loader,args) in other.items():
             if wanted(name):
                 setattr(self,name,loader(connection,*args))
@@ -615,12 +641,13 @@ class HistoryLookup:
         gdp=self.h.gdp.at(self.run,(self.player,),self.seq)
         gdp=None if gdp is None else gdp[0]
         government=self.spent(self.h.government)
+        supports=[support for country,support in self.h.wars.live(self.run,self.seq) if country==self.player]
         return [treasury[0],treasury[1],interest[0] if interest else 0,treasury[2],total,politics[0],float('nan') if sol is None else sol[0],
                 *queues(self.queue),*construction(report),balance_gdp(treasury[2],gdp),
-                *army(self.h.military.at(self.run,(self.player,),self.seq),sum(1 for country, in self.h.wars.live(self.run,self.seq) if country==self.player),
-                      self.spent(self.h.army),gdp),
+                *army(self.h.military.at(self.run,(self.player,),self.seq),len(supports),self.spent(self.h.army),gdp),
                 self.h.infamy.at(self.run,self.seq)[0],float('nan') if legitimacy is None else legitimacy[0],radicals_percent(population[3],total),*self.interest_groups,
-                government,balance_gdp(government,gdp),*self.h.policy.at(self.run,self.seq),*self.enactment]
+                government,balance_gdp(government,gdp),*self.h.policy.at(self.run,self.seq),*self.enactment,
+                *war(supports,self.h.battles.until(self.run,self.seq),self.h.hours.at(self.run,self.seq)[0],self.player),*self.h.sliders[self.run]]
 
     @cached_property
     @timed_often

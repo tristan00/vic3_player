@@ -99,7 +99,7 @@ class Selection:
         self.diplomacy=bool(self.names.intersection(diplomacy.COUNTERPART_NUMERIC+diplomacy.COUNTERPART_CATEGORICAL))
         self.history={'hours','treasury','population','politics'}
         for names,required in (
-            (NUMBERS,{'legitimacy','budget','interest','sol','construction','gdp','government','queue','military','wars','army','infamy','groups','group_stats','policy','enactments','law_rows'}),
+            (NUMBERS,{'legitimacy','budget','interest','sol','construction','gdp','government','queue','military','wars','army','infamy','groups','group_stats','policy','enactments','law_rows','battles','sliders'}),
             (PRICES,{'markets','goods','world'}),(INSTITUTIONS,{'institution_rows'}),(TARIFFS,{'tariff_rows'}),(TAXES,{'taxed'}),
             (CATEGORIES[:-1],{'law_rows'}),(['player.country_rank'],{'countries'})):
             if self.names.intersection(names):
