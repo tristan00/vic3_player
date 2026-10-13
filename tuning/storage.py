@@ -55,7 +55,7 @@ def save(path,value):
 @timed
 def load(path):
     with gzip.open(path,'rb') as stream:
-        return pickle.load(stream)
+        return pickle.loads(stream.read())
 
 
 @timed
