@@ -712,6 +712,7 @@ create table run (
   primary_culture_share float8 check (primary_culture_share between 0 and 1),
   interconnectedness float8 check (interconnectedness between 0 and 1),
   antagonism float8 check (antagonism between 0 and 1),
+  sizer text not null check (sizer in ('random', 'catboost', 'mixed')),
   picker text not null check (picker in ('first', 'catboost', 'catboost_piecewise')),
   candidates int2 not null check (candidates >= 1),
   objective_gdp float8 not null check (objective_gdp between 0 and 1),
@@ -785,6 +786,50 @@ create table smac_candidate (
   expected_improvement float8 not null,
   beat_probability float8 not null,
   primary key (run_id, rank)
+);
+
+create table size_candidate (
+  run_id int4 not null references run,
+  seq int4 not null,
+  actions int2 not null,
+  predicted_change float8 not null,
+  chosen bool not null,
+  primary key (run_id, seq, actions)
+);
+
+create table size_model (
+  run_id int4 primary key references run,
+  pauses int4 not null,
+  runs int4 not null,
+  seconds float8 not null,
+  iterations int4 not null,
+  depth int2 not null,
+  learning_rate float8 not null,
+  loss_function text not null,
+  random_seed int4 not null,
+  thread_count int2 not null,
+  rsm float8 not null,
+  l2_leaf_reg float8 not null,
+  random_strength float8 not null,
+  one_hot_max_size int2 not null,
+  max_ctr_complexity int2 not null,
+  boosting_type text not null,
+  bootstrap_type text not null,
+  subsample float8,
+  bagging_temperature float8,
+  border_count int2 not null,
+  leaf_estimation_iterations int2 not null,
+  counter_calc_method text not null,
+  grow_policy text not null,
+  min_data_in_leaf int4,
+  max_leaves int4
+);
+
+create table size_importance (
+  run_id int4 not null references size_model,
+  feature text not null,
+  importance float8 not null,
+  primary key (run_id, feature)
 );
 
 create table pick_candidate (

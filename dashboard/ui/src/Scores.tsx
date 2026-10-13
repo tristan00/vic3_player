@@ -44,7 +44,7 @@ export function Scores() {
           const settings = Object.entries(objective).filter(([, value]) => !value || typeof value !== 'object')
           const partColumns = [...new Set(parts.flatMap((part) => Object.keys(part)))].filter((name) => name !== 'component')
           const measures = [{ name: 'runs', kind: 'int' }, { name: 'scored', kind: 'int' }, { name: 'score', label: 'median score', kind: 'num' }, { name: 'game_years', label: 'median years', kind: 'num' }, ...components.map((component) => ({ name: component, kind: 'num', group: 'median contribution' }))]
-          const policies = [...groupBy(rows, (row) => `${row.initializer} / ${row.picker}`).entries()].map(([policy, group]) => ({ policy, initializer: group[0].initializer, picker: group[0].picker, ...summary(group, components) }))
+          const policies = [...groupBy(rows, (row) => `${row.initializer} / ${row.sizer} / ${row.picker}`).entries()].map(([policy, group]) => ({ policy, initializer: group[0].initializer, sizer: group[0].sizer, picker: group[0].picker, ...summary(group, components) }))
           const endings = [...groupBy(rows.filter((row) => row.ended), (row) => row.state).entries()].map(([state, group]) => ({ state, tone: group[0].tone, ...summary(group, components) }))
           const reasons = [...groupBy(rows.filter((row) => row.score === null && row.ended), (row) => row.not_scored ?? '').entries()].map(([reason, group]) => ({ reason, runs: group.length, latest: Math.max(...group.map((row) => row.run)) }))
           return (
@@ -64,8 +64,8 @@ export function Scores() {
                   <Dots points={scored.map((row) => ({ x: row.game_years, y: row.score, key: row.state, title: `run ${row.run} · ${row.country}`, to: `/runs/${row.run}` }))} palette={palette} xTitle="game years" yTitle="score" clip={[0.03, 0.97]} />
                 </Panel>
               </div>
-              <Panel title="Initializer and picker">
-                <Grid search={false} rows={policies} sort={{ name: 'runs', desc: true }} columns={[{ name: 'initializer', kind: 'name' }, { name: 'picker', kind: 'name' }, ...measures]} />
+              <Panel title="Initializer, sizer and picker">
+                <Grid search={false} rows={policies} sort={{ name: 'runs', desc: true }} columns={[{ name: 'initializer', kind: 'name' }, { name: 'sizer', kind: 'name' }, { name: 'picker', kind: 'name' }, ...measures]} />
               </Panel>
               <Panel title="End reason">
                 <Grid search={false} rows={endings} sort={{ name: 'runs', desc: true }} columns={[stateColumn, ...measures]} />
@@ -76,7 +76,7 @@ export function Scores() {
                 </Panel>
               )}
               <Panel title="Scored runs">
-                <Grid fold rows={scored} sort={{ name: 'score', desc: true }} facets={['state', 'initializer', 'picker']} columns={[{ name: 'run', kind: 'run' }, stateColumn, { name: 'country', kind: 'name' }, { name: 'initializer', kind: 'name' }, { name: 'picker', kind: 'name' }, { name: 'game_years', label: 'game years', kind: 'num' }, { name: 'score', kind: 'num' }, ...components.map((component) => ({ name: component, kind: 'num', group: 'contribution' }))]} />
+                <Grid fold rows={scored} sort={{ name: 'score', desc: true }} facets={['state', 'initializer', 'sizer', 'picker']} columns={[{ name: 'run', kind: 'run' }, stateColumn, { name: 'country', kind: 'name' }, { name: 'initializer', kind: 'name' }, { name: 'sizer', kind: 'name' }, { name: 'picker', kind: 'name' }, { name: 'game_years', label: 'game years', kind: 'num' }, { name: 'score', kind: 'num' }, ...components.map((component) => ({ name: component, kind: 'num', group: 'contribution' }))]} />
               </Panel>
             </>
           )

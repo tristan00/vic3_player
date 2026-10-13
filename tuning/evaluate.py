@@ -6,7 +6,7 @@ import numpy as np
 from interface.common import evidence, timed
 from .data import training, validate_manifest
 from .features import selected_columns, selected_families
-from .metrics import differentiation, summarize
+from .metrics import SPEC, differentiation, summarize
 from .model import Monitor, PickerModel
 from .storage import load, save, write
 
@@ -19,7 +19,7 @@ def evaluate(connection,directory,manifest,model,config,threads,seed,progress_pa
     groups=manifest['groups'][model]
     bounds={run:dates for run,*dates in manifest['bounds']}
     columns=selected_columns(groups,config)
-    families=selected_families(groups,config) if model=='histogram' else None
+    families=None if model=='row' else selected_families(groups,config)
     stage={'training_runs':len(manifest['train']),'validation_runs':len(manifest['validation']),'timings':{}}
     def progress(step):
         now=time.time()
@@ -33,7 +33,7 @@ def evaluate(connection,directory,manifest,model,config,threads,seed,progress_pa
     fitted=PickerModel(model,config,groups,threads,seed)
     fitted.fit(features,y,weights,Monitor(progress_path,stage))
     rows=len(y)
-    check=features[:min(100,len(y))] if model=='histogram' else features.iloc[:min(100,len(y))].copy()
+    check=features.iloc[:min(100,len(y))].copy() if model=='row' else features[:min(100,len(y))]
     before=fitted.predict(check)
     del features,y,weights
     gc.collect()
@@ -41,7 +41,7 @@ def evaluate(connection,directory,manifest,model,config,threads,seed,progress_pa
     candidates=load(directory/f'scoring_{model}.pkl.gz')
     targets,keys=candidates['targets'],candidates['pauses']
     predicted=fitted.predict(candidates['validation'],threads)
-    options=fitted.predict(candidates['features'],threads).reshape(len(candidates['keys']),100)
+    options=fitted.predict(candidates['features'],threads).reshape(len(candidates['keys']),SPEC['candidates'][model])
     for (run,seq),scores in zip(candidates['keys'],options):
         mask=(keys[:,0]==run)&(keys[:,1]==seq)
         if not mask.any():

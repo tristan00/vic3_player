@@ -221,11 +221,11 @@ class Store:
         return [name for name, in self.connection.execute('select d.name from run r join country_definition d on d.country_definition=r.tag order by run_id desc limit %s',(count,))]
 
     @timed
-    def begin_run(self,started_at,kind,advisors,tag,world,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,generated,weights,centres,picker,candidates,objective,proposal=None,pick_model=None):
+    def begin_run(self,started_at,kind,advisors,tag,world,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,generated,weights,centres,sizer,picker,candidates,objective,proposal=None,size_model=None,pick_model=None):
         self.connection.execute("update run set ended_at=heartbeat_at,end_reason='loop_lost' where ended_at is null")
         self.pending={'started_at':started_at,'kind':kind,'advisors':list(advisors),'tag':tag,'world':world,'cli_seed':cli_seed,'run_seed':run_seed,'years':years,'minutes':minutes,'profile':profile,'pool':pool,
                       'runs_requested':runs_requested,'generated':generated,'weights':dict(weights),'centres':dict(centres),
-                      'picker':picker,'candidates':candidates,'objective':objective,'proposal':proposal,'pick_model':pick_model}
+                      'sizer':sizer,'picker':picker,'candidates':candidates,'objective':objective,'proposal':proposal,'size_model':size_model,'pick_model':pick_model}
         self.run_id=self.constants=None
         self.seq=0
         self.anchored={entity:set() for entity in ENTITIES}
@@ -237,12 +237,12 @@ class Store:
         tag=self.names('country_definition',[pending['tag']])[0]
         run_id=cursor.execute('insert into run (run_id,kind,source_session,started_at,heartbeat_at,progress_at,progress_step,world_id,ruleset_id,player_country,'
                               'game_speed,first_start,custom_rng_seed,tag,world_file,cli_seed,run_seed,years,minutes,profile,pool,runs_requested,'
-                              'world_seed,countries,states,pop,modernity,copies,diversity,military,picker,candidates,objective_gdp,objective_population,objective_sol,objective_alpha,objective_stock) '
-                              'values ((select coalesce(max(run_id),0)+1 from run),%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
+                              'world_seed,countries,states,pop,modernity,copies,diversity,military,sizer,picker,candidates,objective_gdp,objective_population,objective_sol,objective_alpha,objective_stock) '
+                              'values ((select coalesce(max(run_id),0)+1 from run),%s,%s,%s,%s,now(),now(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) returning run_id',
                               (pending['kind'],self.session,pending['started_at'],'open_run',self.world_id,self.ruleset_id,constants['player_country'],
                                constants['game_speed'],constants['first_start'],constants['custom_rng_seed'],tag,pending['world'],pending['cli_seed'],
                                pending['run_seed'],pending['years'],pending['minutes'],pending['profile'],pending['pool'],pending['runs_requested'],
-                               *[None if pending['generated'] is None else pending['generated'].get(k) for k in ('seed','countries','states','pop','modernity','copies','diversity','military')],pending['picker'],pending['candidates'],pending['objective'][0]['gdp'],pending['objective'][0]['population'],pending['objective'][0]['sol'],pending['objective'][1],pending['objective'][0]['stock'])).fetchone()[0]
+                               *[None if pending['generated'] is None else pending['generated'].get(k) for k in ('seed','countries','states','pop','modernity','copies','diversity','military')],pending['sizer'],pending['picker'],pending['candidates'],pending['objective'][0]['gdp'],pending['objective'][0]['population'],pending['objective'][0]['sol'],pending['objective'][1],pending['objective'][0]['stock'])).fetchone()[0]
         names=sorted(pending['weights'])
         if pending['generated'] is not None:
             values=pending['generated']
@@ -253,13 +253,20 @@ class Store:
         self.copy(cursor,'run_advisor',('run_id','position','advisor'),enumerate_rows(run_id,self.names('advisor',pending['advisors'])))
         if pending['proposal'] is not None:
             {'random_smac_weighting':self.record_smac_proposal,'random_svr_weighting':self.record_svr_proposal}[pending['proposal']['initializer']](cursor,run_id,pending['proposal'])
-        if pending['pick_model'] is not None:
-            pauses,runs,seconds,params,importance=pending['pick_model']
-            cursor.execute(f'insert into pick_model (run_id,pauses,runs,seconds,{",".join(params)}) values ({",".join(["%s"]*(4+len(params)))})',(run_id,pauses,runs,seconds,*params.values()))
-            self.copy(cursor,'pick_importance',('run_id','feature','importance'),[(run_id,feature,value) for feature,value in importance])
+        for step in ('size','pick'):
+            if pending[step+'_model'] is not None:
+                pauses,runs,seconds,params,importance=pending[step+'_model']
+                cursor.execute(f'insert into {step}_model (run_id,pauses,runs,seconds,{",".join(params)}) values ({",".join(["%s"]*(4+len(params)))})',(run_id,pauses,runs,seconds,*params.values()))
+                self.copy(cursor,step+'_importance',('run_id','feature','importance'),[(run_id,feature,value) for feature,value in importance])
         self.copy(cursor,'run_game_rule',('run_id','game_rule_setting'),[(run_id,rule) for rule in self.names('game_rule_setting',constants['game_rules'])])
         self.run_id=run_id
         self.constants=constants
+
+    @timed
+    def record_size(self,seq,predictions,chosen):
+        with self.connection.cursor() as cursor:
+            self.copy(cursor,'size_candidate',('run_id','seq','actions','predicted_change','chosen'),
+                      [(self.run_id,seq,length,predicted,length==chosen) for length,predicted in predictions])
 
     @timed
     def record_pick(self,seq,batches,predictions,chosen):

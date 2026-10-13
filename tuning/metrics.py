@@ -1,8 +1,9 @@
 import numpy as np
 
+from advisors.catalogue import LENGTHS
 from interface.common import evidence, timed_often
 
-SPEC={'name':'option_entropy_v2','candidates':100,
+SPEC={'name':'option_entropy_v2','candidates':{'histogram':100,'row':100,'size':len(LENGTHS)},
       'aggregation':'equal snapshots within equal runs',
       'formula':'differentiation_weight * (1 - mean(entropy / log(candidates))) + reward_weight * normalized_rmse / (1 + normalized_rmse)'}
 
@@ -26,10 +27,10 @@ def scale(targets,weights=None):
 @timed_often
 def differentiation(predictions):
     values=np.asarray(predictions,dtype=float)
-    if values.shape!=(100,) or not np.isfinite(values).all():
+    if values.ndim!=1 or len(values)<2 or not np.isfinite(values).all():
         raise ValueError(evidence(shape=values.shape,finite=bool(np.isfinite(values).all())))
-    probabilities=np.unique(values,return_counts=True)[1]/100
-    return float(np.dot(probabilities,np.log(1/probabilities))/np.log(100))
+    probabilities=np.unique(values,return_counts=True)[1]/len(values)
+    return float(np.dot(probabilities,np.log(1/probabilities))/np.log(len(values)))
 
 
 @timed_often

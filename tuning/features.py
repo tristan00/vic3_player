@@ -42,10 +42,12 @@ def taxonomy(model):
         found=[column for group in groups.values() for column in group['columns']]
         if len(found)!=len(set(found)) or set(found)!=set(row.NUMERIC+row.CATEGORICAL):
             raise ValueError(evidence(found=len(found),distinct=len(set(found)),differing=set(found)^set(row.NUMERIC+row.CATEGORICAL)))
-    elif model=='histogram':
+    elif model in ('histogram','size'):
         groups['option.batch_size']={'kind':'columns','role':'option','columns':['batch_size']}
-        actions={hist.ACTION,*hist.ANSWER,*hist.QUEUE,*hist.PLAY,*hist.PLAY_CONTEXT,*hist.PLAY_PACTS,*hist.LEADERS,*state.SITE}
-        actions.update(f'{action}.{param}' for action,params in RECORDED_PARAMS.items() for param,_ in params)
+        actions=set()
+        if model=='histogram':
+            actions={hist.ACTION,*hist.ANSWER,*hist.QUEUE,*hist.PLAY,*hist.PLAY_CONTEXT,*hist.PLAY_PACTS,*hist.LEADERS,*state.SITE}
+            actions.update(f'{action}.{param}' for action,params in RECORDED_PARAMS.items() for param,_ in params)
         for name in sorted(actions):
             groups['option.'+name]={'kind':'histogram','role':'option','source':'actions','family':name}
         for name in [hist.BUILDINGS,hist.METHODS,*hist.COUNTRY]:
@@ -75,7 +77,7 @@ class Encoder:
 
     @timed
     def fit(self,records):
-        if self.model=='histogram':
+        if self.model!='row':
             frequencies={}
             for record in records:
                 for source in ('actions','held'):
@@ -143,4 +145,6 @@ class Encoder:
         context=dict(zip(row.STATE,lookup.numbers+lookup.prices+lookup.institutions+lookup.tariffs+lookup.taxes))
         context.update(zip(state.CATEGORIES,state.categories(lookup)))
         held=hist.live_holdings(snapshot)
+        if self.model=='size':
+            return self.transform([{'state':context,'held':held,'actions':[],'size':length} for length in candidates])
         return self.transform([{'state':context,'held':held,'actions':hist.entries(batch,lookup),'size':len(batch)} for batch in candidates])

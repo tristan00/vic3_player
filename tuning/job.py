@@ -174,8 +174,8 @@ def run(directory):
         heartbeat({'phase':'prepare'})
         data=Path(settings['data']) if settings['data'] else directory/'data'
         if not (data/'dataset.json').exists():
-            prepare(data,settings['seed'],settings['points_per_run'],heartbeat)
-        manifest=verify(data)
+            prepare(data,settings['models'],settings['seed'],settings['points_per_run'],heartbeat)
+        manifest=verify(data,settings['models'])
         for model in settings['models']:
             run_search(directory/model,data,manifest,model,settings,heartbeat)
         write(directory/'status.json',{'state':'completed','phase':'completed','updated':time.time(),'seconds':time.monotonic()-started})

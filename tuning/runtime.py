@@ -23,7 +23,7 @@ def train(connection,model):
     config=Space(groups).canonical(design['config'])
     bounds={run:(first,last,reason) for run,first,last,reason in connection.execute(HISTORY,scored_runs()).fetchall()}
     columns=selected_columns(groups,config)
-    families=selected_families(groups,config) if model=='histogram' else None
+    families=None if model=='row' else selected_families(groups,config)
     features,y,keys,weights=training(connection,bounds,model,columns,families=families)
     runs={key[0] for key in keys}
     loaded=time.monotonic()-started

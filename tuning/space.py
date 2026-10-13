@@ -29,6 +29,7 @@ class Space:
     def __init__(self,groups):
         self.groups=groups
         self.parameters={name:dict(spec) for name,spec in MODEL.items()}
+        self.anchor='feature.option.'+('action' if 'option.action' in groups else 'batch_size')
         for name,group in groups.items():
             values=['off','on'] if group['kind']=='columns' else ['off','count','share'] if group['role']=='option' else ['off','count']
             self.parameters['feature.'+name]={'kind':'choice','values':values}
@@ -76,8 +77,8 @@ class Space:
         repaired=all(config['feature.'+name]=='off' for name,group in self.groups.items() if group['role']=='option')
         sampled=dict(config)
         if repaired:
-            config['feature.option.action']=self.parameters['feature.option.action']['values'][1]
-        return self.canonical(config),{'feature_probability':densities,'action_required':repaired,'sampled':sampled}
+            config[self.anchor]=self.parameters[self.anchor]['values'][1]
+        return self.canonical(config),{'feature_probability':densities,'anchor_required':repaired,'sampled':sampled}
 
     @timed_often
     def vector(self,config):

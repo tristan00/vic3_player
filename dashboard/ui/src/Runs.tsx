@@ -17,6 +17,7 @@ export function runColumns(found: any): Col[] {
     { name: 'country', kind: 'name' },
     { name: 'world', kind: 'world' },
     { name: 'initializer', kind: 'name' },
+    { name: 'sizer', kind: 'name' },
     { name: 'picker', kind: 'name' },
     { name: 'attempted', kind: 'int', group: 'actions' },
     ...found.statuses.map((status: string) => ({ name: status, kind: 'int', group: 'actions' })),
@@ -30,7 +31,7 @@ export function Runs() {
   return (
     <div className="page">
       <h1>Runs</h1>
-      <Waiting loaded={runs}>{() => <Grid sync fold rows={runs.data.rows} columns={runColumns(runs.data)} sort={{ name: 'run', desc: true }} facets={['state', 'country', 'initializer', 'picker']} />}</Waiting>
+      <Waiting loaded={runs}>{() => <Grid sync fold rows={runs.data.rows} columns={runColumns(runs.data)} sort={{ name: 'run', desc: true }} facets={['state', 'country', 'initializer', 'sizer', 'picker']} />}</Waiting>
     </div>
   )
 }
@@ -105,11 +106,11 @@ function Selection({ run, row }: { run: number; row: any }) {
   return (
     <Waiting loaded={selection}>
       {() => {
-        const { weights, records, pauses } = selection.data
+        const { weights, records, pauses, sizes, lengths } = selection.data
         const top = Math.max(...weights.map((weight: any) => weight.weight), 0)
         return (
           <>
-            <Facts items={[['initializer', label(row.initializer ?? '')], ['picker', label(row.picker)], ['candidates', row.candidates]]} />
+            <Facts items={[['initializer', label(row.initializer ?? '')], ['sizer', label(row.sizer)], ['picker', label(row.picker)], ['candidates', row.candidates]]} />
             {records
               .filter((record: any) => record.row)
               .map((record: any) => (
@@ -117,6 +118,11 @@ function Selection({ run, row }: { run: number; row: any }) {
                   <Facts items={Object.entries(record.row).filter(([, value]) => value !== null).map(([name, value]) => [name, typeof value === 'number' ? num(value) : String(value)])} />
                 </Panel>
               ))}
+            {sizes.length > 0 && (
+              <Panel title="Block lengths">
+                <Grid rows={sizes} page={30} columns={[{ name: 'seq', label: 'snapshot', kind: 'int' }, { name: 'date' }, { name: 'chosen', label: 'chosen length', kind: 'int' }, { name: 'predicted', label: 'chosen', kind: 'num' }, ...lengths.map((length: string) => ({ name: length, kind: 'num', group: 'predicted by block length' }))]} />
+              </Panel>
+            )}
             {pauses.length > 0 && (
               <Panel title="Pauses">
                 <Grid rows={pauses} page={30} columns={[{ name: 'seq', label: 'snapshot', render: (pause) => <a onClick={() => setQuery({ tab: 'selection', pause: String(pause.seq) })}>{pause.seq}</a> }, { name: 'date' }, { name: 'candidates', kind: 'int' }, { name: 'distinct_predictions', kind: 'int' }, { name: 'lowest', kind: 'num' }, { name: 'mean', kind: 'num' }, { name: 'highest', kind: 'num' }, { name: 'chosen', label: 'chosen', kind: 'num' }, { name: 'chosen_actions', kind: 'int' }]} />

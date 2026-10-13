@@ -64,7 +64,7 @@ def listing():
     shown=[{'model':model,'trial':found['trial'],'search':found['search'],'installed_at':found['installed_at'],'threads':found['threads'],
             **{'validation_'+key:value for key,value in found['validation'].items()},
             **{key+'_weight':value for key,value in found['weighting']['weights'].items()}} for model,found in active.items()]
-    return {'rows':rows,'installed':shown,'metric':{key:value for key,value in SPEC.items() if not isinstance(value,str)}}
+    return {'rows':rows,'installed':shown,'metric':{f'{model} candidates':count for model,count in SPEC['candidates'].items()}}
 
 
 @db.often

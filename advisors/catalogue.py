@@ -307,3 +307,4 @@ CANCELLING=frozenset({'cancel_queued_construction'})
 SITED={**dict.fromkeys((*SECTORS,*NAVAL),'build'),'downsize_building':'downsize',
        **dict.fromkeys(('switch_building_method','reset_building_methods','switch_methods_statewide','reset_methods_statewide'),'method')}
 PLAY_ACTIONS=frozenset(name for name,params in PARAMS.items() if PLAY_TYPE in params)
+LENGTHS=tuple(range(6,17))

@@ -7,6 +7,7 @@ import psutil, psycopg
 from advisors.catalogue import NAMES
 from advisors.initializers import ADVISORS
 from advisors.pickers import PICKERS
+from advisors.sizers import SIZERS
 from advisors.data.rewards import draw_objective
 from interface import GameInterface, record
 from interface.actions import Executor
@@ -19,10 +20,10 @@ from interface.timing import RECORDER, span
 from interface.runner.session import _spawn, process as owner
 from interface.world.bank import take
 from interface.world.sampling import SLIDERS, PER_COUNTRY
-from loop.sampling import batches, block_length
+from loop.sampling import batches
 
 STATE=DEFAULT_DATA/'collection.json'
-DEFAULTS=dict(profile='actions',world_cache=[],runs=1,warmup=0,years=100.,minutes=30.,seed=int(time.time()),advisors=['random'],pickers=['first'])
+DEFAULTS=dict(profile='actions',world_cache=[],runs=1,warmup=0,years=100.,minutes=30.,seed=int(time.time()),advisors=['random'],sizers=['random'],pickers=['first'])
 
 @contextmanager
 def state():
@@ -49,7 +50,8 @@ def redraw(connection,run_id,seq,count,seed,weights=None,snapshot=None):
     advisor=ADVISORS['random'](seed)
     advisor.weights=weights if weights is not None else dict(connection.execute(
         'select a.name,w.weight from run_weight w join advisor_action a using(advisor_action) where w.run_id=%s',(run_id,)))
-    return snapshot,[[(name,params) for name,params,_ in block] for block in batches(snapshot,advisor,count)]
+    length,_=SIZERS['random']().size(snapshot,advisor.random)
+    return snapshot,[[(name,params) for name,params,_ in block] for block in batches(snapshot,advisor,count,length)]
 
 
 @timed
@@ -60,7 +62,7 @@ def mobilization(snapshot,fought):
 
 
 @timed
-def play(game,store,advisor,picker,settings):
+def play(game,store,advisor,sizer,picker,settings):
     executor=Executor(game)
     shared=Shared(store.connection)
     def capture(phase):
@@ -78,7 +80,9 @@ def play(game,store,advisor,picker,settings):
             turn+=1
             snapshot.load()
             forced,fought=mobilization(snapshot,fought)
-            length=block_length(advisor.random) if picker.name=='catboost_piecewise' else None
+            length,sized=sizer.size(snapshot,advisor.random)
+            if sized is not None:
+                store.record_size(snapshot.seq,sized,length)
             drawn=batches(snapshot,advisor,1 if picker.name=='first' else 100,length,forced)
             chosen,predictions=picker.pick([[(n,p) for n,p,_ in b] for b in drawn],snapshot)
             if predictions is not None:
@@ -142,24 +146,26 @@ def collect(settings,completed):
     country=rng.choice([c for c in manifest['countries'] if c['country_type']!='decentralized'])
     objective=draw_objective(rng)
     advisor=ADVISORS[rng.choice(['random'] if completed<settings['warmup'] else settings['advisors'])](rng.randrange(10**9))
+    sizer=SIZERS[rng.choice(['random'] if completed<settings['warmup'] else settings['sizers'])]()
     picker=PICKERS[rng.choice(['first'] if completed<settings['warmup'] else settings['pickers'])]()
     game=GameInterface(settings['profile'])
     store=Store()
     try:
         advisor.start_run(store,NAMES,objective)
         with ThreadPoolExecutor(1) as preparing:
-            training=preparing.submit(picker.start_run,store,objective)
+            training=[preparing.submit(step.start_run,store,objective) for step in (sizer,picker)]
             game.campaign(country['tag'],world,lock=state)
             Executor(game).run('pause')
-            training.result()
+            for trained in training:
+                trained.result()
         generated=dict(seed=manifest['seed'],countries=len(manifest['countries']),states=len(manifest['states']),pop=1,diversity=None,
                        **{n:country[n] if n in PER_COUNTRY else manifest[n] for n in SLIDERS if n in (country if n in PER_COUNTRY else manifest)})
         store.begin_run(started_at=datetime.now(timezone.utc),kind='mini',advisors=[advisor.name],tag=country['tag'],world=world.parent.name,
                         cli_seed=settings['seed'],run_seed=settings['seed']+completed,years=settings['years'],minutes=settings['minutes'],
                         profile=settings['profile'],pool=0,runs_requested=settings['runs'],generated=generated,weights=advisor.weights,
-                        centres=advisor.used,picker=picker.name,candidates=1 if picker.name=='first' else 100,objective=objective,
-                        proposal=advisor.proposal,pick_model=picker.trained)
-        reason=play(game,store,advisor,picker,settings)
+                        centres=advisor.used,sizer=sizer.name,picker=picker.name,candidates=1 if picker.name=='first' else 100,objective=objective,
+                        proposal=advisor.proposal,size_model=sizer.trained,pick_model=picker.trained)
+        reason=play(game,store,advisor,sizer,picker,settings)
         store.world_reports(world)
         store.end_run(reason)
     except BaseException as error:
@@ -229,7 +235,8 @@ def main(argv=None):
                 parser.error(evidence(runs=settings['runs'],warmup=settings['warmup'],years=settings['years'],minutes=settings['minutes']))
             if not settings['profile'] or Path(settings['profile']).name!=settings['profile'] or settings['profile'] in ('.','..'):
                 parser.error(evidence(profile=settings['profile']))
-            if not set(settings['advisors'])<=ADVISORS.keys() or not set(settings['pickers'])<=PICKERS.keys(): parser.error(evidence(advisors=settings['advisors'],pickers=settings['pickers'],known_advisors=sorted(ADVISORS),known_pickers=sorted(PICKERS)))
+            if not set(settings['advisors'])<=ADVISORS.keys() or not set(settings['sizers'])<=SIZERS.keys() or not set(settings['pickers'])<=PICKERS.keys():
+                parser.error(evidence(advisors=settings['advisors'],sizers=settings['sizers'],pickers=settings['pickers'],known_advisors=sorted(ADVISORS),known_sizers=sorted(SIZERS),known_pickers=sorted(PICKERS)))
             if not settings['world_cache'] or any(not (Path(directory)/'bank.json').is_file() for directory in settings['world_cache']):
                 parser.error(evidence(world_cache=settings['world_cache']))
             settings['world_cache']=sorted({str(Path(directory).resolve()) for directory in settings['world_cache']})

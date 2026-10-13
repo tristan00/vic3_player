@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import psycopg
 
-from advisors.catalogue import NAMES
+from advisors.catalogue import LENGTHS, NAMES
 from advisors.data.endgame import HISTORY, OBJECTIVE, REWARD_COMPONENTS, reward, scored_runs
 from advisors.data.features import CATEGORIES, LiveLookup, categories
 from advisors.data.histograms import entries, live_holdings
@@ -20,6 +20,7 @@ from .features import taxonomy
 from .storage import digest, load, read, save, source_digest, write
 
 LOG=logging.getLogger('tuning')
+DRAWN=frozenset({'histogram','row'})
 
 
 @timed
@@ -30,14 +31,14 @@ def batch_records(rows):
 
 
 @timed
-def blueprint(bounds,seed,points_per_run):
+def blueprint(bounds,seed,points_per_run,models):
     return {'version':VERSION,'seed':seed,'points_per_run':points_per_run,'objective':OBJECTIVE,'bounds':bounds,'empty':[],
               'created_at':datetime.now(timezone.utc).isoformat(),'source_digest':source_digest(),
-              'weights':{name:1. for name in NAMES},'groups':{model:taxonomy(model) for model in ('histogram','row')},'runs':[],'files':{}}
+              'weights':{name:1. for name in NAMES},'groups':{model:taxonomy(model) for model in models},'runs':[],'files':{}}
 
 
 @timed
-def prepare(directory,seed=19,points_per_run=12,progress=None):
+def prepare(directory,models,seed=19,points_per_run=12,progress=None):
     if points_per_run<1:
         raise ValueError(evidence(points_per_run=points_per_run))
     directory.mkdir(parents=True,exist_ok=True)
@@ -46,13 +47,13 @@ def prepare(directory,seed=19,points_per_run=12,progress=None):
         connection.execute('set transaction isolation level repeatable read read only')
         if checkpoint.exists():
             manifest=read(checkpoint)
-            if manifest['seed']!=seed or manifest['points_per_run']!=points_per_run or manifest['objective']!=OBJECTIVE or manifest['groups']!={model:taxonomy(model) for model in ('histogram','row')}:
-                raise ValueError(evidence(seed=manifest['seed'],given_seed=seed,points_per_run=manifest['points_per_run'],given_points_per_run=points_per_run,objective_match=manifest['objective']==OBJECTIVE,groups_match=manifest['groups']=={model:taxonomy(model) for model in ('histogram','row')}))
+            if manifest['seed']!=seed or manifest['points_per_run']!=points_per_run or manifest['objective']!=OBJECTIVE or manifest['groups']!={model:taxonomy(model) for model in models}:
+                raise ValueError(evidence(seed=manifest['seed'],given_seed=seed,points_per_run=manifest['points_per_run'],given_points_per_run=points_per_run,objective_match=manifest['objective']==OBJECTIVE,groups_match=manifest['groups']=={model:taxonomy(model) for model in models}))
             for name,expected in manifest['files'].items():
                 if digest(directory/name)!=expected:
                     raise ValueError(evidence(name=name,digest=digest(directory/name),expected=expected))
         else:
-            manifest=blueprint(connection.execute(HISTORY,scored_runs()).fetchall(),seed,points_per_run)
+            manifest=blueprint(connection.execute(HISTORY,scored_runs()).fetchall(),seed,points_per_run,models)
             write(checkpoint,manifest)
         finished={item['run'] for item in manifest['runs']}|set(manifest['empty'])
         for index,(run,*dates) in enumerate(manifest['bounds']):
@@ -70,39 +71,8 @@ def prepare(directory,seed=19,points_per_run=12,progress=None):
             manifest['runs'].append({'run':run,'batch_rows':len(records),'action_rows':sum(record['size'] for record in records),'snapshots':selected})
             write(checkpoint,manifest)
         partition(manifest)
-        shared=Shared(connection)
-        try:
-            for index,run in enumerate(manifest['validation']):
-                path=directory/f'candidates_{run}.pkl.gz'
-                if path.name in manifest['files']:
-                    continue
-                selected=next(item['snapshots'] for item in manifest['runs'] if item['run']==run)
-                candidates=[]
-                for number,seq in enumerate(selected):
-                    if progress:
-                        progress({'phase':'prepare','step':'100 candidate batches and 100 actions','run':run,'snapshot':seq,
-                                  'done':index,'total':len(manifest['validation']),'snapshot_done':number,'snapshot_total':len(selected)})
-                    from loop.run import redraw
-                    snapshot=Stored(connection,run,seq,shared)
-                    draw_seed=int(np.random.SeedSequence([seed,run,seq]).generate_state(1)[0])
-                    _,blocks=redraw(connection,run,seq,100,draw_seed,weights=manifest['weights'],snapshot=snapshot)
-                    if len(blocks)!=100 or any(not block for block in blocks):
-                        raise ValueError(evidence(run=run,seq=seq,blocks=len(blocks),empty=sum(not block for block in blocks)))
-                    lookup=LiveLookup(snapshot)
-                    context={**dict(zip(batch.STATE,lookup.numbers+lookup.prices+lookup.institutions+lookup.tariffs+lookup.taxes)),
-                             **dict(zip(CATEGORIES,categories(lookup)))}
-                    held=live_holdings(snapshot)
-                    generated=[{'state':context,'actions':entries(block,lookup),'held':held,'size':len(block)} for block in blocks]
-                    flattened=[item for block in blocks for item in block]
-                    chosen=np.random.default_rng(draw_seed).choice(len(flattened),100,replace=False)
-                    sampled=[flattened[i] for i in chosen]
-                    candidates.append({'run':run,'seq':seq,'seed':draw_seed,'batch_lengths':[len(block) for block in blocks],
-                                       'action_indices':chosen.tolist(),'histogram':generated,'row':row.live(snapshot,sampled)})
-                save(path,candidates)
-                manifest['files'][path.name]=digest(path)
-                write(checkpoint,manifest)
-        finally:
-            shared.close()
+        if DRAWN.intersection(models):
+            draw(connection,directory,manifest,progress)
         validate_manifest(manifest)
         needed={f'candidates_{run}.pkl.gz' for run in manifest['validation']}
         manifest['files']={name:value for name,value in manifest['files'].items() if name in needed}
@@ -112,25 +82,67 @@ def prepare(directory,seed=19,points_per_run=12,progress=None):
 
 
 @timed
+def draw(connection,directory,manifest,progress):
+    from loop.run import redraw
+    shared=Shared(connection)
+    try:
+        for index,run in enumerate(manifest['validation']):
+            path=directory/f'candidates_{run}.pkl.gz'
+            if path.name in manifest['files']:
+                continue
+            selected=next(item['snapshots'] for item in manifest['runs'] if item['run']==run)
+            candidates=[]
+            for number,seq in enumerate(selected):
+                if progress:
+                    progress({'phase':'prepare','step':'100 candidate batches and 100 actions','run':run,'snapshot':seq,
+                              'done':index,'total':len(manifest['validation']),'snapshot_done':number,'snapshot_total':len(selected)})
+                snapshot=Stored(connection,run,seq,shared)
+                draw_seed=int(np.random.SeedSequence([manifest['seed'],run,seq]).generate_state(1)[0])
+                _,blocks=redraw(connection,run,seq,100,draw_seed,weights=manifest['weights'],snapshot=snapshot)
+                if len(blocks)!=100 or any(not block for block in blocks):
+                    raise ValueError(evidence(run=run,seq=seq,blocks=len(blocks),empty=sum(not block for block in blocks)))
+                lookup=LiveLookup(snapshot)
+                context={**dict(zip(batch.STATE,lookup.numbers+lookup.prices+lookup.institutions+lookup.tariffs+lookup.taxes)),
+                         **dict(zip(CATEGORIES,categories(lookup)))}
+                held=live_holdings(snapshot)
+                generated=[{'state':context,'actions':entries(block,lookup),'held':held,'size':len(block)} for block in blocks]
+                flattened=[item for block in blocks for item in block]
+                chosen=np.random.default_rng(draw_seed).choice(len(flattened),100,replace=False)
+                sampled=[flattened[i] for i in chosen]
+                candidates.append({'run':run,'seq':seq,'seed':draw_seed,'batch_lengths':[len(block) for block in blocks],
+                                   'action_indices':chosen.tolist(),'histogram':generated,'row':row.live(snapshot,sampled)})
+            save(path,candidates)
+            manifest['files'][path.name]=digest(path)
+            write(directory/'preparation.json',manifest)
+    finally:
+        shared.close()
+
+
+@timed
 def pack(connection,directory,manifest):
     bounds={run:dates for run,*dates in manifest['bounds']}
     snapshots={item['run']:item['snapshots'] for item in manifest['runs']}
-    keys,records,frames=[],[],[]
-    for run in manifest['validation']:
-        for candidate in load(directory/f'candidates_{run}.pkl.gz'):
-            keys.append((candidate['run'],candidate['seq']))
-            records.extend(candidate['histogram'])
-            frames.append(candidate['row'])
-    joined={}
-    for name in frames[0].columns:
-        parts=[frame[name] for frame in frames]
-        joined[name]=pd.api.types.union_categoricals(parts) if isinstance(parts[0].dtype,pd.CategoricalDtype) else np.concatenate([part.to_numpy() for part in parts])
-    for model,features in (('histogram',records),('row',pd.DataFrame(joined,copy=False))):
+    drawn={}
+    if DRAWN.intersection(manifest['groups']):
+        keys,records,frames=[],[],[]
+        for run in manifest['validation']:
+            for candidate in load(directory/f'candidates_{run}.pkl.gz'):
+                keys.append((candidate['run'],candidate['seq']))
+                records.extend(candidate['histogram'])
+                frames.append(candidate['row'])
+        joined={}
+        for name in frames[0].columns:
+            parts=[frame[name] for frame in frames]
+            joined[name]=pd.api.types.union_categoricals(parts) if isinstance(parts[0].dtype,pd.CategoricalDtype) else np.concatenate([part.to_numpy() for part in parts])
+        drawn={'histogram':(keys,records),'row':(keys,pd.DataFrame(joined,copy=False))}
+    for model in manifest['groups']:
         validation,targets,pauses,_=training(connection,{run:bounds[run] for run in manifest['validation']},model,snapshots=snapshots)
+        if model=='size':
+            drawn[model]=([tuple(pause) for pause in pauses.tolist()],[{**record,'size':length} for record in validation for length in LENGTHS])
+        keys,features=drawn[model]
         path=directory/f'scoring_{model}.pkl.gz'
         save(path,{'keys':keys,'features':features,'validation':validation,'targets':targets,'pauses':pauses})
         manifest['files'][path.name]=digest(path)
-
 
 @timed
 def partition(manifest):
@@ -152,11 +164,12 @@ def validate_manifest(manifest):
 
 
 @timed
-def verify(directory):
+def verify(directory,models):
     manifest=read(directory/'dataset.json')
     validate_manifest(manifest)
-    if manifest['objective']!=OBJECTIVE or manifest['groups']!={model:taxonomy(model) for model in ('histogram','row')}:
-        raise ValueError(evidence(objective=manifest['objective'],current_objective=OBJECTIVE,groups_match=manifest['groups']=={model:taxonomy(model) for model in ('histogram','row')}))
+    if manifest['objective']!=OBJECTIVE or not set(models)<=set(manifest['groups']) or manifest['groups']!={model:taxonomy(model) for model in manifest['groups']}:
+        raise ValueError(evidence(objective=manifest['objective'],current_objective=OBJECTIVE,models=models,prepared=sorted(manifest['groups']),
+                                  groups_match=manifest['groups']=={model:taxonomy(model) for model in manifest['groups']}))
     for name,expected in manifest['files'].items():
         if digest(directory/name)!=expected:
             raise ValueError(evidence(name=name,digest=digest(directory/name),expected=expected))
@@ -165,7 +178,9 @@ def verify(directory):
 
 @timed
 def training(connection,bounds,model,columns=None,snapshots=None,families=None):
-    if model=='histogram':
+    if model!='row':
+        if model=='size' and families is None:
+            families={'actions':set(),'held':None}
         found={run:batch_records(rows) for run,rows in batch.training_rows(connection,bounds,columns,families,snapshots).items()}
         features=[record for records in found.values() for record in records]
         y=np.asarray([record['y'] for record in features])

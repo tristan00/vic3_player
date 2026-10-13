@@ -7,11 +7,6 @@ from .translate import offer
 FINISH={'capitulate','back_down','white_peace','declare_bankruptcy','leave_power_bloc'}
 
 
-@timed_often
-def block_length(rng):
-    return rng.choices(range(6,17),weights=range(11,0,-1))[0]
-
-
 class Sampler:
     @timed
     def __init__(self,snapshot,advisor,forced=()):
@@ -61,6 +56,6 @@ class Sampler:
 
 
 @timed
-def batches(snapshot,advisor,count,length=None,forced=()):
+def batches(snapshot,advisor,count,length,forced=()):
     sampler=Sampler(snapshot,advisor,forced)
-    return [sampler.block(block_length(advisor.random) if length is None else length) for _ in range(count)]
+    return [sampler.block(length) for _ in range(count)]

@@ -1,6 +1,7 @@
 import time
 from threading import Lock
 
+from advisors.catalogue import LENGTHS
 from advisors.data.endgame import HISTORY, OBJECTIVE, REWARD_COMPONENTS, Trajectories
 from advisors.data.rewards import HOURS_PER_YEAR, OUTCOMES, scored_runs
 from interface.recording.spec import ENTITIES, TABLE
@@ -15,7 +16,7 @@ FROZEN='set transaction isolation level repeatable read read only'
 IDENTITY='''select r.run_id,r.source_session,r.started_at,r.ended_at,r.end_reason,r.player_country,count(*),max(s.seq),min(s.game_date),max(s.game_date)
 from run r join snapshot s on s.run_id=r.run_id where r.ended_at is not null group by r.run_id'''
 RUNS='''select r.run_id,r.started_at,r.ended_at,extract(epoch from coalesce(r.ended_at,now())-r.started_at)::float8/60,r.end_reason,r.end_detail,
-r.world_id,r.world_file,r.picker,r.candidates,c.name,a.name,s.snapshots,s.earliest,s.latest
+r.world_id,r.world_file,r.sizer,r.picker,r.candidates,c.name,a.name,s.snapshots,s.earliest,s.latest
 from run r join country_definition c on c.country_definition=r.tag
 left join run_advisor p on p.run_id=r.run_id and p.position=0 left join advisor a on a.advisor=p.advisor
 cross join lateral (select count(*) as snapshots,min(t.game_date) as earliest,max(t.game_date) as latest from snapshot t where t.run_id=r.run_id) s
@@ -40,6 +41,8 @@ CANDIDATES='''select c.candidate,c.predicted_change,c.chosen,c.actions,
 coalesce((select string_agg(a.name,' → ' order by p.position) from pick_candidate_action p join advisor_action a using (advisor_action)
           where p.run_id=c.run_id and p.seq=c.seq and p.candidate=c.candidate),'') as acts
 from pick_candidate c where c.run_id=%s and c.seq=%s order by c.predicted_change desc,c.candidate'''
+SIZES='''select c.seq,s.game_date,c.actions,c.predicted_change,c.chosen from size_candidate c join snapshot s on s.run_id=c.run_id and s.seq=c.seq
+where c.run_id=%s order by c.seq,c.actions'''
 TIMING='select span,calls,errors,total_ms,self_ms,min_ms,p50_ms,p95_ms,p99_ms,max_ms from run_timing where run_id=%s order by span'
 
 
@@ -112,13 +115,13 @@ def gathered(run):
         acts.counted(tallies.setdefault(number,{}),status,count,unverified)
     statuses=acts.ordered({status for _,status,_,_ in counted})
     rows=[]
-    for number,started,ended,minutes,reason,detail,world,world_file,picker,candidates,country,initializer,snapshots,first,last in listed:
+    for number,started,ended,minutes,reason,detail,world,world_file,sizer,picker,candidates,country,initializer,snapshots,first,last in listed:
         state=reason if ended is not None else 'running' if number==current else None
         result,unscored=results.get(number,(None,None))
         parts={part['component']:part['contribution'] for part in result['parts']} if result else {}
         tally=tallies.get(number,{})
         rows.append({'run':number,'started':started,'ended':ended,'minutes':minutes,'end_detail':detail,'world':world,'world_file':world_file,
-                     'picker':picker,'candidates':candidates,'country':country,'initializer':initializer,'snapshots':snapshots,
+                     'sizer':sizer,'picker':picker,'candidates':candidates,'country':country,'initializer':initializer,'snapshots':snapshots,
                      'first_date':db.day(first),'last_date':db.day(last),'game_years':None if first is None else (last-first)/HOURS_PER_YEAR,
                      'state':state,'tone':'live' if state=='running' else 'plain' if state in OUTCOMES else 'bad',
                      'attempted':tally.get('attempted',0),**{status:tally.get(status,0) for status in statuses},'unverified':tally.get('unverified',0),
@@ -210,7 +213,13 @@ def selection(run):
     pauses=db.records(PAUSES,(run,))
     for pause in pauses:
         pause['date']=db.day(pause['date'])
-    return {'weights':weights,'records':records,'pauses':pauses}
+    sizes={}
+    for seq,date,actions,predicted,chosen in db.rows(SIZES,(run,)):
+        row=sizes.setdefault(seq,{'seq':seq,'date':db.day(date)})
+        row[str(actions)]=predicted
+        if chosen:
+            row.update(chosen=actions,predicted=predicted)
+    return {'weights':weights,'records':records,'pauses':pauses,'sizes':list(sizes.values()),'lengths':[str(length) for length in LENGTHS]}
 
 
 @db.timed

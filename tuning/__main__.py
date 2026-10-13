@@ -6,7 +6,7 @@ import sys
 
 from interface.common import evidence
 from interface.runner.session import _spawn
-from . import ROOT
+from . import MODELS, ROOT
 from .storage import read, write
 from .weighting import initialize, normalize
 
@@ -16,7 +16,7 @@ def main():
     parser.add_argument('command',choices=['start','resume','work','status'])
     parser.add_argument('--directory',type=Path)
     parser.add_argument('--data',type=Path)
-    parser.add_argument('--models',nargs='+',choices=['histogram','row'],default=['histogram','row'])
+    parser.add_argument('--models',nargs='+',choices=MODELS,default=list(MODELS))
     parser.add_argument('--trials',type=int,default=400)
     parser.add_argument('--points-per-run',type=int,default=12)
     parser.add_argument('--threads',type=int,default=4)
