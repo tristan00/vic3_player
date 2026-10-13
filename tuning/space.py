@@ -31,11 +31,10 @@ class Space:
         self.parameters={name:dict(spec) for name,spec in MODEL.items()}
         self.anchor='feature.option.'+('action' if 'option.action' in groups else 'batch_size')
         for name,group in groups.items():
-            values=['off','on'] if group['kind']=='columns' else ['off','count','share'] if group['role']=='option' else ['off','count']
+            values=['off','on'] if group['kind']=='columns' else ['off',*group['forms']]
             self.parameters['feature.'+name]={'kind':'choice','values':values}
-            if group['kind']=='histogram':
-                self.parameters['bins.'+name]={'kind':'choice','values':[8,32,128,0],
-                                               'when':{'feature.'+name:values[1:]}}
+            if group['kind']=='histogram' and group['bins']:
+                self.parameters['bins.'+name]={'kind':'choice','values':group['bins'],'when':{'feature.'+name:values[1:]}}
 
     @timed_often
     def canonical(self,config):

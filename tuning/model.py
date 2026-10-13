@@ -57,7 +57,7 @@ class PickerModel:
 
     @timed
     def predict(self,features,threads=1):
-        frame=features.loc[:,self.estimator.feature_names_ or self.encoder.columns[:1]] if self.encoder.model=='row' else self.encoder.transform(features)
+        frame=self.encoder.transform(features,self.estimator.feature_names_ or self.encoder.columns[:1]) if self.encoder.model=='row' else self.encoder.transform(features)
         return np.asarray(self.estimator.predict(pool(frame,threads=threads),thread_count=threads))*self.scale+self.mean
 
     @timed

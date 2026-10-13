@@ -5,7 +5,7 @@ import numpy as np
 
 from interface.common import evidence, timed
 from .data import training, validate_manifest
-from .features import selected_columns, selected_families
+from .features import loaded_columns, selected_families
 from .metrics import SPEC, differentiation, summarize
 from .model import Monitor, PickerModel
 from .storage import load, save, write
@@ -18,7 +18,7 @@ def evaluate(connection,directory,manifest,model,config,threads,seed,progress_pa
     points,baseline=[],[]
     groups=manifest['groups'][model]
     bounds={run:dates for run,*dates in manifest['bounds']}
-    columns=selected_columns(groups,config)
+    columns=loaded_columns(groups,config)
     families=None if model=='row' else selected_families(groups,config)
     stage={'training_runs':len(manifest['train']),'validation_runs':len(manifest['validation']),'timings':{}}
     def progress(step):

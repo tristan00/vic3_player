@@ -86,7 +86,7 @@ def hyperparameters(space):
         found=space['groups'].get(group)
         numeric=spec['kind']!='choice'
         key=('model' if found is None else 'data',
-             name if found is None else f"{found['role']} {'column group' if found['kind']=='columns' else 'histogram'}{' bins' if prefix=='bins' else ''}",
+             name if found is None else f"{found['role']} {'summary' if 'sources' in found else 'column group' if found['kind']=='columns' else 'histogram'}{' bins' if prefix=='bins' else ''}",
              spec['kind'],
              f"{spec['low']:g} to {spec['high']:g}" if numeric else ', '.join(str(value) for value in spec['values']),
              ('log' if spec.get('log') else 'linear') if numeric else None,
