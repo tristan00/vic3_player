@@ -84,8 +84,9 @@ class Vocabulary(dict):
 
 class Shared:
     @timed
-    def __init__(self,connection):
+    def __init__(self,connection,readers=READERS):
         self.connection=connection
+        self.count=readers
         self.tables={name for name, in connection.execute("select relname from pg_class where relnamespace='public'::regnamespace and relkind='r'")}
         self.name_columns={}
         for table,column,vocabulary in connection.execute(
@@ -109,9 +110,9 @@ class Shared:
     @timed
     def open(self):
         self.readers=queue.SimpleQueue()
-        for _ in range(READERS):
+        for _ in range(self.count):
             self.readers.put(psycopg.connect(self.connection.info.dsn,autocommit=True,prepare_threshold=None))
-        self.workers=ThreadPoolExecutor(READERS,thread_name_prefix='snapshot-reader')
+        self.workers=ThreadPoolExecutor(self.count,thread_name_prefix='snapshot-reader')
 
     @timed_often
     def fetch(self,stored,run_id,seq):
@@ -125,7 +126,7 @@ class Shared:
     def close(self):
         if self.workers is not None:
             self.workers.shutdown()
-            for _ in range(READERS):
+            for _ in range(self.count):
                 self.readers.get().close()
             self.workers=self.readers=None
 

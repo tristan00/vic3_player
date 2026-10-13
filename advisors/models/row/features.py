@@ -334,7 +334,12 @@ def frame(rows,columns=NUMERIC+CATEGORICAL):
 
 
 @timed
-def live(snapshot,actions):
+def described(snapshot,actions):
     point=Live(snapshot)
     state=context(point)
-    return frame([{**state,**action_features(name,params,point)} for name,params in actions])
+    return [{**state,**action_features(name,params,point)} for name,params in actions]
+
+
+@timed
+def live(snapshot,actions):
+    return frame(described(snapshot,actions))

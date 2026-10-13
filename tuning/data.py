@@ -1,5 +1,7 @@
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime, timezone
 import logging
+import time
 
 import numpy as np
 import pandas as pd
@@ -21,6 +23,7 @@ from .storage import digest, load, read, save, source_digest, write
 
 LOG=logging.getLogger('tuning')
 DRAWN=frozenset({'histogram','row'})
+DRAWERS=12
 
 
 @timed
@@ -55,20 +58,17 @@ def prepare(directory,models,seed=19,points_per_run=12,progress=None):
         else:
             manifest=blueprint(connection.execute(HISTORY,scored_runs()).fetchall(),seed,points_per_run,models)
             write(checkpoint,manifest)
-        finished={item['run'] for item in manifest['runs']}|set(manifest['empty'])
-        for index,(run,*dates) in enumerate(manifest['bounds']):
-            if run in finished:
-                continue
+        if not manifest['runs']:
             if progress:
-                progress({'phase':'prepare','step':'training rows','run':run,'done':index,'total':len(manifest['bounds'])})
-            records=batch_records(batch.training_rows(connection,{run:dates})[run])
-            if not records:
-                manifest['empty'].append(run)
-                write(checkpoint,manifest)
-                continue
-            available=sorted({record['seq'] for record in records})
-            selected=sorted(np.random.default_rng(np.random.SeedSequence([seed,run])).choice(available,min(points_per_run,len(available)),replace=False).tolist())
-            manifest['runs'].append({'run':run,'batch_rows':len(records),'action_rows':sum(record['size'] for record in records),'snapshots':selected})
+                progress({'phase':'prepare','step':'pauses','total':len(manifest['bounds'])})
+            found=batch.training_rows(connection,{run:dates for run,*dates in manifest['bounds']},[],{'actions':set(),'held':set()})
+            manifest['empty']=[run for run,rows in found.items() if not rows]
+            for run,rows in found.items():
+                records=batch_records(rows)
+                available=sorted({record['seq'] for record in records})
+                if available:
+                    selected=sorted(np.random.default_rng(np.random.SeedSequence([seed,run])).choice(available,min(points_per_run,len(available)),replace=False).tolist())
+                    manifest['runs'].append({'run':run,'batch_rows':len(records),'action_rows':sum(record['size'] for record in records),'snapshots':selected})
             write(checkpoint,manifest)
         partition(manifest)
         if DRAWN.intersection(models):
@@ -82,23 +82,18 @@ def prepare(directory,models,seed=19,points_per_run=12,progress=None):
 
 
 @timed
-def draw(connection,directory,manifest,progress):
+def candidates(dsn,directory,seed,weights,run,selected):
     from loop.run import redraw
-    shared=Shared(connection)
-    try:
-        for index,run in enumerate(manifest['validation']):
-            path=directory/f'candidates_{run}.pkl.gz'
-            if path.name in manifest['files']:
-                continue
-            selected=next(item['snapshots'] for item in manifest['runs'] if item['run']==run)
-            candidates=[]
-            for number,seq in enumerate(selected):
-                if progress:
-                    progress({'phase':'prepare','step':'100 candidate batches and 100 actions','run':run,'snapshot':seq,
-                              'done':index,'total':len(manifest['validation']),'snapshot_done':number,'snapshot_total':len(selected)})
+    started=time.monotonic()
+    found,rows=[],[]
+    with psycopg.connect(dsn,connect_timeout=5) as connection:
+        connection.execute('set transaction isolation level repeatable read read only')
+        shared=Shared(connection,1)
+        try:
+            for seq in selected:
                 snapshot=Stored(connection,run,seq,shared)
-                draw_seed=int(np.random.SeedSequence([manifest['seed'],run,seq]).generate_state(1)[0])
-                _,blocks=redraw(connection,run,seq,100,draw_seed,weights=manifest['weights'],snapshot=snapshot)
+                draw_seed=int(np.random.SeedSequence([seed,run,seq]).generate_state(1)[0])
+                _,blocks=redraw(connection,run,seq,100,draw_seed,weights=weights,snapshot=snapshot)
                 if len(blocks)!=100 or any(not block for block in blocks):
                     raise ValueError(evidence(run=run,seq=seq,blocks=len(blocks),empty=sum(not block for block in blocks)))
                 lookup=LiveLookup(snapshot)
@@ -108,14 +103,31 @@ def draw(connection,directory,manifest,progress):
                 generated=[{'state':context,'actions':entries(block,lookup),'held':held,'size':len(block)} for block in blocks]
                 flattened=[item for block in blocks for item in block]
                 chosen=np.random.default_rng(draw_seed).choice(len(flattened),100,replace=False)
-                sampled=[flattened[i] for i in chosen]
-                candidates.append({'run':run,'seq':seq,'seed':draw_seed,'batch_lengths':[len(block) for block in blocks],
-                                   'action_indices':chosen.tolist(),'histogram':generated,'row':row.live(snapshot,sampled)})
-            save(path,candidates)
-            manifest['files'][path.name]=digest(path)
+                rows+=row.described(snapshot,[flattened[i] for i in chosen])
+                found.append({'run':run,'seq':seq,'seed':draw_seed,'batch_lengths':[len(block) for block in blocks],
+                              'action_indices':chosen.tolist(),'histogram':generated})
+        finally:
+            shared.close()
+    path=directory/f'candidates_{run}.pkl.gz'
+    save(path,{'snapshots':found,'row':row.frame(rows)})
+    return path.name,digest(path),time.monotonic()-started
+
+
+@timed
+def draw(connection,directory,manifest,progress):
+    validation=set(manifest['validation'])
+    pending=[item for item in manifest['runs'] if item['run'] in validation and f"candidates_{item['run']}.pkl.gz" not in manifest['files']]
+    if not pending:
+        return
+    with ProcessPoolExecutor(min(DRAWERS,len(pending))) as pool:
+        jobs=[pool.submit(candidates,connection.info.dsn,directory,manifest['seed'],manifest['weights'],item['run'],item['snapshots']) for item in pending]
+        for done,job in enumerate(as_completed(jobs),1):
+            name,found,seconds=job.result()
+            manifest['files'][name]=found
             write(directory/'preparation.json',manifest)
-    finally:
-        shared.close()
+            LOG.info('%s drawn in %.1fs, %d of %d',name,seconds,done,len(pending))
+            if progress:
+                progress({'phase':'prepare','step':'100 candidate batches and 100 actions','done':done,'total':len(pending)})
 
 
 @timed
@@ -126,10 +138,11 @@ def pack(connection,directory,manifest):
     if DRAWN.intersection(manifest['groups']):
         keys,records,frames=[],[],[]
         for run in manifest['validation']:
-            for candidate in load(directory/f'candidates_{run}.pkl.gz'):
+            found=load(directory/f'candidates_{run}.pkl.gz')
+            frames.append(found['row'])
+            for candidate in found['snapshots']:
                 keys.append((candidate['run'],candidate['seq']))
                 records.extend(candidate['histogram'])
-                frames.append(candidate['row'])
         joined={}
         for name in frames[0].columns:
             parts=[frame[name] for frame in frames]
@@ -143,6 +156,7 @@ def pack(connection,directory,manifest):
         path=directory/f'scoring_{model}.pkl.gz'
         save(path,{'keys':keys,'features':features,'validation':validation,'targets':targets,'pauses':pauses})
         manifest['files'][path.name]=digest(path)
+
 
 @timed
 def partition(manifest):
