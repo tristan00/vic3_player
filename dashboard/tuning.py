@@ -59,12 +59,13 @@ def listing():
                          'installed':str((directory/model).resolve())==active.get(model,{}).get('search'),
                          'differentiation_weight':weights['weights']['differentiation'] if weights else None,
                          'reward_weight':weights['weights']['reward'] if weights else None,
+                         'tuner':request['tuner']['name'],**{'tuner.'+name:value for name,value in request['tuner']['params'].items()},
                          'points_per_run':request['points_per_run'],'threads':request['threads'],'memory_gb':request['memory_gb'],'seed':request['seed'],
                          'seconds':job.get('seconds') if job else None})
     shown=[{'model':model,'trial':found['trial'],'search':found['search'],'installed_at':found['installed_at'],'threads':found['threads'],
             **{'validation_'+key:value for key,value in found['validation'].items()},
             **{key+'_weight':value for key,value in found['weighting']['weights'].items()}} for model,found in active.items()]
-    return {'rows':rows,'installed':shown,'metric':{f'{model} candidates':count for model,count in SPEC['candidates'].items()}}
+    return {'rows':rows,'installed':shown,'tuner_params':list(dict.fromkeys(name for row in rows for name in row if name.startswith('tuner.'))),'metric':{f'{model} candidates':count for model,count in SPEC['candidates'].items()}}
 
 
 @db.often
@@ -121,7 +122,7 @@ def detail(search,model):
         rows.append({'trial':found['trial'],'state':found['state'],'loss':loss(metrics,weights['weights']) if metrics else None,
                      **{key:value for key,value in (metrics or {}).items() if key!='score'},
                      'seconds':found.get('seconds'),'peak_memory_gb':found.get('peak_memory_gb'),'method':proposal.get('method'),
-                     'predicted_score':proposal.get('predicted_score'),'uncertainty':proposal.get('uncertainty'),
+                     'predicted_score':proposal.get('predicted_score'),'uncertainty':proposal.get('uncertainty'),'proposal_seconds':proposal.get('seconds'),
                      'feature_groups_on':sum(config[key]!='off' for key in flags),
                      **{key:value for key,value in config.items() if '.' not in key},
                      'interrupted_step':found.get('interrupted_step'),'error':found.get('error')})

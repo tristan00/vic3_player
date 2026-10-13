@@ -8,6 +8,7 @@ from interface.common import evidence
 from interface.runner.session import _spawn
 from . import MODELS, ROOT
 from .storage import read, write
+from .tuners import PARAMS, configured
 from .weighting import initialize, normalize
 
 
@@ -25,17 +26,20 @@ def main():
     parser.add_argument('--install',action='store_true')
     parser.add_argument('--differentiation-weight',type=float)
     parser.add_argument('--reward-weight',type=float)
+    parser.add_argument('--tuner',choices=sorted(PARAMS))
+    parser.add_argument('--tuner-params',nargs='*',default=[],metavar='NAME=VALUE')
     args=parser.parse_args()
     directory=args.directory or ROOT/datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     if args.command=='start':
-        if args.differentiation_weight is None or args.reward_weight is None:
-            parser.error(evidence(differentiation_weight=args.differentiation_weight,reward_weight=args.reward_weight))
+        if args.differentiation_weight is None or args.reward_weight is None or args.tuner is None:
+            parser.error(evidence(differentiation_weight=args.differentiation_weight,reward_weight=args.reward_weight,tuner=args.tuner))
+        tuner=configured(args.tuner,args.tuner_params)
         weights=normalize({'differentiation':args.differentiation_weight,'reward':args.reward_weight})
         if min(args.trials,args.points_per_run,args.threads,args.memory_gb)<=0 or args.threads>20 or not math.isfinite(args.memory_gb):
             raise ValueError(evidence(trials=args.trials,points_per_run=args.points_per_run,threads=args.threads,memory_gb=args.memory_gb))
         directory.mkdir(parents=True,exist_ok=False)
         write(directory/'request.json',{'data':str(args.data.resolve()) if args.data else None,'models':list(dict.fromkeys(args.models)),
-              'trials':args.trials,'points_per_run':args.points_per_run,'threads':args.threads,'memory_gb':args.memory_gb,'seed':args.seed,'install':args.install,'initial_weights':weights})
+              'trials':args.trials,'points_per_run':args.points_per_run,'threads':args.threads,'memory_gb':args.memory_gb,'seed':args.seed,'install':args.install,'initial_weights':weights,'tuner':tuner})
         for model in dict.fromkeys(args.models):
             initialize(directory/model,weights)
     if args.command in ('start','resume'):

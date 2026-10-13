@@ -25,10 +25,11 @@ export function Tuning() {
             <Panel title="Searches">
               <Grid
                 rows={tuning.data.rows}
-                facets={['model', 'state']}
+                facets={['model', 'state', 'tuner']}
                 columns={[
                   { name: 'search', render: (row) => <Link to={`/tuning/${row.search}/${row.model}`}>{row.search}</Link> },
                   { name: 'model' },
+                  { name: 'tuner', kind: 'name' },
                   { name: 'state', render: (row) => (row.state ?? row.job ? <Pill value={row.state ?? row.job} tone={tone(row.state ?? row.job)} /> : null) },
                   { name: 'finished', label: 'trials', kind: 'int' },
                   { name: 'requested', kind: 'int' },
@@ -37,6 +38,7 @@ export function Tuning() {
                   { name: 'installed', kind: 'bool' },
                   { name: 'differentiation_weight', kind: 'frac', group: 'loss weights' },
                   { name: 'reward_weight', kind: 'frac', group: 'loss weights' },
+                  ...tuning.data.tuner_params.map((name: string) => ({ name, label: label(name.slice(6)), group: 'tuner settings' })),
                   { name: 'points_per_run', kind: 'int' },
                   { name: 'threads', kind: 'int' },
                   { name: 'memory_gb', label: 'memory GiB', kind: 'num' },
@@ -140,6 +142,9 @@ export function Search() {
               />
               {current && <Facts items={[['running trial', current.trial], ['seconds', num(current.seconds, 3)], ['memory GiB', num(current.memory_gb, 3)], ['step', current.detail?.step ?? '']]} />}
               {found.status?.error && <pre className="problem">{found.status.error}</pre>}
+              <Panel title="Tuner">
+                <Facts items={[['tuner', label(found.request.tuner.name)], ...Object.entries(found.request.tuner.params).map(([name, value]) => [label(name), typeof value === 'number' ? num(value) : String(value)] as [string, string])]} />
+              </Panel>
               <Weights search={search} model={model} weights={found.weights} reload={detail.reload} />
               <div className="tabs">
                 {Object.entries(TABS).map(([key, name]) => (

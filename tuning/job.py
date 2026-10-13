@@ -122,7 +122,7 @@ def run_search(directory,data,manifest,model,settings,heartbeat):
     while len(history)<settings['trials']:
         number=len(history)
         weights=weighting.current(directory)
-        config,proposal,trace=propose(space,history,settings['seed']+number,model,weights)
+        config,proposal,trace=propose(space,history,settings['seed']+number,model,weights,settings['tuner'])
         save(directory/f'proposal_{number:05d}.pkl.gz',trace)
         trial={'trial':number,'config':config,'proposal':proposal,'state':'running','started_at':datetime.now(timezone.utc).isoformat()}
         request={'trial':number,'data':str(data.resolve()),'model':model,'config':config,'threads':settings['threads'],'seed':settings['seed'],'weighting':weights}
