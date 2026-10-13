@@ -699,6 +699,21 @@ td:hover .filterable a.only {
   opacity: 0.75;
 }
 
+.chart .fit {
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.chart .fit-label {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--ink);
+  stroke: var(--surface);
+  stroke-width: 4px;
+  paint-order: stroke;
+}
+
 .legend {
   display: flex;
   flex-wrap: wrap;

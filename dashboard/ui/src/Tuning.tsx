@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { request, useApi } from './api'
 import { Dots } from './charts'
-import { colors, label, num, span, time } from './format'
+import { colors, label, num, span, sum, time } from './format'
 import { Facts, Figures, Grid, Panel, Pill, Waiting, columnsOf } from './Grid'
 
 function tone(state: string | null) {
@@ -109,6 +109,8 @@ export function Search() {
         {() => {
           const found = detail.data
           const rows: any[] = found.rows
+          const space: any[] = found.hyperparameters
+          const tuned = (kept: any[]) => num(sum(kept.map((row) => row.count)))
           const done = rows.filter((row) => row.loss !== null)
           let best = Infinity
           const trend = done.map((row) => [row.trial, (best = Math.min(best, row.loss))] as [number, number])
@@ -130,8 +132,8 @@ export function Search() {
               {current && <Facts items={[['running trial', current.trial], ['seconds', num(current.seconds, 3)], ['memory GiB', num(current.memory_gb, 3)], ['step', current.detail?.step ?? '']]} />}
               {found.status?.error && <pre className="problem">{found.status.error}</pre>}
               <Weights search={search} model={model} weights={found.weights} reload={detail.reload} />
-              <Panel title="Loss by trial">
-                <Dots points={done.map((row) => ({ x: row.trial, y: row.loss, key: row.method ?? 'trial', title: `trial ${row.trial}`, to: `/tuning/${search}/${model}?trial=${row.trial}` }))} palette={colors([...new Set(done.map((row) => row.method ?? 'trial'))] as string[])} line={trend} zero={false} height={220} />
+              <Panel title="Loss by trial" extra="solid lowest so far · dashed linear trend">
+                <Dots points={done.map((row) => ({ x: row.trial, y: row.loss, key: row.method ?? 'trial', title: `trial ${row.trial}`, to: `/tuning/${search}/${model}?trial=${row.trial}` }))} palette={colors([...new Set(done.map((row) => row.method ?? 'trial'))] as string[])} line={trend} fit zero={false} height={220} />
               </Panel>
               {picked && (
                 <div ref={panel}>
@@ -162,6 +164,12 @@ export function Search() {
                   ]}
                 />
               </Panel>
+              {space.length > 0 && (
+                <Panel title="Hyperparameters" extra={`${tuned(space)} tuned`}>
+                  <Facts items={[...['model', 'data'].map((side) => [side, tuned(space.filter((row) => row.side === side))] as [string, string]), ...[...new Set(space.map((row) => row.type))].map((type) => [type, tuned(space.filter((row) => row.type === type))] as [string, string]), ['conditional', tuned(space.filter((row) => row.needs))], ['model input columns', num(sum(space.map((row) => row.input_columns)))]]} />
+                  <Grid search={false} rows={space} columns={[{ name: 'side' }, { name: 'hyperparameter', kind: 'name' }, { name: 'type' }, { name: 'values', kind: 'text' }, { name: 'scale' }, { name: 'needs', label: 'only when', kind: 'text' }, { name: 'count', kind: 'int' }, { name: 'input_columns', label: 'model input columns', kind: 'int' }]} />
+                </Panel>
+              )}
               <Panel title="Trial settings">
                 <Grid fold rows={rows} sort={{ name: 'loss', desc: false }} columns={[{ name: 'trial', render: (row) => <a onClick={() => setQuery({ trial: String(row.trial) })}>{row.trial}</a> }, { name: 'loss', kind: 'num' }, ...columnsOf(rows).filter((column) => found.settings.includes(column.name))]} />
               </Panel>

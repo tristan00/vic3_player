@@ -9,6 +9,7 @@ from . import db
 
 LOCK=Lock()
 TRIALS={}
+FAMILY=('side','hyperparameter','type','values','scale','needs')
 
 
 @db.often
@@ -76,12 +77,33 @@ def trial(path):
         return found[1]
 
 
+@db.often
+def hyperparameters(space):
+    rows={}
+    for name,spec in space['parameters'].items():
+        prefix,_,group=name.partition('.')
+        found=space['groups'].get(group)
+        numeric=spec['kind']!='choice'
+        key=('model' if found is None else 'data',
+             name if found is None else f"{found['role']} {'column group' if found['kind']=='columns' else 'histogram'}{' bins' if prefix=='bins' else ''}",
+             spec['kind'],
+             f"{spec['low']:g} to {spec['high']:g}" if numeric else ', '.join(str(value) for value in spec['values']),
+             ('log' if spec.get('log') else 'linear') if numeric else None,
+             ' and '.join(f"{'own switch' if parent.startswith('feature.') else parent} = {' or '.join(values)}" for parent,values in spec.get('when',{}).items()) or None)
+        row=rows.setdefault(key,{**dict(zip(FAMILY,key)),'count':0,'input_columns':None})
+        row['count']+=1
+        if prefix=='feature' and found['kind']=='columns':
+            row['input_columns']=(row['input_columns'] or 0)+len(found['columns'])
+    return list(rows.values())
+
+
 @db.timed
 def detail(search,model):
     directory=searched(search,model)
     if directory is None:
         return None
     weights=weighting.current(directory)
+    space=optional(directory/'search.json')
     rows=[]
     baseline=None
     measures=[]
@@ -100,7 +122,7 @@ def detail(search,model):
                      **{key:value for key,value in (metrics or {}).items() if key!='score'},
                      'seconds':found.get('seconds'),'peak_memory_gb':found.get('peak_memory_gb'),'method':proposal.get('method'),
                      'predicted_score':proposal.get('predicted_score'),'uncertainty':proposal.get('uncertainty'),
-                     'features_used':sum(config[key]!='off' for key in flags),'features':len(flags),
+                     'feature_groups_on':sum(config[key]!='off' for key in flags),
                      **{key:value for key,value in config.items() if '.' not in key},
                      'interrupted_step':found.get('interrupted_step'),'error':found.get('error')})
     status=optional(directory/'status.json')
@@ -108,7 +130,8 @@ def detail(search,model):
     active=installed().get(model,{})
     return {'search':search,'model':model,'status':status,'state':state_of(status),'weights':weights,'baseline':baseline,
             'winner':winner['trial'] if winner else None,'installed':active.get('trial') if active.get('search')==str(directory.resolve()) else None,
-            'request':read(directory.parent/'request.json'),'rows':rows,'measures':measures,'settings':settings}
+            'request':read(directory.parent/'request.json'),'rows':rows,'measures':measures,'settings':settings,
+            'hyperparameters':hyperparameters(space) if space else []}
 
 
 @db.timed

@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { fraction, gameDate, label, num, short } from './format'
+import { fraction, gameDate, label, num, short, sum } from './format'
 
 const LEFT = 48
 const RIGHT = 14
@@ -271,7 +271,16 @@ export function Columns({ data, keys, palette, height = 170, y = short, legend =
 
 export type Dot = { x: number; y: number; key: string; title: string; to?: string }
 
-export function Dots({ points, palette, height = 190, x = plain, y = short, line, zero = true, legend = true, xTitle, yTitle, clip }: { points: Dot[]; palette: Record<string, string>; height?: number; x?: (v: number) => string; y?: (v: number) => string; line?: [number, number][]; zero?: boolean; legend?: boolean; xTitle?: string; yTitle?: string; clip?: [number, number] }) {
+function regression(points: Dot[]) {
+  const mx = sum(points.map((point) => point.x)) / points.length
+  const my = sum(points.map((point) => point.y)) / points.length
+  const xx = sum(points.map((point) => (point.x - mx) ** 2))
+  const xy = sum(points.map((point) => (point.x - mx) * (point.y - my)))
+  const yy = sum(points.map((point) => (point.y - my) ** 2))
+  return { r: xy / Math.sqrt(xx * yy), at: (value: number) => my + (xy / xx) * (value - mx) }
+}
+
+export function Dots({ points, palette, height = 190, x = plain, y = short, line, fit = false, zero = true, legend = true, xTitle, yTitle, clip }: { points: Dot[]; palette: Record<string, string>; height?: number; x?: (v: number) => string; y?: (v: number) => string; line?: [number, number][]; fit?: boolean; zero?: boolean; legend?: boolean; xTitle?: string; yTitle?: string; clip?: [number, number] }) {
   const [ref, width] = useWidth()
   const [hover, setHover] = useState<Dot | null>(null)
   const navigate = useNavigate()
@@ -287,7 +296,9 @@ export function Dots({ points, palette, height = 190, x = plain, y = short, line
   const ordered = kept.map((point) => point.y).sort((a, b) => a - b)
   const inside = clip ? ordered.slice(Math.floor(clip[0] * (ordered.length - 1)), Math.ceil(clip[1] * (ordered.length - 1)) + 1) : ordered
   const [x0, x1] = extent(kept.map((point) => point.x), false)
-  const [y0, y1] = extent(inside, zero)
+  const straight = fit ? regression(kept) : null
+  const ends = straight && Number.isFinite(straight.r) ?[Math.min(...kept.map((point) => point.x)), Math.max(...kept.map((point) => point.x))].map((at) => [at, straight.at(at)]) : []
+  const [y0, y1] = extent([...inside, ...ends.map((end) => end[1])], zero)
   const beyond = kept.filter((point) => point.y < y0 || point.y > y1).length
   const px = (value: number) => LEFT + ((value - x0) / (x1 - x0)) * (width - LEFT - RIGHT)
   const py = (value: number) => TOP + (1 - (Math.max(y0, Math.min(y1, value)) - y0) / (y1 - y0)) * (height - TOP - BOTTOM)
@@ -323,6 +334,14 @@ export function Dots({ points, palette, height = 190, x = plain, y = short, line
               ) : (
                 <circle key={index} cx={px(point.x)} cy={py(point.y)} r={hover === point ? 5 : 3.2} fill={palette[point.key]} stroke="#fff" strokeWidth={1} />
               ),
+            )}
+            {straight && ends.length > 0 && (
+              <>
+                <line className="fit" x1={px(ends[0][0])} y1={py(ends[0][1])} x2={px(ends[1][0])} y2={py(ends[1][1])} />
+                <text className="fit-label" x={px(ends[1][0])} y={py(ends[1][1]) < TOP + 18 ? py(ends[1][1]) + 16 : py(ends[1][1]) - 8} textAnchor="end">
+                  r = {straight.r.toFixed(2)}
+                </text>
+              </>
             )}
           </Frame>
         </svg>
