@@ -37,14 +37,10 @@ def evaluate(connection,directory,manifest,model,config,threads,seed,progress_pa
     before=fitted.predict(check)
     del features,y,weights
     gc.collect()
-    if model=='row':
-        columns=fitted.estimator.feature_names_ or columns[:1]
-    progress('assemble validation from database')
-    snapshots={item['run']:item['snapshots'] for item in manifest['runs']}
-    validation,targets,keys,_=training(connection,{run:bounds[run] for run in manifest['validation']},model,columns,snapshots,families)
     progress('score snapshots')
-    predicted=fitted.predict(validation,threads)
     candidates=load(directory/f'scoring_{model}.pkl.gz')
+    targets,keys=candidates['targets'],candidates['pauses']
+    predicted=fitted.predict(candidates['validation'],threads)
     options=fitted.predict(candidates['features'],threads).reshape(len(candidates['keys']),100)
     for (run,seq),scores in zip(candidates['keys'],options):
         mask=(keys[:,0]==run)&(keys[:,1]==seq)

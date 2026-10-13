@@ -103,16 +103,18 @@ def prepare(directory,seed=19,points_per_run=12,progress=None):
                 write(checkpoint,manifest)
         finally:
             shared.close()
-    validate_manifest(manifest)
-    needed={f'candidates_{run}.pkl.gz' for run in manifest['validation']}
-    manifest['files']={name:value for name,value in manifest['files'].items() if name in needed}
-    pack(directory,manifest)
+        validate_manifest(manifest)
+        needed={f'candidates_{run}.pkl.gz' for run in manifest['validation']}
+        manifest['files']={name:value for name,value in manifest['files'].items() if name in needed}
+        pack(connection,directory,manifest)
     write(directory/'dataset.json',manifest)
     return manifest
 
 
 @timed
-def pack(directory,manifest):
+def pack(connection,directory,manifest):
+    bounds={run:dates for run,*dates in manifest['bounds']}
+    snapshots={item['run']:item['snapshots'] for item in manifest['runs']}
     keys,records,frames=[],[],[]
     for run in manifest['validation']:
         for candidate in load(directory/f'candidates_{run}.pkl.gz'):
@@ -124,8 +126,9 @@ def pack(directory,manifest):
         parts=[frame[name] for frame in frames]
         joined[name]=pd.api.types.union_categoricals(parts) if isinstance(parts[0].dtype,pd.CategoricalDtype) else np.concatenate([part.to_numpy() for part in parts])
     for model,features in (('histogram',records),('row',pd.DataFrame(joined,copy=False))):
+        validation,targets,pauses,_=training(connection,{run:bounds[run] for run in manifest['validation']},model,snapshots=snapshots)
         path=directory/f'scoring_{model}.pkl.gz'
-        save(path,{'keys':keys,'features':features})
+        save(path,{'keys':keys,'features':features,'validation':validation,'targets':targets,'pauses':pauses})
         manifest['files'][path.name]=digest(path)
 
 
