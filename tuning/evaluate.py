@@ -48,9 +48,8 @@ def evaluate(connection,directory,manifest,model,config,threads,seed,progress_pa
             raise ValueError(evidence(run=run,seq=seq))
         mse=float(np.mean((predicted[mask]-targets[mask])**2))
         constant_mse=float(np.mean((fitted.mean-targets[mask])**2))
-        points.append({'run':run,'seq':seq,'mse':mse,'normalized_mse':mse/fitted.scale**2,**differentiation(scores,fitted.scale)})
-        baseline.append({'run':run,'mse':constant_mse,'normalized_mse':constant_mse/fitted.scale**2,
-                         'entropy':0.,'std':0.,'spread':0.,'differentiation':0.})
+        points.append({'run':run,'seq':seq,'mse':mse,'normalized_mse':mse/fitted.scale**2,'differentiation':differentiation(scores)})
+        baseline.append({'run':run,'mse':constant_mse,'normalized_mse':constant_mse/fitted.scale**2,'differentiation':0.})
     del candidates
     progress('save model')
     save(output.with_suffix('.model.pkl.gz'),fitted)
