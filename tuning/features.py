@@ -94,11 +94,21 @@ class Encoder:
     def transform(self,records):
         if self.model=='row':
             return records.loc[:,self.columns]
-        frame=pd.DataFrame([{column:record['state'][column] if column!='batch_size' else record['size'] for column in self.columns} for record in records])
-        for column in set(state.CATEGORIES)&set(frame.columns):
-            frame[column]=frame[column].astype('category')
-        for column in set(frame.columns)-set(state.CATEGORIES):
-            frame[column]=frame[column].astype(np.float32)
+        contexts,holdings={},{}
+        for index,record in enumerate(records):
+            contexts.setdefault(id(record['state']),(record['state'],[]))[1].append(index)
+            holdings.setdefault(id(record['held']),(record['held'],[]))[1].append(index)
+        named=[column for column in self.columns if column!='batch_size']
+        distinct=pd.DataFrame([{column:found[column] for column in named} for found,_ in contexts.values()],index=range(len(contexts)))
+        for column in set(state.CATEGORIES)&set(named):
+            distinct[column]=distinct[column].astype('category')
+        for column in set(named)-set(state.CATEGORIES):
+            distinct[column]=distinct[column].astype(np.float32)
+        places=np.empty(len(records),np.intp)
+        for position,(_,members) in enumerate(contexts.values()):
+            places[members]=position
+        sizes=np.asarray([record['size'] for record in records],float)
+        frame=pd.concat([distinct.iloc[places].reset_index(drop=True),pd.DataFrame({'batch_size':sizes.astype(np.float32)})],axis=1).loc[:,self.columns]
         mapping={}
         labels=[]
         for name,values in self.vocabulary.items():
@@ -107,14 +117,22 @@ class Encoder:
             labels.extend(f'{name}.{position}={value}' for position,value in enumerate([*values,'<other>']))
         indices,columns,weights=[],[],[]
         for index,record in enumerate(records):
-            for source in ('actions','held'):
-                for family,value,weight in record[source]:
-                    if (source,family) in mapping:
-                        lookup,other,share=mapping[source,family]
-                        indices.append(index)
-                        columns.append(lookup.get(value,other))
-                        weights.append(weight/record['size'] if share else weight)
-        sparse=coo_matrix((weights,(indices,columns)),shape=(len(records),len(labels)),dtype=np.float32).tocsc()
+            for family,value,weight in record['actions']:
+                found=mapping.get(('actions',family))
+                if found is not None:
+                    indices.append(index)
+                    columns.append(found[0].get(value,found[1]))
+                    weights.append(weight/record['size'] if found[2] else weight)
+        parts=[(np.asarray(indices,np.intp),np.asarray(columns,np.intp),np.asarray(weights,float))]
+        for held,members in holdings.values():
+            found=[(lookup.get(value,other),weight,share) for family,value,weight in held if ('held',family) in mapping for lookup,other,share in [mapping['held',family]]]
+            if found:
+                column,weight,share=(np.asarray(values) for values in zip(*found))
+                rows=np.repeat(members,len(found))
+                spread=np.tile(weight.astype(float),len(members))
+                parts.append((rows,np.tile(column,len(members)),np.where(np.tile(share,len(members)),spread/sizes[rows],spread)))
+        sparse=coo_matrix((np.concatenate([part[2] for part in parts]),(np.concatenate([part[0] for part in parts]),np.concatenate([part[1] for part in parts]))),
+                          shape=(len(records),len(labels)),dtype=np.float32).tocsc()
         return pd.concat([frame,pd.DataFrame.sparse.from_spmatrix(sparse,columns=labels)],axis=1)
 
     @timed

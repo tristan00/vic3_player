@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import logging
 
 import numpy as np
+import pandas as pd
 import psycopg
 
 from advisors.catalogue import NAMES
@@ -16,7 +17,7 @@ from interface.options.stored import Shared, Stored
 from interface.recording.store import DSN
 from . import VERSION
 from .features import taxonomy
-from .storage import digest, read, save, source_digest, write
+from .storage import digest, load, read, save, source_digest, write
 
 LOG=logging.getLogger('tuning')
 
@@ -105,8 +106,27 @@ def prepare(directory,seed=19,points_per_run=12,progress=None):
     validate_manifest(manifest)
     needed={f'candidates_{run}.pkl.gz' for run in manifest['validation']}
     manifest['files']={name:value for name,value in manifest['files'].items() if name in needed}
+    pack(directory,manifest)
     write(directory/'dataset.json',manifest)
     return manifest
+
+
+@timed
+def pack(directory,manifest):
+    keys,records,frames=[],[],[]
+    for run in manifest['validation']:
+        for candidate in load(directory/f'candidates_{run}.pkl.gz'):
+            keys.append((candidate['run'],candidate['seq']))
+            records.extend(candidate['histogram'])
+            frames.append(candidate['row'])
+    joined={}
+    for name in frames[0].columns:
+        parts=[frame[name] for frame in frames]
+        joined[name]=pd.api.types.union_categoricals(parts) if isinstance(parts[0].dtype,pd.CategoricalDtype) else np.concatenate([part.to_numpy() for part in parts])
+    for model,features in (('histogram',records),('row',pd.DataFrame(joined,copy=False))):
+        path=directory/f'scoring_{model}.pkl.gz'
+        save(path,{'keys':keys,'features':features})
+        manifest['files'][path.name]=digest(path)
 
 
 @timed
@@ -134,10 +154,9 @@ def verify(directory):
     validate_manifest(manifest)
     if manifest['objective']!=OBJECTIVE or manifest['groups']!={model:taxonomy(model) for model in ('histogram','row')}:
         raise ValueError(evidence(objective=manifest['objective'],current_objective=OBJECTIVE,groups_match=manifest['groups']=={model:taxonomy(model) for model in ('histogram','row')}))
-    for run in manifest['validation']:
-        name=f'candidates_{run}.pkl.gz'
-        if digest(directory/name)!=manifest['files'][name]:
-            raise ValueError(evidence(name=name,digest=digest(directory/name),expected=manifest['files'][name]))
+    for name,expected in manifest['files'].items():
+        if digest(directory/name)!=expected:
+            raise ValueError(evidence(name=name,digest=digest(directory/name),expected=expected))
     return manifest
 
 

@@ -43,31 +43,19 @@ def evaluate(connection,directory,manifest,model,config,threads,seed,progress_pa
     snapshots={item['run']:item['snapshots'] for item in manifest['runs']}
     validation,targets,keys,_=training(connection,{run:bounds[run] for run in manifest['validation']},model,columns,snapshots,families)
     progress('score snapshots')
-    predicted=fitted.predict(validation)
-    for run in manifest['validation']:
-        write(progress_path,{**stage,'step':'score snapshots','run':run,'updated':time.time()})
-        candidates=load(directory/f'candidates_{run}.pkl.gz')
-        selected=[candidate['seq'] for candidate in candidates]
-        selected_rows=(keys[:,0]==run)&np.isin(keys[:,1],selected)
-        run_targets=targets[selected_rows]
-        run_predictions=predicted[selected_rows]
-        sequences=keys[selected_rows,1]
-        if model=='histogram':
-            generated=[record for candidate in candidates for record in candidate[model]]
-            options=fitted.predict(generated).reshape(len(candidates),100)
-        else:
-            options=np.vstack([fitted.predict(candidate[model]) for candidate in candidates])
-        for index,candidate in enumerate(candidates):
-            seq=candidate['seq']
-            mask=sequences==seq
-            if not mask.any():
-                raise ValueError(evidence(run=run,seq=seq))
-            mse=float(np.mean((run_predictions[mask]-run_targets[mask])**2))
-            constant_mse=float(np.mean((fitted.mean-run_targets[mask])**2))
-            points.append({'run':run,'seq':seq,'mse':mse,'normalized_mse':mse/fitted.scale**2,**differentiation(options[index],fitted.scale)})
-            baseline.append({'run':run,'mse':constant_mse,'normalized_mse':constant_mse/fitted.scale**2,
-                             'entropy':0.,'std':0.,'spread':0.,'differentiation':0.})
-        del candidates
+    predicted=fitted.predict(validation,threads)
+    candidates=load(directory/f'scoring_{model}.pkl.gz')
+    options=fitted.predict(candidates['features'],threads).reshape(len(candidates['keys']),100)
+    for (run,seq),scores in zip(candidates['keys'],options):
+        mask=(keys[:,0]==run)&(keys[:,1]==seq)
+        if not mask.any():
+            raise ValueError(evidence(run=run,seq=seq))
+        mse=float(np.mean((predicted[mask]-targets[mask])**2))
+        constant_mse=float(np.mean((fitted.mean-targets[mask])**2))
+        points.append({'run':run,'seq':seq,'mse':mse,'normalized_mse':mse/fitted.scale**2,**differentiation(scores,fitted.scale)})
+        baseline.append({'run':run,'mse':constant_mse,'normalized_mse':constant_mse/fitted.scale**2,
+                         'entropy':0.,'std':0.,'spread':0.,'differentiation':0.})
+    del candidates
     progress('save model')
     save(output.with_suffix('.model.pkl.gz'),fitted)
     restored=load(output.with_suffix('.model.pkl.gz'))
