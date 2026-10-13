@@ -14,7 +14,7 @@ UNCERTAINTY_WEIGHT=1.
 @timed
 def propose(space,history,seed,model,weighting):
     rng=np.random.default_rng(seed)
-    random_trials=RANDOM_TRIALS[model]
+    random_trials=RANDOM_TRIALS
     count=1 if len(history)<random_trials else CANDIDATES
     seen={identity(trial['config']) for trial in history}
     candidates=[]

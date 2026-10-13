@@ -21,7 +21,7 @@ from .space import Space
 from .storage import digest, read, save, source_digest, write
 
 LOG=logging.getLogger('tuning')
-SECONDS=30
+SECONDS=40
 
 
 @timed
