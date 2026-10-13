@@ -92,7 +92,7 @@ def summarize(root):
         scores.append('<tr>'+''.join(f'<td>{v}</td>' for v in (
             name,number(val.get('sequence_nrmse')),number(test.get('sequence_nrmse')),number(test.get('reward_loss')),
             number(test.get('mean_pause_entropy')),number(test.get('normalized_candidate_std')),
-            number(test.get('entropy_at_1_percent_std')),number(val.get('score')),number(test.get('score')),result.get('best_epoch','Pending')) )+'</tr>')
+            number(val.get('score')),number(test.get('score')),result.get('best_epoch','Pending')) )+'</tr>')
     details=''
     if done:
         from .experiment import restore
@@ -115,13 +115,13 @@ def summarize(root):
         details+='<p>Sequence error controls: '+', '.join(f'{name} {number(v["sequence_nrmse"])}' for name,v in controls.items())+'. These are prediction controls, not alternative world representations.</p>'
         charts(root,list(results.values()))
         details+='<img src="comparison.png" alt="Full world and removal comparison"><img src="horizons.png" alt="Errors by target and horizon">'
-        fields=['name','validation_sequence','test_sequence','test_reward_loss','test_entropy','test_candidate_spread','test_entropy_at_1_percent','validation_score','test_score','selected_epoch']
+        fields=['name','validation_sequence','test_sequence','test_reward_loss','test_entropy','test_candidate_spread','validation_score','test_score','selected_epoch']
         with (root/'scores.csv').open('w',newline='') as stream:
             writer=csv.writer(stream)
             writer.writerow(fields)
             for r in results.values():
                 v,t=r['validation'],r['test']
-                writer.writerow([r['name'],v['sequence_nrmse'],t['sequence_nrmse'],t['reward_loss'],t['mean_pause_entropy'],t['normalized_candidate_std'],t['entropy_at_1_percent_std'],v['score'],t['score'],r['best_epoch']])
+                writer.writerow([r['name'],v['sequence_nrmse'],t['sequence_nrmse'],t['reward_loss'],t['mean_pause_entropy'],t['normalized_candidate_std'],v['score'],t['score'],r['best_epoch']])
     counts=Counter(r['split'] for r in manifest['rows']) if manifest else {}
     config=next(iter(results.values()))['configuration'] if results else {'width':48,'layers':3,'epochs':24,'patience':6,'sequence_length':4,'action_layers':2,'seed':41}
     runtimes=''.join('<tr>'+''.join(f'<td>{value}</td>' for value in (
@@ -162,8 +162,8 @@ def summarize(root):
 <h2>Training feasibility</h2><p>The complete probe contained {probe['nodes']:,} nodes and {probe['edges']:,} directed edges. Peak allocated GPU memory was {probe['gpu_peak_bytes']/1e9:.2f} GB; warmed training steps took {np.median(probe['step_seconds'][1:]):.3f} seconds. Production training streams chronological observations and uses bounded backpropagation chunks, preserving recurrent state between chunks. It does not sample or prune neighbors.</p>
 <h2>Evaluation</h2><p>Dataset decisions by split: {html.escape(str(dict(counts))) if counts else 'preparation in progress'}. Splits keep whole runs separate. Every recorded decision is included, with unavailable targets masked individually. Feature dictionaries and numeric normalization use training graphs only. Every attempt uses the same decisions, targets, candidates, initialization seed and configuration.</p>{dataset_detail}
 <p>Forecasts cover GDP, population, standard of living and cost-weighted building stock at 90, 180, 365, 730 and 1,095 days. Targets are log ratios relative to the exact pre-action snapshot. Unobserved horizons are masked. These are observed future trajectories, including subsequent actions, rather than isolated causal effects of the proposed block.</p>
-<div class="scroll"><table><tr><th>Attempt</th><th>Validation sequence</th><th>Test sequence</th><th>Test reward loss</th><th>Test entropy</th><th>Candidate spread</th><th>Entropy at 1%</th><th>Validation score</th><th>Test score</th><th>Epoch</th></tr>{''.join(scores)}</table></div>
-<p>Sequence error is normalized RMSE across observed trajectory cells. Reward loss is normalized RMSE of a trapezoidal, equal-component utility over the forecast horizons. The comparison score is 0.1 × reward loss + 0.9 × (1 − candidate entropy). Entropy alone does not establish accuracy or useful action effects. Candidate spread and entropy at a 1% training-utility standard-deviation tolerance expose tiny numerical distinctions. Thirty complete alternatives at every held-out decision are regenerated with loop.run.redraw. All alternatives read the same observation state; only the recorded action advances memory.</p>
+<div class="scroll"><table><tr><th>Attempt</th><th>Validation sequence</th><th>Test sequence</th><th>Test reward loss</th><th>Test entropy</th><th>Candidate spread</th><th>Validation score</th><th>Test score</th><th>Epoch</th></tr>{''.join(scores)}</table></div>
+<p>Sequence error is normalized RMSE across observed trajectory cells. Reward loss is normalized RMSE of a trapezoidal, equal-component utility over the forecast horizons. The comparison score is 0.1 × reward loss + 0.9 × (1 − candidate entropy). Entropy alone does not establish accuracy or useful action effects. Candidate spread exposes tiny numerical distinctions. Thirty complete alternatives at every held-out decision are regenerated with loop.run.redraw. All alternatives read the same observation state; only the recorded action advances memory.</p>
 <p>Epoch selection uses validation sequence error. Validation scores select the reported model; test results do not affect selection. The full world baseline is always retained and reported.</p>
 {selected}{details}{runtime_table}{verification}<h2>Configuration</h2><pre>{html.escape(json.dumps(config,indent=2))}</pre><p>Shared relational message passing with typed edges, weighted feature embeddings and current-world type pooling. Chronological full-world observations, per-entity and global GRU memory, bounded sequence backpropagation, AdamW, gradient clipping at five, float32 with TF32 disabled. Maximum 24 epochs; stop after six epochs without validation improvement.</p>
 </html>'''

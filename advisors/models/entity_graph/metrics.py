@@ -43,11 +43,10 @@ def accuracy(prediction,y,mask,scale,reward_scale):
 @timed_often
 def differentiation(predictions,reward_scale):
     scores=[utility(p) for p in predictions]
-    values=np.array([entropy(row,reward_scale*1e-6) for row in scores])
+    values=np.array([entropy(row) for row in scores])
     return {'mean_pause_entropy':float(values.mean()),'median_pause_entropy':float(np.median(values)),
             'tied_pause_fraction':float(np.mean(values==0)),'entropy_pauses':len(values),
             'normalized_candidate_std':float(np.mean([np.std(row)/reward_scale for row in scores])),
-            'entropy_at_1_percent_std':float(np.mean([entropy(row,reward_scale*.01) for row in scores])),
             'entropy_values':values.tolist()}
 
 
