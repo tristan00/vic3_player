@@ -11,8 +11,8 @@ from ..models import forest
 LOG=logging.getLogger('loop')
 
 
-class RandomSmacWeightingAdvisor(RandomAdvisor):
-    name='random_smac_weighting'
+class RandomForestWeightingAdvisor(RandomAdvisor):
+    name='random_forest_weighting'
 
     @timed
     def propose(self,X,y,low,high,names=None):
@@ -32,6 +32,6 @@ class RandomSmacWeightingAdvisor(RandomAdvisor):
         self.proposal=record
         chosen=(10**x).tolist()
         self.weights={**{name:0 for name in actions if name in self.excluded},**dict(zip(space,chosen))}
-        LOG.info('random_smac_weighting proposal (%s) from %d scored runs, best %s %.3f, predicted %s',
+        LOG.info('random_forest_weighting proposal (%s) from %d scored runs, best %s %.3f, predicted %s',
                  record['method'],len(y),NAME,record['best_reward'],f"{record['predicted_reward']:.3f}")
         return self.weights

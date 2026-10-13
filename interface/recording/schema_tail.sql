@@ -41,7 +41,7 @@ begin
                  where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and a.attname = 'run_id' and c.relname <> 'run' loop
     execute format('update %I set run_id = $2 where run_id = $1', target.relname) using old, new;
   end loop;
-  update smac_observation set observed_run = new where observed_run = old;
+  update forest_observation set observed_run = new where observed_run = old;
   update svr_observation set observed_run = new where observed_run = old;
   update run set run_id = new where run_id = old;
 end $$;
@@ -55,7 +55,7 @@ begin
                  where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and a.attname = 'run_id' and c.relname <> 'run' loop
     execute format('delete from %I where run_id = $1', target.relname) using doomed;
   end loop;
-  delete from smac_observation where observed_run = doomed;
+  delete from forest_observation where observed_run = doomed;
   delete from svr_observation where observed_run = doomed;
   delete from run where run_id = doomed;
   for later in select run_id from run where run_id > doomed order by run_id loop

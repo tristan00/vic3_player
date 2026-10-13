@@ -252,7 +252,7 @@ class Store:
                   [(run_id,action,pending['weights'][name],pending['centres'].get(name)) for name,action in zip(names,self.names('advisor_action',names))])
         self.copy(cursor,'run_advisor',('run_id','position','advisor'),enumerate_rows(run_id,self.names('advisor',pending['advisors'])))
         if pending['proposal'] is not None:
-            {'random_smac_weighting':self.record_smac_proposal,'random_svr_weighting':self.record_svr_proposal}[pending['proposal']['initializer']](cursor,run_id,pending['proposal'])
+            {'random_forest_weighting':self.record_forest_proposal,'random_svr_weighting':self.record_svr_proposal}[pending['proposal']['initializer']](cursor,run_id,pending['proposal'])
         for step in ('size','pick'):
             if pending[step+'_model'] is not None:
                 pauses,runs,seconds,params,importance=pending[step+'_model']
@@ -279,15 +279,15 @@ class Store:
                       [(self.run_id,seq,index,position,next(codes)) for index,batch in enumerate(batches) for position,_ in enumerate(batch)])
 
     @timed
-    def record_smac_proposal(self,cursor,run_id,proposal):
-        cursor.execute('insert into smac_proposal (run_id,reward,method,observations,best_reward,predicted_reward,uncertainty,expected_improvement,beat_probability,candidates,seconds) '
+    def record_forest_proposal(self,cursor,run_id,proposal):
+        cursor.execute('insert into forest_proposal (run_id,reward,method,observations,best_reward,predicted_reward,uncertainty,expected_improvement,beat_probability,candidates,seconds) '
                        'values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                        (run_id,proposal['reward'],proposal['method'],proposal['observations'],proposal['best_reward'],proposal['predicted_reward'],proposal['uncertainty'],
                         proposal['expected_improvement'],proposal['beat_probability'],proposal['candidates'],proposal['seconds']))
-        self.copy(cursor,'smac_observation',('run_id','observed_run','reward'),[(run_id,observed,reward) for observed,reward in proposal['observed']])
-        self.copy(cursor,'smac_candidate',('run_id','rank','source','predicted_reward','uncertainty','expected_improvement','beat_probability'),
+        self.copy(cursor,'forest_observation',('run_id','observed_run','reward'),[(run_id,observed,reward) for observed,reward in proposal['observed']])
+        self.copy(cursor,'forest_candidate',('run_id','rank','source','predicted_reward','uncertainty','expected_improvement','beat_probability'),
                   [(run_id,*row) for row in proposal['candidate_rows']])
-        self.copy(cursor,'smac_importance',('run_id','dimension','importance'),[(run_id,name,value) for name,value in proposal['importance']])
+        self.copy(cursor,'forest_importance',('run_id','dimension','importance'),[(run_id,name,value) for name,value in proposal['importance']])
 
     @timed
     def record_svr_proposal(self,cursor,run_id,proposal):

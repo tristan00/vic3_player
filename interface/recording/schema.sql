@@ -754,7 +754,7 @@ create table run_weight (
   primary key (run_id, advisor_action)
 );
 
-create table smac_proposal (
+create table forest_proposal (
   run_id int4 primary key references run,
   method text not null check (method in ('default', 'random', 'expected_improvement')),
   observations int4 not null,
@@ -770,15 +770,15 @@ create table smac_proposal (
   check (num_nulls(predicted_reward, uncertainty, expected_improvement, beat_probability) in (0, 4))
 );
 
-create table smac_observation (
-  run_id int4 not null references smac_proposal,
+create table forest_observation (
+  run_id int4 not null references forest_proposal,
   observed_run int4 not null references run,
   reward float8 not null,
   primary key (run_id, observed_run)
 );
 
-create table smac_candidate (
-  run_id int4 not null references smac_proposal,
+create table forest_candidate (
+  run_id int4 not null references forest_proposal,
   rank int4 not null,
   source text not null check (source in ('random', 'local_search')),
   predicted_reward float8 not null,
@@ -920,8 +920,8 @@ create table svr_coefficient (
   primary key (run_id, dimension)
 );
 
-create table smac_importance (
-  run_id int4 not null references smac_proposal,
+create table forest_importance (
+  run_id int4 not null references forest_proposal,
   dimension text not null,
   importance float8 not null,
   primary key (run_id, dimension)
@@ -6716,7 +6716,7 @@ begin
                  where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and a.attname = 'run_id' and c.relname <> 'run' loop
     execute format('update %I set run_id = $2 where run_id = $1', target.relname) using old, new;
   end loop;
-  update smac_observation set observed_run = new where observed_run = old;
+  update forest_observation set observed_run = new where observed_run = old;
   update svr_observation set observed_run = new where observed_run = old;
   update run set run_id = new where run_id = old;
 end $$;
@@ -6730,7 +6730,7 @@ begin
                  where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and a.attname = 'run_id' and c.relname <> 'run' loop
     execute format('delete from %I where run_id = $1', target.relname) using doomed;
   end loop;
-  delete from smac_observation where observed_run = doomed;
+  delete from forest_observation where observed_run = doomed;
   delete from svr_observation where observed_run = doomed;
   delete from run where run_id = doomed;
   for later in select run_id from run where run_id > doomed order by run_id loop

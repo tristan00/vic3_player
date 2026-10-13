@@ -1,5 +1,5 @@
 from .random import RandomAdvisor
-from .smac import RandomSmacWeightingAdvisor
+from .forest import RandomForestWeightingAdvisor
 from .svr import RandomSvrWeightingAdvisor
 
-ADVISORS={advisor.name:advisor for advisor in (RandomAdvisor,RandomSmacWeightingAdvisor,RandomSvrWeightingAdvisor)}
+ADVISORS={advisor.name:advisor for advisor in (RandomAdvisor,RandomForestWeightingAdvisor,RandomSvrWeightingAdvisor)}
