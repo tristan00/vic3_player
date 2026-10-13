@@ -4989,20 +4989,22 @@
   },
   "trial": 217,
   "objective": {
-    "name": "endgame_military_v5",
+    "name": "endgame_sectors_v6",
     "weights": {
       "stock": 0.1111111111111111,
       "population": 0.6666666666666666,
       "gdp": 0.2222222222222222,
       "construction": 0.5,
-      "military": 0.05
+      "military": 0.05,
+      "sectors": 0.1
     },
     "alphas": {
       "stock": 0.5,
       "population": 1.0,
       "gdp": -0.5,
       "construction": 0.0,
-      "military": 0.0
+      "military": 0.0,
+      "sectors": 0.0
     },
     "window_years": 1.0
   },

@@ -1,8 +1,7 @@
-from bisect import bisect_right
 from collections import defaultdict
-import math
 
-from interface.common import evidence, timed, timed_often
+from interface.common import evidence, timed
+from .levels import MeanLog
 from .rewards import PLAYERS, SNAPSHOTS
 
 MANPOWER_PER_UNIT=1000
@@ -14,7 +13,7 @@ from owned join combat_unit_history h using (run_id,combat_unit)
 order by h.run_id,h.seq,h.combat_unit'''
 
 
-class MilitaryStrength:
+class MilitaryStrength(MeanLog):
     @timed
     def __init__(self,connection,runs):
         players=dict(connection.execute(PLAYERS,(runs,)).fetchall())
@@ -27,37 +26,15 @@ class MilitaryStrength:
         snapshots=defaultdict(list)
         for run,seq,hour in connection.execute(SNAPSHOTS,(runs,)).fetchall():
             snapshots[run].append((seq,hour))
-        self.hours={}
-        self.units={}
-        self.totals={}
+        states={}
         for run,rows in snapshots.items():
-            units,states={},{}
+            units,found={},{}
             manpower=0
             for seq,hour in sorted(rows):
                 for unit,value in events[run,seq]:
                     manpower+=value-units.pop(unit,0)
                     if value:
                         units[unit]=value
-                states[hour]=manpower/MANPOWER_PER_UNIT
-            hours=sorted(states)
-            totals=[0.]
-            for first,last in zip(hours,hours[1:]):
-                totals.append(totals[-1]+(last-first)*math.log1p(states[first]))
-            self.hours[run]=hours
-            self.units[run]=[states[hour] for hour in hours]
-            self.totals[run]=totals
-
-    @timed_often
-    def mean_log(self,run,start,end):
-        hours=self.hours.get(run,[])
-        if end<=start or not hours or start<hours[0] or end>hours[-1]:
-            return None
-        values=[]
-        for hour in (start,end):
-            i=bisect_right(hours,hour)-1
-            values.append(self.totals[run][i]+(hour-hours[i])*math.log1p(self.units[run][i]))
-        return (values[1]-values[0])/(end-start)
-
-    @timed_often
-    def series(self,run):
-        return list(zip(self.hours.get(run,[]),self.units.get(run,[])))
+                found[hour]=manpower/MANPOWER_PER_UNIT
+            states[run]=found
+        super().__init__(states)
