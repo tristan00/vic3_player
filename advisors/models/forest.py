@@ -8,10 +8,6 @@ TREES=50
 LEAF=2
 FEATURES='sqrt'
 CANDIDATES=2000
-STARTS=10
-NEIGHBOURS=50
-LOCAL_STEPS=20
-STEP=.125
 
 @timed_often
 def predict(forest,points,best):
@@ -23,26 +19,6 @@ def predict(forest,points,best):
     return mean,spread,(mean-best)*beat+spread*norm.pdf(z),beat
 
 
-@timed_often
-def expected_improvement(forest,points,best):
-    return predict(forest,points,best)[2]
-
-
-@timed
-def local_search(forest,starts,best,low,high,rng):
-    points=starts.copy()
-    scores=expected_improvement(forest,points,best)
-    for _ in range(LOCAL_STEPS):
-        moves=rng.normal(0,1,(len(points),NEIGHBOURS,points.shape[1]))*STEP*(high-low)*(rng.random((len(points),NEIGHBOURS,points.shape[1]))<.1)
-        neighbours=np.clip(points[:,None,:]+moves,low,high)
-        found=expected_improvement(forest,neighbours.reshape(-1,points.shape[1]),best).reshape(len(points),NEIGHBOURS)
-        pick=found.argmax(1)
-        better=found[np.arange(len(points)),pick]>scores
-        points[better]=neighbours[np.arange(len(points)),pick][better]
-        scores[better]=found[np.arange(len(points)),pick][better]
-    return points,scores
-
-
 @timed
 def fit(X,y,rng):
     if not len(y):
@@ -51,15 +27,12 @@ def fit(X,y,rng):
 
 
 @timed
-def propose(forest,X,y,low,high,rng,names,random_points):
-    climbed,_=local_search(forest,np.clip(X[np.argsort(y)[-STARTS:]],low,high),y.max(),low,high,rng)
-    points=np.vstack([random_points,climbed])
-    sources=['random']*len(random_points)+['local_search']*len(climbed)
+def propose(forest,y,names,candidates):
+    points=np.asarray(candidates)
     mean,spread,improvement,beat=predict(forest,points,y.max())
     order=np.argsort(-improvement,kind='stable')
-    rows=[(rank,sources[i],float(mean[i]),float(spread[i]),float(improvement[i]),float(beat[i])) for rank,i in enumerate(order)]
+    rows=[(rank,'random',float(mean[i]),float(spread[i]),float(improvement[i]),float(beat[i])) for rank,i in enumerate(order)]
     record={'observations':len(y),'best_reward':float(y.max()),'candidates':len(points),'candidate_rows':rows,
             'importance':[(name,float(value)) for name,value in zip(names,forest.feature_importances_)],'method':'expected_improvement',
             **dict(zip(('predicted_reward','uncertainty','expected_improvement','beat_probability'),rows[0][2:]))}
     return points[order[0]],record
-

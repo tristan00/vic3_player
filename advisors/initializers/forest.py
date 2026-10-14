@@ -3,7 +3,7 @@ import numpy as np
 
 from interface.common import timed
 from interface.timing import current
-from .random import HIGH, LOW, RandomAdvisor
+from .random import RandomAdvisor
 from ..data.weights import history, normalized
 from ..data.endgame import NAME
 from ..models import forest
@@ -18,16 +18,15 @@ class RandomForestWeightingAdvisor(RandomAdvisor):
     def fit(self,store,space):
         X,y,runs=history(store.connection,space)
         target=normalized(y)
-        return forest.fit(X,target,np.random.default_rng(self.random.randrange(2**32))),X,y,target,runs
+        return forest.fit(X,target,np.random.default_rng(self.random.randrange(2**32))),y,target,runs
 
     @timed
     def start_run(self,store,actions,objective,kept):
         space=[name for name in actions if name not in self.excluded]
         if kept is None:
             kept=self.fit(store,space)
-        model,X,y,target,runs=kept
-        rng=np.random.default_rng(self.random.randrange(2**32))
-        x,record=forest.propose(model,X,target,np.full(len(space),LOW),np.full(len(space),HIGH),rng,space,self.candidates(space,forest.CANDIDATES))
+        model,y,target,runs=kept
+        x,record=forest.propose(model,target,space,self.candidates(space,forest.CANDIDATES))
         record['initializer']=self.name
         record['reward']='composite'
         record['observed']=[(run_id,float(reward)) for run_id,reward in zip(runs,y)]
