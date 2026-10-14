@@ -14,18 +14,20 @@ class RandomSvrWeightingAdvisor(RandomAdvisor):
     name='random_svr_weighting'
 
     @timed
+    def fit(self,store,space):
+        X,y,runs=history(store.connection,space)
+        if not len(y):
+            raise ValueError(evidence(name=self.name,scored=len(y)))
+        target=normalized(y)
+        rows=np.random.default_rng(self.random.randrange(2**32)).integers(len(y),size=len(y))
+        return Surface(X[rows],target[rows]),y,target,runs,np.bincount(rows,minlength=len(y))
+
+    @timed
     def start_run(self,store,actions,objective,kept):
         space=[name for name in actions if name not in self.excluded]
         if kept is None:
-            X,y,runs=history(store.connection,space)
-            if not len(y):
-                raise ValueError(evidence(name=self.name,scored=len(y)))
-            kept=X,y,normalized(y),runs
-        X,y,target,runs=kept
-        rng=np.random.default_rng(self.random.randrange(2**32))
-        rows=rng.integers(len(y),size=len(y))
-        draws=np.bincount(rows,minlength=len(y))
-        surface=Surface(X[rows],target[rows])
+            kept=self.fit(store,space)
+        surface,y,target,runs,draws=kept
         x=best(surface,LOW,HIGH,self.candidates(space,SAMPLES))
         record={'initializer':self.name,'method':'bootstrap_svr','observations':len(y),'c':C,'epsilon':EPSILON,'predicted_reward':surface.value(x),
                 'bounded':int(np.sum((x==LOW)|(x==HIGH))),
