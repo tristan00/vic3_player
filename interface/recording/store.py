@@ -285,7 +285,7 @@ class Store:
                        (run_id,proposal['reward'],proposal['method'],proposal['observations'],proposal['best_reward'],proposal['predicted_reward'],proposal['uncertainty'],
                         proposal['expected_improvement'],proposal['beat_probability'],proposal['candidates'],proposal['seconds']))
         self.copy(cursor,'forest_observation',('run_id','observed_run','reward'),[(run_id,observed,reward) for observed,reward in proposal['observed']])
-        self.copy(cursor,'forest_candidate',('run_id','rank','source','predicted_reward','uncertainty','expected_improvement','beat_probability'),
+        self.copy(cursor,'forest_candidate',('run_id','rank','predicted_reward','uncertainty','expected_improvement','beat_probability'),
                   [(run_id,*row) for row in proposal['candidate_rows']])
         self.copy(cursor,'forest_importance',('run_id','dimension','importance'),[(run_id,name,value) for name,value in proposal['importance']])
 

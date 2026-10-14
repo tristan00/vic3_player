@@ -263,7 +263,6 @@ create table forest_observation (
 create table forest_candidate (
   run_id int4 not null references forest_proposal,
   rank int4 not null,
-  source text not null check (source in ('random', 'local_search')),
   predicted_reward float8 not null,
   uncertainty float8 not null,
   expected_improvement float8 not null,

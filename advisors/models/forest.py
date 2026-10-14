@@ -31,8 +31,8 @@ def propose(forest,y,names,candidates):
     points=np.asarray(candidates)
     mean,spread,improvement,beat=predict(forest,points,y.max())
     order=np.argsort(-improvement,kind='stable')
-    rows=[(rank,'random',float(mean[i]),float(spread[i]),float(improvement[i]),float(beat[i])) for rank,i in enumerate(order)]
+    rows=[(rank,float(mean[i]),float(spread[i]),float(improvement[i]),float(beat[i])) for rank,i in enumerate(order)]
     record={'observations':len(y),'best_reward':float(y.max()),'candidates':len(points),'candidate_rows':rows,
             'importance':[(name,float(value)) for name,value in zip(names,forest.feature_importances_)],'method':'expected_improvement',
-            **dict(zip(('predicted_reward','uncertainty','expected_improvement','beat_probability'),rows[0][2:]))}
+            **dict(zip(('predicted_reward','uncertainty','expected_improvement','beat_probability'),rows[0][1:]))}
     return points[order[0]],record
