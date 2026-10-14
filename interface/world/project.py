@@ -286,6 +286,7 @@ def nations(rng,data,states,groups,capitals,strategic,country_pool,random_ideolo
             state['administration_scale']=(base_cost+pop*cost)/(base_cost+pop*owner_costs[original['owner']])
             state_scales=dict(scales,building_government_administration=state['administration_scale'])
             state['buildings']=expected(state['eligible_records'],state_scales)
+            state['eligible_records']=[r for r in state['eligible_records'] if scalar(r,'building') in state['buildings']]
             buildings=project(state['eligible_records'],tag,state['key'],local_tags,own_states,state_countries,state_scales,companies)
             state['generated_buildings']=' '.join(buildings)
             histories['buildings'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {state["generated_buildings"]} }} }}')
