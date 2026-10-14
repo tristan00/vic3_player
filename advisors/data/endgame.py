@@ -8,13 +8,15 @@ from .rewards import BUILDINGS, COSTS, ENDED, HOURS_PER_YEAR, OWNERS, PLAYED, PL
 
 COMPONENTS=('stock','population','gdp')
 LEVELS=('military','sectors')
-REWARD_COMPONENTS=(*COMPONENTS,'construction',*LEVELS)
-NAME='endgame_sectors_v6'
-OBJECTIVE={'name':NAME,'weights':{'stock':1/9,'population':6/9,'gdp':2/9,'construction':.5,'military':.05,'sectors':.1},
-           'alphas':{'stock':.5,'population':1.,'gdp':-.5,'construction':0.,'military':0.,'sectors':0.},'window_years':1.}
+FLAT=('construction',*LEVELS,'timeout')
+REWARD_COMPONENTS=(*COMPONENTS,*FLAT)
+NAME='endgame_timeout_v7'
+OBJECTIVE={'name':NAME,'weights':{'stock':1/9,'population':6/9,'gdp':2/9,'construction':.5,'military':.05,'sectors':.1,'timeout':.2},
+           'alphas':{'stock':.5,'population':1.,'gdp':-.5,'construction':0.,'military':0.,'sectors':0.,'timeout':0.},'window_years':1.}
 HISTORY=f'''select r.run_id,min(s.game_date),max(s.game_date),r.end_reason
 {ENDED}
 {PLAYED}'''
+TIMED_OUT="select run_id from run where run_id=any(%s) and end_reason='time'"
 POPULATION='''select run_id,seq,lower_strata+middle_strata+upper_strata
 from player_population where run_id=any(%s) order by run_id,seq'''
 GDP='''select e.run_id,e.seq,e.gdp from country_economy_report e
@@ -26,11 +28,11 @@ where e.run_id=any(%s) and e.present order by e.run_id,e.seq'''
 def reward(years,parts):
     root=years**.5
     return ((root*parts['stock']+6*years*parts['population']+2*parts['gdp']/root)/9
-            +sum(OBJECTIVE['weights'][name]*parts[name] for name in ('construction',*LEVELS)))
+            +sum(OBJECTIVE['weights'][name]*parts[name] for name in FLAT))
 
 
 @timed_often
-def breakdown(start,end,baseline,points,active_fraction,mean_logs):
+def breakdown(start,end,baseline,points,active_fraction,mean_logs,timed_out):
     years=(end-start)/HOURS_PER_YEAR
     if years<=0 or not math.isfinite(years):
         raise ValueError(evidence(start=start,end=end,years=years))
@@ -65,13 +67,16 @@ def breakdown(start,end,baseline,points,active_fraction,mean_logs):
         weight=OBJECTIVE['weights'][name]
         parts.append({'component':name,'start_value':None,'end_ratio':None,'recent_change':None,
                       'part':mean_log,'weight':weight,'alpha':0.,'duration_factor':1.,'contribution':weight*mean_log})
+    weight=OBJECTIVE['weights']['timeout']
+    parts.append({'component':'timeout','start_value':None,'end_ratio':None,'recent_change':None,
+                  'part':float(timed_out),'weight':weight,'alpha':0.,'duration_factor':1.,'contribution':weight*timed_out})
     raw={part['component']:part['part'] for part in parts}
     return {'years':years,'window_years':window,'score':reward(years,raw),'parts':parts}
 
 
 @timed_often
-def target(start,end,baseline,points,active_fraction,mean_logs):
-    result=breakdown(start,end,baseline,points,active_fraction,mean_logs)
+def target(start,end,baseline,points,active_fraction,mean_logs,timed_out):
+    result=breakdown(start,end,baseline,points,active_fraction,mean_logs,timed_out)
     return result['score'],result['years'],{part['component']:part['part'] for part in result['parts']}
 
 
@@ -80,6 +85,7 @@ class Trajectories:
     def __init__(self,connection,runs):
         self.construction=ConstructionActivity(connection,runs)
         self.levels={'military':MilitaryStrength(connection,runs),'sectors':ConstructionSectors(connection,runs)}
+        self.timed_out={run for run, in connection.execute(TIMED_OUT,(runs,)).fetchall()}
         self.dates=defaultdict(dict)
         self.starts={}
         for run,seq,date in sorted(connection.execute(SNAPSHOTS,(runs,)).fetchall()):
@@ -130,12 +136,12 @@ class Trajectories:
     @timed_often
     def target(self,run,start,end,baseline):
         return target(start,end,baseline,{name:self.points[name][run] for name in COMPONENTS},
-                      self.construction.fraction(run,start,end),self.mean_logs(run,start,end))
+                      self.construction.fraction(run,start,end),self.mean_logs(run,start,end),run in self.timed_out)
 
     @timed_often
     def breakdown(self,run,start,end,baseline):
         return {'baseline_seq':self.starts[run,start],**breakdown(start,end,baseline,{name:self.points[name][run] for name in COMPONENTS},
-                                                               self.construction.fraction(run,start,end),self.mean_logs(run,start,end))}
+                                                               self.construction.fraction(run,start,end),self.mean_logs(run,start,end),run in self.timed_out)}
 
 
 @timed
