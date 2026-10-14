@@ -41,7 +41,7 @@ def stop(process):
 
 
 @timed
-def execute(directory,request,seconds,memory_gb,heartbeat):
+def execute(directory,request,seconds,memory_gb,heartbeat,started):
     if not 0<seconds<=SECONDS:
         raise ValueError(evidence(seconds=seconds,limit=SECONDS))
     request_path=directory/f"request_{request['trial']:05d}.json"
@@ -50,8 +50,7 @@ def execute(directory,request,seconds,memory_gb,heartbeat):
     output.unlink(missing_ok=True)
     output.with_suffix('.progress.json').unlink(missing_ok=True)
     write(request_path,request)
-    started=time.monotonic()
-    started_at=time.time()
+    started_at=time.time()-(time.monotonic()-started)
     environment={**os.environ,**{name:str(request['threads']) for name in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','NUMEXPR_NUM_THREADS')}}
     with output.with_suffix('.stderr.log').open('w') as log:
         child=subprocess.Popen([sys.executable,'-m','tuning.worker','--request',str(request_path)],cwd=Path(__file__).resolve().parents[1],
@@ -129,6 +128,7 @@ def run_search(directory,data,manifest,model,settings,heartbeat):
             raise ValueError(evidence(trial=trial['trial'],state=trial['state']))
     while len(history)<settings['trials']:
         number=len(history)
+        started=time.monotonic()
         weights=weighting.current(directory)
         config,proposal,trace=propose(space,history,settings['seed']+number,model,weights,settings['tuner'])
         save(directory/f'proposal_{number:05d}.pkl.gz',trace)
@@ -138,8 +138,8 @@ def run_search(directory,data,manifest,model,settings,heartbeat):
             write(directory/'status.json',{'state':'running','phase':'tuning','current':{**trial,**current},'finished':len(history),
                                           'requested':settings['trials'],'updated':time.time(),'pid':os.getpid(),'created':psutil.Process().create_time()})
             heartbeat({'phase':'tuning','model':model,'current':current,'finished':len(history)})
-        update({'seconds':0})
-        result=execute(directory,request,SECONDS,settings['memory_gb'],update)
+        update({'seconds':time.monotonic()-started})
+        result=execute(directory,request,SECONDS,settings['memory_gb'],update,started)
         found={**trial,**result}
         write(directory/f'trial_{number:05d}.json',found)
         history.append(found)
