@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.optimize import minimize
 from sklearn.svm import SVR
 
 from interface.common import timed, timed_often
@@ -8,13 +7,11 @@ KERNEL='rbf'
 C=.1
 EPSILON=.5
 SAMPLES=2000
-STARTS=8
 
 
 class Surface:
     @timed
     def __init__(self,X,target):
-        self.seen=X
         self.centre,self.spread=X.mean(0),X.std(0)
         self.spread[self.spread==0]=1
         scaled=self.scaled(X)
@@ -48,9 +45,6 @@ class Surface:
 
 
 @timed
-def best(surface,low,high,candidates):
-    starts=np.vstack([surface.seen,candidates])
-    values=np.array([surface.value(point) for point in starts])
-    found=[minimize(lambda point:(-surface.value(point),-surface.slope(point)),starts[index],jac=True,method='L-BFGS-B',bounds=[(low,high)]*starts.shape[1])
-           for index in np.argsort(values)[::-1][:STARTS]]
-    return min(found,key=lambda result:result.fun).x
+def best(surface,candidates):
+    points=np.asarray(candidates)
+    return points[np.argmax([surface.value(point) for point in points])]

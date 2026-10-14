@@ -28,7 +28,7 @@ class RandomSvrWeightingAdvisor(RandomAdvisor):
         if kept is None:
             kept=self.fit(store,space)
         surface,y,target,runs,draws=kept
-        x=best(surface,LOW,HIGH,self.candidates(space,SAMPLES))
+        x=best(surface,self.candidates(space,SAMPLES))
         record={'initializer':self.name,'method':'bootstrap_svr','observations':len(y),'c':C,'epsilon':EPSILON,'predicted_reward':surface.value(x),
                 'bounded':int(np.sum((x==LOW)|(x==HIGH))),
                 'coefficients':[(name,float(a),float(b),float(chosen)) for name,a,b,chosen in zip(space,surface.slope(x),surface.curve(x),x)]}
