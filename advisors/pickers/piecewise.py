@@ -30,14 +30,17 @@ class CatBoostPiecewisePicker:
         self.trained=None
 
     @timed
-    def start_run(self,store,objective):
-        self.model,rows,starts,runs,loaded,fitted,timings=self.fit_apart(store.connection.info.dsn)
-        RECORDER.merge(timings)
+    def start_run(self,store,objective,kept):
+        if kept is None:
+            *kept,timings=self.fit_apart(store.connection.info.dsn)
+            RECORDER.merge(timings)
+        self.model,rows,starts,runs,loaded,fitted=kept
         params={name:value for name,value in self.model.params.items() if name not in ('allow_writing_files','verbose')}
         params.update(model_kind='row',training_rows=rows)
         self.trained=(starts,runs,current().seconds,params,self.model.importance())
-        LOG.info('%s picker trained on %d rows from %d runs in %.1fs using %s (cold load %.1fs, fit %.1fs)',
+        LOG.info('%s picker model of %d rows from %d runs ready in %.1fs using %s (cold load %.1fs, fit %.1fs)',
                  self.name,rows,runs,self.trained[2],NAME,loaded,fitted)
+        return kept
 
     @timed
     def fit_apart(self,dsn):

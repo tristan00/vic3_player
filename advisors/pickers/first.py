@@ -7,7 +7,7 @@ class PickFirst:
     trained=None
 
     @timed_often
-    def start_run(self,store,objective):
+    def start_run(self,store,objective,kept):
         pass
 
     @timed_often

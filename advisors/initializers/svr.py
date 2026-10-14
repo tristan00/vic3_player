@@ -14,12 +14,14 @@ class RandomSvrWeightingAdvisor(RandomAdvisor):
     name='random_svr_weighting'
 
     @timed
-    def start_run(self,store,actions,objective):
+    def start_run(self,store,actions,objective,kept):
         space=[name for name in actions if name not in self.excluded]
-        X,y,runs=history(store.connection,space)
-        if not len(y):
-            raise ValueError(evidence(name=self.name,scored=len(y)))
-        target=normalized(y)
+        if kept is None:
+            X,y,runs=history(store.connection,space)
+            if not len(y):
+                raise ValueError(evidence(name=self.name,scored=len(y)))
+            kept=X,y,normalized(y),runs
+        X,y,target,runs=kept
         rng=np.random.default_rng(self.random.randrange(2**32))
         rows=rng.integers(len(y),size=len(y))
         draws=np.bincount(rows,minlength=len(y))
@@ -33,4 +35,4 @@ class RandomSvrWeightingAdvisor(RandomAdvisor):
         self.proposal=record
         self.weights={**{name:0 for name in actions if name in self.excluded},**dict(zip(space,(10**x).tolist()))}
         LOG.info('random_svr_weighting proposal (%s) from %d scored runs, predicted %.3f, in %.1fs',record['method'],len(y),record['predicted_reward'],record['seconds'])
-        return self.weights
+        return kept

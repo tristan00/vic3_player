@@ -23,7 +23,8 @@ from interface.world.sampling import SLIDERS, PER_COUNTRY
 from loop.sampling import batches
 
 STATE=DEFAULT_DATA/'collection.json'
-DEFAULTS=dict(profile='actions',world_cache=[],runs=1,warmup=0,years=100.,minutes=30.,seed=int(time.time()),advisors=['random'],sizers=['random'],pickers=['first'])
+DEFAULTS=dict(profile='actions',world_cache=[],runs=1,warmup=0,years=100.,minutes=30.,seed=int(time.time()),advisors=['random'],sizers=['random'],pickers=['first'],refit=10)
+FITTED={}
 
 @contextmanager
 def state():
@@ -42,6 +43,17 @@ def state():
 def launch(data):
     process=_spawn([sys.executable,'-m','loop.run','_work'],Path(__file__).resolve().parents[1])
     data.update(pid=process.pid,created=process.create_time(),active=data['settings'],phase='starting',stop=False,restart=False,error=None,run_id=None,snapshot=None,game_hours=None)
+
+
+@timed
+def begin(step,refit,completed,*arguments):
+    since,kept=FITTED.get(type(step),(completed,None))
+    if completed-since>=refit:
+        kept=None
+    found=step.start_run(*arguments,kept)
+    if kept is None:
+        FITTED[type(step)]=(completed,found)
+    logging.info('%s %s',type(step).__name__,'fitted' if kept is None else f'kept from {completed-since} runs ago')
 
 
 @timed
@@ -151,9 +163,9 @@ def collect(settings,completed):
     game=GameInterface(settings['profile'])
     store=Store()
     try:
-        advisor.start_run(store,NAMES,objective)
+        begin(advisor,settings['refit'],completed,store,NAMES,objective)
         with ThreadPoolExecutor(1) as preparing:
-            training=[preparing.submit(step.start_run,store,objective) for step in (sizer,picker)]
+            training=[preparing.submit(begin,step,settings['refit'],completed,store,objective) for step in (sizer,picker)]
             game.campaign(country['tag'],world,lock=state)
             Executor(game).run('pause')
             for trained in training:
@@ -231,8 +243,8 @@ def main(argv=None):
         if running and command in ('start','resume'): parser.error(evidence(command=command,pid=running.pid))
         settings={**(DEFAULTS if command=='start' else data['settings']),**args}
         if command in ('start','resume','configure','restart'):
-            if settings['runs']<1 or settings['warmup']<0 or any(not math.isfinite(settings[n]) or settings[n]<=0 for n in ('years','minutes')):
-                parser.error(evidence(runs=settings['runs'],warmup=settings['warmup'],years=settings['years'],minutes=settings['minutes']))
+            if settings['runs']<1 or settings['warmup']<0 or settings['refit']<1 or any(not math.isfinite(settings[n]) or settings[n]<=0 for n in ('years','minutes')):
+                parser.error(evidence(runs=settings['runs'],warmup=settings['warmup'],refit=settings['refit'],years=settings['years'],minutes=settings['minutes']))
             if not settings['profile'] or Path(settings['profile']).name!=settings['profile'] or settings['profile'] in ('.','..'):
                 parser.error(evidence(profile=settings['profile']))
             if not set(settings['advisors'])<=ADVISORS.keys() or not set(settings['sizers'])<=SIZERS.keys() or not set(settings['pickers'])<=PICKERS.keys():

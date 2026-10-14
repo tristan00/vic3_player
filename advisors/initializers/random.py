@@ -25,10 +25,9 @@ class RandomAdvisor:
         self.proposal=None
 
     @timed_often
-    def start_run(self,store,actions,objective):
+    def start_run(self,store,actions,objective,kept):
         self.used={name:CENTRES.get(name,CENTRE) for name in actions if name not in self.excluded}
         self.weights={name:10**self.around(self.used[name]) if name in self.used else 0 for name in actions}
-        return self.weights
 
     @timed_often
     def candidates(self,names,count):

@@ -19,11 +19,14 @@ class CatBoostSizer:
         self.trained=None
 
     @timed
-    def start_run(self,store,objective):
-        self.model,rows,starts,runs,loaded,fitted=train(store.connection,'size')
+    def start_run(self,store,objective,kept):
+        if kept is None:
+            kept=train(store.connection,'size')
+        self.model,rows,starts,runs,loaded,fitted=kept
         params={name:value for name,value in self.model.params.items() if name not in ('verbose','allow_writing_files')}
         self.trained=(rows,runs,current().seconds,params,self.model.importance())
-        LOG.info('%s sizer trained on %d rows from %d runs in %.1fs using %s',self.name,*self.trained[:3],NAME)
+        LOG.info('%s sizer model of %d rows from %d runs ready in %.1fs using %s',self.name,*self.trained[:3],NAME)
+        return kept
 
     @timed
     def size(self,snapshot,rng):
