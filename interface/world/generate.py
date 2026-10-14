@@ -762,7 +762,7 @@ def generate(root,game,vanilla,source_group_pool,country_pool,seed,countries,sta
               'width':width,'height':height,'mod':str((out/'mod').resolve()),'countries':world['countries'],
               'states':[{'id':s['id'],'key':s['key'],'name':s['name'],'country':s['country'],'provinces':s['province_codes'],'coastal':s['coastal'],
                          'hubs':s['hubs'],'template':s['template'],'source_group':s['source_group'],
-                         'buildings':s['buildings'],'excluded_buildings':s['excluded_buildings']} for s in land_states],
+                         'administration_scale':s['administration_scale'],'buildings':s['buildings'],'excluded_buildings':s['excluded_buildings']} for s in land_states],
               'seas':[{'id':s['id'],'key':s['key'],'name':s['name'],'province':codes[s['province']]} for s in seas],
               'lakes':[codes[p] for p in lakes],
               'straits':[{'from':codes[s['from']],'to':codes[s['to']]} for s in chokepoints]}

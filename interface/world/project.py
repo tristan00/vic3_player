@@ -85,6 +85,18 @@ def starting_history(data,source,techs):
 
 
 @timed_often
+def administration(text,data):
+    laws={}
+    for preset,law in re.findall(r'effect_starting_politics_(\w+)\s*=|activate_law\s*=\s*law_type:(\w+)',text):
+        for name in data['politics_laws'][preset].values() if preset else [law]:
+            laws[data['law_groups'][name]]=name
+    levels={scalar(value,'institution'):int(scalar(value,'level')) for value in re.findall(r'set_institution_investment_level\s*=\s*\{([^}]*)\}',text)}
+    rules=[data['law_administration'][law] for law in laws.values()]
+    investment=sum(levels.get(institution,1) for _,_,institution in rules if institution)
+    return data['administration_costs']['STATE_BUREAUCRACY_POP_BASE_COST']*(1+sum(r[0] for r in rules))+investment*(1+sum(r[1] for r in rules))
+
+
+@timed_often
 def politics(text,data,techs,capacity):
     def base(law):
         while law in data['law_parents']:
@@ -191,6 +203,8 @@ def nations(rng,data,states,groups,capitals,strategic,country_pool,random_ideolo
     else:
         overlords,blocs=connect(relation_rng,interconnectedness,[levels for levels,_,_ in strength],types,[by_id[i]['center'] for i in capitals],data['subject_rules'])
     bloc_of={member:bloc for bloc in blocs for member in bloc['members']}
+    owner_costs={owner:administration(' '.join(data['history']['countries']['c:'+owner]),data) for owner in {s['source']['owner'] for s in states}}
+    base_cost,pop_multiple=data['administration_costs']['STATE_BUREAUCRACY_BASE_COST'],data['administration_costs']['STATE_BUREAUCRACY_POP_MULTIPLE']
     starting_war=opening_war(war_rng,war,[i for i in range(len(tags)) if i not in overlords])
     if starting_war:
         starting_war=[{'country':tags[holder],'target':tags[owner],'state':by_id[war_rng.choice(groups[owner])]['key']}
@@ -223,6 +237,7 @@ def nations(rng,data,states,groups,capitals,strategic,country_pool,random_ideolo
                 home=scalar(setup,'set_company_state_region').removeprefix('s:')
                 country_text+=f'\nadd_company = company_type:{key}\n'+history_text(setup,local_tags,dict(local_states,**{home:company_states[key]}),group_map)
         histories['countries'].append(f'c:{tag} ?= {{ {country_text} }}')
+        cost=administration(country_text,data)
         definition=re.sub(r'^'+donor+r'\s*=',tag+' =',source['definition'],count=1)
         definition=re.sub(r'\bcapital\s*=\s*STATE_\w+',f'capital = {capital["key"]}',definition)
         definition=re.sub(r'\bcountry_type\s*=\s*\w+',f'country_type = {types[index]}',definition)
@@ -267,7 +282,11 @@ def nations(rng,data,states,groups,capitals,strategic,country_pool,random_ideolo
                                        f'{"state_type = "+state_type if state_type else ""} owned_provinces = {{ {" ".join(state["province_codes"])} }} }} '
                                        f'{state_effects} }}')
             histories['pops'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {" ".join(state["pop_records"])} }} }}')
-            buildings=project(state['eligible_records'],tag,state['key'],local_tags,own_states,state_countries,scales,companies)
+            pop=sum(int(scalar(record,'size')) for record in original['pop_records'])/pop_multiple
+            state['administration_scale']=(base_cost+pop*cost)/(base_cost+pop*owner_costs[original['owner']])
+            state_scales=dict(scales,building_government_administration=state['administration_scale'])
+            state['buildings']=expected(state['eligible_records'],state_scales)
+            buildings=project(state['eligible_records'],tag,state['key'],local_tags,own_states,state_countries,state_scales,companies)
             state['generated_buildings']=' '.join(buildings)
             histories['buildings'].append(f's:{state["key"]} = {{ region_state:{tag} = {{ {state["generated_buildings"]} }} }}')
             if original['trade_history']:

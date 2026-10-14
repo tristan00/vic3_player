@@ -78,7 +78,13 @@ def _law_rules(game):
     buildings={key:listed(value,'unlocking_technologies') for key,value in read(game,'common/buildings')}
     parents={key:scalar(value,'parent') for key,value in read(game,'common/laws') if scalar(value,'parent')}
     laws={key:(listed(value,'disallowing_laws'),listed(value,'unlocking_laws'),listed(value,'unlocking_technologies')) for key,value in read(game,'common/laws')}
-    return {'law_rules':laws,'law_parents':parents,'tier_techs':tiers,'building_techs':buildings,'tech_requires':{tech:needs for tech,(_,needs) in techs.items()}}
+    modifier=lambda value,name:sum(map(float,re.findall(r'\b'+name+r'\s*=\s*(-?[\d.]+)',value)))
+    administration={key:(modifier(value,'state_bureaucracy_population_base_cost_factor_mult'),modifier(value,'country_bureaucracy_investment_cost_factor_mult'),scalar(value,'institution'))
+                    for key,value in read(game,'common/laws')}
+    defines=' '.join(text for _,text in read(game,'common/defines'))
+    costs={name:float(scalar(defines,name)) for name in ('STATE_BUREAUCRACY_BASE_COST','STATE_BUREAUCRACY_POP_BASE_COST','STATE_BUREAUCRACY_POP_MULTIPLE')}
+    return {'law_rules':laws,'law_parents':parents,'tier_techs':tiers,'building_techs':buildings,'tech_requires':{tech:needs for tech,(_,needs) in techs.items()},
+            'law_administration':administration,'administration_costs':costs}
 
 
 @timed
