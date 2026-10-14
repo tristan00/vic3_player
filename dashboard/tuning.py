@@ -109,12 +109,15 @@ def detail(search,model):
     baseline=None
     measures=[]
     settings=[]
+    steps=[]
     for path in sorted(directory.glob('trial_*.json')):
         found=trial(path)
         metrics=found.get('metrics')
         config=found['config']
         flags=[key for key in config if key.startswith('feature.')]
         proposal=found.get('proposal') or {}
+        timings=proposal.get('timings',{})
+        steps+=[key for key in timings if key not in steps]
         if found.get('baseline'):
             baseline={**found['baseline'],'loss':loss(found['baseline'],weights['weights'])}
         measures+=[key for key in metrics or {} if key!='score' and key not in measures]
@@ -124,7 +127,7 @@ def detail(search,model):
                      'training_rows':found.get('training_rows'),'input_features':found.get('features'),
                      'training_runs':len(found['train_ids']) if 'train_ids' in found else None,
                      'seconds':found.get('seconds'),'peak_memory_gb':found.get('peak_memory_gb'),'method':proposal.get('method'),
-                     'predicted_score':proposal.get('predicted_score'),'uncertainty':proposal.get('uncertainty'),'proposal_seconds':proposal.get('seconds'),
+                     'predicted_score':proposal.get('predicted_score'),'uncertainty':proposal.get('uncertainty'),'proposal_seconds':proposal.get('seconds'),**{'tuner.'+key:value for key,value in timings.items()},
                      'feature_groups_on':sum(config[key]!='off' for key in flags),
                      **{key:value for key,value in config.items() if '.' not in key},
                      'interrupted_step':found.get('interrupted_step'),'error':found.get('error')})
@@ -133,7 +136,7 @@ def detail(search,model):
     active=installed().get(model,{})
     return {'search':search,'model':model,'status':status,'state':state_of(status),'weights':weights,'baseline':baseline,
             'winner':winner['trial'] if winner else None,'installed':active.get('trial') if active.get('search')==str(directory.resolve()) else None,
-            'request':read(directory.parent/'request.json'),'rows':rows,'measures':measures,'settings':settings,
+            'request':read(directory.parent/'request.json'),'rows':rows,'measures':measures,'settings':settings,'steps':steps,
             'hyperparameters':hyperparameters(space) if space else []}
 
 

@@ -129,6 +129,7 @@ export function Search() {
           const winner = rows.find((row) => row.trial === found.winner)
           const current = found.status?.current
           const sized = SIZES.map(([name]) => name)
+          const timed = found.steps.map((name: string) => 'tuner.' + name)
           const latest = done[done.length - 1]
           return (
             <>
@@ -169,6 +170,7 @@ export function Search() {
                     {() => (
                       <>
                         {config.data.proposal && <Facts items={Object.entries(config.data.proposal).filter(([, value]) => typeof value !== 'object').map(([name, value]) => [name, typeof value === 'number' ? num(value) : String(value)])} />}
+                        {config.data.proposal?.timings && <Facts items={Object.entries(config.data.proposal.timings).map(([name, value]) => [`${name} seconds`, num(value)])} />}
                         <Grid rows={Object.entries(config.data.config).map(([setting, value]) => ({ setting, value }))} page={40} columns={[{ name: 'setting', kind: 'text' }, { name: 'value', kind: 'text' }]} />
                       </>
                     )}
@@ -196,7 +198,9 @@ export function Search() {
                       { name: 'loss', kind: 'num' },
                       ...SIZES.map(([name, title]) => ({ name, label: title, kind: 'int', group: 'data size' })),
                       ...columnsOf(rows).filter((column) => found.measures.includes(column.name) && !sized.includes(column.name)),
-                      ...columnsOf(rows).filter((column) => !['trial', 'state', 'loss', ...sized, ...found.measures, ...found.settings].includes(column.name)),
+                      { name: 'proposal_seconds', label: 'total', kind: 'num', group: 'tuner seconds' },
+                      ...timed.map((name: string) => ({ name, label: label(name.slice(6)), kind: 'num', group: 'tuner seconds' })),
+                      ...columnsOf(rows).filter((column) => !['trial', 'state', 'loss', 'proposal_seconds', ...timed, ...sized, ...found.measures, ...found.settings].includes(column.name)),
                     ]}
                   />
                 </Panel>
