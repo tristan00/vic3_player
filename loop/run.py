@@ -157,15 +157,19 @@ def collect(settings,completed):
     manifest=json.loads(world.read_text(encoding='utf-8'))
     country=rng.choice([c for c in manifest['countries'] if c['country_type']!='decentralized'])
     objective=draw_objective(rng)
-    advisor=ADVISORS[rng.choice(['random'] if completed<settings['warmup'] else settings['advisors'])](rng.randrange(10**9))
-    sizer=SIZERS[rng.choice(['random'] if completed<settings['warmup'] else settings['sizers'])]()
-    picker=PICKERS[rng.choice(['first'] if completed<settings['warmup'] else settings['pickers'])]()
+    advisors,sizers,pickers=(['random'],['random'],['first']) if completed<settings['warmup'] else (settings['advisors'],settings['sizers'],settings['pickers'])
+    advisor=ADVISORS[rng.choice(advisors)](rng.randrange(10**9))
+    sizer=SIZERS[rng.choice(sizers)]()
+    picker=PICKERS[rng.choice(pickers)]()
+    skip={type(advisor),type(sizer),type(picker),*FITTED}
     game=GameInterface(settings['profile'])
     store=Store()
+    spare=[(ADVISORS[name](rng.randrange(10**9)),store,NAMES,objective) for name in advisors if ADVISORS[name] not in skip]
+    spare+=[(kind(),store,objective) for kind in [*map(SIZERS.get,sizers),*map(PICKERS.get,pickers)] if kind not in skip]
     try:
         begin(advisor,settings['refit'],completed,store,NAMES,objective)
         with ThreadPoolExecutor(1) as preparing:
-            training=[preparing.submit(begin,step,settings['refit'],completed,store,objective) for step in (sizer,picker)]
+            training=[preparing.submit(begin,step,settings['refit'],completed,*arguments) for step,*arguments in [(sizer,store,objective),(picker,store,objective),*spare]]
             game.campaign(country['tag'],world,lock=state)
             Executor(game).run('pause')
             for trained in training:
