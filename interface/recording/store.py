@@ -16,6 +16,7 @@ SLOT=0xffffff
 FIXED={'pact_history':('first_country','second_country'),'treaty_history':('first_country','second_country'),
        'diplomatic_action_history':('first_country','second_country')}
 ANALYZERS=8
+COHERENCE_TEXT={'type','country','state_region'}
 
 
 @timed_often
@@ -541,6 +542,65 @@ class Store:
                                     (reason,detail,game_exited_at,self.run_id))
             with self.connection.transaction(),self.connection.cursor() as cursor:
                 self.record_timing(cursor)
+
+    @timed
+    def measures(self,keys):
+        known=dict(((kind,level,name),ident) for ident,kind,level,name in self.connection.execute('select coherence_measure,kind,level,name from coherence_measure'))
+        fresh=sorted(set(keys)-known.keys())
+        if fresh:
+            known.update(((kind,level,name),ident) for ident,kind,level,name in self.connection.execute(
+                'insert into coherence_measure (kind,level,name) select * from unnest(%s::text[],%s::text[],%s::text[]) returning coherence_measure,kind,level,name',
+                [list(column) for column in zip(*fresh)]))
+        return known
+
+    @timed
+    def coherence_values(self,cursor,prefix,key,countries,states):
+        countries=[(tag,row['type'],name,value) for tag,row in countries.items() for name,value in row.items() if name not in COHERENCE_TEXT]
+        states=[(row['state_region'],row['country'],row['type'],name,value) for row in states for name,value in row.items() if name not in COHERENCE_TEXT]
+        ids=self.measures({('country','country',name) for *_,name,_ in countries}|{('state','state',name) for *_,name,_ in states})
+        self.copy(cursor,f'{prefix}_country',(key[0],'tag','country_type','coherence_measure','value'),
+                  [(key[1],tag,kind,ids['country','country',name],defined(value)) for tag,kind,name,value in countries])
+        self.copy(cursor,f'{prefix}_state',(key[0],'state_region','tag','country_type','coherence_measure','value'),
+                  [(key[1],region,tag,kind,ids['state','state',name],defined(value)) for region,tag,kind,name,value in states])
+
+    @timed
+    def coherence_geography(self,cursor,prefix,key,geography):
+        objects=[(level,name,position,value) for level,columns in geography['objects'].items() for name,values in columns.items() for position,value in enumerate(values)]
+        shares=[(kind[:-1],name,numerator,denominator) for kind in ('ratios','checks') for name,(numerator,denominator) in geography[kind].items()]
+        ids=self.measures({('object',level,name) for level,name,*_ in objects}|{(kind,kind,name) for kind,name,*_ in shares})
+        self.copy(cursor,f'{prefix}_object',(key[0],'coherence_measure','position','value'),
+                  [(key[1],ids['object',level,name],position,defined(value)) for level,name,position,value in objects])
+        self.copy(cursor,f'{prefix}_share',(key[0],'coherence_measure','numerator','denominator'),
+                  [(key[1],ids[kind,kind,name],numerator,denominator) for kind,name,numerator,denominator in shares])
+
+    @timed
+    def record_reference(self,build,countries,states,geography):
+        with self.connection.transaction(),self.connection.cursor() as cursor:
+            reference=cursor.execute('insert into coherence_reference (build,measured_at) values (%s,now()) returning coherence_reference',(build,)).fetchone()[0]
+            self.coherence_values(cursor,'coherence_reference',('coherence_reference',reference),countries,states)
+            self.coherence_geography(cursor,'coherence_reference',('coherence_reference',reference),geography)
+        return reference
+
+    @timed
+    def record_coherence(self,build,countries,states,measured_ms):
+        with self.connection.transaction(),self.connection.cursor() as cursor:
+            cursor.execute('insert into run_coherence (run_id,build,measured_ms) values (%s,%s,%s)',(self.run_id,build,measured_ms))
+            self.coherence_values(cursor,'run_coherence',('run_id',self.run_id),countries,states)
+
+    @timed
+    def world_coherent(self):
+        return self.connection.execute('select 1 from world_coherence where world_id=%s',(self.world_id,)).fetchone() is not None
+
+    @timed
+    def record_world_coherence(self,geography):
+        with self.connection.transaction(),self.connection.cursor() as cursor:
+            cursor.execute('insert into world_coherence (world_id) values (%s)',(self.world_id,))
+            self.coherence_geography(cursor,'world_coherence',('world_id',self.world_id),geography)
+
+
+@timed_often
+def defined(value):
+    return None if value is None or value!=value else float(value)
 
 
 @timed_often

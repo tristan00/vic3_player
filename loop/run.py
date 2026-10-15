@@ -18,7 +18,8 @@ from interface.options.stored import Shared, Stored
 from interface.recording.store import Store, DSN
 from interface.timing import RECORDER, span
 from interface.runner.session import _spawn, process as owner
-from miniworld.bank import KNOBS, manifest as load_world, take, worlds
+from miniworld import coherence
+from miniworld.bank import KNOBS, GEOGRAPHY, manifest as load_world, take, worlds
 from loop.sampling import batches
 
 STATE=DEFAULT_DATA/'collection.json'
@@ -73,7 +74,16 @@ def mobilization(snapshot,fought):
 
 
 @timed
-def play(game,store,advisor,sizer,picker,settings):
+def cohere(game,store,manifest):
+    started=time.perf_counter()
+    mod=Path(manifest['mod'])
+    countries,states=coherence.measure(game.reader(),[mod])
+    store.record_coherence(coherence.build(),countries,states,(time.perf_counter()-started)*1000)
+    if not store.world_coherent():
+        store.record_world_coherence(json.loads((mod.parent/GEOGRAPHY).read_text(encoding='utf-8')))
+
+@timed
+def play(game,store,advisor,sizer,picker,settings,manifest):
     executor=Executor(game)
     shared=Shared(store.connection)
     def capture(phase):
@@ -83,6 +93,7 @@ def play(game,store,advisor,sizer,picker,settings):
     try:
         executor.run('pause')
         snapshot=capture('start')
+        cohere(game,store,manifest)
         start,deadline=snapshot.hours,time.monotonic()+settings['minutes']*60
         seq,turn,dirty,late,fought=0,0,0,[],set()
         while time.monotonic()<deadline and snapshot.hours-start<settings['years']*8760:
@@ -179,7 +190,7 @@ def collect(settings,completed):
                         profile=settings['profile'],pool=0,runs_requested=settings['runs'],generated=generated,weights=advisor.weights,
                         centres=advisor.used,sizer=sizer.name,picker=picker.name,candidates=1 if picker.name=='first' else 100,objective=objective,
                         proposal=advisor.proposal,size_model=sizer.trained,pick_model=picker.trained)
-        reason=play(game,store,advisor,sizer,picker,settings)
+        reason=play(game,store,advisor,sizer,picker,settings,manifest)
         store.end_run(reason)
     except BaseException as error:
         defeated=isinstance(error,Defeated)

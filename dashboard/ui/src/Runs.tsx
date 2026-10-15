@@ -1,6 +1,7 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useApi } from './api'
 import { Buildings } from './Buildings'
+import { Coherence } from './Coherence'
 import { Lines } from './charts'
 import { PALETTE, heading, label, num, time } from './format'
 import { Facts, Grid, Panel, Pill, Waiting, type Col } from './Grid'
@@ -36,7 +37,7 @@ export function Runs() {
   )
 }
 
-const TABS = ['overview', 'buildings', 'actions', 'selection', 'score', 'state', 'timing', 'record']
+const TABS = ['overview', 'coherence', 'buildings', 'actions', 'selection', 'score', 'state', 'timing', 'record']
 
 function Score({ found }: { found: any }) {
   const result = found.breakdown
@@ -245,6 +246,7 @@ export function Run() {
                 ))}
               </div>
               {tab === 'overview' && <Through run={run} live={live} />}
+              {tab === 'coherence' && <Coherence run={run} />}
               {tab === 'buildings' && <Buildings run={run} live={live} />}
               {tab === 'actions' && <ActionLog run={run} live={live} />}
               {tab === 'selection' && <Selection run={run} row={row} />}
