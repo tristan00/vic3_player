@@ -23,7 +23,7 @@ timed=timer('dashboard')
 @often
 def sources():
     found={}
-    for path in [path for folder in ('advisors','interface','loop','tuning') for path in (ROOT/folder).rglob('*.py')]+list((ROOT/'dashboard').glob('*.py')):
+    for path in [path for folder in ('advisors','interface','loop','miniworld','tuning') for path in (ROOT/folder).rglob('*.py')]+list((ROOT/'dashboard').glob('*.py')):
         try:
             found[path]=path.stat().st_mtime_ns
         except FileNotFoundError:

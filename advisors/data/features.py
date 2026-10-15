@@ -24,7 +24,7 @@ ENACTMENT=[f'law_enactment.{name}' for name in ('active','phase','progress_perce
 CONSTRUCTION=['government_queue_items','government_queue_left','private_queue_items','private_queue_left','construction_capacity','construction_used','construction_paused']
 MILITARY=['battalions','mobilization_ratio','wars','army_spending','army_spending_gdp']
 WAR=['war.support','war.battles_won','war.battles_lost','war.advances_made','war.advances_suffered']
-SLIDERS=['countries','states','military','source_regions','random_ideology_share','primary_culture_share','interconnectedness','antagonism']
+SLIDERS=['countries','states','pop','concentration','landmasses','climate','relief','density','diversity','diplomacy','ideology']
 WORLD=[f'world.{name}' for name in SLIDERS]
 NUMBERS=(['treasury','debt','interest','balance','population','bureaucracy_available','standard_of_living']+CONSTRUCTION+['balance_gdp']+MILITARY
          +['infamy','government_legitimacy','radicals_percent']+GROUP_FEATURES+['government_spending','government_spending_gdp']+POLICY+ENACTMENT+WAR+WORLD)

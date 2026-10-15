@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 import hashlib
-import json
 import logging
 from pathlib import Path
 import pickle
@@ -58,6 +57,7 @@ def put(tables,name,columns,rows):
 
 @timed
 def record(game,store,phase):
+    from miniworld.bank import manifest as load_world
     session=game.session()
     identity=f'{session["pid"]}:{session["created"]}'
     manifests=[Path(mod).parent/'manifest.json' for mod in session['mods']]
@@ -85,7 +85,7 @@ def record(game,store,phase):
             answered=~np.isin(snapshot[table]['id'].astype(np.int64)&0xffffff,list(windows))
             snapshot[table]={column:values[~answered] for column,values in snapshot[table].items()}
         tables={name:{column:values.tolist() for column,values in columns.items()} for name,columns in snapshot.items()}
-        manifest=json.loads(world.read_text(encoding='utf-8')) if world else None
+        manifest=load_world(world) if world else None
     try:
         with span('interface.recording.record.assemble','interface') as assembling:
             colors=_scripted(tables,snapshot,held,tags,label,player,living,manifest,map_data(game.game_dir,manifest))
@@ -143,9 +143,10 @@ def prepare(game,store,world):
 
 @timed
 def register(game,session,world,store):
+    from miniworld.bank import manifest as load_world
     root=game.game_dir/'game'
     mods=session['mods']
-    manifest=json.loads(world.read_text(encoding='utf-8')) if world else None
+    manifest=load_world(world) if world else None
     options=event_options(root,mods)
     consequences=event_effects(root,mods)
     rows=definitions(root,mods)

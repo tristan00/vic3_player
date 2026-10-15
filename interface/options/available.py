@@ -364,7 +364,7 @@ def play_allowed(s,play,liberating=False,**saved):
             and all(passes(s,'common/war_goal_types',goal,('possible','valid'),scope) for goal in goals))
 
 
-@timed
+@timed_often
 def recently_disbanded(s):
     def compute():
         rows=s.connection.execute('''select t.name,g.game_date from company_history h
@@ -388,11 +388,11 @@ def companies(s):
     if any(second==s.player and kind=='chartered_company' for _,second,kind in s.rows('pact','first_country,second_country,pact_type')):
         return []
     acquired,_,_,_=technologies(s)
-    held=held_companies(s)
+    held=held_companies(s)|recently_disbanded(s)
     principles=bloc_principles(s)
     potential={combo['building_type'] for combo in buildable(s)}|{kind for _,kind,_ in s.buildings()}
     scope=country_scope(s)
-    return [name for name in s.keys('company_type') if name not in held and name not in recently_disbanded(s)
+    return [name for name in s.keys('company_type') if name not in held
             and (not definition(s,'common/company_types',name,'unlocking_principles') or set(definition(s,'common/company_types',name,'unlocking_principles'))&principles)
             and any(set(definition(s,'common/buildings',kind,'unlocking_technologies'))<=acquired and kind in potential
                     for block in definition(s,'common/company_types',name,'building_types') for kind in block.split())

@@ -18,8 +18,7 @@ from interface.options.stored import Shared, Stored
 from interface.recording.store import Store, DSN
 from interface.timing import RECORDER, span
 from interface.runner.session import _spawn, process as owner
-from interface.world.bank import take
-from interface.world.sampling import SLIDERS, PER_COUNTRY
+from miniworld.bank import KNOBS, manifest as load_world, take, worlds
 from loop.sampling import batches
 
 STATE=DEFAULT_DATA/'collection.json'
@@ -154,8 +153,8 @@ def collect(settings,completed):
     RECORDER.reset()
     rng=random.Random(settings['seed']+completed)
     world=take(settings['world_cache'],rng)
-    manifest=json.loads(world.read_text(encoding='utf-8'))
-    country=rng.choice([c for c in manifest['countries'] if c['country_type']!='decentralized'])
+    manifest=load_world(world)
+    country=rng.choice(manifest['countries'])
     objective=draw_objective(rng)
     advisors,sizers,pickers=(['random'],['random'],['first']) if completed<settings['warmup'] else (settings['advisors'],settings['sizers'],settings['pickers'])
     advisor=ADVISORS[rng.choice(advisors)](rng.randrange(10**9))
@@ -170,19 +169,17 @@ def collect(settings,completed):
         begin(advisor,settings['refit'],completed,store,NAMES,objective)
         with ThreadPoolExecutor(1) as preparing:
             training=[preparing.submit(begin,step,settings['refit'],completed,*arguments) for step,*arguments in [(sizer,store,objective),(picker,store,objective),*spare]]
-            game.campaign(country['tag'],world,lock=state)
-            Executor(game).run('pause')
+            game.campaign(country['tag'],manifest,lock=state)
             for trained in training:
                 trained.result()
-        generated=dict(seed=manifest['seed'],countries=len(manifest['countries']),states=len(manifest['states']),pop=1,diversity=None,
-                       **{n:country[n] if n in PER_COUNTRY else manifest[n] for n in SLIDERS if n in (country if n in PER_COUNTRY else manifest)})
+        generated=dict(seed=manifest['seed'],countries=len(manifest['countries']),states=len(manifest['states']),pop=manifest['population'],
+                       **{name:manifest['knobs'][name] for name in KNOBS})
         store.begin_run(started_at=datetime.now(timezone.utc),kind='mini',advisors=[advisor.name],tag=country['tag'],world=world.parent.name,
                         cli_seed=settings['seed'],run_seed=settings['seed']+completed,years=settings['years'],minutes=settings['minutes'],
                         profile=settings['profile'],pool=0,runs_requested=settings['runs'],generated=generated,weights=advisor.weights,
                         centres=advisor.used,sizer=sizer.name,picker=picker.name,candidates=1 if picker.name=='first' else 100,objective=objective,
                         proposal=advisor.proposal,size_model=sizer.trained,pick_model=picker.trained)
         reason=play(game,store,advisor,sizer,picker,settings)
-        store.world_reports(world)
         store.end_run(reason)
     except BaseException as error:
         defeated=isinstance(error,Defeated)
@@ -256,6 +253,10 @@ def main(argv=None):
             if not settings['world_cache'] or any(not (Path(directory)/'bank.json').is_file() for directory in settings['world_cache']):
                 parser.error(evidence(world_cache=settings['world_cache']))
             settings['world_cache']=sorted({str(Path(directory).resolve()) for directory in settings['world_cache']})
+            try:
+                worlds(settings['world_cache'])
+            except (OSError,ValueError,KeyError,TypeError) as error:
+                parser.error(evidence(world_cache=settings['world_cache'],error=str(error)))
             data['settings']=settings
         if command=='cancel': data.update(stop=False,restart=False,settings=data['active'].copy() if running else settings)
         if command in ('stop','restart'): data.update(stop=command=='stop',restart=command=='restart')

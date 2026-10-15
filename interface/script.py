@@ -1,4 +1,5 @@
 import json
+from functools import lru_cache
 from pathlib import Path
 import re
 
@@ -55,7 +56,21 @@ def scalar(text,key):
 
 @timed_often
 def clean(path):
+    path=Path(path)
+    stat=path.stat()
+    return source(path,stat.st_mtime_ns,stat.st_size)
+
+
+@lru_cache(maxsize=4096)
+@timed_often
+def source(path,modified,size):
     return re.sub(r'"(?:\\.|[^"\\])*"|#[^\n]*',lambda m:'' if m[0][0]=='#' else m[0],path.read_text(encoding='utf-8-sig'))
+
+
+@lru_cache(maxsize=4096)
+@timed_often
+def parsed(path,modified,size):
+    return tuple(blocks(source(path,modified,size)))
 
 
 @timed_often
@@ -71,7 +86,8 @@ def script_files(game,folder,mods=()):
 
 def read(game,folder,mods=()):
     for path in script_files(game,folder,mods):
-        yield from blocks(clean(path))
+        stat=path.stat()
+        yield from parsed(path,stat.st_mtime_ns,stat.st_size)
 
 
 GATE_PREFIXES=('unlocking_','disallowing_','required_')
@@ -298,8 +314,7 @@ def definitions(game,mods=()):
 
 @timed_often
 def event_namespaces(game,mods=()):
-    return list(dict.fromkeys(key.rsplit('.',1)[0] for path in script_files(game,'events',mods)
-                              for key,_ in blocks(clean(path)) if re.fullmatch(r'[\w-]+\.\d+',key)))
+    return list(dict.fromkeys(key.rsplit('.',1)[0] for key,_ in read(game,'events',mods) if re.fullmatch(r'[\w-]+\.\d+',key)))
 
 
 @timed_often
@@ -309,16 +324,8 @@ def keys(game,folder,mods=()):
 
 @timed
 def event_options(game,mods=()):
-    events={}
-    for path in script_files(game,'events',mods):
-        for key,value in blocks(clean(path)):
-            if re.fullmatch(r'[\w-]+\.\d+',key):
-                events[key]=[]
-                options=[option for kind,option in blocks(body(value)) if kind=='option']
-                for index,option in enumerate(options):
-                    inner=dict(blocks(body(option)))
-                    events[key].append((key,index,scalar(option,'name'),int('trigger' in inner),int(bool(re.search(r'\bdefault_option\s*=\s*yes',option)))))
-    return [row for rows in events.values() for row in rows]
+    return [row for key,value in dict(read(game,'events',mods)).items() if re.fullmatch(r'[\w-]+\.\d+',key)
+            for row in event(key,value)[0]]
 
 
 EFFECTS=frozenset(json.loads(Path(__file__).parent.joinpath('recording/effects.json').read_text(encoding='utf-8')))
@@ -342,13 +349,18 @@ def effects_in(text):
 
 @timed
 def event_effects(game,mods=()):
-    rows={}
-    for path in script_files(game,'events',mods):
-        for key,value in blocks(clean(path)):
-            if re.fullmatch(r'[\w-]+\.\d+',key):
-                options=[option for kind,option in blocks(body(value)) if kind=='option']
-                rows[key]=[(key,index,position,effect,detail) for index,option in enumerate(options) for position,(effect,detail) in enumerate(effects_in(body(option)))]
-    return [row for found in rows.values() for row in found]
+    return [row for key,value in dict(read(game,'events',mods)).items() if re.fullmatch(r'[\w-]+\.\d+',key)
+            for row in event(key,value)[1]]
+
+
+@lru_cache(maxsize=8192)
+@timed_often
+def event(key,value):
+    options=[option for kind,option in blocks(body(value)) if kind=='option']
+    metadata=tuple((key,index,scalar(option,'name'),int('trigger' in dict(blocks(body(option)))),int(bool(re.search(r'\bdefault_option\s*=\s*yes',option))))
+                   for index,option in enumerate(options))
+    effects=tuple((key,index,position,effect,detail) for index,option in enumerate(options) for position,(effect,detail) in enumerate(effects_in(body(option))))
+    return metadata,effects
 
 
 def entries(game,folder):

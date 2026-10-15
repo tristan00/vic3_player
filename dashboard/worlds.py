@@ -1,8 +1,7 @@
 from threading import Lock
 import time
 
-from interface.script import blocks, body, scalar
-from interface.world.bank import Bank
+from miniworld.bank import status
 
 from . import db, names
 
@@ -29,6 +28,12 @@ def flat(item,places):
     return out
 
 
+@db.often
+def scalars(known):
+    return {**{key:value for key,value in known.items() if number(value)},
+            **{name:value for part in known.values() if isinstance(part,dict) for name,value in part.items() if number(value)}}
+
+
 @db.timed
 def listing():
     found=db.records('''select w.world_id as world,max(r.world_file) as world_file,count(r.run_id) as runs,max(r.run_id) as last_run
@@ -36,8 +41,9 @@ def listing():
     for row in found:
         known=names.manifest(row['world'])
         if known:
-            row.update({key:value for key,value in known.items() if number(value)},
-                       **{key+'_count':len(value) for key,value in known.items() if isinstance(value,list) and value and all(isinstance(item,dict) for item in value)})
+            values=scalars(known)
+            row.update(values,**{key+'_count':len(value) for key,value in known.items()
+                                 if key not in values and isinstance(value,list) and value and all(isinstance(item,dict) for item in value)})
     return {'rows':found}
 
 
@@ -46,7 +52,7 @@ def bank(directory):
     with LOCK:
         found=BANKS.get(directory)
         if found is None or time.monotonic()-found[0]>FRESH:
-            found=BANKS[directory]=(time.monotonic(),Bank(directory).status())
+            found=BANKS[directory]=(time.monotonic(),status(directory))
         return found[1]
 
 
@@ -59,23 +65,17 @@ def detail(world):
          'settings':{},'lists':{},'relations':[],'pacts':[],'map':None}
     if known is None:
         return out
-    states=known.get('states',[])
+    states=known['states']
     places={state['key']:state['name'] for state in states}
-    out['settings']={key:value for key,value in known.items() if not isinstance(value,(list,dict))}
+    out['settings']={**{key:value for key,value in known.items() if not isinstance(value,(list,dict))},**scalars(known)}
     out['settings'].update({key:', '.join(str(places.get(part,part)) for part in value) for key,value in known.items()
                             if isinstance(value,list) and value and not any(isinstance(part,(list,dict)) for part in value)})
     out['lists']={key:[flat(item,places) for item in value] for key,value in known.items() if isinstance(value,list) and value and all(isinstance(item,dict) for item in value)}
     out['map']={'provinces':{color:state['key'] for state in states for color in state['provinces']},
                 'owners':{state['key']:state['country'] for state in states},'names':{state['key']:state['name'] for state in states}}
-    text=db.one("select data from world_asset where world_id=%s and name='history/diplomacy.txt'",(world,))
-    if text:
-        for country,record in blocks(body(bytes(text[0]).decode('utf-8-sig'))):
-            for kind,entry in blocks(body(record)):
-                other=scalar(entry,'country')
-                if kind=='set_relations':
-                    out['relations'].append({'country':country.removeprefix('c:'),'with':other.removeprefix('c:'),'relations':int(scalar(entry,'value'))})
-                elif kind=='create_diplomatic_pact':
-                    out['pacts'].append({'country':country.removeprefix('c:'),'with':other.removeprefix('c:'),'pact':scalar(entry,'type')})
+    out['relations']=[{'country':item['country'],'with':item['with'],'relations':item['value']} for item in known['relations']]
+    out['pacts']=([{'country':item['overlord'],'with':item['subject'],'pact':item['type']} for item in known['subjects']]
+                  +[{'country':item['country'],'with':item['rival'],'pact':'requested rivalry'} for item in known['rivals']])
     return out
 
 

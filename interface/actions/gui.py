@@ -1,4 +1,5 @@
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from ..common import evidence, timed, timed_often
@@ -394,6 +395,15 @@ PROPOSAL_CAPTURE=('widget = { size = { 0 0 } state = { name = capture_message du
 
 @timed
 def windows(game_dir,mods=()):
+    mods=tuple(str(root) for root in map(Path,mods) if (root/'gui').is_dir())
+    sources=tuple((path,stat.st_mtime_ns,stat.st_size) for root in (game_dir,*map(Path,mods))
+                  for path in sorted((root/'gui').rglob('*.gui')) for stat in (path.stat(),))
+    return window_files(game_dir,mods,sources)
+
+
+@lru_cache(maxsize=4)
+@timed
+def window_files(game_dir,mods,sources):
     injected={PROPOSALS:[PROPOSAL_CAPTURE],TRANSPORT_PLANNER:[TRANSPORT_WIDGET],SHIP_PAGES:[ship_navigation()]}
     for (path,anchor),inner in action_widgets(True):
         injected.setdefault((path,anchor),[]).append(inner)

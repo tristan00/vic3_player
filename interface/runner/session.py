@@ -3,6 +3,7 @@ from contextlib import nullcontext
 from pathlib import Path
 import psutil
 from ..common import DEFAULT_DATA, DEFAULT_GAME, evidence, timed, write_json
+from ..timing import span
 from .memory import Process, Reader, kernel
 from .tail import LogTail
 
@@ -65,7 +66,8 @@ class GameInterface:
 
     def reader(self):
         if self._reader is None:
-            self._reader=Reader(self.session()['pid'],self.game_dir,self.session()['mods'])
+            session=self.session()
+            self._reader=Reader(session['pid'],self.game_dir,session['mods'])
         self._reader.check()
         return self._reader
 
@@ -89,11 +91,11 @@ class GameInterface:
     @timed
     def campaign(self,tag,world,lock=nullcontext):
         from .control import prepare
-        from ..world.buildings import loaded
-        from ..world.relationships import loaded as relationships
-        if any((p.info['name'] or '').lower()=='victoria3.exe' for p in psutil.process_iter(['name'])):
-            raise RuntimeError(evidence(running=[p.pid for p in psutil.process_iter(['name']) if (p.info['name'] or '').lower()=='victoria3.exe']))
-        manifest=json.loads(Path(world).read_text(encoding='utf-8')) if world else None
+        from miniworld.bank import manifest as load_world
+        running=[p.pid for p in psutil.process_iter(['name']) if (p.info['name'] or '').lower()=='victoria3.exe']
+        if running:
+            raise RuntimeError(evidence(running=running))
+        manifest=world if isinstance(world,dict) else load_world(world) if world else None
         mods=([manifest['mod']] if manifest else [])+[str(prepare(self,tag,manifest))]
         settings=self.profile/'pdx_settings.json'
         configured=json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
@@ -108,7 +110,7 @@ class GameInterface:
             write_json(self.session_file,dict(pid=process.pid,created=process.create_time(),started=started,mods=mods))
         self.tail=LogTail(self.profile/'logs',self.profile/'debug_store.log',time.strftime('%H:%M:%S',time.localtime(started)))
         deadline=time.monotonic()+20
-        while manifest and len(manifest['states'])<360:
+        while manifest:
             try:
                 patch_harvest(process.pid)
                 break
@@ -116,17 +118,14 @@ class GameInterface:
                 if time.monotonic()>deadline: raise
                 time.sleep(.05)
         token=json.loads((self.data_dir/'control'/self.profile.name/'session.json').read_text())['startup_token']
-        deadline=time.monotonic()+180
-        while 'INTERFACE|end|'+token not in self.log_since(0):
-            if not process.is_running() or time.monotonic()>deadline:
-                raise RuntimeError(evidence(running=process.is_running(),token=token))
-            time.sleep(.1)
+        with span('interface.runner.session.GameInterface.loading','interface'):
+            deadline=time.monotonic()+180
+            while 'INTERFACE|end|'+token not in self.log_since(0):
+                if not process.is_running() or time.monotonic()>deadline:
+                    raise RuntimeError(evidence(running=process.is_running(),token=token))
+                time.sleep(.05)
         reader=self.reader()
         countries,_=reader.table('country')
         code=countries['country_definition'][countries['id'].tolist().index(reader.player())]
         if reader.names[int(code)-1][1]!=tag:
             raise RuntimeError(evidence(loaded=reader.names[int(code)-1][1],tag=tag))
-        for name,check,errors in (('opening_buildings',loaded,'differences'),('opening_relationships',relationships,'errors')):
-            report=check(reader,manifest)
-            write_json(Path(world).parent/(name+'.json'),report)
-            if report[errors]: raise RuntimeError(evidence(name=name,errors=report[errors]))

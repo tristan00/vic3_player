@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useApi } from './api'
 import { Legend } from './charts'
-import { colors, heading, num, time } from './format'
+import { colors, heading, num } from './format'
 import { Facts, Grid, Panel, Waiting, columnsOf } from './Grid'
 import { runColumns } from './Runs'
 
@@ -70,7 +70,7 @@ export function Worlds() {
         {() =>
           bank.data.banks.map((found: any) => (
             <Panel key={found.directory} title="World bank" extra={found.directory}>
-              <Facts items={[['worlds', num(found.worlds)], ...found.outputs.flatMap((output: any, index: number) => Object.entries(output.status ?? {}).filter(([name]) => name !== 'pid' && name !== 'created').map(([name, value]) => [`output ${index + 1} ${name}`, typeof value === 'number' && value > 1e9 && value < 1e11 ? time(value) : typeof value === 'number' ? num(value) : String(value)] as [string, string]))]} />
+              <Facts items={[['worlds', num(found.worlds)], ['seed', String(found.seed)], ['created', found.created], ['build seconds', num(found.seconds)], ['workers', num(found.workers)], ...Object.entries(found.knobs).map(([name, range]: [string, any]) => [`${name} min / median / max`, `${num(range.min)} / ${num(range.median)} / ${num(range.max)}`] as [string, string])]} />
             </Panel>
           ))
         }
@@ -133,7 +133,7 @@ export function World() {
                   <Grid rows={found.pacts} search={false} page={20} columns={[{ name: 'country' }, { name: 'with' }, { name: 'pact', kind: 'name' }]} />
                 </Panel>
               </div>
-              {['countries', 'starting_war', 'power_blocs', 'states']
+              {['countries', 'blocs', 'states']
                 .filter((name) => found.lists[name])
                 .map((name) => (
                   <Panel key={name} title={heading(name)}>

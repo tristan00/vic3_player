@@ -34,18 +34,15 @@ def identity(files,manifest=b''):
 
 @timed
 def mini_world(path):
+    from miniworld.bank import manifest as load_world
     path=Path(path)
     raw=path.read_bytes()
-    manifest=json.loads(raw)
-    files=assets(Path(manifest['mod'])/'map_data')
+    manifest=load_world(path)
+    mod=Path(manifest['mod'])
+    archived=assets(mod)
+    files={name.removeprefix('map_data/'):data for name,data in archived.items() if name.startswith('map_data/')}
     regions={normal(color):state['key'] for state in manifest['states'] for color in state['provinces']}
-    archived={**files,'manifest.json':raw}
-    for history in sorted((Path(manifest['mod'])/'common/history').glob('*/interface.txt')):
-        archived[f'history/{history.parent.name}.txt']=history.read_bytes()
-    for name in ('audit.json','opening_buildings.json','opening_relationships.json'):
-        report=path.parent/name
-        if report.exists():
-            archived[name]=report.read_bytes()
+    archived={**files,**{name:data for name,data in archived.items() if not name.startswith('map_data/')},'manifest.json':raw}
     return identity(files,raw),files,regions,archived
 
 
