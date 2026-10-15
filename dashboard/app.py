@@ -15,7 +15,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import FileResponse, Response
 
 from interface.common import evidence
-from . import actions, buildings, coherence, db, names, runs, tables, tuning, worlds
+from . import actions, buildings, db, names, runs, tables, tuning, worlds
 
 LOG=logging.getLogger('dashboard')
 DIST=Folder(__file__).resolve().parent/'ui'/'dist'
@@ -184,12 +184,6 @@ def run_selection(run:RUN):
 @db.often
 def run_timing(run:RUN):
     return db.reply(runs.timing(run))
-
-
-@app.get('/api/runs/{run}/coherence')
-@db.often
-def run_coherence(run:RUN):
-    return found(coherence.report(run),f'run {run} coherence')
 
 
 @app.get('/api/runs/{run}/candidates/{seq}')

@@ -56,7 +56,7 @@ def generated(directory):
     rng=np.random.default_rng(SEED)
     rows=[]
     for index in range(WORLDS):
-        knobs={**bank.draw(rng,bank.RANGES),'diplomacy':0.,'ideology':0.}
+        knobs={**bank.draw(rng),'diplomacy':0.,'ideology':0.}
         knobs['countries']=max(knobs['countries'],min(MINIMUM,knobs['states']))
         out=directory/f'world_{index}'
         made=build.build(models,out,int(rng.integers(2**31)),knobs)

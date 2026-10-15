@@ -14,7 +14,6 @@ from interface.common import evidence, write_json
 from . import timed, timed_often
 
 INDEX='bank.json'
-GEOGRAPHY='geography.json'
 RANGES={'countries':(1,20),'size':(1.2,10.),'concentration':(.1,10.),'landmasses':(1,4),'climate':(.1,.9),'relief':(.3,2.),'density':(.4,2.5),'diversity':(0.,2.5),'diplomacy':(0.,1.),'ideology':(0.,1.)}
 LIMIT=160
 KNOBS=('concentration','landmasses','climate','relief','density','diversity','diplomacy','ideology')
@@ -22,16 +21,16 @@ MODELS=None
 
 
 @timed
-def draw(rng,ranges):
-    countries=int(rng.integers(ranges['countries'][0],ranges['countries'][1]+1))
-    size=float(np.exp(rng.uniform(*np.log(ranges['size']))))
+def draw(rng):
+    countries=int(rng.integers(RANGES['countries'][0],RANGES['countries'][1]+1))
+    size=float(np.exp(rng.uniform(*np.log(RANGES['size']))))
     states=int(min(LIMIT,max(countries,round(countries*size))))
     return {'states':states,'countries':countries,'size':size,
-            'concentration':float(np.exp(rng.uniform(*np.log(ranges['concentration'])))),
-            'landmasses':int(min(states,rng.integers(ranges['landmasses'][0],ranges['landmasses'][1]+1))),
-            'climate':float(rng.uniform(*ranges['climate'])),'relief':float(rng.uniform(*ranges['relief'])),
-            'density':float(np.exp(rng.uniform(*np.log(ranges['density'])))),'diversity':float(rng.uniform(*ranges['diversity'])),
-            'diplomacy':float(rng.uniform(*ranges['diplomacy'])),'ideology':float(rng.uniform(*ranges['ideology']))}
+            'concentration':float(np.exp(rng.uniform(*np.log(RANGES['concentration'])))),
+            'landmasses':int(min(states,rng.integers(RANGES['landmasses'][0],RANGES['landmasses'][1]+1))),
+            'climate':float(rng.uniform(*RANGES['climate'])),'relief':float(rng.uniform(*RANGES['relief'])),
+            'density':float(np.exp(rng.uniform(*np.log(RANGES['density'])))),'diversity':float(rng.uniform(*RANGES['diversity'])),
+            'diplomacy':float(rng.uniform(*RANGES['diplomacy'])),'ideology':float(rng.uniform(*RANGES['ideology']))}
 
 
 @timed
@@ -44,23 +43,20 @@ def ready(models):
 @timed
 def one(directory,name,seed,knobs):
     from .build import build
-    from .coherence import geography
     started=time.monotonic()
-    out=Path(directory)/'worlds'/name
-    build(MODELS,out,seed,knobs)
-    write_json(out/GEOGRAPHY,geography(str(out)))
+    build(MODELS,Path(directory)/'worlds'/name,seed,knobs)
     return {'name':name,'seed':seed,'knobs':knobs,'manifest':f'worlds/{name}/manifest.json','seconds':round(time.monotonic()-started,2)}
 
 
 @timed
-def create(directory,count,seed,workers,ranges):
+def create(directory,count,seed,workers):
     from .build import prepare
     if count<1 or workers<1: raise ValueError(evidence(count=count,workers=workers))
     directory=Path(directory).resolve()
     directory.mkdir(parents=True,exist_ok=False)
     workers=min(workers,count)
     rng=np.random.default_rng(seed)
-    jobs=[(f'world_{index:04d}',int(rng.integers(2**31)),draw(rng,ranges)) for index in range(count)]
+    jobs=[(f'world_{index:04d}',int(rng.integers(2**31)),draw(rng)) for index in range(count)]
     jobs.sort(key=lambda job:(-job[2]['states'],job[0]))
     started=time.monotonic()
     models=prepare()
@@ -73,7 +69,7 @@ def create(directory,count,seed,workers,ranges):
     worlds.sort(key=lambda world:world['name'])
     pending=directory/(INDEX+'.tmp')
     write_json(pending,{'seed':seed,'count':count,'workers':workers,'created':datetime.now(timezone.utc).isoformat(),
-                                'seconds':round(time.monotonic()-started,1),'ranges':ranges,'worlds':worlds})
+                                'seconds':round(time.monotonic()-started,1),'ranges':RANGES,'worlds':worlds})
     pending.replace(directory/INDEX)
     return directory/INDEX
 
@@ -100,7 +96,7 @@ def catalogue(revisions):
     for path,modified,size in revisions:
         for world in index(path,modified,size)['worlds']:
             target=(path.parent/world['manifest']).resolve()
-            if not target.is_relative_to(path.parent) or not target.is_file() or not (target.parent/GEOGRAPHY).is_file(): raise ValueError(evidence(manifest=target,bank=path,geography=(target.parent/GEOGRAPHY).is_file()))
+            if not target.is_relative_to(path.parent) or not target.is_file(): raise ValueError(evidence(manifest=target,bank=path))
             found.append(target)
     if not found: raise ValueError(evidence(banks=revisions))
     return tuple(found)
@@ -149,13 +145,9 @@ def main():
     parser.add_argument('--count',type=int,required=True)
     parser.add_argument('--seed',type=int,required=True)
     parser.add_argument('--workers',type=int,default=min(8,os.cpu_count() or 1))
-    parser.add_argument('--range',nargs=3,action='append',default=[],metavar=('KNOB','LOW','HIGH'))
     args=parser.parse_args()
-    unknown=sorted({name for name,*_ in args.range}-RANGES.keys())
-    if unknown: parser.error(evidence(unknown=unknown,knobs=sorted(RANGES)))
-    ranges={**RANGES,**{name:tuple(type(bound)(value) for bound,value in zip(RANGES[name],(low,high))) for name,low,high in args.range}}
     logging.basicConfig(level=logging.INFO,format='%(asctime)s %(process)d %(message)s')
-    print(create(args.directory,args.count,args.seed,args.workers,ranges))
+    print(create(args.directory,args.count,args.seed,args.workers))
 
 
 if __name__=='__main__':
